@@ -14,13 +14,12 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('email')->unique();
-            $table->string('password')->nullable();
+            $table->string('password');
             $table->string('role')->default('user');
             $table->string('passkey', 32)->nullable()->unique();
-            $table->unsignedBigInteger('uploaded')->default(0);
-            $table->unsignedBigInteger('downloaded')->default(0);
-            $table->unsignedBigInteger('seedtime')->default(0);
-            $table->boolean('enabled')->default(true);
+            $table->bigInteger('uploaded')->default(0);
+            $table->bigInteger('downloaded')->default(0);
+            $table->bigInteger('seedtime')->default(0);
         });
     }
 

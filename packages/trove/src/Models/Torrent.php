@@ -54,6 +54,14 @@ class Torrent extends Model
     }
 
     /**
+     * Check if the torrent has a stored file.
+     */
+    public function hasTorrentFile(): bool
+    {
+        return ! empty($this->torrent_file);
+    }
+
+    /**
      * Create a new factory instance for the model.
      */
     protected static function newFactory(): \Illuminate\Database\Eloquent\Factories\Factory

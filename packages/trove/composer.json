@@ -20,9 +20,19 @@
         "illuminate/database": "^12.0",
         "illuminate/events": "^12.0"
     },
+    "require-dev": {
+        "orchestra/testbench": "^10.0",
+        "pestphp/pest": "^4.0",
+        "mockery/mockery": "^1.6"
+    },
     "autoload": {
         "psr-4": {
             "Marque\\Trove\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Marque\\Trove\\Tests\\": "tests/"
         }
     },
     "extra": {
@@ -32,6 +42,14 @@
             ]
         }
     },
+    "scripts": {
+        "test": "pest"
+    },
     "minimum-stability": "stable",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    }
 }

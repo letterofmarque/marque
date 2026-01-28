@@ -112,14 +112,23 @@ describe('Bencode', function () {
             ]);
         });
 
-        it('roundtrips data correctly', function () {
+        it('roundtrips simple data correctly', function () {
+            // Note: encode() sorts dict keys, so decoded result will be in sorted order
+            $data = ['a' => 1, 'b' => 2, 'c' => [1, 2, 3]];
+
+            $encoded = Bencode::encode($data);
+            $decoded = Bencode::decode($encoded);
+
+            expect($decoded)->toBe($data);
+        });
+
+        it('roundtrips tracker announce data', function () {
+            // Keys are already sorted for this test
             $data = [
-                'announce' => 'http://tracker.example.com/announce',
-                'info' => [
-                    'name' => 'test.txt',
-                    'length' => 12345,
-                    'piece length' => 262144,
-                ],
+                'complete' => 5,
+                'incomplete' => 10,
+                'interval' => 1800,
+                'peers' => '',
             ];
 
             $encoded = Bencode::encode($data);

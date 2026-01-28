@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Marque\Bloodhound\Tests;
+namespace Marque\Cennad\Tests;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Marque\Bloodhound\BloodhoundServiceProvider;
+use Marque\Cennad\CennadServiceProvider;
 use Marque\Trove\TroveServiceProvider;
 use Orchestra\Testbench\TestCase as BaseTestCase;
 
@@ -17,7 +17,7 @@ abstract class TestCase extends BaseTestCase
     {
         return [
             TroveServiceProvider::class,
-            BloodhoundServiceProvider::class,
+            CennadServiceProvider::class,
         ];
     }
 
@@ -32,19 +32,18 @@ abstract class TestCase extends BaseTestCase
             'prefix' => '',
         ]);
 
-        $app['config']->set('bloodhound.redis.connection', 'default');
-        $app['config']->set('bloodhound.redis.prefix', 'bloodhound_test:');
-        $app['config']->set('bloodhound.announce_interval', 1800);
-        $app['config']->set('bloodhound.min_announce_interval', 300);
-        $app['config']->set('bloodhound.peer_expiry', 3600);
-        $app['config']->set('bloodhound.queue.enabled', false);
-
         $app['config']->set('trove.user_model', TestUser::class);
+        $app['config']->set('cennad.middleware', ['api', 'auth']);
+        $app['config']->set('auth.defaults.guard', 'web');
+        $app['config']->set('auth.guards.web.driver', 'session');
+        $app['config']->set('auth.guards.web.provider', 'users');
+        $app['config']->set('auth.providers.users.driver', 'eloquent');
+        $app['config']->set('auth.providers.users.model', TestUser::class);
     }
 
     protected function defineDatabaseMigrations(): void
     {
-        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+        $this->loadMigrationsFrom(__DIR__.'/../../trove/database/migrations');
         $this->loadMigrationsFrom(__DIR__.'/migrations');
     }
 }

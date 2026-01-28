@@ -2,10 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Marque\Bloodhound\Tests;
+namespace Marque\Guise\Tests;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Marque\Bloodhound\BloodhoundServiceProvider;
+use Livewire\LivewireServiceProvider;
+use Marque\Guise\GuiseServiceProvider;
 use Marque\Trove\TroveServiceProvider;
 use Orchestra\Testbench\TestCase as BaseTestCase;
 
@@ -16,8 +17,9 @@ abstract class TestCase extends BaseTestCase
     protected function getPackageProviders($app): array
     {
         return [
+            LivewireServiceProvider::class,
             TroveServiceProvider::class,
-            BloodhoundServiceProvider::class,
+            GuiseServiceProvider::class,
         ];
     }
 
@@ -32,19 +34,30 @@ abstract class TestCase extends BaseTestCase
             'prefix' => '',
         ]);
 
-        $app['config']->set('bloodhound.redis.connection', 'default');
-        $app['config']->set('bloodhound.redis.prefix', 'bloodhound_test:');
-        $app['config']->set('bloodhound.announce_interval', 1800);
-        $app['config']->set('bloodhound.min_announce_interval', 300);
-        $app['config']->set('bloodhound.peer_expiry', 3600);
-        $app['config']->set('bloodhound.queue.enabled', false);
-
         $app['config']->set('trove.user_model', TestUser::class);
+        $app['config']->set('guise.layout', 'guise-test::layouts.app');
+        $app['config']->set('guise.middleware', ['web', 'auth']);
+        $app['config']->set('auth.providers.users.model', TestUser::class);
+
+        // Register test views namespace
+        $app['view']->addNamespace('guise-test', __DIR__.'/views');
     }
 
     protected function defineDatabaseMigrations(): void
     {
-        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+        $this->loadMigrationsFrom(__DIR__.'/../../trove/database/migrations');
         $this->loadMigrationsFrom(__DIR__.'/migrations');
+    }
+
+    protected function getPackageAliases($app): array
+    {
+        return [
+            'Livewire' => \Livewire\Livewire::class,
+        ];
+    }
+
+    protected function defineRoutes($router): void
+    {
+        $router->get('login', fn () => 'login')->name('login');
     }
 }
