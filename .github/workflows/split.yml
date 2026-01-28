@@ -1,0 +1,40 @@
+name: Split Monorepo
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - '*'
+
+jobs:
+  split:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - local_path: 'packages/trove'
+            repo_name: 'trove'
+          - local_path: 'packages/bloodhound'
+            repo_name: 'bloodhound'
+          - local_path: 'packages/cennad'
+            repo_name: 'cennad'
+          - local_path: 'packages/guise'
+            repo_name: 'guise'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Split ${{ matrix.package.local_path }}
+        uses: symplify/monorepo-split-github-action@v2.3.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.SPLIT_TOKEN }}
+        with:
+          package_directory: ${{ matrix.package.local_path }}
+          repository_organization: 'letterofmarque'
+          repository_name: ${{ matrix.package.repo_name }}
+          user_name: 'LOM Software'
+          user_email: 'dan@lom.software'
