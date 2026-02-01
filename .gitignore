@@ -14,3 +14,10 @@ yarn-error.log
 *.swo
 .DS_Store
 composer.lock
+
+# Claude operational files (local only)
+CLAUDE.md
+.claude/
+docs/role.md
+docs/product.md
+docs/directives.md
