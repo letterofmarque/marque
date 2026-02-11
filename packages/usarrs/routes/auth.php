@@ -1,0 +1,46 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Support\Facades\Route;
+use Marque\Usarrs\Http\Controllers\LogoutController;
+use Marque\Usarrs\Http\Controllers\MagicLinkController;
+use Marque\Usarrs\Http\Controllers\PasswordResetController;
+use Marque\Usarrs\Http\Controllers\SocialiteController;
+use Marque\Usarrs\Livewire\Auth\Login;
+use Marque\Usarrs\Livewire\Auth\Register;
+
+/*
+|--------------------------------------------------------------------------
+| Auth Routes
+|--------------------------------------------------------------------------
+*/
+
+// Guest routes
+Route::middleware(config('usarrs.middleware', ['web']))
+    ->prefix(config('usarrs.prefix', ''))
+    ->group(function () {
+        Route::get('login', Login::class)->name('login');
+        Route::get('register', Register::class)->name('register');
+
+        // Password reset
+        Route::get('forgot-password', [PasswordResetController::class, 'showForgotForm'])->name('password.request');
+        Route::post('forgot-password', [PasswordResetController::class, 'sendResetLink'])->name('password.email');
+        Route::get('reset-password/{token}', [PasswordResetController::class, 'showResetForm'])->name('password.reset');
+        Route::post('reset-password', [PasswordResetController::class, 'reset'])->name('password.update');
+
+        // Magic link
+        Route::get('auth/magic-link/sent', [MagicLinkController::class, 'showSentPage'])->name('magic-link.sent');
+        Route::get('auth/magic-link/verify', [MagicLinkController::class, 'verify'])->name('magic-link.verify');
+
+        // Socialite
+        Route::get('auth/{provider}/redirect', [SocialiteController::class, 'redirect'])->name('socialite.redirect');
+        Route::get('auth/{provider}/callback', [SocialiteController::class, 'callback'])->name('socialite.callback');
+    });
+
+// Logout (requires auth)
+Route::middleware(config('usarrs.auth_middleware', ['web', 'auth']))
+    ->prefix(config('usarrs.prefix', ''))
+    ->group(function () {
+        Route::post('logout', LogoutController::class)->name('logout');
+    });

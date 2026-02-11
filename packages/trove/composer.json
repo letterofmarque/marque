@@ -14,8 +14,18 @@
         "issues": "https://github.com/letterofmarque/marque/issues",
         "source": "https://github.com/letterofmarque/marque"
     },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../threepio",
+            "options": {
+                "symlink": true
+            }
+        }
+    ],
     "require": {
         "php": "^8.2",
+        "marque/threepio": "@dev",
         "illuminate/support": "^12.0",
         "illuminate/database": "^12.0",
         "illuminate/events": "^12.0"

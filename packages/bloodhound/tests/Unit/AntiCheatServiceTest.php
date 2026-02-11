@@ -3,12 +3,11 @@
 declare(strict_types=1);
 
 use Marque\Bloodhound\Services\AntiCheatService;
-use Marque\Bloodhound\Services\PeerService;
 
 beforeEach(function () {
     config()->set('bloodhound.anti_cheat.enabled', true);
-    config()->set('bloodhound.redis.prefix', 'bloodhound_test:');
-    config()->set('bloodhound.blacklisted_ports', []);
+    config()->set('threepio.redis.prefix', 'marque_test:');
+    config()->set('threepio.blacklisted_ports', []);
 });
 
 describe('AntiCheatService', function () {
@@ -24,7 +23,7 @@ describe('AntiCheatService', function () {
         });
 
         it('rejects blacklisted ports', function () {
-            config()->set('bloodhound.blacklisted_ports', [6881, 6882, 6883]);
+            config()->set('threepio.blacklisted_ports', [6881, 6882, 6883]);
 
             $service = $this->app->make(AntiCheatService::class);
 

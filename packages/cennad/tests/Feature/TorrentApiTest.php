@@ -10,15 +10,13 @@ beforeEach(function () {
 });
 
 describe('GET /api/torrents', function () {
-    test('requires authentication', function () {
+    test('is publicly accessible', function () {
         $this->getJson('/api/torrents')
-            ->assertUnauthorized();
+            ->assertOk();
     });
 
     test('returns paginated torrents', function () {
         Torrent::factory()->count(3)->create();
-
-        $this->actingAs($this->user);
 
         $this->getJson('/api/torrents')
             ->assertOk()
@@ -49,8 +47,6 @@ describe('GET /api/torrents', function () {
         Torrent::factory()->create(['name' => 'Finding Nemo']);
         Torrent::factory()->create(['name' => 'Other Movie']);
 
-        $this->actingAs($this->user);
-
         $this->getJson('/api/torrents?search=Nemo')
             ->assertOk()
             ->assertJsonCount(1, 'data')
@@ -60,8 +56,6 @@ describe('GET /api/torrents', function () {
     test('can set per_page', function () {
         Torrent::factory()->count(10)->create();
 
-        $this->actingAs($this->user);
-
         $this->getJson('/api/torrents?per_page=5')
             ->assertOk()
             ->assertJsonCount(5, 'data')
@@ -70,11 +64,11 @@ describe('GET /api/torrents', function () {
 });
 
 describe('GET /api/torrents/{torrent}', function () {
-    test('requires authentication', function () {
+    test('is publicly accessible', function () {
         $torrent = Torrent::factory()->create();
 
         $this->getJson("/api/torrents/{$torrent->id}")
-            ->assertUnauthorized();
+            ->assertOk();
     });
 
     test('returns torrent details', function () {
@@ -82,8 +76,6 @@ describe('GET /api/torrents/{torrent}', function () {
             'name' => 'Test Torrent',
             'description' => 'Test description',
         ]);
-
-        $this->actingAs($this->user);
 
         $this->getJson("/api/torrents/{$torrent->id}")
             ->assertOk()
@@ -108,10 +100,33 @@ describe('GET /api/torrents/{torrent}', function () {
     });
 
     test('returns 404 for non-existent torrent', function () {
-        $this->actingAs($this->user);
-
         $this->getJson('/api/torrents/99999')
             ->assertNotFound();
+    });
+});
+
+describe('POST /api/torrents', function () {
+    test('requires authentication', function () {
+        $this->postJson('/api/torrents')
+            ->assertUnauthorized();
+    });
+
+    test('regular user cannot upload', function () {
+        $this->actingAs($this->user);
+
+        $this->postJson('/api/torrents', [
+            'name' => 'Test',
+        ])->assertForbidden();
+    });
+
+    test('requires torrent file and name', function () {
+        $uploader = TestUser::factory()->uploader()->create();
+
+        $this->actingAs($uploader);
+
+        $this->postJson('/api/torrents', [])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['torrent_file', 'name']);
     });
 });
 

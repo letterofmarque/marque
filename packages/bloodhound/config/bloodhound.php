@@ -5,35 +5,34 @@ declare(strict_types=1);
 return [
     /*
     |--------------------------------------------------------------------------
-    | Bloodhound Tracker Configuration
+    | Bloodhound Private Tracker Configuration
     |--------------------------------------------------------------------------
     |
-    | Configuration for the BitTorrent tracker (announce/scrape).
+    | Settings specific to the private tracker. Shared protocol settings
+    | (announce intervals, peer storage, ports) live in threepio config.
     |
     */
-
-    // Announce interval in seconds (default 30 minutes)
-    'announce_interval' => env('BLOODHOUND_ANNOUNCE_INTERVAL', 1800),
-
-    // Minimum announce interval in seconds (default 5 minutes)
-    'min_announce_interval' => env('BLOODHOUND_MIN_ANNOUNCE_INTERVAL', 300),
-
-    // Maximum peers to return in announce response
-    'max_peers_per_announce' => env('BLOODHOUND_MAX_PEERS', 50),
-
-    // Peer expiry time in seconds (default 1 hour - peers not announcing are removed)
-    'peer_expiry' => env('BLOODHOUND_PEER_EXPIRY', 3600),
 
     /*
     |--------------------------------------------------------------------------
-    | Redis Configuration
+    | Ratio Tracking
     |--------------------------------------------------------------------------
+    |
+    | Controls how user ratios are tracked.
+    |
+    | 'full' - Track upload/download bytes, enforce ratio requirements
+    | 'off' - No tracking at all
+    | 'seedtime' - Track seeding time instead (ratioless)
+    |
     */
 
-    'redis' => [
-        'connection' => env('BLOODHOUND_REDIS_CONNECTION', 'default'),
-        'prefix' => env('BLOODHOUND_REDIS_PREFIX', 'bloodhound:'),
-    ],
+    'ratio_mode' => env('BLOODHOUND_RATIO_MODE', 'full'),
+
+    // Minimum ratio required (only applies when ratio_mode = 'full')
+    'min_ratio' => env('BLOODHOUND_MIN_RATIO', 0.5),
+
+    // Minimum seed time in seconds (only applies when ratio_mode = 'seedtime')
+    'min_seedtime' => env('BLOODHOUND_MIN_SEEDTIME', 86400), // 24 hours
 
     /*
     |--------------------------------------------------------------------------
@@ -168,20 +167,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Peer Response Format
-    |--------------------------------------------------------------------------
-    |
-    | Controls the format of peer lists returned to clients.
-    | 'auto' - detect from client request (compact if supported)
-    | 'compact' - always use compact format (6 bytes per peer)
-    | 'dictionary' - always use dictionary format (for older clients)
-    |
-    */
-
-    'peer_response_format' => env('BLOODHOUND_PEER_FORMAT', 'auto'),
-
-    /*
-    |--------------------------------------------------------------------------
     | Stats Queue
     |--------------------------------------------------------------------------
     |
@@ -193,26 +178,6 @@ return [
         'enabled' => env('BLOODHOUND_QUEUE_STATS', true),
         'connection' => env('BLOODHOUND_QUEUE_CONNECTION', null), // null = default
         'queue' => env('BLOODHOUND_QUEUE_NAME', 'tracker'),
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Port Blacklist
-    |--------------------------------------------------------------------------
-    |
-    | Ports that are commonly used by other P2P software and should be blocked.
-    |
-    */
-
-    'blacklisted_ports' => [
-        411, 412, 413,      // Direct Connect
-        1214,               // Kazaa
-        4662,               // eMule
-        6346, 6347,         // Gnutella
-        6699,               // WinMX
-        6881, 6882, 6883,   // Old BitTorrent default range (often blocked by ISPs)
-        6884, 6885, 6886,
-        6887, 6888, 6889,
     ],
 
     /*

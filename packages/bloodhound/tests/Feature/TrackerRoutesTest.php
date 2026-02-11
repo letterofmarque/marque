@@ -2,14 +2,15 @@
 
 declare(strict_types=1);
 
-use Marque\Bloodhound\Support\Bencode;
 use Marque\Bloodhound\Tests\TestUser;
+use Marque\Threepio\Http\Middleware\BlockBrowsers;
+use Marque\Threepio\Support\Bencode;
 use Marque\Trove\Models\Torrent;
 
 // Helper to make tracker requests (without browser headers that would be blocked)
 function trackerGet($test, string $url): \Illuminate\Testing\TestResponse
 {
-    return $test->withoutMiddleware(\Marque\Bloodhound\Http\Middleware\BlockBrowsers::class)
+    return $test->withoutMiddleware(BlockBrowsers::class)
         ->withHeaders(['User-Agent' => 'qBittorrent/4.5.0'])
         ->get($url);
 }

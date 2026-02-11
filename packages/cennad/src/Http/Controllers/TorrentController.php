@@ -12,6 +12,7 @@ use Marque\Cennad\Http\Resources\TorrentCollection;
 use Marque\Cennad\Http\Resources\TorrentResource;
 use Marque\Trove\Models\Torrent;
 use Marque\Trove\Services\TorrentService;
+use Symfony\Component\HttpFoundation\Response;
 
 class TorrentController extends Controller
 {
@@ -32,6 +33,31 @@ class TorrentController extends Controller
         );
 
         return new TorrentCollection($torrents);
+    }
+
+    /**
+     * Store a newly created torrent.
+     */
+    public function store(Request $request): JsonResponse
+    {
+        $this->authorize('create', Torrent::class);
+
+        $validated = $request->validate([
+            'torrent_file' => 'required|file|max:2048',
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string|max:10000',
+        ]);
+
+        $torrent = $this->service->createFromUpload(
+            file: $request->file('torrent_file'),
+            user: $request->user(),
+            name: $validated['name'],
+            description: $validated['description'] ?? null,
+        );
+
+        return (new TorrentResource($torrent->load('user')))
+            ->response()
+            ->setStatusCode(Response::HTTP_CREATED);
     }
 
     /**

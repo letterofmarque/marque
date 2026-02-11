@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace Marque\Bloodhound\Services;
 
 use Illuminate\Http\Response;
-use Marque\Bloodhound\Enums\AnnounceEvent;
 use Marque\Bloodhound\Events\TorrentCompleted;
 use Marque\Bloodhound\Jobs\UpdateUserStats;
-use Marque\Bloodhound\Support\TrackerResponse;
+use Marque\Threepio\Enums\AnnounceEvent;
+use Marque\Threepio\Services\PeerService;
+use Marque\Threepio\Support\TrackerResponse;
 use Marque\Trove\Contracts\UserInterface;
 use Marque\Trove\Models\Torrent;
 
@@ -96,8 +97,8 @@ final class AnnounceService
             peers: [],
             complete: $this->peerService->getSeeders($torrent->id),
             incomplete: $this->peerService->getLeechers($torrent->id),
-            interval: (int) config('bloodhound.announce_interval', 1800),
-            minInterval: (int) config('bloodhound.min_announce_interval', 300),
+            interval: (int) config('threepio.announce_interval', 1800),
+            minInterval: (int) config('threepio.min_announce_interval', 300),
             compact: true,
         );
     }
@@ -183,7 +184,7 @@ final class AnnounceService
         }
 
         // Get peers for response
-        $maxPeers = min($numWant, (int) config('bloodhound.max_peers_per_announce', 50));
+        $maxPeers = min($numWant, (int) config('threepio.max_peers_per_announce', 50));
         $peers = $this->peerService->getPeersForAnnounce(
             torrentId: $torrent->id,
             excludePeerId: $peerId,
@@ -198,8 +199,8 @@ final class AnnounceService
             peers: $peers,
             complete: $this->peerService->getSeeders($torrent->id),
             incomplete: $this->peerService->getLeechers($torrent->id),
-            interval: (int) config('bloodhound.announce_interval', 1800),
-            minInterval: (int) config('bloodhound.min_announce_interval', 300),
+            interval: (int) config('threepio.announce_interval', 1800),
+            minInterval: (int) config('threepio.min_announce_interval', 300),
             compact: $useCompact,
         );
     }
@@ -224,7 +225,7 @@ final class AnnounceService
      */
     private function shouldUseCompact(bool $clientSupportsCompact): bool
     {
-        $format = config('bloodhound.peer_response_format', 'auto');
+        $format = config('threepio.peer_response_format', 'auto');
 
         return match ($format) {
             'compact' => true,

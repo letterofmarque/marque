@@ -15,18 +15,28 @@ use Marque\Cennad\Http\Controllers\TorrentController;
 */
 
 $prefix = config('cennad.prefix', 'api');
-$middleware = config('cennad.middleware', ['api', 'auth:api']);
+$publicMiddleware = config('cennad.public_middleware', ['api']);
+$protectedMiddleware = config('cennad.protected_middleware', ['api', 'auth:api']);
 $routePrefix = config('cennad.route_names.prefix', 'cennad');
 
+// Public routes - no auth required
 Route::prefix($prefix)
-    ->middleware($middleware)
+    ->middleware($publicMiddleware)
     ->group(function () use ($routePrefix) {
-        Route::apiResource('torrents', TorrentController::class)
-            ->only(['index', 'show', 'update', 'destroy'])
-            ->names([
-                'index' => "{$routePrefix}.torrents.index",
-                'show' => "{$routePrefix}.torrents.show",
-                'update' => "{$routePrefix}.torrents.update",
-                'destroy' => "{$routePrefix}.torrents.destroy",
-            ]);
+        Route::get('torrents', [TorrentController::class, 'index'])
+            ->name("{$routePrefix}.torrents.index");
+        Route::get('torrents/{torrent}', [TorrentController::class, 'show'])
+            ->name("{$routePrefix}.torrents.show");
+    });
+
+// Protected routes - auth required
+Route::prefix($prefix)
+    ->middleware($protectedMiddleware)
+    ->group(function () use ($routePrefix) {
+        Route::post('torrents', [TorrentController::class, 'store'])
+            ->name("{$routePrefix}.torrents.store");
+        Route::put('torrents/{torrent}', [TorrentController::class, 'update'])
+            ->name("{$routePrefix}.torrents.update");
+        Route::delete('torrents/{torrent}', [TorrentController::class, 'destroy'])
+            ->name("{$routePrefix}.torrents.destroy");
     });

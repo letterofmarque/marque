@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
 use Marque\Bloodhound\Services\AnnounceService;
-use Marque\Bloodhound\Support\TrackerResponse;
+use Marque\Threepio\Support\TrackerResponse;
 use Marque\Trove\Contracts\UserInterface;
 use Marque\Trove\Models\Torrent;
 

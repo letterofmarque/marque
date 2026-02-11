@@ -32,24 +32,4 @@ return [
     |
     */
     'storage_disk' => env('TROVE_STORAGE_DISK', 'local'),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Ratio Tracking
-    |--------------------------------------------------------------------------
-    |
-    | Controls how user ratios are tracked.
-    |
-    | 'full' - Track upload/download bytes, enforce ratio requirements
-    | 'off' - No tracking at all
-    | 'seedtime' - Track seeding time instead (ratioless)
-    |
-    */
-    'ratio_mode' => env('TROVE_RATIO_MODE', 'full'),
-
-    // Minimum ratio required (only applies when ratio_mode = 'full')
-    'min_ratio' => env('TROVE_MIN_RATIO', 0.5),
-
-    // Minimum seed time in seconds (only applies when ratio_mode = 'seedtime')
-    'min_seedtime' => env('TROVE_MIN_SEEDTIME', 86400), // 24 hours
 ];

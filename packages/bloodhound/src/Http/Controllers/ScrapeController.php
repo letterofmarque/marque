@@ -7,8 +7,8 @@ namespace Marque\Bloodhound\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
-use Marque\Bloodhound\Services\PeerService;
-use Marque\Bloodhound\Support\TrackerResponse;
+use Marque\Threepio\Services\PeerService;
+use Marque\Threepio\Support\TrackerResponse;
 use Marque\Trove\Models\Torrent;
 
 class ScrapeController extends Controller

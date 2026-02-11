@@ -14,7 +14,7 @@ abstract class Component extends LivewireComponent
      */
     protected function guiseLayout(): string
     {
-        return config('guise.layout', 'layouts.app');
+        return config('guise.layout', 'id::layouts.app');
     }
 
     /**

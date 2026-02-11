@@ -8,6 +8,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Storage;
+use Marque\Threepio\Support\Bencode;
 use Marque\Trove\Contracts\TorrentServiceInterface;
 use Marque\Trove\Models\Torrent;
 
@@ -123,7 +124,7 @@ class TorrentService implements TorrentServiceInterface
     protected function parseTorrentFile(UploadedFile $file): array
     {
         $content = file_get_contents($file->getRealPath());
-        $decoded = $this->bdecode($content);
+        $decoded = Bencode::decode($content);
 
         if (! isset($decoded['info'])) {
             throw new \InvalidArgumentException('Invalid torrent file: missing info dictionary');
@@ -132,7 +133,7 @@ class TorrentService implements TorrentServiceInterface
         $info = $decoded['info'];
 
         // Calculate info_hash (SHA1 of bencoded info dictionary)
-        $infoHash = sha1($this->bencode($info));
+        $infoHash = sha1(Bencode::encode($info));
 
         // Calculate total size
         $size = 0;
@@ -155,107 +156,5 @@ class TorrentService implements TorrentServiceInterface
             'file_count' => $fileCount,
             'name' => $info['name'] ?? 'Unknown',
         ];
-    }
-
-    /**
-     * Decode bencoded data.
-     */
-    protected function bdecode(string $data): mixed
-    {
-        $pos = 0;
-
-        return $this->bdecodeValue($data, $pos);
-    }
-
-    protected function bdecodeValue(string $data, int &$pos): mixed
-    {
-        $char = $data[$pos];
-
-        if ($char === 'i') {
-            // Integer
-            $pos++;
-            $end = strpos($data, 'e', $pos);
-            $value = (int) substr($data, $pos, $end - $pos);
-            $pos = $end + 1;
-
-            return $value;
-        }
-
-        if ($char === 'l') {
-            // List
-            $pos++;
-            $list = [];
-            while ($data[$pos] !== 'e') {
-                $list[] = $this->bdecodeValue($data, $pos);
-            }
-            $pos++;
-
-            return $list;
-        }
-
-        if ($char === 'd') {
-            // Dictionary
-            $pos++;
-            $dict = [];
-            while ($data[$pos] !== 'e') {
-                $key = $this->bdecodeValue($data, $pos);
-                $dict[$key] = $this->bdecodeValue($data, $pos);
-            }
-            $pos++;
-
-            return $dict;
-        }
-
-        if (is_numeric($char)) {
-            // String
-            $colon = strpos($data, ':', $pos);
-            $length = (int) substr($data, $pos, $colon - $pos);
-            $pos = $colon + 1;
-            $value = substr($data, $pos, $length);
-            $pos += $length;
-
-            return $value;
-        }
-
-        throw new \InvalidArgumentException("Invalid bencode at position $pos");
-    }
-
-    /**
-     * Encode data to bencode format.
-     */
-    protected function bencode(mixed $data): string
-    {
-        if (is_int($data)) {
-            return "i{$data}e";
-        }
-
-        if (is_string($data)) {
-            return strlen($data).':'.$data;
-        }
-
-        if (is_array($data)) {
-            // Check if it's a list or dictionary
-            if (array_keys($data) === range(0, count($data) - 1)) {
-                // List
-                $encoded = 'l';
-                foreach ($data as $item) {
-                    $encoded .= $this->bencode($item);
-                }
-
-                return $encoded.'e';
-            }
-
-            // Dictionary (must be sorted by key)
-            ksort($data);
-            $encoded = 'd';
-            foreach ($data as $key => $value) {
-                $encoded .= $this->bencode((string) $key);
-                $encoded .= $this->bencode($value);
-            }
-
-            return $encoded.'e';
-        }
-
-        throw new \InvalidArgumentException('Cannot bencode type: '.gettype($data));
     }
 }

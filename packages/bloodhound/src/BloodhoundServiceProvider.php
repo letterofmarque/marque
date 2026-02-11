@@ -11,7 +11,6 @@ use Marque\Bloodhound\Listeners\RecordSnatch;
 use Marque\Bloodhound\Services\AntiCheatService;
 use Marque\Bloodhound\Services\AnnounceService;
 use Marque\Bloodhound\Services\ClientValidationService;
-use Marque\Bloodhound\Services\PeerService;
 
 class BloodhoundServiceProvider extends ServiceProvider
 {
@@ -20,7 +19,6 @@ class BloodhoundServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/bloodhound.php', 'bloodhound');
 
         // Register services as singletons
-        $this->app->singleton(PeerService::class);
         $this->app->singleton(ClientValidationService::class);
         $this->app->singleton(AntiCheatService::class);
         $this->app->singleton(AnnounceService::class);

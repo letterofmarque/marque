@@ -7,6 +7,7 @@ namespace Marque\Bloodhound\Services;
 use Illuminate\Redis\Connections\Connection;
 use Illuminate\Support\Facades\Redis;
 use Marque\Bloodhound\Events\CheatDetected;
+use Marque\Threepio\Services\PeerService;
 
 /**
  * Anti-cheat detection service for the tracker.
@@ -25,7 +26,7 @@ final class AntiCheatService
     public function __construct(
         private readonly PeerService $peerService,
     ) {
-        $this->prefix = config('bloodhound.redis.prefix', 'bloodhound:');
+        $this->prefix = config('threepio.redis.prefix', 'marque:');
     }
 
     /**
@@ -100,7 +101,7 @@ final class AntiCheatService
      */
     public function checkPort(int $port): array
     {
-        $blacklisted = config('bloodhound.blacklisted_ports', []);
+        $blacklisted = config('threepio.blacklisted_ports', []);
 
         if (in_array($port, $blacklisted, true)) {
             return [
@@ -332,6 +333,6 @@ final class AntiCheatService
 
     private function redis(): Connection
     {
-        return Redis::connection(config('bloodhound.redis.connection', 'default'));
+        return Redis::connection(config('threepio.redis.connection', 'default'));
     }
 }

@@ -15,8 +15,11 @@ return [
     // API route prefix (e.g., 'api' results in /api/torrents)
     'prefix' => env('CENNAD_API_PREFIX', 'api'),
 
-    // Middleware to apply to API routes
-    'middleware' => ['api', 'auth:api'],
+    // Middleware for public API routes (index, show)
+    'public_middleware' => ['api'],
+
+    // Middleware for protected API routes (store, update, destroy)
+    'protected_middleware' => ['api', 'auth:api'],
 
     // Route name prefix for API routes
     'route_names' => [

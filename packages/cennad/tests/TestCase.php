@@ -33,7 +33,8 @@ abstract class TestCase extends BaseTestCase
         ]);
 
         $app['config']->set('trove.user_model', TestUser::class);
-        $app['config']->set('cennad.middleware', ['api', 'auth']);
+        $app['config']->set('cennad.public_middleware', ['api']);
+        $app['config']->set('cennad.protected_middleware', ['api', 'auth']);
         $app['config']->set('auth.defaults.guard', 'web');
         $app['config']->set('auth.guards.web.driver', 'session');
         $app['config']->set('auth.guards.web.provider', 'users');
