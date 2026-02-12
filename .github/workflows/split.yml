@@ -5,10 +5,11 @@ on:
     branches:
       - main
     tags:
-      - '*'
+      - '*/v*'
 
 jobs:
-  split:
+  split_branch:
+    if: github.ref_type == 'branch'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -38,8 +39,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Split ${{ matrix.package.local_path }}
-        if: "!startsWith(github.ref, 'refs/tags/')"
+      - name: Split ${{ matrix.package.repo_name }}
         uses: symplify/monorepo-split-github-action@v2.3.0
         env:
           GITHUB_TOKEN: ${{ secrets.SPLIT_TOKEN }}
@@ -50,15 +50,33 @@ jobs:
           user_name: 'LOM Software'
           user_email: 'dan@lom.software'
 
-      - name: Split ${{ matrix.package.local_path }} (tag)
-        if: "startsWith(github.ref, 'refs/tags/')"
+  split_tag:
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Parse tag
+        id: tag
+        run: |
+          # Tag format: <package>/v<version> e.g. cennad/v2.0.1
+          TAG="${GITHUB_REF_NAME}"
+          PACKAGE="${TAG%%/*}"
+          VERSION="${TAG#*/}"
+          echo "package=${PACKAGE}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Splitting ${PACKAGE} at ${VERSION}"
+
+      - name: Split ${{ steps.tag.outputs.package }} (${{ steps.tag.outputs.version }})
         uses: symplify/monorepo-split-github-action@v2.3.0
         env:
           GITHUB_TOKEN: ${{ secrets.SPLIT_TOKEN }}
         with:
-          package_directory: ${{ matrix.package.local_path }}
+          package_directory: 'packages/${{ steps.tag.outputs.package }}'
           repository_organization: 'letterofmarque'
-          repository_name: ${{ matrix.package.repo_name }}
+          repository_name: ${{ steps.tag.outputs.package }}
           user_name: 'LOM Software'
           user_email: 'dan@lom.software'
-          tag: ${{ github.ref_name }}
+          tag: ${{ steps.tag.outputs.version }}
