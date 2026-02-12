@@ -22,6 +22,16 @@ jobs:
             repo_name: 'cennad'
           - local_path: 'packages/guise'
             repo_name: 'guise'
+          - local_path: 'packages/threepio'
+            repo_name: 'threepio'
+          - local_path: 'packages/hound'
+            repo_name: 'hound'
+          - local_path: 'packages/id'
+            repo_name: 'id'
+          - local_path: 'packages/disguise'
+            repo_name: 'disguise'
+          - local_path: 'packages/usarrs'
+            repo_name: 'usarrs'
 
     steps:
       - uses: actions/checkout@v4
