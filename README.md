@@ -9,9 +9,14 @@ Built by [Letter Of Marque Software](https://lom.software).
 | Package | Description |
 |---------|-------------|
 | [marque/trove](packages/trove) | Core models, services, contracts, and policies |
-| [marque/bloodhound](packages/bloodhound) | BitTorrent tracker (announce/scrape) |
+| [marque/bloodhound](packages/bloodhound) | Private BitTorrent tracker (announce/scrape) |
 | [marque/cennad](packages/cennad) | REST API controllers and resources |
-| [marque/guise](packages/guise) | Livewire web frontend components |
+| [marque/guise](packages/guise) | Livewire web frontend (authenticated) |
+| [marque/threepio](packages/threepio) | BitTorrent protocol primitives |
+| [marque/hound](packages/hound) | Public BitTorrent tracker (no auth) |
+| [marque/id](packages/id) | App layout shell (navigation, theming) |
+| [marque/disguise](packages/disguise) | Public web frontend (browse without login) |
+| [marque/usarrs](packages/usarrs) | Auth, user profiles, invites, admin |
 
 ## Requirements
 
@@ -72,6 +77,24 @@ php artisan vendor:publish --tag=bloodhound-config
 php artisan vendor:publish --tag=guise-config
 php artisan vendor:publish --tag=cennad-config
 ```
+
+## Releasing
+
+Packages are versioned independently. To release a package:
+
+```bash
+git tag <package>/v<version>
+git push origin <package>/v<version>
+```
+
+For example:
+
+```bash
+git tag cennad/v2.0.1
+git push origin cennad/v2.0.1
+```
+
+The split workflow parses the tag, splits only that package, and pushes the version tag to its sub-repo. Packagist picks it up automatically.
 
 ## Development
 
