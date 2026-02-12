@@ -39,6 +39,7 @@ jobs:
           fetch-depth: 0
 
       - name: Split ${{ matrix.package.local_path }}
+        if: "!startsWith(github.ref, 'refs/tags/')"
         uses: symplify/monorepo-split-github-action@v2.3.0
         env:
           GITHUB_TOKEN: ${{ secrets.SPLIT_TOKEN }}
@@ -48,3 +49,16 @@ jobs:
           repository_name: ${{ matrix.package.repo_name }}
           user_name: 'LOM Software'
           user_email: 'dan@lom.software'
+
+      - name: Split ${{ matrix.package.local_path }} (tag)
+        if: "startsWith(github.ref, 'refs/tags/')"
+        uses: symplify/monorepo-split-github-action@v2.3.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.SPLIT_TOKEN }}
+        with:
+          package_directory: ${{ matrix.package.local_path }}
+          repository_organization: 'letterofmarque'
+          repository_name: ${{ matrix.package.repo_name }}
+          user_name: 'LOM Software'
+          user_email: 'dan@lom.software'
+          tag: ${{ github.ref_name }}
