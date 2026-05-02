@@ -15,9 +15,15 @@ yarn-error.log
 .DS_Store
 composer.lock
 
-# Claude operational files (local only)
+# Claude operational files + internal docs (local only)
+# Public-facing user docs (e.g. UPGRADE.md, README.md) stay tracked at docs/ root
+# but anything internal — role/why/how/product/directives, plans/, graph/ — stays local.
 CLAUDE.md
 .claude/
 docs/role.md
+docs/why.md
+docs/how.md
 docs/product.md
 docs/directives.md
+docs/graph/
+docs/plans/
