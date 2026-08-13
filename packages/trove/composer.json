@@ -25,7 +25,7 @@
     ],
     "require": {
         "php": "^8.2",
-        "marque/threepio": "@dev",
+        "marque/threepio": "^2.0",
         "illuminate/support": "^12.0",
         "illuminate/database": "^12.0",
         "illuminate/events": "^12.0"
@@ -46,6 +46,9 @@
         }
     },
     "extra": {
+        "branch-alias": {
+            "dev-main": "2.0.x-dev"
+        },
         "laravel": {
             "providers": [
                 "Marque\\Trove\\TroveServiceProvider"
@@ -55,7 +58,7 @@
     "scripts": {
         "test": "pest"
     },
-    "minimum-stability": "stable",
+    "minimum-stability": "dev",
     "prefer-stable": true,
     "config": {
         "allow-plugins": {

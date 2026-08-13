@@ -39,9 +39,9 @@
     ],
     "require": {
         "php": "^8.2",
-        "marque/trove": "@dev",
-        "marque/threepio": "@dev",
-        "marque/id": "@dev",
+        "marque/trove": "^2.0",
+        "marque/threepio": "^2.0",
+        "marque/id": "^2.1",
         "illuminate/support": "^12.0",
         "illuminate/routing": "^12.0",
         "illuminate/view": "^12.0",
@@ -63,6 +63,9 @@
         }
     },
     "extra": {
+        "branch-alias": {
+            "dev-main": "2.1.x-dev"
+        },
         "laravel": {
             "providers": [
                 "Marque\\Guise\\GuiseServiceProvider"
@@ -72,7 +75,7 @@
     "scripts": {
         "test": "pest"
     },
-    "minimum-stability": "stable",
+    "minimum-stability": "dev",
     "prefer-stable": true,
     "config": {
         "allow-plugins": {
