@@ -142,8 +142,8 @@ Bloodhound applies `BlockBrowsers` middleware to tracker endpoints. This rejects
 
 ## Requirements
 
-- PHP 8.2+
-- Laravel 12+
+- PHP 8.4+
+- Laravel 13+
 - Redis
 - [marque/trove](https://packagist.org/packages/marque/trove)
 

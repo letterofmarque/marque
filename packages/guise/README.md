@@ -104,8 +104,8 @@ If you need to reference the components directly:
 
 ## Requirements
 
-- PHP 8.2+
-- Laravel 12+
+- PHP 8.4+
+- Laravel 13+
 - Livewire 4+
 - Tailwind CSS
 - [marque/trove](https://packagist.org/packages/marque/trove)

@@ -71,8 +71,8 @@ content: [
 
 ## Requirements
 
-- PHP 8.2+
-- Laravel 12+
+- PHP 8.4+
+- Laravel 13+
 - Livewire 4+
 - Tailwind CSS
 

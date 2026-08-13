@@ -20,7 +20,7 @@ packages/
 
 ### Prerequisites
 
-- PHP 8.2+
+- PHP 8.4+
 - Composer
 - Redis (for Bloodhound tests)
 

@@ -38,18 +38,18 @@
         }
     ],
     "require": {
-        "php": "^8.2",
-        "marque/trove": "^2.0",
-        "marque/threepio": "^2.0",
-        "marque/id": "^2.1",
-        "illuminate/support": "^12.0",
-        "illuminate/routing": "^12.0",
-        "illuminate/view": "^12.0",
+        "php": "^8.4",
+        "marque/trove": "^3.0",
+        "marque/threepio": "^3.0",
+        "marque/id": "^3.0",
+        "illuminate/support": "^13.0",
+        "illuminate/routing": "^13.0",
+        "illuminate/view": "^13.0",
         "livewire/livewire": "^4.0"
     },
     "require-dev": {
-        "orchestra/testbench": "^10.0",
-        "pestphp/pest": "^4.0",
+        "orchestra/testbench": "^11.0",
+        "pestphp/pest": "^5.0",
         "mockery/mockery": "^1.6"
     },
     "autoload": {
@@ -64,7 +64,7 @@
     },
     "extra": {
         "branch-alias": {
-            "dev-main": "2.1.x-dev"
+            "dev-main": "3.0.x-dev"
         },
         "laravel": {
             "providers": [

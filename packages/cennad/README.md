@@ -118,8 +118,8 @@ Cennad uses Laravel's standard `auth:api` guard. Configure authentication in you
 
 ## Requirements
 
-- PHP 8.2+
-- Laravel 12+
+- PHP 8.4+
+- Laravel 13+
 - [marque/trove](https://packagist.org/packages/marque/trove)
 
 ## License
