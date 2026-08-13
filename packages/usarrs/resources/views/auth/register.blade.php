@@ -1,54 +1,45 @@
 <div class="flex min-h-full items-center justify-center py-12 sm:px-6 lg:px-8">
     <div class="w-full max-w-md space-y-8">
         <div class="text-center">
-            <flux:heading size="xl">{{ __('Create Account') }}</flux:heading>
-            <flux:text class="mt-2 text-zinc-500">
+            <x-id::heading size="xl">{{ __('Create Account') }}</x-id::heading>
+            <x-id::text class="mt-2 text-zinc-500">
                 {{ __('Register for a new account') }}
-            </flux:text>
+            </x-id::text>
         </div>
 
         <form wire:submit="register" class="space-y-6">
             @if ($inviteRequired)
-                <flux:field>
-                    <flux:label>{{ __('Invite Code') }}</flux:label>
-                    <flux:input wire:model="invite" required />
-                    <flux:error name="invite" />
-                </flux:field>
+                <x-id::field :label="__('Invite Code')" name="invite">
+                    <x-id::input wire:model="invite" required />
+                </x-id::field>
             @endif
 
-            <flux:field>
-                <flux:label>{{ __('Name') }}</flux:label>
-                <flux:input wire:model="name" required autofocus />
-                <flux:error name="name" />
-            </flux:field>
+            <x-id::field :label="__('Name')" name="name">
+                <x-id::input wire:model="name" required autofocus />
+            </x-id::field>
 
-            <flux:field>
-                <flux:label>{{ __('Email') }}</flux:label>
-                <flux:input wire:model="email" type="email" required />
-                <flux:error name="email" />
-            </flux:field>
+            <x-id::field :label="__('Email')" name="email">
+                <x-id::input wire:model="email" type="email" required />
+            </x-id::field>
 
-            <flux:field>
-                <flux:label>{{ __('Password') }}</flux:label>
-                <flux:input wire:model="password" type="password" required />
-                <flux:error name="password" />
-            </flux:field>
+            <x-id::field :label="__('Password')" name="password">
+                <x-id::input wire:model="password" type="password" required />
+            </x-id::field>
 
-            <flux:field>
-                <flux:label>{{ __('Confirm Password') }}</flux:label>
-                <flux:input wire:model="password_confirmation" type="password" required />
-            </flux:field>
+            <x-id::field :label="__('Confirm Password')">
+                <x-id::input wire:model="password_confirmation" type="password" required />
+            </x-id::field>
 
-            <flux:button type="submit" variant="primary" class="w-full">
+            <x-id::button type="submit" variant="primary" class="w-full">
                 {{ __('Register') }}
-            </flux:button>
+            </x-id::button>
         </form>
 
-        <flux:text class="text-center text-sm text-zinc-500">
+        <x-id::text class="text-center text-sm text-zinc-500">
             {{ __('Already have an account?') }}
             <a href="{{ route('login') }}" class="text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100" wire:navigate>
                 {{ __('Log in') }}
             </a>
-        </flux:text>
+        </x-id::text>
     </div>
 </div>

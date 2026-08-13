@@ -60,7 +60,7 @@ composer require marque/bloodhound
 ### Guise (Web UI)
 - Livewire components for torrent browsing, viewing, uploading, editing
 - Configurable layouts
-- Flux UI compatible
+- Dependency-free Blade UI components (from marque/id), styled with Tailwind CSS
 
 ### Cennad (API)
 - RESTful torrent endpoints

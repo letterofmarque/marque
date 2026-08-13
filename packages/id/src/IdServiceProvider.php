@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Marque\Id;
 
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
 use Marque\Id\View\Components\Navigation;
 
@@ -17,6 +18,8 @@ class IdServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'id');
+
+        Blade::anonymousComponentNamespace(__DIR__.'/../resources/views/components', 'id');
 
         if (class_exists(\Livewire\Livewire::class)) {
             \Livewire\Livewire::component('id-navigation', Navigation::class);

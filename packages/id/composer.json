@@ -25,9 +25,6 @@
         "pestphp/pest": "^4.0",
         "mockery/mockery": "^1.6"
     },
-    "suggest": {
-        "livewire/flux": "Required for the default Flux UI themed views"
-    },
     "autoload": {
         "psr-4": {
             "Marque\\Id\\": "src/"

@@ -1,8 +1,8 @@
 <div class="flex h-full w-full flex-1 flex-col gap-4">
-    <flux:heading size="xl">{{ __('Users') }}</flux:heading>
+    <x-id::heading size="xl">{{ __('Users') }}</x-id::heading>
 
     <div class="flex items-center gap-4">
-        <flux:input
+        <x-id::input
             wire:model.live.debounce.300ms="search"
             placeholder="{{ __('Search users...') }}"
             icon="magnifying-glass"
@@ -11,37 +11,39 @@
     </div>
 
     <div class="rounded-xl border border-zinc-200 dark:border-zinc-700">
-        <flux:table>
-            <flux:table.columns>
-                <flux:table.column>{{ __('Name') }}</flux:table.column>
-                <flux:table.column>{{ __('Email') }}</flux:table.column>
-                <flux:table.column>{{ __('Role') }}</flux:table.column>
-                <flux:table.column>{{ __('Status') }}</flux:table.column>
-                <flux:table.column></flux:table.column>
-            </flux:table.columns>
+        <x-id::table>
+            <thead>
+                <tr class="border-b border-zinc-200 dark:border-zinc-700">
+                    <th class="px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">{{ __('Name') }}</th>
+                    <th class="px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">{{ __('Email') }}</th>
+                    <th class="px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">{{ __('Role') }}</th>
+                    <th class="px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">{{ __('Status') }}</th>
+                    <th class="px-3 py-2"></th>
+                </tr>
+            </thead>
 
-            <flux:table.rows>
+            <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
                 @forelse ($users as $user)
-                    <flux:table.row :key="$user->id">
-                        <flux:table.cell class="font-medium">{{ $user->name }}</flux:table.cell>
-                        <flux:table.cell>{{ $user->email }}</flux:table.cell>
-                        <flux:table.cell>{{ ucfirst($user->role->value ?? $user->role) }}</flux:table.cell>
-                        <flux:table.cell>{{ ucfirst($user->status ?? 'active') }}</flux:table.cell>
-                        <flux:table.cell>
-                            <flux:button variant="ghost" size="sm" :href="route('admin.users.show', $user)" wire:navigate>
+                    <tr wire:key="{{ $user->id }}">
+                        <td class="px-3 py-2 font-medium">{{ $user->name }}</td>
+                        <td class="px-3 py-2">{{ $user->email }}</td>
+                        <td class="px-3 py-2">{{ ucfirst($user->role->value ?? $user->role) }}</td>
+                        <td class="px-3 py-2">{{ ucfirst($user->status ?? 'active') }}</td>
+                        <td class="px-3 py-2">
+                            <x-id::button variant="ghost" size="sm" :href="route('admin.users.show', $user)" wire:navigate>
                                 {{ __('View') }}
-                            </flux:button>
-                        </flux:table.cell>
-                    </flux:table.row>
+                            </x-id::button>
+                        </td>
+                    </tr>
                 @empty
-                    <flux:table.row>
-                        <flux:table.cell colspan="5" class="text-center py-8">
-                            <flux:text class="text-zinc-500">{{ __('No users found.') }}</flux:text>
-                        </flux:table.cell>
-                    </flux:table.row>
+                    <tr>
+                        <td colspan="5" class="px-3 py-8 text-center">
+                            <x-id::text class="text-zinc-500">{{ __('No users found.') }}</x-id::text>
+                        </td>
+                    </tr>
                 @endforelse
-            </flux:table.rows>
-        </flux:table>
+            </tbody>
+        </x-id::table>
     </div>
 
     @if ($users->hasPages())

@@ -1,53 +1,55 @@
 <div class="flex h-full w-full flex-1 flex-col gap-4">
     <div class="flex items-center justify-between">
-        <flux:heading size="xl">{{ __('My Invites') }}</flux:heading>
+        <x-id::heading size="xl">{{ __('My Invites') }}</x-id::heading>
         @if ($canCreate)
-            <flux:button variant="primary" :href="route('invites.create')" icon="plus" wire:navigate>
+            <x-id::button variant="primary" :href="route('invites.create')" icon="plus" wire:navigate>
                 {{ __('Create Invite') }}
-            </flux:button>
+            </x-id::button>
         @endif
     </div>
 
     @if (session('status'))
         <div class="rounded-lg bg-green-50 p-4 dark:bg-green-900/20">
-            <flux:text class="text-sm text-green-700 dark:text-green-300">{{ session('status') }}</flux:text>
+            <x-id::text class="text-sm text-green-700 dark:text-green-300">{{ session('status') }}</x-id::text>
         </div>
     @endif
 
     <div class="rounded-xl border border-zinc-200 dark:border-zinc-700">
-        <flux:table>
-            <flux:table.columns>
-                <flux:table.column>{{ __('Code') }}</flux:table.column>
-                <flux:table.column>{{ __('Recipient') }}</flux:table.column>
-                <flux:table.column>{{ __('Status') }}</flux:table.column>
-                <flux:table.column>{{ __('Expires') }}</flux:table.column>
-                <flux:table.column></flux:table.column>
-            </flux:table.columns>
+        <x-id::table>
+            <thead>
+                <tr class="border-b border-zinc-200 dark:border-zinc-700">
+                    <th class="px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">{{ __('Code') }}</th>
+                    <th class="px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">{{ __('Recipient') }}</th>
+                    <th class="px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">{{ __('Status') }}</th>
+                    <th class="px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">{{ __('Expires') }}</th>
+                    <th class="px-3 py-2"></th>
+                </tr>
+            </thead>
 
-            <flux:table.rows>
+            <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
                 @forelse ($invites as $invite)
-                    <flux:table.row :key="$invite->id">
-                        <flux:table.cell class="font-mono text-sm">{{ $invite->code }}</flux:table.cell>
-                        <flux:table.cell>{{ $invite->recipient_email ?? '-' }}</flux:table.cell>
-                        <flux:table.cell>{{ ucfirst($invite->status->value) }}</flux:table.cell>
-                        <flux:table.cell>{{ $invite->expires_at?->diffForHumans() ?? '-' }}</flux:table.cell>
-                        <flux:table.cell>
+                    <tr wire:key="{{ $invite->id }}">
+                        <td class="px-3 py-2 font-mono text-sm">{{ $invite->code }}</td>
+                        <td class="px-3 py-2">{{ $invite->recipient_email ?? '-' }}</td>
+                        <td class="px-3 py-2">{{ ucfirst($invite->status->value) }}</td>
+                        <td class="px-3 py-2">{{ $invite->expires_at?->diffForHumans() ?? '-' }}</td>
+                        <td class="px-3 py-2">
                             @if ($invite->status === \Marque\Usarrs\Enums\InviteStatus::Pending)
-                                <flux:button variant="ghost" size="sm" wire:click="revoke({{ $invite->id }})" wire:confirm="{{ __('Revoke this invite?') }}">
+                                <x-id::button variant="ghost" size="sm" wire:click="revoke({{ $invite->id }})" wire:confirm="{{ __('Revoke this invite?') }}">
                                     {{ __('Revoke') }}
-                                </flux:button>
+                                </x-id::button>
                             @endif
-                        </flux:table.cell>
-                    </flux:table.row>
+                        </td>
+                    </tr>
                 @empty
-                    <flux:table.row>
-                        <flux:table.cell colspan="5" class="text-center py-8">
-                            <flux:text class="text-zinc-500">{{ __('No invites yet.') }}</flux:text>
-                        </flux:table.cell>
-                    </flux:table.row>
+                    <tr>
+                        <td colspan="5" class="px-3 py-8 text-center">
+                            <x-id::text class="text-zinc-500">{{ __('No invites yet.') }}</x-id::text>
+                        </td>
+                    </tr>
                 @endforelse
-            </flux:table.rows>
-        </flux:table>
+            </tbody>
+        </x-id::table>
     </div>
 
     @if ($invites->hasPages())

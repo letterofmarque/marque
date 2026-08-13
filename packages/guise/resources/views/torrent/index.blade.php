@@ -1,15 +1,15 @@
 <div class="flex h-full w-full flex-1 flex-col gap-4">
     <div class="flex items-center justify-between">
-        <flux:heading size="xl">{{ __('Torrents') }}</flux:heading>
+        <x-id::heading size="xl">{{ __('Torrents') }}</x-id::heading>
         @if (auth()->user()->isUploader())
-            <flux:button variant="primary" :href="route('torrents.upload')" icon="plus" wire:navigate>
+            <x-id::button variant="primary" :href="route('torrents.upload')" icon="plus" wire:navigate>
                 {{ __('Upload') }}
-            </flux:button>
+            </x-id::button>
         @endif
     </div>
 
     <div class="flex items-center gap-4">
-        <flux:input
+        <x-id::input
             wire:model.live.debounce.300ms="search"
             placeholder="{{ __('Search torrents...') }}"
             icon="magnifying-glass"
@@ -18,43 +18,45 @@
     </div>
 
     <div class="rounded-xl border border-zinc-200 dark:border-zinc-700">
-        <flux:table>
-            <flux:table.columns>
-                <flux:table.column>{{ __('Name') }}</flux:table.column>
-                <flux:table.column>{{ __('Size') }}</flux:table.column>
-                <flux:table.column>{{ __('Files') }}</flux:table.column>
-                <flux:table.column>{{ __('Uploaded by') }}</flux:table.column>
-                <flux:table.column>{{ __('Date') }}</flux:table.column>
-                <flux:table.column></flux:table.column>
-            </flux:table.columns>
+        <x-id::table>
+            <thead>
+                <tr class="border-b border-zinc-200 dark:border-zinc-700">
+                    <th class="px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">{{ __('Name') }}</th>
+                    <th class="px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">{{ __('Size') }}</th>
+                    <th class="px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">{{ __('Files') }}</th>
+                    <th class="px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">{{ __('Uploaded by') }}</th>
+                    <th class="px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">{{ __('Date') }}</th>
+                    <th class="px-3 py-2"></th>
+                </tr>
+            </thead>
 
-            <flux:table.rows>
+            <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
                 @forelse ($torrents as $torrent)
-                    <flux:table.row :key="$torrent->id">
-                        <flux:table.cell class="font-medium">
+                    <tr wire:key="{{ $torrent->id }}">
+                        <td class="px-3 py-2 font-medium">
                             <a href="{{ route('torrents.show', $torrent) }}" class="hover:underline" wire:navigate>
                                 {{ $torrent->name }}
                             </a>
-                        </flux:table.cell>
-                        <flux:table.cell>{{ $torrent->sizeForHumans() }}</flux:table.cell>
-                        <flux:table.cell>{{ $torrent->file_count }}</flux:table.cell>
-                        <flux:table.cell>{{ $torrent->user->name }}</flux:table.cell>
-                        <flux:table.cell>{{ $torrent->created_at->diffForHumans() }}</flux:table.cell>
-                        <flux:table.cell>
-                            <flux:button variant="ghost" size="sm" :href="route('torrents.show', $torrent)" wire:navigate>
+                        </td>
+                        <td class="px-3 py-2">{{ $torrent->sizeForHumans() }}</td>
+                        <td class="px-3 py-2">{{ $torrent->file_count }}</td>
+                        <td class="px-3 py-2">{{ $torrent->user->name }}</td>
+                        <td class="px-3 py-2">{{ $torrent->created_at->diffForHumans() }}</td>
+                        <td class="px-3 py-2">
+                            <x-id::button variant="ghost" size="sm" :href="route('torrents.show', $torrent)" wire:navigate>
                                 {{ __('View') }}
-                            </flux:button>
-                        </flux:table.cell>
-                    </flux:table.row>
+                            </x-id::button>
+                        </td>
+                    </tr>
                 @empty
-                    <flux:table.row>
-                        <flux:table.cell colspan="6" class="text-center py-8">
-                            <flux:text class="text-zinc-500">{{ __('No torrents found.') }}</flux:text>
-                        </flux:table.cell>
-                    </flux:table.row>
+                    <tr>
+                        <td colspan="6" class="px-3 py-8 text-center">
+                            <x-id::text class="text-zinc-500">{{ __('No torrents found.') }}</x-id::text>
+                        </td>
+                    </tr>
                 @endforelse
-            </flux:table.rows>
-        </flux:table>
+            </tbody>
+        </x-id::table>
     </div>
 
     @if ($torrents->hasPages())

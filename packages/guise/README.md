@@ -1,10 +1,10 @@
 # Marque Guise
 
-Livewire web frontend for the [Marque](https://github.com/letterofmarque/marque) tracker platform. Provides torrent browsing, uploading, and management UI built with Livewire and Flux UI.
+Livewire web frontend for the [Marque](https://github.com/letterofmarque/marque) tracker platform. Provides torrent browsing, uploading, and management UI built with Livewire and Tailwind CSS.
 
 ## Installation
 
-Requires [marque/trove](https://packagist.org/packages/marque/trove) and [Flux UI](https://fluxui.dev).
+Requires [marque/trove](https://packagist.org/packages/marque/trove) and [marque/id](https://packagist.org/packages/marque/id), which supplies the Blade UI components.
 
 ```bash
 composer require marque/guise
@@ -107,8 +107,9 @@ If you need to reference the components directly:
 - PHP 8.2+
 - Laravel 12+
 - Livewire 4+
-- Flux UI
+- Tailwind CSS
 - [marque/trove](https://packagist.org/packages/marque/trove)
+- [marque/id](https://packagist.org/packages/marque/id)
 
 ## License
 

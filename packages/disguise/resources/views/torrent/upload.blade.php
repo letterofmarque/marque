@@ -1,50 +1,44 @@
 <div class="flex h-full w-full flex-1 flex-col gap-6">
     <div class="flex items-center gap-4">
-        <flux:button variant="ghost" :href="route('torrents.index')" icon="arrow-left" wire:navigate>
+        <x-id::button variant="ghost" :href="route('torrents.index')" icon="arrow-left" wire:navigate>
             {{ __('Back') }}
-        </flux:button>
+        </x-id::button>
     </div>
 
     <div class="max-w-2xl">
-        <flux:heading size="xl" class="mb-6">{{ __('Upload Torrent') }}</flux:heading>
+        <x-id::heading size="xl" class="mb-6">{{ __('Upload Torrent') }}</x-id::heading>
 
         <form wire:submit="upload" class="flex flex-col gap-6">
-            <flux:field>
-                <flux:label>{{ __('Torrent File') }}</flux:label>
-                <flux:input
+            <x-id::field :label="__('Torrent File')" name="torrentFile">
+                <x-id::input
                     type="file"
                     wire:model="torrentFile"
                     accept=".torrent"
                 />
-                <flux:error name="torrentFile" />
-            </flux:field>
+            </x-id::field>
 
-            <flux:field>
-                <flux:label>{{ __('Name') }}</flux:label>
-                <flux:input
+            <x-id::field :label="__('Name')" name="name">
+                <x-id::input
                     wire:model="name"
                     placeholder="{{ __('Enter torrent name...') }}"
                 />
-                <flux:error name="name" />
-            </flux:field>
+            </x-id::field>
 
-            <flux:field>
-                <flux:label>{{ __('Description') }}</flux:label>
-                <flux:textarea
+            <x-id::field :label="__('Description')" name="description">
+                <x-id::textarea
                     wire:model="description"
                     placeholder="{{ __('Optional description...') }}"
                     rows="4"
                 />
-                <flux:error name="description" />
-            </flux:field>
+            </x-id::field>
 
             <div class="flex gap-2">
-                <flux:button type="submit" variant="primary">
+                <x-id::button type="submit" variant="primary">
                     {{ __('Upload') }}
-                </flux:button>
-                <flux:button variant="ghost" :href="route('torrents.index')" wire:navigate>
+                </x-id::button>
+                <x-id::button variant="ghost" :href="route('torrents.index')" wire:navigate>
                     {{ __('Cancel') }}
-                </flux:button>
+                </x-id::button>
             </div>
         </form>
     </div>
