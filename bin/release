@@ -1,0 +1,367 @@
+#!/usr/bin/env bash
+#
+# Release one or more Marque packages.
+#
+#   bin/release guise 3.1.0                  release a single package
+#   bin/release --all 3.0.1                  release every package at one version
+#   bin/release guise 3.1.0 usarrs 3.1.0     release several at once
+#   bin/release --dry-run guise 3.1.0        show the plan, change nothing
+#
+# Handles the three things that are easy to get wrong by hand:
+#
+#   1. Dependency order — a package must publish before anything requiring it.
+#      The order is derived from the composer.json files, not hardcoded.
+#   2. Tag batching — GitHub silently suppresses workflow triggers when more
+#      than three tags arrive in one push. Tags land, nothing splits, and
+#      Packagist is never notified. We push in batches of three and wait.
+#   3. Verification — confirms each version actually reached Packagist rather
+#      than assuming the split succeeded.
+#
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+readonly PACKAGES_DIR="packages"
+readonly MAX_TAGS_PER_PUSH=3
+readonly PACKAGIST_POLL_ATTEMPTS=20
+readonly PACKAGIST_POLL_DELAY=15
+
+DRY_RUN=false
+declare -a RELEASES=()   # "package version" pairs
+
+red()   { printf '\033[31m%s\033[0m\n' "$*"; }
+green() { printf '\033[32m%s\033[0m\n' "$*"; }
+blue()  { printf '\033[34m%s\033[0m\n' "$*"; }
+warn()  { printf '\033[33m%s\033[0m\n' "$*"; }
+die()   { red "error: $*" >&2; exit 1; }
+
+usage() {
+    sed -n '3,18p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'
+    exit "${1:-0}"
+}
+
+all_packages() {
+    find "$PACKAGES_DIR" -maxdepth 1 -mindepth 1 -type d -printf '%f\n' | sort
+}
+
+# Topological sort: a package sorts after every marque/* package it requires.
+# Reads the actual composer.json files so it cannot drift from reality.
+dependency_order() {
+    local -a pkgs=("$@")
+    local -a ordered=()
+    local -A placed=()
+    local pkg dep deps_met progress
+
+    while (( ${#ordered[@]} < ${#pkgs[@]} )); do
+        progress=false
+
+        for pkg in "${pkgs[@]}"; do
+            [[ -n "${placed[$pkg]:-}" ]] && continue
+
+            deps_met=true
+            while read -r dep; do
+                [[ -z "$dep" ]] && continue
+                # Only care about deps that are themselves part of this release.
+                for candidate in "${pkgs[@]}"; do
+                    if [[ "$candidate" == "$dep" && -z "${placed[$dep]:-}" ]]; then
+                        deps_met=false
+                        break
+                    fi
+                done
+                $deps_met || break
+            done < <(marque_deps_of "$pkg")
+
+            if $deps_met; then
+                ordered+=("$pkg")
+                placed[$pkg]=1
+                progress=true
+            fi
+        done
+
+        if ! $progress; then
+            die "dependency cycle among: ${pkgs[*]}"
+        fi
+    done
+
+    printf '%s\n' "${ordered[@]}"
+}
+
+marque_deps_of() {
+    local pkg="$1"
+    local file="$PACKAGES_DIR/$pkg/composer.json"
+    [[ -f "$file" ]] || return 0
+    jq -r '(.require // {}) | keys[] | select(startswith("marque/")) | sub("^marque/"; "")' "$file"
+}
+
+validate_semver() {
+    [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)[0-9]*)?$ ]] \
+        || die "'$1' is not a valid version (expected X.Y.Z or X.Y.Z-beta1)"
+}
+
+package_exists() {
+    [[ -d "$PACKAGES_DIR/$1" ]]
+}
+
+tag_for() { printf '%s/v%s\n' "$1" "$2"; }
+
+tag_already_exists() {
+    git rev-parse -q --verify "refs/tags/$1" >/dev/null 2>&1 \
+        || git ls-remote --tags origin "refs/tags/$1" 2>/dev/null | grep -q .
+}
+
+# Confirm the working tree is releasable before tagging anything.
+preflight() {
+    blue "==> Preflight"
+
+    [[ -z "$(git status --porcelain)" ]] \
+        || die "working tree is dirty — commit or stash first"
+
+    local branch
+    branch="$(git branch --show-current)"
+    [[ "$branch" == "main" ]] \
+        || die "on branch '$branch' — releases are cut from main"
+
+    git fetch --quiet origin main
+    local local_head remote_head
+    local_head="$(git rev-parse HEAD)"
+    remote_head="$(git rev-parse origin/main)"
+    [[ "$local_head" == "$remote_head" ]] \
+        || die "local main differs from origin/main — push or pull first"
+
+    green "    clean tree, on main, in sync with origin"
+}
+
+run_tests_for() {
+    local pkg="$1"
+    blue "==> Testing $pkg"
+
+    if $DRY_RUN; then
+        echo "    [dry-run] would run: composer test in $PACKAGES_DIR/$pkg"
+        return 0
+    fi
+
+    if ( cd "$PACKAGES_DIR/$pkg" && composer test >/tmp/marque-test-$pkg.log 2>&1 ); then
+        green "    $(sed 's/\x1b\[[0-9;]*m//g' /tmp/marque-test-$pkg.log | grep -E '^  Tests:' | head -1)"
+    else
+        red "    FAILED — see /tmp/marque-test-$pkg.log"
+        tail -20 /tmp/marque-test-$pkg.log | sed 's/^/    /'
+        die "tests failed for $pkg, nothing tagged"
+    fi
+}
+
+create_tag() {
+    local pkg="$1" version="$2" tag
+    tag="$(tag_for "$pkg" "$version")"
+
+    if tag_already_exists "$tag"; then
+        die "tag $tag already exists — bump the version or delete the tag"
+    fi
+
+    if $DRY_RUN; then
+        echo "    [dry-run] would tag: $tag"
+        return 0
+    fi
+
+    git tag -a "$tag" -m "$pkg $version"
+    echo "    tagged $tag"
+}
+
+# Push tags in batches of MAX_TAGS_PER_PUSH. More than that in a single push
+# and GitHub silently drops the workflow triggers.
+push_tags() {
+    local -a tags=("$@")
+    local -a batch=()
+    local tag
+
+    for tag in "${tags[@]}"; do
+        batch+=("$tag")
+        if (( ${#batch[@]} == MAX_TAGS_PER_PUSH )); then
+            push_batch "${batch[@]}"
+            batch=()
+        fi
+    done
+
+    (( ${#batch[@]} > 0 )) && push_batch "${batch[@]}"
+}
+
+push_batch() {
+    local -a batch=("$@")
+    blue "==> Pushing ${#batch[@]} tag(s): ${batch[*]}"
+
+    if $DRY_RUN; then
+        echo "    [dry-run] would push: ${batch[*]}"
+        return 0
+    fi
+
+    git push origin "${batch[@]}" >/dev/null 2>&1
+    green "    pushed"
+
+    wait_for_splits "${batch[@]}"
+}
+
+wait_for_splits() {
+    local -a tags=("$@")
+    local tag pkg run_id conclusion
+
+    blue "==> Waiting for split workflows"
+
+    # Give GitHub a moment to register the runs.
+    sleep 5
+
+    for tag in "${tags[@]}"; do
+        pkg="${tag%%/*}"
+        run_id="$(gh run list --limit 20 \
+            --json databaseId,headBranch \
+            --jq "[.[] | select(.headBranch == \"$tag\")] | first | .databaseId" 2>/dev/null)"
+
+        if [[ -z "$run_id" || "$run_id" == "null" ]]; then
+            warn "    no workflow run found for $tag"
+            warn "    re-trigger with: gh workflow run 'Split Monorepo' -f tag=$tag"
+            continue
+        fi
+
+        gh run watch "$run_id" --exit-status >/dev/null 2>&1 || true
+        conclusion="$(gh run view "$run_id" --json conclusion --jq .conclusion 2>/dev/null)"
+
+        if [[ "$conclusion" == "success" ]]; then
+            green "    $tag split ok"
+        else
+            red "    $tag split $conclusion"
+            warn "    re-trigger with: gh workflow run 'Split Monorepo' -f tag=$tag"
+        fi
+    done
+}
+
+verify_packagist() {
+    local pkg="$1" version="$2" attempt found
+
+    for (( attempt = 1; attempt <= PACKAGIST_POLL_ATTEMPTS; attempt++ )); do
+        found="$(curl -sf "https://repo.packagist.org/p2/marque/$pkg.json" 2>/dev/null \
+            | jq -r --arg v "v$version" '.packages["marque/'"$pkg"'"][]?.version | select(. == $v)' \
+            | head -1)"
+
+        if [[ -n "$found" ]]; then
+            green "    marque/$pkg $found published"
+            return 0
+        fi
+        sleep "$PACKAGIST_POLL_DELAY"
+    done
+
+    warn "    marque/$pkg v$version not on Packagist after $(( PACKAGIST_POLL_ATTEMPTS * PACKAGIST_POLL_DELAY ))s"
+    warn "    check https://packagist.org/packages/marque/$pkg"
+    return 1
+}
+
+main() {
+    local -a argv=("$@")
+    (( ${#argv[@]} > 0 )) || usage 1
+
+    # Parse flags and package/version pairs.
+    local all_version=""
+    local -a positional=()
+    local arg
+    for arg in "${argv[@]}"; do
+        case "$arg" in
+            -h|--help) usage 0 ;;
+            -n|--dry-run) DRY_RUN=true ;;
+            --all) all_version="PENDING" ;;
+            -*) die "unknown flag: $arg" ;;
+            *)
+                if [[ "$all_version" == "PENDING" ]]; then
+                    all_version="$arg"
+                else
+                    positional+=("$arg")
+                fi
+                ;;
+        esac
+    done
+
+    if [[ -n "$all_version" && "$all_version" != "PENDING" ]]; then
+        validate_semver "$all_version"
+        local pkg
+        while read -r pkg; do
+            RELEASES+=("$pkg $all_version")
+        done < <(all_packages)
+    else
+        (( ${#positional[@]} % 2 == 0 )) \
+            || die "expected package/version pairs, got: ${positional[*]}"
+        (( ${#positional[@]} > 0 )) || usage 1
+
+        local i
+        for (( i = 0; i < ${#positional[@]}; i += 2 )); do
+            local pkg="${positional[i]}" version="${positional[i+1]}"
+            package_exists "$pkg" || die "no such package: $pkg"
+            validate_semver "$version"
+            RELEASES+=("$pkg $version")
+        done
+    fi
+
+    # Sort the release set into dependency order.
+    local -a pkgs=()
+    local entry
+    for entry in "${RELEASES[@]}"; do
+        pkgs+=("${entry%% *}")
+    done
+
+    local -a ordered=()
+    while read -r pkg; do
+        ordered+=("$pkg")
+    done < <(dependency_order "${pkgs[@]}")
+
+    # Plan.
+    blue "==> Release plan"
+    $DRY_RUN && warn "    DRY RUN — nothing will be tagged or pushed"
+    local p v
+    for p in "${ordered[@]}"; do
+        for entry in "${RELEASES[@]}"; do
+            [[ "${entry%% *}" == "$p" ]] && v="${entry##* }"
+        done
+        echo "    $p -> v$v"
+    done
+    echo
+
+    preflight
+
+    # Test everything before tagging anything.
+    for p in "${ordered[@]}"; do
+        run_tests_for "$p"
+    done
+
+    # Tag in dependency order.
+    blue "==> Tagging"
+    local -a tags=()
+    for p in "${ordered[@]}"; do
+        for entry in "${RELEASES[@]}"; do
+            [[ "${entry%% *}" == "$p" ]] && v="${entry##* }"
+        done
+        create_tag "$p" "$v"
+        tags+=("$(tag_for "$p" "$v")")
+    done
+
+    push_tags "${tags[@]}"
+
+    if $DRY_RUN; then
+        echo
+        green "Dry run complete — nothing changed."
+        return 0
+    fi
+
+    blue "==> Verifying on Packagist"
+    local failed=0
+    for p in "${ordered[@]}"; do
+        for entry in "${RELEASES[@]}"; do
+            [[ "${entry%% *}" == "$p" ]] && v="${entry##* }"
+        done
+        verify_packagist "$p" "$v" || failed=1
+    done
+
+    echo
+    if (( failed )); then
+        warn "Released, but some packages are not visible on Packagist yet."
+        warn "This is usually webhook lag — re-check in a minute."
+    else
+        green "Release complete."
+    fi
+}
+
+main "$@"
