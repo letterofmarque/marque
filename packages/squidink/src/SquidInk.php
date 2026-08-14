@@ -10,6 +10,7 @@ use Marque\SquidInk\Document\Node;
 use Marque\SquidInk\Document\Nodes\Document;
 use Marque\SquidInk\Document\Schema;
 use Marque\SquidInk\Exceptions\UnknownFormat;
+use Marque\SquidInk\Shortcodes\ShortcodeParser;
 
 /**
  * The entry point: parse source text in some input syntax, render a document to
@@ -33,6 +34,7 @@ final class SquidInk
     public function __construct(
         private Schema $schema,
         private string $defaultParser = 'markdown',
+        private ?ShortcodeParser $shortcodes = null,
     ) {}
 
     public function registerParser(Parser $parser): self
@@ -91,7 +93,13 @@ final class SquidInk
             throw UnknownFormat::parser($name, $this->parsers());
         }
 
-        return $this->parsers[$name]->parse($source, $schema ?? $this->schema);
+        $document = $this->parsers[$name]->parse($source, $schema ?? $this->schema);
+
+        // Shortcodes are a pass over the parsed tree rather than something each
+        // parser implements, so every input syntax gets them for free.
+        $this->shortcodes?->process($document);
+
+        return $document;
     }
 
     /**

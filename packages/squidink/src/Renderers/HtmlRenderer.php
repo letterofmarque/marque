@@ -14,6 +14,7 @@ use Marque\SquidInk\Document\Nodes\Image;
 use Marque\SquidInk\Document\Nodes\OrderedList;
 use Marque\SquidInk\Document\Nodes\Shortcode;
 use Marque\SquidInk\Document\Nodes\Text;
+use Marque\SquidInk\Shortcodes\ShortcodeRegistry;
 
 /**
  * Documents to HTML.
@@ -28,11 +29,8 @@ use Marque\SquidInk\Document\Nodes\Text;
  */
 final class HtmlRenderer implements Renderer
 {
-    /**
-     * @param  callable(Shortcode): ?string  $shortcodeRenderer
-     */
     public function __construct(
-        private mixed $shortcodeRenderer = null,
+        private ?ShortcodeRegistry $shortcodes = null,
     ) {}
 
     public function name(): string
@@ -201,17 +199,15 @@ final class HtmlRenderer implements Renderer
             return '';
         }
 
-        if (is_callable($this->shortcodeRenderer)) {
-            $rendered = ($this->shortcodeRenderer)($node);
+        $rendered = $this->shortcodes?->render(
+            $node,
+            $this->name(),
+            fn (): string => $this->children($node),
+        );
 
-            if ($rendered !== null) {
-                return $rendered;
-            }
-        }
-
-        // Unregistered: render the children as ordinary content rather than
-        // erroring, so content written elsewhere still reads sensibly.
-        return $this->children($node);
+        // Unregistered, or registered but declining this format: render the
+        // children as ordinary content rather than erroring.
+        return $rendered ?? $this->children($node);
     }
 
     private function escape(string $value): string

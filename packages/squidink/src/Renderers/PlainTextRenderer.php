@@ -8,7 +8,9 @@ use Marque\SquidInk\Contracts\Renderer;
 use Marque\SquidInk\Document\Node;
 use Marque\SquidInk\Document\Nodes\CodeBlock;
 use Marque\SquidInk\Document\Nodes\Image;
+use Marque\SquidInk\Document\Nodes\Shortcode;
 use Marque\SquidInk\Document\Nodes\Text;
+use Marque\SquidInk\Shortcodes\ShortcodeRegistry;
 
 /**
  * Documents to plain text — API responses, search indexing, notification
@@ -20,6 +22,10 @@ use Marque\SquidInk\Document\Nodes\Text;
  */
 final class PlainTextRenderer implements Renderer
 {
+    public function __construct(
+        private ?ShortcodeRegistry $shortcodes = null,
+    ) {}
+
     public function name(): string
     {
         return 'text';
@@ -43,6 +49,7 @@ final class PlainTextRenderer implements Renderer
             'hard_break' => "\n",
             'image' => $this->image($node),
             'text' => $node instanceof Text ? $node->text() : '',
+            'shortcode' => $this->shortcode($node),
             default => $this->children($node),
         };
     }
@@ -71,6 +78,21 @@ final class PlainTextRenderer implements Renderer
 
         // Verbatim, as everywhere else.
         return $node->code()."\n\n";
+    }
+
+    private function shortcode(Node $node): string
+    {
+        if (! $node instanceof Shortcode) {
+            return '';
+        }
+
+        $rendered = $this->shortcodes?->render(
+            $node,
+            $this->name(),
+            fn (): string => $this->children($node),
+        );
+
+        return $rendered ?? $this->children($node);
     }
 
     private function image(Node $node): string

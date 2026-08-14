@@ -7,10 +7,15 @@ namespace Marque\SquidInk;
 use Illuminate\Support\ServiceProvider;
 use Marque\SquidInk\Contracts\Parser;
 use Marque\SquidInk\Contracts\Renderer;
+use Marque\SquidInk\Contracts\Shortcode;
 use Marque\SquidInk\Document\Schema;
 use Marque\SquidInk\Parsers\MarkdownParser;
 use Marque\SquidInk\Renderers\HtmlRenderer;
 use Marque\SquidInk\Renderers\PlainTextRenderer;
+use Marque\SquidInk\Shortcodes\MediaInfoShortcode;
+use Marque\SquidInk\Shortcodes\ShortcodeParser;
+use Marque\SquidInk\Shortcodes\ShortcodeRegistry;
+use Marque\SquidInk\Shortcodes\SpoilerShortcode;
 
 class SquidInkServiceProvider extends ServiceProvider
 {
@@ -28,9 +33,31 @@ class SquidInkServiceProvider extends ServiceProvider
         PlainTextRenderer::class,
     ];
 
+    private const DEFAULT_SHORTCODES = [
+        SpoilerShortcode::class,
+        MediaInfoShortcode::class,
+    ];
+
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/squidink.php', 'squidink');
+
+        $this->app->singleton(ShortcodeRegistry::class, function ($app): ShortcodeRegistry {
+            $registry = new ShortcodeRegistry;
+
+            $configured = $app['config']->get('squidink.shortcodes', []);
+            $classes = $configured === [] ? self::DEFAULT_SHORTCODES : array_values($configured);
+
+            foreach ($classes as $class) {
+                $shortcode = $app->make($class);
+
+                if ($shortcode instanceof Shortcode) {
+                    $registry->register($shortcode);
+                }
+            }
+
+            return $registry;
+        });
 
         $this->app->singleton(SquidInk::class, function ($app): SquidInk {
             $config = $app['config']->get('squidink', []);
@@ -38,6 +65,7 @@ class SquidInkServiceProvider extends ServiceProvider
             $squidInk = new SquidInk(
                 $this->schemaFrom($config['schema'] ?? []),
                 $config['default_parser'] ?? 'markdown',
+                new ShortcodeParser($app->make(ShortcodeRegistry::class)),
             );
 
             foreach ($this->resolve($config['parsers'] ?? [], self::DEFAULT_PARSERS) as $parser) {

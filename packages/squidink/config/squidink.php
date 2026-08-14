@@ -88,7 +88,15 @@ return [
     */
 
     'shortcodes' => [
-        // 'spoiler' => \Marque\SquidInk\Shortcodes\SpoilerShortcode::class,
+        // Leave empty for the shipped defaults (spoiler, mediainfo). Naming any
+        // here replaces the defaults entirely, so include the ones you want:
+        //
+        // \Marque\SquidInk\Shortcodes\SpoilerShortcode::class,
+        // \Marque\SquidInk\Shortcodes\MediaInfoShortcode::class,
+        // \App\Text\TorrentStatusShortcode::class,
+        //
+        // Written with braces rather than square brackets — {spoiler}...
+        // {/spoiler} — so they are unambiguous alongside BBCode input.
     ],
 
     /*
