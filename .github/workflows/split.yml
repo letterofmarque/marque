@@ -6,10 +6,16 @@ on:
       - main
     tags:
       - '*/v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to split, e.g. guise/v3.1.0 (must already exist)'
+        required: true
+        type: string
 
 jobs:
   split_branch:
-    if: github.ref_type == 'branch'
+    if: github.ref_type == 'branch' && github.event_name == 'push'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -51,18 +57,21 @@ jobs:
           user_email: 'dan@lom.software'
 
   split_tag:
-    if: github.ref_type == 'tag'
+    if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # On dispatch the default checkout is the branch head, not the tag.
+          ref: ${{ github.event.inputs.tag || github.ref }}
 
       - name: Parse tag
         id: tag
         run: |
           # Tag format: <package>/v<version> e.g. cennad/v2.0.1
-          TAG="${GITHUB_REF_NAME}"
+          # On dispatch the tag comes from the input; on push, from the ref.
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
           PACKAGE="${TAG%%/*}"
           VERSION="${TAG#*/}"
           echo "package=${PACKAGE}" >> "$GITHUB_OUTPUT"
