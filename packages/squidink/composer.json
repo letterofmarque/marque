@@ -1,0 +1,64 @@
+{
+    "name": "marque/squidink",
+    "description": "Format-agnostic text pipeline for Marque — parse any supported syntax to a document AST, render it safely to anything",
+    "type": "library",
+    "license": "MIT",
+    "keywords": [
+        "markdown",
+        "bbcode",
+        "ast",
+        "text",
+        "laravel"
+    ],
+    "authors": [
+        {
+            "name": "Letter Of Marque Software",
+            "email": "dan@lom.software",
+            "homepage": "https://lom.software"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/letterofmarque/marque/issues",
+        "source": "https://github.com/letterofmarque/marque"
+    },
+    "require": {
+        "php": "^8.4",
+        "illuminate/support": "^13.0",
+        "league/commonmark": "^2.10"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^11.0",
+        "pestphp/pest": "^5.0",
+        "mockery/mockery": "^1.6"
+    },
+    "autoload": {
+        "psr-4": {
+            "Marque\\SquidInk\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Marque\\SquidInk\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "1.0.x-dev"
+        },
+        "laravel": {
+            "providers": [
+                "Marque\\SquidInk\\SquidInkServiceProvider"
+            ]
+        }
+    },
+    "scripts": {
+        "test": "pest"
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    }
+}
