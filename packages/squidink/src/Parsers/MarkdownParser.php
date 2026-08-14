@@ -123,10 +123,19 @@ final class MarkdownParser implements Parser
             $node instanceof CmListItem => [$this->block(new ListItem, $node, $marks)],
             $node instanceof ListBlock => [$this->list($node, $marks)],
 
-            $node instanceof FencedCode => [new CodeBlock($node->getLiteral(), $this->language($node))],
-            $node instanceof IndentedCode => [new CodeBlock($node->getLiteral())],
+            $node instanceof FencedCode => [new CodeBlock($this->code($node), $this->language($node))],
+            $node instanceof IndentedCode => [new CodeBlock($this->code($node))],
             $node instanceof ThematicBreak => [new HorizontalRule],
-            $node instanceof Newline => [new HardBreak],
+
+            // CommonMark's Newline covers both kinds of line ending, and they
+            // mean different things: a hard break (two trailing spaces, or a
+            // backslash) is a break the author asked for, while a soft break is
+            // just where the source line happened to wrap and renders as
+            // whitespace. Mapping both to HardBreak would make Markdown honour
+            // wrapping the way BBCode does, which CommonMark explicitly does not.
+            $node instanceof Newline => $node->getType() === Newline::HARDBREAK
+                ? [new HardBreak]
+                : [new Text("\n", $marks)],
 
             $node instanceof CmText => [new Text($node->getLiteral(), $marks)],
             $node instanceof CmCode => [new Text($node->getLiteral(), [...$marks, new CodeMark])],
@@ -213,6 +222,24 @@ final class MarkdownParser implements Parser
         $list = $parent->parent();
 
         return $list instanceof ListBlock && $list->isTight();
+    }
+
+    /**
+     * A code block's content, without the newline that precedes its closing
+     * delimiter.
+     *
+     * CommonMark's AST includes that newline because it is part of the block's
+     * literal text, but it is syntax rather than content — the author wrote it to
+     * put ``` on its own line. Dropping it here is what lets the same code block
+     * written in Markdown and in BBCode be byte-identical, which is the whole
+     * point of CodeBlock. Only one is dropped, so deliberate trailing blank lines
+     * survive.
+     */
+    private function code(FencedCode|IndentedCode $node): string
+    {
+        $literal = $node->getLiteral();
+
+        return str_ends_with($literal, "\n") ? substr($literal, 0, -1) : $literal;
     }
 
     private function language(FencedCode $node): ?string

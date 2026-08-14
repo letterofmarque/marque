@@ -74,6 +74,23 @@ describe('MarkdownParser blocks', function () {
     });
 });
 
+describe('MarkdownParser line breaks', function () {
+    it('treats a soft wrap as whitespace, not a break', function () {
+        $doc = parseMarkdown("one\ntwo");
+
+        // CommonMark: a single newline is where the source line happened to wrap.
+        // Emitting a <br> here would make Markdown honour hard-wrapped source the
+        // way BBCode does, which is a different language.
+        expect(nodeTypes($doc))->not->toContain('hard_break');
+    });
+
+    it('honours an explicit hard break', function () {
+        $doc = parseMarkdown("one  \ntwo");
+
+        expect(nodeTypes($doc))->toContain('hard_break');
+    });
+});
+
 describe('MarkdownParser code blocks', function () {
     it('keeps fenced code verbatim', function () {
         $nfo = "  ▄▄▄· ▄▄·\n ▐█ ▀█ ▐█ ▌▪   \n\ttabbed";
@@ -82,8 +99,19 @@ describe('MarkdownParser code blocks', function () {
 
         $block = $doc->children()[0];
 
+        // Exactly what was between the fences: the newline before the closing
+        // fence is syntax, not content. This is what lets the same block written
+        // in BBCode be byte-identical — see FormatEquivalenceTest.
         expect($block)->toBeInstanceOf(CodeBlock::class)
-            ->and($block->code())->toBe($nfo."\n");
+            ->and($block->code())->toBe($nfo);
+    });
+
+    it('keeps a deliberate trailing blank line', function () {
+        $doc = parseMarkdown("```\ncode\n\n```");
+
+        // Only the closing fence's own newline is dropped, so a blank line the
+        // author actually wanted survives.
+        expect($doc->children()[0]->code())->toBe("code\n");
     });
 
     it('records the fence language', function () {
