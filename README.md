@@ -92,28 +92,33 @@ major, how the grey areas are decided, pre-releases, and the support window.
 
 ## Releasing
 
-Packages are versioned independently. To release a package:
+Packages are versioned independently. Use the release script:
 
 ```bash
-git tag <package>/v<version>
-git push origin <package>/v<version>
+bin/release cennad 3.0.1                  # one package
+bin/release guise 3.1.0 usarrs 3.1.0      # several at once
+bin/release --all 3.1.0                   # every package
+bin/release --dry-run guise 3.1.0         # show the plan, change nothing
 ```
 
-For example:
+It runs the test suites first, sorts the release into dependency order, tags, pushes in
+safe batches, waits for each split workflow, and verifies the versions reached Packagist.
+
+To release by hand, tag as `<package>/v<version>` and push. The split workflow parses the
+tag, splits only that package, and pushes the version tag to its sub-repo; Packagist
+picks it up automatically. Two things to watch:
+
+- **Push tags in batches of three or fewer.** GitHub suppresses workflow triggers when
+  more than three tags arrive in a single push — the tags land, nothing splits, and
+  Packagist is never notified. It fails silently.
+- **Release in dependency order.** A package must be published before anything that
+  requires it: `threepio` → `trove` and `id` → everything else.
+
+If a split is missed, re-trigger it from an existing tag:
 
 ```bash
-git tag cennad/v2.0.1
-git push origin cennad/v2.0.1
+gh workflow run 'Split Monorepo' -f tag=guise/v3.1.0
 ```
-
-The split workflow parses the tag, splits only that package, and pushes the version tag to its sub-repo. Packagist picks it up automatically.
-
-**Push tags in batches of three or fewer.** GitHub suppresses workflow triggers when
-more than three tags arrive in a single push — the tags land, nothing splits, and
-Packagist is never notified. It fails silently.
-
-**Release in dependency order.** A package must be published before anything that
-requires it: `threepio` → `trove` and `id` → everything else.
 
 ## Development
 
