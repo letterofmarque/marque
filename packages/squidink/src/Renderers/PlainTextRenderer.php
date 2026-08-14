@@ -6,6 +6,7 @@ namespace Marque\SquidInk\Renderers;
 
 use Marque\SquidInk\Contracts\Renderer;
 use Marque\SquidInk\Document\Node;
+use Marque\SquidInk\Document\Nodes\BlockQuote;
 use Marque\SquidInk\Document\Nodes\CodeBlock;
 use Marque\SquidInk\Document\Nodes\Image;
 use Marque\SquidInk\Document\Nodes\Shortcode;
@@ -41,7 +42,7 @@ final class PlainTextRenderer implements Renderer
         return match ($node->type()) {
             'document' => $this->blocks($node),
             'paragraph', 'heading' => $this->children($node)."\n\n",
-            'block_quote' => $this->children($node)."\n\n",
+            'block_quote' => $this->blockQuote($node),
             'bullet_list', 'ordered_list' => $this->children($node)."\n",
             'list_item' => trim($this->children($node))."\n",
             'code_block' => $this->codeBlock($node),
@@ -68,6 +69,19 @@ final class PlainTextRenderer implements Renderer
         }
 
         return $text;
+    }
+
+    private function blockQuote(Node $node): string
+    {
+        $content = $this->children($node);
+
+        // Who said it is content, not formatting, so it survives into plain text
+        // where a search index can see it.
+        if ($node instanceof BlockQuote && $node->author() !== null) {
+            return $node->author().":\n".$content."\n";
+        }
+
+        return $content."\n\n";
     }
 
     private function codeBlock(Node $node): string

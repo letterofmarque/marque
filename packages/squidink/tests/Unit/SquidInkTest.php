@@ -44,8 +44,8 @@ describe('SquidInk service', function () {
     it('names the available formats when asked for one it does not have', function () {
         $squidInk = app(SquidInk::class);
 
-        expect(fn () => $squidInk->parse('x', 'bbcode'))
-            ->toThrow(UnknownFormat::class, 'Available: markdown.');
+        expect(fn () => $squidInk->parse('x', 'textile'))
+            ->toThrow(UnknownFormat::class, 'markdown');
 
         expect(fn () => $squidInk->render($squidInk->parse('x'), 'pdf'))
             ->toThrow(UnknownFormat::class);
@@ -55,7 +55,15 @@ describe('SquidInk service', function () {
         $squidInk = app(SquidInk::class);
 
         expect($squidInk->hasParser('markdown'))->toBeTrue()
-            ->and($squidInk->hasParser('bbcode'))->toBeFalse()
+            ->and($squidInk->hasParser('bbcode'))->toBeTrue()
+            ->and($squidInk->hasParser('textile'))->toBeFalse()
             ->and($squidInk->hasRenderer('html'))->toBeTrue();
+    });
+
+    it('parses either syntax through the same service', function () {
+        $squidInk = app(SquidInk::class);
+
+        expect($squidInk->convert('**bold**', 'markdown'))
+            ->toBe($squidInk->convert('[b]bold[/b]', 'bbcode'));
     });
 });

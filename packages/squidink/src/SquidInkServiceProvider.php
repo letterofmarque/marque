@@ -9,6 +9,7 @@ use Marque\SquidInk\Contracts\Parser;
 use Marque\SquidInk\Contracts\Renderer;
 use Marque\SquidInk\Contracts\Shortcode;
 use Marque\SquidInk\Document\Schema;
+use Marque\SquidInk\Parsers\BBCodeParser;
 use Marque\SquidInk\Parsers\MarkdownParser;
 use Marque\SquidInk\Renderers\HtmlRenderer;
 use Marque\SquidInk\Renderers\PlainTextRenderer;
@@ -26,6 +27,7 @@ class SquidInkServiceProvider extends ServiceProvider
      */
     private const DEFAULT_PARSERS = [
         MarkdownParser::class,
+        BBCodeParser::class,
     ];
 
     private const DEFAULT_RENDERERS = [

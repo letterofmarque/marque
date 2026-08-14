@@ -7,7 +7,9 @@ namespace Marque\SquidInk\Renderers;
 use Marque\SquidInk\Contracts\Renderer;
 use Marque\SquidInk\Document\Marks\Colour;
 use Marque\SquidInk\Document\Marks\Link;
+use Marque\SquidInk\Document\Marks\Size;
 use Marque\SquidInk\Document\Node;
+use Marque\SquidInk\Document\Nodes\BlockQuote;
 use Marque\SquidInk\Document\Nodes\CodeBlock;
 use Marque\SquidInk\Document\Nodes\Heading;
 use Marque\SquidInk\Document\Nodes\Image;
@@ -29,6 +31,30 @@ use Marque\SquidInk\Shortcodes\ShortcodeRegistry;
  */
 final class HtmlRenderer implements Renderer
 {
+    /**
+     * The order marks nest in, outermost first.
+     *
+     * Marks are a set, not a sequence — but HTML nesting is ordered, so the
+     * renderer has to choose. Choosing by a fixed table rather than by the order
+     * a parser happened to add them is what stops the input syntax leaking into
+     * the output: `***both***` and `[b][i]both[/i][/b]` are the same document and
+     * must render to the same string.
+     *
+     * Link and colour sit outside the emphasis tags so that a styled link is one
+     * anchor containing formatted text, rather than formatting containing several
+     * anchors.
+     */
+    private const MARK_ORDER = [
+        'link',
+        'colour',
+        'size',
+        'bold',
+        'italic',
+        'underline',
+        'strike',
+        'code',
+    ];
+
     public function __construct(
         private ?ShortcodeRegistry $shortcodes = null,
     ) {}
@@ -44,7 +70,7 @@ final class HtmlRenderer implements Renderer
             'document' => $this->children($node),
             'paragraph' => $this->wrap('p', $this->children($node)),
             'heading' => $this->heading($node),
-            'block_quote' => $this->wrap('blockquote', $this->children($node)),
+            'block_quote' => $this->blockQuote($node),
             'bullet_list' => $this->wrap('ul', $this->children($node)),
             'ordered_list' => $this->orderedList($node),
             'list_item' => $this->wrap('li', $this->children($node)),
@@ -79,6 +105,19 @@ final class HtmlRenderer implements Renderer
         $level = $node instanceof Heading ? $node->level() : 1;
 
         return $this->wrap('h'.$level, $this->children($node));
+    }
+
+    private function blockQuote(Node $node): string
+    {
+        $content = $this->children($node);
+
+        // An attributed quote gets a <cite>; browsers ignore <blockquote cite>
+        // for display, and the name is worth showing.
+        if ($node instanceof BlockQuote && $node->author() !== null) {
+            $content = $this->wrap('cite', $this->escape($node->author())).$content;
+        }
+
+        return $this->wrap('blockquote', $content);
     }
 
     private function orderedList(Node $node): string
@@ -142,7 +181,7 @@ final class HtmlRenderer implements Renderer
         $html = $this->escape($node->text());
 
         // Innermost first, so the resulting nesting is stable and predictable.
-        foreach (array_reverse($node->marks()) as $mark) {
+        foreach ($this->ordered($node->marks()) as $mark) {
             $html = match ($mark->type()) {
                 'bold' => $this->wrap('strong', $html),
                 'italic' => $this->wrap('em', $html),
@@ -151,11 +190,42 @@ final class HtmlRenderer implements Renderer
                 'code' => $this->wrap('code', $html),
                 'link' => $this->link($mark, $html),
                 'colour' => $this->colour($mark, $html),
+                'size' => $this->size($mark, $html),
                 default => $html,
             };
         }
 
         return $html;
+    }
+
+    /**
+     * Marks sorted innermost first, ready to wrap around text in sequence.
+     *
+     * Anything not in MARK_ORDER sorts innermost, in its existing relative
+     * order — a mark a consumer added is applied closest to the text rather than
+     * silently dropped or reordered against its peers.
+     *
+     * @param  list<\Marque\SquidInk\Document\Mark>  $marks
+     * @return list<\Marque\SquidInk\Document\Mark>
+     */
+    private function ordered(array $marks): array
+    {
+        $rank = static function (string $type): int {
+            $position = array_search($type, self::MARK_ORDER, true);
+
+            return $position === false ? count(self::MARK_ORDER) : $position;
+        };
+
+        // Stable sort, descending: the last mark applied is the innermost tag.
+        $indexed = [];
+
+        foreach ($marks as $index => $mark) {
+            $indexed[] = [$rank($mark->type()), $index, $mark];
+        }
+
+        usort($indexed, static fn (array $a, array $b): int => $b[0] <=> $a[0] ?: $b[1] <=> $a[1]);
+
+        return array_map(static fn (array $row) => $row[2], $indexed);
     }
 
     private function link(mixed $mark, string $content): string
@@ -191,6 +261,17 @@ final class HtmlRenderer implements Renderer
         // The value is a hex code or a name from a fixed list — validated in the
         // constructor, so it cannot break out of the style attribute.
         return sprintf('<span style="color:%s">%s</span>', $mark->colour(), $content);
+    }
+
+    private function size(mixed $mark, string $content): string
+    {
+        if (! $mark instanceof Size || $mark->length() === '') {
+            return $content;
+        }
+
+        // The length comes from a fixed scale keyed by a validated step, so no
+        // user input reaches the style attribute.
+        return sprintf('<span style="font-size:%s">%s</span>', $mark->length(), $content);
     }
 
     private function shortcode(Node $node): string

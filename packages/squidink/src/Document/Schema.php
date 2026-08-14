@@ -9,6 +9,7 @@ use Marque\SquidInk\Document\Marks\Code as CodeMark;
 use Marque\SquidInk\Document\Marks\Colour;
 use Marque\SquidInk\Document\Marks\Italic;
 use Marque\SquidInk\Document\Marks\Link;
+use Marque\SquidInk\Document\Marks\Size;
 use Marque\SquidInk\Document\Marks\Strike;
 use Marque\SquidInk\Document\Marks\Underline;
 use Marque\SquidInk\Document\Nodes\BlockQuote;
@@ -66,6 +67,7 @@ final class Schema
         'code' => CodeMark::class,
         'link' => Link::class,
         'colour' => Colour::class,
+        'size' => Size::class,
     ];
 
     /**
