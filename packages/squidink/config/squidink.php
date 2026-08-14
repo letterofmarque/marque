@@ -29,7 +29,12 @@ return [
     */
 
     'parsers' => [
+        // Leave empty for the shipped defaults (markdown). Naming any parser
+        // here replaces the defaults entirely, so include the ones you still
+        // want:
+        //
         // 'markdown' => \Marque\SquidInk\Parsers\MarkdownParser::class,
+        // 'bbcode'   => \App\Text\MyBBCodeParser::class,
     ],
 
     /*
@@ -43,6 +48,9 @@ return [
     */
 
     'renderers' => [
+        // Leave empty for the shipped defaults (html, text). As with parsers,
+        // naming any replaces the defaults entirely.
+        //
         // 'html' => \Marque\SquidInk\Renderers\HtmlRenderer::class,
         // 'text' => \Marque\SquidInk\Renderers\PlainTextRenderer::class,
     ],
