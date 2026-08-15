@@ -39,6 +39,8 @@ jobs:
             repo_name: 'disguise'
           - local_path: 'packages/usarrs'
             repo_name: 'usarrs'
+          - local_path: 'packages/squidink'
+            repo_name: 'squidink'
 
     steps:
       - uses: actions/checkout@v4

@@ -17,6 +17,7 @@ Built by [Letter Of Marque Software](https://lom.software).
 | [marque/id](packages/id) | App layout shell (navigation, theming) |
 | [marque/disguise](packages/disguise) | Public web frontend (browse without login) |
 | [marque/usarrs](packages/usarrs) | Auth, user profiles, invites, admin |
+| [marque/squidink](packages/squidink) | Format-agnostic text pipeline (Markdown, BBCode → HTML) |
 
 ## Requirements
 
@@ -40,6 +41,9 @@ composer require marque/cennad
 
 # BitTorrent tracker
 composer require marque/bloodhound
+
+# Rich text for descriptions and posts
+composer require marque/squidink
 ```
 
 ## Features
@@ -61,6 +65,13 @@ composer require marque/bloodhound
 - Livewire components for torrent browsing, viewing, uploading, editing
 - Configurable layouts
 - Dependency-free Blade UI components (from marque/id), styled with Tailwind CSS
+
+### SquidInk (Text)
+- Markdown and BBCode in, HTML and plain text out, one document model between
+- Site owner picks the input syntax; content records the parser that wrote it
+- Schema-declared node vocabulary — unsupported input cannot become unexpected output
+- Editor component whose toolbar is built from the active parser's own syntax
+- Add your own parsers, renderers and shortcodes through the same API the built-ins use
 
 ### Cennad (API)
 - RESTful torrent endpoints
