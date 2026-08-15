@@ -9,6 +9,7 @@ use Marque\SquidInk\Contracts\Renderer;
 use Marque\SquidInk\Document\Node;
 use Marque\SquidInk\Document\Nodes\Document;
 use Marque\SquidInk\Document\Schema;
+use Marque\SquidInk\Editor\Toolbar;
 use Marque\SquidInk\Exceptions\UnknownFormat;
 use Marque\SquidInk\Shortcodes\ShortcodeParser;
 
@@ -80,6 +81,28 @@ final class SquidInk
     public function schema(): Schema
     {
         return $this->schema;
+    }
+
+    public function defaultParser(): string
+    {
+        return $this->defaultParser;
+    }
+
+    /**
+     * The registered parser by name, or null. Editors need the object rather
+     * than the name so they can ask it about its syntax.
+     */
+    public function parser(?string $name = null): ?Parser
+    {
+        return $this->parsers[$name ?? $this->defaultParser] ?? null;
+    }
+
+    /**
+     * The toolbar for a parser — empty when it does not describe its syntax.
+     */
+    public function toolbar(?string $parser = null): Toolbar
+    {
+        return Toolbar::for($this->parser($parser));
     }
 
     /**

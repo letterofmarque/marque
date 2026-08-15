@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Marque\SquidInk;
 
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
 use Marque\SquidInk\Contracts\Parser;
 use Marque\SquidInk\Contracts\Renderer;
@@ -90,10 +91,29 @@ class SquidInkServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->loadViewsFrom(__DIR__.'/../resources/views', 'squidink');
+
+        Blade::anonymousComponentNamespace(__DIR__.'/../resources/views/components', 'squidink');
+
+        // Livewire adds live preview, which needs a server round trip. It is
+        // deliberately optional: the Blade editor works without it, so a host app
+        // that does not use Livewire is not shut out of the package.
+        if (class_exists(\Livewire\Livewire::class)) {
+            \Livewire\Livewire::component('squidink-editor', Livewire\Editor::class);
+        }
+
         if ($this->app->runningInConsole()) {
             $this->publishes([
                 __DIR__.'/../config/squidink.php' => config_path('squidink.php'),
             ], 'squidink-config');
+
+            $this->publishes([
+                __DIR__.'/../resources/views' => resource_path('views/vendor/squidink'),
+            ], 'squidink-views');
+
+            $this->publishes([
+                __DIR__.'/../resources/js' => public_path('vendor/squidink'),
+            ], 'squidink-assets');
         }
     }
 

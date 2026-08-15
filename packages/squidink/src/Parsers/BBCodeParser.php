@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Marque\SquidInk\Parsers;
 
+use Marque\SquidInk\Contracts\DescribesSyntax;
 use Marque\SquidInk\Contracts\Parser;
 use Marque\SquidInk\Document\Mark;
 use Marque\SquidInk\Document\Marks\Bold;
@@ -27,6 +28,7 @@ use Marque\SquidInk\Document\Nodes\OrderedList;
 use Marque\SquidInk\Document\Nodes\Paragraph;
 use Marque\SquidInk\Document\Nodes\Text;
 use Marque\SquidInk\Document\Schema;
+use Marque\SquidInk\Editor\Insertion;
 use Marque\SquidInk\Parsers\BBCode\Lexer;
 use Marque\SquidInk\Parsers\BBCode\Tag;
 use Marque\SquidInk\Parsers\BBCode\Token;
@@ -52,7 +54,7 @@ use Marque\SquidInk\Parsers\BBCode\Token;
  * that TBDev, XBTiT and the Gazelle forks agree on; dialect-specific tags belong
  * in booty's converters, not here.
  */
-final class BBCodeParser implements Parser
+final class BBCodeParser implements DescribesSyntax, Parser
 {
     /**
      * The vocabulary. Anything absent renders as the literal text typed.
@@ -103,6 +105,61 @@ final class BBCodeParser implements Parser
     public function name(): string
     {
         return 'bbcode';
+    }
+
+    /**
+     * The toolbar vocabulary, derived from the tag table above rather than
+     * restated: a tag this parser cannot parse must not get a button.
+     */
+    private const INSERTIONS = [
+        'bold' => ['B', 'b'],
+        'italic' => ['I', 'i'],
+        'underline' => ['U', 'u'],
+        'strike' => ['S', 's'],
+        'link' => ['Link', 'url'],
+        'image' => ['Image', 'img'],
+        'quote' => ['Quote', 'quote'],
+        'code' => ['Code', 'code'],
+        'list' => ['List', 'list'],
+        'colour' => ['Colour', 'color'],
+        'size' => ['Size', 'size'],
+    ];
+
+    public function actions(): array
+    {
+        return array_keys(self::INSERTIONS);
+    }
+
+    public function insertion(string $action): ?Insertion
+    {
+        if (! isset(self::INSERTIONS[$action])) {
+            return null;
+        }
+
+        [$label, $tag] = self::INSERTIONS[$action];
+
+        // Tags taking an argument prompt for it in the opening tag, so the
+        // selection stays the visible text rather than the target.
+        return match ($action) {
+            'link' => new Insertion($action, $label, '[url=https://]', '[/url]', 'link text'),
+            'image' => new Insertion($action, $label, '[img]', '[/img]', 'https://'),
+            'colour' => new Insertion($action, $label, '[color=red]', '[/color]', 'text'),
+            'size' => new Insertion($action, $label, '[size=5]', '[/size]', 'text'),
+
+            'quote', 'code' => new Insertion(
+                $action,
+                $label,
+                '['.$tag.']',
+                '[/'.$tag.']',
+                $action === 'code' ? 'code' : 'quoted text',
+                block: true,
+            ),
+
+            // A list needs an item marker to be worth anything.
+            'list' => new Insertion($action, $label, "[list]\n[*]", "\n[/list]", 'item', block: true),
+
+            default => new Insertion($action, $label, '['.$tag.']', '[/'.$tag.']', 'text'),
+        };
     }
 
     public function parse(string $source, Schema $schema): Document

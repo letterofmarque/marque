@@ -25,6 +25,7 @@ use League\CommonMark\Node\Inline\Newline;
 use League\CommonMark\Node\Inline\Text as CmText;
 use League\CommonMark\Node\Node as CmNode;
 use League\CommonMark\Parser\MarkdownParser as CommonMarkParser;
+use Marque\SquidInk\Contracts\DescribesSyntax;
 use Marque\SquidInk\Contracts\Parser;
 use Marque\SquidInk\Document\Mark;
 use Marque\SquidInk\Document\Marks\Bold;
@@ -46,6 +47,7 @@ use Marque\SquidInk\Document\Nodes\OrderedList;
 use Marque\SquidInk\Document\Nodes\Paragraph;
 use Marque\SquidInk\Document\Nodes\Text;
 use Marque\SquidInk\Document\Schema;
+use Marque\SquidInk\Editor\Insertion;
 
 /**
  * CommonMark input.
@@ -59,7 +61,7 @@ use Marque\SquidInk\Document\Schema;
  * peer of BBCode instead of the privileged format everything else converts
  * into, and it is where raw HTML gets dropped.
  */
-final class MarkdownParser implements Parser
+final class MarkdownParser implements DescribesSyntax, Parser
 {
     private CommonMarkParser $engine;
 
@@ -80,6 +82,57 @@ final class MarkdownParser implements Parser
     public function name(): string
     {
         return 'markdown';
+    }
+
+    /**
+     * Markdown expresses fewer things than BBCode does, and declines the rest.
+     *
+     * There is no underline, colour or size in CommonMark, so those return null
+     * and the toolbar simply omits the buttons rather than offering ones that
+     * would insert literal junk. Headings go the other way — Markdown has them
+     * and BBCode does not.
+     */
+    private const INSERTIONS = [
+        'bold' => 'B',
+        'italic' => 'I',
+        'strike' => 'S',
+        'link' => 'Link',
+        'image' => 'Image',
+        'heading' => 'H',
+        'quote' => 'Quote',
+        'code' => 'Code',
+        'list' => 'List',
+    ];
+
+    public function actions(): array
+    {
+        return array_keys(self::INSERTIONS);
+    }
+
+    public function insertion(string $action): ?Insertion
+    {
+        $label = self::INSERTIONS[$action] ?? null;
+
+        if ($label === null) {
+            return null;
+        }
+
+        return match ($action) {
+            'bold' => new Insertion($action, $label, '**', '**', 'text'),
+            'italic' => new Insertion($action, $label, '*', '*', 'text'),
+            'strike' => new Insertion($action, $label, '~~', '~~', 'text'),
+            'code' => new Insertion($action, $label, '`', '`', 'code'),
+
+            'link' => new Insertion($action, $label, '[', '](https://)', 'link text'),
+            'image' => new Insertion($action, $label, '![', '](https://)', 'alt text'),
+
+            // Line-level constructs: no suffix, and they need their own line.
+            'heading' => new Insertion($action, $label, '## ', '', 'Heading', block: true),
+            'quote' => new Insertion($action, $label, '> ', '', 'quoted text', block: true),
+            'list' => new Insertion($action, $label, '- ', '', 'item', block: true),
+
+            default => null,
+        };
     }
 
     public function parse(string $source, Schema $schema): Document
