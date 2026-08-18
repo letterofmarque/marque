@@ -1,0 +1,101 @@
+{
+    "name": "marque/parley",
+    "description": "Polymorphic threaded discussion for Marque — torrent comments and forum-lite from one data model",
+    "type": "library",
+    "license": "MIT",
+    "keywords": [
+        "comments",
+        "discussion",
+        "forum",
+        "threads",
+        "laravel"
+    ],
+    "authors": [
+        {
+            "name": "Letter Of Marque Software",
+            "email": "dan@lom.software",
+            "homepage": "https://lom.software"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/letterofmarque/marque/issues",
+        "source": "https://github.com/letterofmarque/marque"
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../trove",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../threepio",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../id",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../squidink",
+            "options": {
+                "symlink": true
+            }
+        }
+    ],
+    "require": {
+        "php": "^8.4",
+        "marque/trove": "^3.0",
+        "marque/id": "^3.0",
+        "marque/squidink": "^1.0",
+        "illuminate/support": "^13.0",
+        "illuminate/database": "^13.0",
+        "illuminate/routing": "^13.0",
+        "illuminate/view": "^13.0",
+        "illuminate/auth": "^13.0",
+        "livewire/livewire": "^4.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^11.0",
+        "pestphp/pest": "^5.0",
+        "mockery/mockery": "^1.6"
+    },
+    "autoload": {
+        "psr-4": {
+            "Marque\\Parley\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Marque\\Parley\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "1.0.x-dev"
+        },
+        "laravel": {
+            "providers": [
+                "Marque\\Parley\\ParleyServiceProvider"
+            ]
+        }
+    },
+    "scripts": {
+        "test": "pest"
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    }
+}

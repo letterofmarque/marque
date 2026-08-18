@@ -41,6 +41,8 @@ jobs:
             repo_name: 'usarrs'
           - local_path: 'packages/squidink'
             repo_name: 'squidink'
+          - local_path: 'packages/parley'
+            repo_name: 'parley'
 
     steps:
       - uses: actions/checkout@v4

@@ -27,6 +27,7 @@ jobs:
           - guise
           - disguise
           - usarrs
+          - parley
 
     name: ${{ matrix.package }} (PHP ${{ matrix.php }})
 
