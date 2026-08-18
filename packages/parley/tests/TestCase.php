@@ -50,6 +50,12 @@ abstract class TestCase extends BaseTestCase
         // Rendering is squidink's job; caching it would only obscure test
         // failures behind a stale render.
         $app['config']->set('squidink.cache.enabled', false);
+
+        // SQLite ships with foreign key enforcement OFF, so cascadeOnDelete and
+        // nullOnDelete silently do nothing under test unless this is set — the
+        // constraints exist in the schema and are never exercised. Turning it on
+        // is what makes the referential behaviour in these tests mean anything.
+        $app['config']->set('database.connections.testing.foreign_key_constraints', true);
     }
 
     protected function defineDatabaseMigrations(): void

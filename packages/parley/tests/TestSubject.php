@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Marque\Parley\Tests;
 
 use Illuminate\Database\Eloquent\Model;
+use Marque\Parley\Concerns\HasThreads;
 
 /**
  * Something a discussion attaches to.
@@ -17,6 +18,8 @@ use Illuminate\Database\Eloquent\Model;
  */
 class TestSubject extends Model
 {
+    use HasThreads;
+
     protected $table = 'test_subjects';
 
     protected $guarded = [];
