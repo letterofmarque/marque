@@ -5,13 +5,25 @@ declare(strict_types=1);
 namespace Marque\Parley;
 
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use Marque\Parley\Contracts\PostServiceInterface;
+use Marque\Parley\Contracts\ThreadServiceInterface;
+use Marque\Parley\Models\Post;
+use Marque\Parley\Models\Thread;
+use Marque\Parley\Policies\PostPolicy;
+use Marque\Parley\Policies\ThreadPolicy;
+use Marque\Parley\Services\PostService;
+use Marque\Parley\Services\ThreadService;
 
 class ParleyServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/parley.php', 'parley');
+
+        $this->app->bind(ThreadServiceInterface::class, ThreadService::class);
+        $this->app->bind(PostServiceInterface::class, PostService::class);
     }
 
     public function boot(): void
@@ -22,6 +34,7 @@ class ParleyServiceProvider extends ServiceProvider
         Blade::anonymousComponentNamespace(__DIR__.'/../resources/views/components', 'parley');
 
         $this->registerRoutes();
+        $this->registerPolicies();
 
         // Livewire is how parley's UI is delivered, but the models, services and
         // policies work without it — an API-only consumer can use the package
@@ -44,6 +57,12 @@ class ParleyServiceProvider extends ServiceProvider
                 __DIR__.'/../database/migrations' => database_path('migrations'),
             ], 'parley-migrations');
         }
+    }
+
+    protected function registerPolicies(): void
+    {
+        Gate::policy(Thread::class, ThreadPolicy::class);
+        Gate::policy(Post::class, PostPolicy::class);
     }
 
     /**
