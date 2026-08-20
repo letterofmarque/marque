@@ -47,6 +47,13 @@ abstract class TestCase extends BaseTestCase
         $app['config']->set('trove.user_model', TestUser::class);
         $app['config']->set('auth.providers.users.model', TestUser::class);
 
+        // The forum's full-page components render through parley's own
+        // layout, which defaults to id::layouts.app — that pulls in Laravel's
+        // Vite helper, which has no manifest under Testbench. A minimal test
+        // layout sidesteps it, same fix guise's own suite already needed.
+        $app['view']->addNamespace('parley-test', __DIR__.'/views');
+        $app['config']->set('parley.layout', 'parley-test::layouts.app');
+
         // Rendering is squidink's job; caching it would only obscure test
         // failures behind a stale render.
         $app['config']->set('squidink.cache.enabled', false);

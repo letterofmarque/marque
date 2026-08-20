@@ -18,6 +18,7 @@ Built by [Letter Of Marque Software](https://lom.software).
 | [marque/disguise](packages/disguise) | Public web frontend (browse without login) |
 | [marque/usarrs](packages/usarrs) | Auth, user profiles, invites, admin |
 | [marque/squidink](packages/squidink) | Format-agnostic text pipeline (Markdown, BBCode → HTML) |
+| [marque/parley](packages/parley) | Polymorphic threaded discussion (torrent comments + forum) |
 
 ## Requirements
 
@@ -44,6 +45,9 @@ composer require marque/bloodhound
 
 # Rich text for descriptions and posts
 composer require marque/squidink
+
+# Torrent comments and a lightweight forum
+composer require marque/parley
 ```
 
 ## Features
@@ -78,6 +82,13 @@ composer require marque/squidink
 - Token-based authentication (Laravel Passport)
 - Configurable routes and middleware
 
+### Parley (Discussion)
+- Torrent comments and a lightweight forum from one polymorphic model — attach discussion
+  to any model with the `HasThreads` trait
+- Arbitrary-depth nested replies, pin/lock/soft-delete moderation keyed off trove roles
+- Forum behind a config toggle that genuinely removes its routes, not just its nav links
+- Post bodies render through marque/squidink — no formatting or escaping of its own
+
 ## Configuration
 
 Publish the config files:
@@ -87,6 +98,7 @@ php artisan vendor:publish --tag=trove-config
 php artisan vendor:publish --tag=bloodhound-config
 php artisan vendor:publish --tag=guise-config
 php artisan vendor:publish --tag=cennad-config
+php artisan vendor:publish --tag=parley-config
 ```
 
 ## Versioning

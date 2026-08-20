@@ -7,8 +7,14 @@ namespace Marque\Parley;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
 use Marque\Parley\Contracts\PostServiceInterface;
 use Marque\Parley\Contracts\ThreadServiceInterface;
+use Marque\Parley\Livewire\CommentThread;
+use Marque\Parley\Livewire\Forum\CategoryIndex;
+use Marque\Parley\Livewire\Forum\ThreadCreate;
+use Marque\Parley\Livewire\Forum\ThreadIndex;
+use Marque\Parley\Livewire\Forum\ThreadShow;
 use Marque\Parley\Models\Post;
 use Marque\Parley\Models\Thread;
 use Marque\Parley\Policies\PostPolicy;
@@ -82,6 +88,17 @@ class ParleyServiceProvider extends ServiceProvider
 
     protected function registerLivewireComponents(): void
     {
-        // Registered as the components land.
+        Livewire::component('parley-comment-thread', CommentThread::class);
+
+        // The forum's own full-page components are registered unconditionally
+        // here, same as the comment thread — it's route registration
+        // (registerRoutes()) that actually gates the forum behind the config
+        // toggle. Registering the Livewire components regardless costs
+        // nothing (nothing routes to them when the toggle is off) and keeps
+        // this method a plain list rather than duplicating the toggle check.
+        Livewire::component('parley-forum-category-index', CategoryIndex::class);
+        Livewire::component('parley-forum-thread-index', ThreadIndex::class);
+        Livewire::component('parley-forum-thread-show', ThreadShow::class);
+        Livewire::component('parley-forum-thread-create', ThreadCreate::class);
     }
 }
