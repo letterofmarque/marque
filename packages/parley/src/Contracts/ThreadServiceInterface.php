@@ -22,8 +22,25 @@ interface ThreadServiceInterface
      * yet. Thin wrapper over HasThreads::comments() at the service layer, so
      * callers that go through services rather than the model directly still
      * get lazy creation.
+     *
+     * @throws \LogicException if $subject does not use HasThreads — use
+     *                          threadFor() instead for a model that can't
+     *                          take the trait (see docs/integration.md).
      */
     public function forSubject(Model $subject, Authenticatable $user): Thread;
+
+    /**
+     * The comment thread for an arbitrary model, created if it does not exist
+     * yet — without requiring HasThreads on the model.
+     *
+     * This is the entry point for a consumer that cannot add HasThreads to the
+     * subject itself, typically because the subject is owned by a mandatory
+     * package that can't take a dependency on parley (docs/integration.md,
+     * "attaching to a model you don't own"). It works against the subject's
+     * morph class and key directly, the same identity HasThreads::comments()
+     * resolves through — the two paths always find the same thread.
+     */
+    public function threadFor(Model $subject, Authenticatable $user): Thread;
 
     public function update(Thread $thread, string $title): Thread;
 

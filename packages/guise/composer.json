@@ -35,6 +35,20 @@
             "options": {
                 "symlink": true
             }
+        },
+        {
+            "type": "path",
+            "url": "../squidink",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../parley",
+            "options": {
+                "symlink": true
+            }
         }
     ],
     "require": {
@@ -50,7 +64,12 @@
     "require-dev": {
         "orchestra/testbench": "^11.0",
         "pestphp/pest": "^5.0",
-        "mockery/mockery": "^1.6"
+        "mockery/mockery": "^1.6",
+        "marque/squidink": "^1.0",
+        "marque/parley": "^1.0"
+    },
+    "suggest": {
+        "marque/parley": "Adds a comment thread to the torrent show page — see docs/integration.md"
     },
     "autoload": {
         "psr-4": {

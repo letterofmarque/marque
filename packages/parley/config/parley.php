@@ -92,6 +92,12 @@ return [
     'format' => [
         'parser' => env('PARLEY_PARSER'),
         'schema' => 'permissive',
+
+        // Source-text length cap for a post body, enforced at the Livewire
+        // component's validation layer. Not a squidink or database concern —
+        // this is purely "how much can one message be", the same kind of
+        // limit any UGC form needs.
+        'max_length' => env('PARLEY_MAX_LENGTH', 20000),
     ],
 
     /*

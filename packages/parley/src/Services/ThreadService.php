@@ -38,6 +38,27 @@ class ThreadService implements ThreadServiceInterface
         return $subject->comments($user->getAuthIdentifier());
     }
 
+    public function threadFor(Model $subject, Authenticatable $user): Thread
+    {
+        // Same identity HasThreads::comments() resolves through — a subject
+        // found via the trait and one found via this method always land on
+        // the same row, whichever path a consumer happens to use.
+        $thread = Thread::comments()
+            ->where('threadable_type', $subject->getMorphClass())
+            ->where('threadable_id', $subject->getKey())
+            ->first();
+
+        if ($thread !== null) {
+            return $thread;
+        }
+
+        return Thread::create([
+            'threadable_type' => $subject->getMorphClass(),
+            'threadable_id' => $subject->getKey(),
+            'user_id' => $user->getAuthIdentifier(),
+        ]);
+    }
+
     public function update(Thread $thread, string $title): Thread
     {
         $thread->update(['title' => $title]);

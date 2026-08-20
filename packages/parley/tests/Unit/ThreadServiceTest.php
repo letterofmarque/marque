@@ -47,6 +47,58 @@ describe('ThreadService', function () {
             ->and(Thread::count())->toBe(1);
     });
 
+    it('resolves a comment thread for a subject WITHOUT requiring HasThreads', function () {
+        // threadFor() is the entry point a consumer uses when it cannot add
+        // HasThreads to the model itself — see docs/integration.md,
+        // "attaching to a model you don't own". Deliberately a bare model
+        // with no HasThreads, unlike every other test in this file.
+        $subject = new class extends \Illuminate\Database\Eloquent\Model {
+            protected $table = 'test_subjects';
+
+            protected $guarded = [];
+        };
+        $subject->save();
+
+        $user = TestUser::factory()->create();
+
+        $thread = threadService()->threadFor($subject, $user);
+
+        expect($thread->isComments())->toBeTrue()
+            ->and($thread->threadable_id)->toBe($subject->id)
+            ->and($thread->threadable_type)->toBe($subject->getMorphClass());
+    });
+
+    it('returns the same thread from threadFor on a second call rather than creating another', function () {
+        $subject = new class extends \Illuminate\Database\Eloquent\Model {
+            protected $table = 'test_subjects';
+
+            protected $guarded = [];
+        };
+        $subject->save();
+
+        $user = TestUser::factory()->create();
+
+        $first = threadService()->threadFor($subject, $user);
+        $second = threadService()->threadFor($subject->fresh(), $user);
+
+        expect($second->id)->toBe($first->id)
+            ->and(Thread::count())->toBe(1);
+    });
+
+    it('finds the same thread whether resolved via HasThreads or threadFor', function () {
+        // The two entry points must agree on identity — a consumer that owns
+        // its model and uses HasThreads, and one that can't and uses
+        // threadFor(), have to land on the same row for the same subject.
+        $user = TestUser::factory()->create();
+        $subject = TestSubject::create(['name' => 'a thing']);
+
+        $viaTrait = threadService()->forSubject($subject, $user);
+        $viaBareModel = threadService()->threadFor($subject->fresh(), $user);
+
+        expect($viaBareModel->id)->toBe($viaTrait->id)
+            ->and(Thread::count())->toBe(1);
+    });
+
     it('refuses a subject that does not use HasThreads', function () {
         $subject = new class extends \Illuminate\Database\Eloquent\Model {
             protected $table = 'test_subjects';
