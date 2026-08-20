@@ -38,7 +38,7 @@
         },
         {
             "type": "path",
-            "url": "../id",
+            "url": "../ise",
             "options": {
                 "symlink": true
             }
@@ -54,7 +54,7 @@
     "require": {
         "php": "^8.4",
         "marque/trove": "^3.0",
-        "marque/id": "^3.0",
+        "marque/ise": "^1.0",
         "marque/squidink": "^1.0",
         "illuminate/support": "^13.0",
         "illuminate/database": "^13.0",

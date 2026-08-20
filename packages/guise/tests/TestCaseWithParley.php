@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Marque\Guise\Tests;
 
-use Marque\Id\IdServiceProvider;
 use Marque\Parley\ParleyServiceProvider;
 use Marque\SquidInk\SquidInkServiceProvider;
 

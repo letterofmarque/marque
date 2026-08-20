@@ -11,7 +11,7 @@ abstract class Component extends LivewireComponent
 {
     protected function disguiseLayout(): string
     {
-        return config('disguise.layout', 'id::layouts.app');
+        return config('disguise.layout', 'ise::layouts.app');
     }
 
     protected function disguiseView(string $view, array $data = []): View

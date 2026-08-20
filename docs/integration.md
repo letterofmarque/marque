@@ -85,9 +85,23 @@ if (class_exists(\Marque\Parley\Contracts\ThreadServiceInterface::class)) {
 
 `Torrent` never imports, extends, or knows about `HasThreads`. `trove`'s `composer.json` gains no new dependency. `guise` is the only package that knows both sides exist, and it already `suggest`s parley rather than requiring it.
 
+## Pattern 4: the second instance is a promotion trigger, not a documentation trigger
+
+The 2026-08-20 cross-package review found the same pattern hand-copied across packages more than once, each copy drifting slightly because there was nothing to copy *from* — only sibling packages to reverse-engineer:
+
+- `providerIsLoaded()` optional-detection existed correctly in guise→parley, but `id` (now `ise`)'s own nav component (deciding whether to render guise/disguise/usarrs nav items) still used `class_exists()` — the exact anti-pattern this doc's Pattern 1 exists to rule out. The package other packages are meant to copy from was itself the odd one out. **Fixed** as part of the `id`→`ise` rename (2026-08-20) — `Navigation::hasProvider()` now uses `providerIsLoaded()`.
+- guise, disguise, usarrs, and parley all independently wrote an identical six-line `abstract class Component extends LivewireComponent` with a `<pkg>Layout()`/`<pkg>View()` pair reading `config('<pkg>.layout', 'ise::layouts.app')`. Four hand-copies of the same idea, no shared source. Still open — see below.
+
+**The rule going forward: when a pattern gets written a second time, that is the signal to check whether it belongs one level down — as a real attachment point in the package everything already depends on (`ise` or `trove`) — not just documented more thoroughly where it sits.** Writing a better comparison of the existing copies doesn't stop a third copy from drifting; giving the third package something to `use` or `extend` does.
+
+Concretely: the fix here is for `ise` (formerly `id` — see `packages/ise/README.md` for the rename) to ship `Marque\Ise\Livewire\HasConfiguredLayout` — the layout-and-view helper every full-page Livewire component package has been hand-writing — so guise/disguise/usarrs/parley use it instead of their own copies, and a fifth package gets it for free. Not built yet; tracked as job #10560 in Cornerstone.
+
+This doesn't apply to *every* duplication — the Testbench/Vite test-layout-namespace fix (job #10561) is test scaffolding, not runtime code a package depends on, so it's a documentation fix, not a promotion. The test is: **does the third package need to `require`/`extend`/`use` something to get this for free, or does it just need to know the fact?** If the former, promote it into the shared package. If the latter, document it.
+
 ## Checklist for the next optional→required wiring
 
 1. Composer: optional package is `suggest`, never `require`, on the consuming side.
-2. Provider: guard registration/routes with `class_exists()` on a class from the optional package.
+2. Provider: guard registration with `class_exists()` on a class from the optional package — this narrower case is fine, since you control whether your own registration depends on the other package having booted first. For a check that decides whether to *render* the other package's UI (a view, a Livewire tag), use `app()->providerIsLoaded()` instead (Pattern 1).
 3. Views: guard the *inclusion* of optional-package UI at the parent template, never inside the optional package's own view. If a view must render either way, own its markup rather than referencing the optional package's components.
 4. Models: never add an optional package's trait to a model owned by a mandatory package. Give the optional package a service entry point that works against a bare `Model` (morph class + key), and let the *consuming, optional-aware* package do the wiring.
+5. Before shipping the wiring: is this the *second* time this shape of integration has been built? If so, stop and check whether it belongs as an attachment point in `ise`/`trove` instead of a second hand-copy (Pattern 4).

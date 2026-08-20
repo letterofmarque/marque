@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Marque\Id\View\Components;
+namespace Marque\Ise\View\Components;
 
 use Livewire\Component;
 
@@ -21,13 +21,13 @@ class Navigation extends Component
 
     public function mount(): void
     {
-        $this->appName = config('id.app_name', 'Marque');
+        $this->appName = config('ise.app_name', 'Marque');
         $this->items = $this->detectNavItems();
     }
 
     public function render(): \Illuminate\Contracts\View\View
     {
-        return view('id::components.navigation');
+        return view('ise::components.navigation');
     }
 
     /**
@@ -87,8 +87,15 @@ class Navigation extends Component
         return app('router')->has($name);
     }
 
+    /**
+     * Whether the given package is actually wired into this app, not just
+     * autoloadable — see docs/integration.md, Pattern 1. class_exists() would
+     * say yes for a require-dev-only install where the provider never
+     * booted; this decides whether to RENDER another package's nav items, so
+     * it needs the stronger check.
+     */
     private function hasProvider(string $class): bool
     {
-        return class_exists($class);
+        return app()->providerIsLoaded($class);
     }
 }

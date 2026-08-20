@@ -25,7 +25,7 @@
 
 @if ($icon)
     <div class="relative {{ $attributes->get('class') ? '' : 'w-full' }}">
-        <x-id::icon
+        <x-ise::icon
             :name="$icon"
             class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400 dark:text-zinc-500"
         />

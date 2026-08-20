@@ -21,7 +21,7 @@
     // This template deliberately references no component from the id package.
     // Blade resolves components at COMPILE time, so a `@if (class_exists(...))`
     // guard around one does not help — the compiler tries to locate it either way
-    // and the view explodes wherever marque/id is not installed. A text pipeline
+    // and the view explodes wherever marque/ise is not installed. A text pipeline
     // must not require a UI package to render, so this template owns its own
     // markup and matches id's classes by hand.
     //

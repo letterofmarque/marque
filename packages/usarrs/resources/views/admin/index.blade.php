@@ -1,8 +1,8 @@
 <div class="flex h-full w-full flex-1 flex-col gap-4">
-    <x-id::heading size="xl">{{ __('Users') }}</x-id::heading>
+    <x-ise::heading size="xl">{{ __('Users') }}</x-ise::heading>
 
     <div class="flex items-center gap-4">
-        <x-id::input
+        <x-ise::input
             wire:model.live.debounce.300ms="search"
             placeholder="{{ __('Search users...') }}"
             icon="magnifying-glass"
@@ -11,7 +11,7 @@
     </div>
 
     <div class="rounded-xl border border-zinc-200 dark:border-zinc-700">
-        <x-id::table>
+        <x-ise::table>
             <thead>
                 <tr class="border-b border-zinc-200 dark:border-zinc-700">
                     <th class="px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">{{ __('Name') }}</th>
@@ -30,20 +30,20 @@
                         <td class="px-3 py-2">{{ ucfirst($user->role->value ?? $user->role) }}</td>
                         <td class="px-3 py-2">{{ ucfirst($user->status ?? 'active') }}</td>
                         <td class="px-3 py-2">
-                            <x-id::button variant="ghost" size="sm" :href="route('admin.users.show', $user)" wire:navigate>
+                            <x-ise::button variant="ghost" size="sm" :href="route('admin.users.show', $user)" wire:navigate>
                                 {{ __('View') }}
-                            </x-id::button>
+                            </x-ise::button>
                         </td>
                     </tr>
                 @empty
                     <tr>
                         <td colspan="5" class="px-3 py-8 text-center">
-                            <x-id::text class="text-zinc-500">{{ __('No users found.') }}</x-id::text>
+                            <x-ise::text class="text-zinc-500">{{ __('No users found.') }}</x-ise::text>
                         </td>
                     </tr>
                 @endforelse
             </tbody>
-        </x-id::table>
+        </x-ise::table>
     </div>
 
     @if ($users->hasPages())

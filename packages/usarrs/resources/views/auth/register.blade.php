@@ -1,45 +1,45 @@
 <div class="flex min-h-full items-center justify-center py-12 sm:px-6 lg:px-8">
     <div class="w-full max-w-md space-y-8">
         <div class="text-center">
-            <x-id::heading size="xl">{{ __('Create Account') }}</x-id::heading>
-            <x-id::text class="mt-2 text-zinc-500">
+            <x-ise::heading size="xl">{{ __('Create Account') }}</x-ise::heading>
+            <x-ise::text class="mt-2 text-zinc-500">
                 {{ __('Register for a new account') }}
-            </x-id::text>
+            </x-ise::text>
         </div>
 
         <form wire:submit="register" class="space-y-6">
             @if ($inviteRequired)
-                <x-id::field :label="__('Invite Code')" name="invite">
-                    <x-id::input wire:model="invite" required />
-                </x-id::field>
+                <x-ise::field :label="__('Invite Code')" name="invite">
+                    <x-ise::input wire:model="invite" required />
+                </x-ise::field>
             @endif
 
-            <x-id::field :label="__('Name')" name="name">
-                <x-id::input wire:model="name" required autofocus />
-            </x-id::field>
+            <x-ise::field :label="__('Name')" name="name">
+                <x-ise::input wire:model="name" required autofocus />
+            </x-ise::field>
 
-            <x-id::field :label="__('Email')" name="email">
-                <x-id::input wire:model="email" type="email" required />
-            </x-id::field>
+            <x-ise::field :label="__('Email')" name="email">
+                <x-ise::input wire:model="email" type="email" required />
+            </x-ise::field>
 
-            <x-id::field :label="__('Password')" name="password">
-                <x-id::input wire:model="password" type="password" required />
-            </x-id::field>
+            <x-ise::field :label="__('Password')" name="password">
+                <x-ise::input wire:model="password" type="password" required />
+            </x-ise::field>
 
-            <x-id::field :label="__('Confirm Password')">
-                <x-id::input wire:model="password_confirmation" type="password" required />
-            </x-id::field>
+            <x-ise::field :label="__('Confirm Password')">
+                <x-ise::input wire:model="password_confirmation" type="password" required />
+            </x-ise::field>
 
-            <x-id::button type="submit" variant="primary" class="w-full">
+            <x-ise::button type="submit" variant="primary" class="w-full">
                 {{ __('Register') }}
-            </x-id::button>
+            </x-ise::button>
         </form>
 
-        <x-id::text class="text-center text-sm text-zinc-500">
+        <x-ise::text class="text-center text-sm text-zinc-500">
             {{ __('Already have an account?') }}
             <a href="{{ route('login') }}" class="text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100" wire:navigate>
                 {{ __('Log in') }}
             </a>
-        </x-id::text>
+        </x-ise::text>
     </div>
 </div>

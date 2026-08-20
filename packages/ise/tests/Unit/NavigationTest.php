@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use Marque\Id\View\Components\Navigation;
+use Marque\Ise\View\Components\Navigation;
 
 describe('Navigation Component', function () {
     it('can be resolved from container', function () {
@@ -12,7 +12,7 @@ describe('Navigation Component', function () {
     });
 
     it('uses app name from config', function () {
-        config()->set('id.app_name', 'TestTracker');
+        config()->set('ise.app_name', 'TestTracker');
 
         $component = $this->app->make(Navigation::class);
         $component->mount();

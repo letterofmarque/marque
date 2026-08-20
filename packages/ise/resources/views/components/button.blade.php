@@ -43,25 +43,25 @@
 @if ($href)
     <a href="{{ $href }}" {{ $attributes->class($classes) }}>
         @if ($icon)
-            <x-id::icon :name="$icon" :class="$iconSize" />
+            <x-ise::icon :name="$icon" :class="$iconSize" />
         @endif
 
         {{ $slot }}
 
         @if ($iconTrailing)
-            <x-id::icon :name="$iconTrailing" :class="$iconSize" />
+            <x-ise::icon :name="$iconTrailing" :class="$iconSize" />
         @endif
     </a>
 @else
     <button {{ $attributes->class($classes)->merge(['type' => 'button']) }}>
         @if ($icon)
-            <x-id::icon :name="$icon" :class="$iconSize" />
+            <x-ise::icon :name="$icon" :class="$iconSize" />
         @endif
 
         {{ $slot }}
 
         @if ($iconTrailing)
-            <x-id::icon :name="$iconTrailing" :class="$iconSize" />
+            <x-ise::icon :name="$iconTrailing" :class="$iconSize" />
         @endif
     </button>
 @endif

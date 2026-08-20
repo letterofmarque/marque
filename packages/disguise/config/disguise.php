@@ -15,7 +15,7 @@ return [
     */
 
     // Layout to use for full-page Livewire components
-    'layout' => env('DISGUISE_LAYOUT', 'id::layouts.app'),
+    'layout' => env('DISGUISE_LAYOUT', 'ise::layouts.app'),
 
     // Route prefix for web routes
     'prefix' => env('DISGUISE_PREFIX', ''),

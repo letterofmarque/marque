@@ -1,15 +1,15 @@
 <div class="flex h-full w-full flex-1 flex-col gap-4">
     <div class="flex items-center justify-between">
-        <x-id::heading size="xl">{{ __('Torrents') }}</x-id::heading>
+        <x-ise::heading size="xl">{{ __('Torrents') }}</x-ise::heading>
         @if (auth()->user()->isUploader())
-            <x-id::button variant="primary" :href="route('torrents.upload')" icon="plus" wire:navigate>
+            <x-ise::button variant="primary" :href="route('torrents.upload')" icon="plus" wire:navigate>
                 {{ __('Upload') }}
-            </x-id::button>
+            </x-ise::button>
         @endif
     </div>
 
     <div class="flex items-center gap-4">
-        <x-id::input
+        <x-ise::input
             wire:model.live.debounce.300ms="search"
             placeholder="{{ __('Search torrents...') }}"
             icon="magnifying-glass"
@@ -18,7 +18,7 @@
     </div>
 
     <div class="rounded-xl border border-zinc-200 dark:border-zinc-700">
-        <x-id::table>
+        <x-ise::table>
             <thead>
                 <tr class="border-b border-zinc-200 dark:border-zinc-700">
                     <th class="px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">{{ __('Name') }}</th>
@@ -43,20 +43,20 @@
                         <td class="px-3 py-2">{{ $torrent->user->name }}</td>
                         <td class="px-3 py-2">{{ $torrent->created_at->diffForHumans() }}</td>
                         <td class="px-3 py-2">
-                            <x-id::button variant="ghost" size="sm" :href="route('torrents.show', $torrent)" wire:navigate>
+                            <x-ise::button variant="ghost" size="sm" :href="route('torrents.show', $torrent)" wire:navigate>
                                 {{ __('View') }}
-                            </x-id::button>
+                            </x-ise::button>
                         </td>
                     </tr>
                 @empty
                     <tr>
                         <td colspan="6" class="px-3 py-8 text-center">
-                            <x-id::text class="text-zinc-500">{{ __('No torrents found.') }}</x-id::text>
+                            <x-ise::text class="text-zinc-500">{{ __('No torrents found.') }}</x-ise::text>
                         </td>
                     </tr>
                 @endforelse
             </tbody>
-        </x-id::table>
+        </x-ise::table>
     </div>
 
     @if ($torrents->hasPages())

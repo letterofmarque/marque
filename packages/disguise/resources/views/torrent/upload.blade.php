@@ -1,44 +1,44 @@
 <div class="flex h-full w-full flex-1 flex-col gap-6">
     <div class="flex items-center gap-4">
-        <x-id::button variant="ghost" :href="route('torrents.index')" icon="arrow-left" wire:navigate>
+        <x-ise::button variant="ghost" :href="route('torrents.index')" icon="arrow-left" wire:navigate>
             {{ __('Back') }}
-        </x-id::button>
+        </x-ise::button>
     </div>
 
     <div class="max-w-2xl">
-        <x-id::heading size="xl" class="mb-6">{{ __('Upload Torrent') }}</x-id::heading>
+        <x-ise::heading size="xl" class="mb-6">{{ __('Upload Torrent') }}</x-ise::heading>
 
         <form wire:submit="upload" class="flex flex-col gap-6">
-            <x-id::field :label="__('Torrent File')" name="torrentFile">
-                <x-id::input
+            <x-ise::field :label="__('Torrent File')" name="torrentFile">
+                <x-ise::input
                     type="file"
                     wire:model="torrentFile"
                     accept=".torrent"
                 />
-            </x-id::field>
+            </x-ise::field>
 
-            <x-id::field :label="__('Name')" name="name">
-                <x-id::input
+            <x-ise::field :label="__('Name')" name="name">
+                <x-ise::input
                     wire:model="name"
                     placeholder="{{ __('Enter torrent name...') }}"
                 />
-            </x-id::field>
+            </x-ise::field>
 
-            <x-id::field :label="__('Description')" name="description">
-                <x-id::textarea
+            <x-ise::field :label="__('Description')" name="description">
+                <x-ise::textarea
                     wire:model="description"
                     placeholder="{{ __('Optional description...') }}"
                     rows="4"
                 />
-            </x-id::field>
+            </x-ise::field>
 
             <div class="flex gap-2">
-                <x-id::button type="submit" variant="primary">
+                <x-ise::button type="submit" variant="primary">
                     {{ __('Upload') }}
-                </x-id::button>
-                <x-id::button variant="ghost" :href="route('torrents.index')" wire:navigate>
+                </x-ise::button>
+                <x-ise::button variant="ghost" :href="route('torrents.index')" wire:navigate>
                     {{ __('Cancel') }}
-                </x-id::button>
+                </x-ise::button>
             </div>
         </form>
     </div>

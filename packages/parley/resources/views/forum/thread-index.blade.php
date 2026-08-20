@@ -1,22 +1,22 @@
 <div class="flex h-full w-full flex-1 flex-col gap-4">
     <div class="flex items-center gap-4">
-        <x-id::button variant="ghost" :href="route('parley.forum.categories.index')" icon="arrow-left" wire:navigate>
+        <x-ise::button variant="ghost" :href="route('parley.forum.categories.index')" icon="arrow-left" wire:navigate>
             {{ __('Back') }}
-        </x-id::button>
+        </x-ise::button>
     </div>
 
     <div class="flex items-center justify-between">
-        <x-id::heading size="xl">{{ $category->name }}</x-id::heading>
+        <x-ise::heading size="xl">{{ $category->name }}</x-ise::heading>
 
         @can('create', \Marque\Parley\Models\Thread::class)
-            <x-id::button variant="primary" :href="route('parley.forum.threads.create', $category)" icon="plus" wire:navigate>
+            <x-ise::button variant="primary" :href="route('parley.forum.threads.create', $category)" icon="plus" wire:navigate>
                 {{ __('New Thread') }}
-            </x-id::button>
+            </x-ise::button>
         @endcan
     </div>
 
     <div class="rounded-xl border border-zinc-200 dark:border-zinc-700">
-        <x-id::table>
+        <x-ise::table>
             <thead>
                 <tr class="border-b border-zinc-200 dark:border-zinc-700">
                     <th class="px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">{{ __('Thread') }}</th>
@@ -45,12 +45,12 @@
                 @empty
                     <tr>
                         <td colspan="3" class="px-3 py-8 text-center">
-                            <x-id::text class="text-zinc-500">{{ __('No threads yet.') }}</x-id::text>
+                            <x-ise::text class="text-zinc-500">{{ __('No threads yet.') }}</x-ise::text>
                         </td>
                     </tr>
                 @endforelse
             </tbody>
-        </x-id::table>
+        </x-ise::table>
     </div>
 
     @if ($threads->hasPages())

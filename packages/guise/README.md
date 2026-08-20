@@ -4,7 +4,7 @@ Livewire web frontend for the [Marque](https://github.com/letterofmarque/marque)
 
 ## Installation
 
-Requires [marque/trove](https://packagist.org/packages/marque/trove) and [marque/id](https://packagist.org/packages/marque/id), which supplies the Blade UI components.
+Requires [marque/trove](https://packagist.org/packages/marque/trove) and [marque/ise](https://packagist.org/packages/marque/ise), which supplies the Blade UI components.
 
 ```bash
 composer require marque/guise
@@ -109,7 +109,7 @@ If you need to reference the components directly:
 - Livewire 4+
 - Tailwind CSS
 - [marque/trove](https://packagist.org/packages/marque/trove)
-- [marque/id](https://packagist.org/packages/marque/id)
+- [marque/ise](https://packagist.org/packages/marque/ise)
 
 ## License
 

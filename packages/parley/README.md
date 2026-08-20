@@ -37,7 +37,7 @@ Publish the config if you want to change anything:
 php artisan vendor:publish --tag=parley-config
 ```
 
-Requires `marque/trove` (user model, roles) and `marque/id` (Blade components) —
+Requires `marque/trove` (user model, roles) and `marque/ise` (Blade components) —
 both are `composer require`d automatically as dependencies.
 
 ## Attaching discussion to a model you own

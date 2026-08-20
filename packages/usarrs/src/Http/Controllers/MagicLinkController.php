@@ -15,7 +15,7 @@ class MagicLinkController
     public function showSentPage(): View
     {
         return view('usarrs::auth.magic-link-sent')
-            ->layout(config('usarrs.layout', 'id::layouts.app'));
+            ->layout(config('usarrs.layout', 'ise::layouts.app'));
     }
 
     public function verify(Request $request): RedirectResponse

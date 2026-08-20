@@ -115,11 +115,28 @@ return [
     | "edit_window" is minutes an author may edit their own post; null means
     | forever.
     |
+    | "lock_blocks_edits" decides what locking a thread actually stops. false
+    | (the default) means lock only stops NEW posts and replies — an author
+    | can still edit or delete their own existing words, "locked" reads as
+    | "no new discussion" rather than "frozen". true makes a locked thread's
+    | content immutable to everyone but a moderator, which suits a deployment
+    | that uses locking to archive/freeze a thread rather than just to stop
+    | it growing. This is a site-owner policy call, not something Marque
+    | should hardcode either way — see docs/why.md's "auth-agnostic" reasoning
+    | for the same principle applied to a different axis.
+    |
+    | TEMPORARY: this is a plain config toggle because there is currently no
+    | central settings/admin surface for a site owner to flip it without a
+    | redeploy. See job #10554 — once that surface exists, this setting (and
+    | most of this file) is a candidate to migrate onto it rather than stay
+    | env()-and-redeploy-only.
+    |
     */
 
     'moderation' => [
         'role' => 'moderator',
         'edit_window' => null,
+        'lock_blocks_edits' => env('PARLEY_LOCK_BLOCKS_EDITS', false),
     ],
 
     /*
@@ -143,9 +160,9 @@ return [
     |--------------------------------------------------------------------------
     |
     | The Blade layout parley's own pages extend. Defaults to the shell that
-    | marque/id provides.
+    | marque/ise provides.
     |
     */
 
-    'layout' => 'id::layouts.app',
+    'layout' => 'ise::layouts.app',
 ];

@@ -13,7 +13,7 @@ return [
     */
 
     // Layout to use for full-page Livewire components
-    'layout' => env('GUISE_LAYOUT', 'id::layouts.app'),
+    'layout' => env('GUISE_LAYOUT', 'ise::layouts.app'),
 
     // Route prefix for web routes
     'prefix' => env('GUISE_PREFIX', ''),

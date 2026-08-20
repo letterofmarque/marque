@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>{{ $title ?? config('id.app_name', 'Marque') }}</title>
+    <title>{{ $title ?? config('ise.app_name', 'Marque') }}</title>
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
@@ -23,8 +23,8 @@
         </main>
 
         {{-- Footer --}}
-        @if(config('id.show_footer', true))
-            @include('id::components.footer')
+        @if(config('ise.show_footer', true))
+            @include('ise::components.footer')
         @endif
     </div>
 

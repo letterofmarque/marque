@@ -68,7 +68,11 @@ describe('PostService', function () {
             ->toThrow(ThreadLockedException::class);
     });
 
-    it('does NOT reject an update on a locked thread — editing is not posting', function () {
+    it('does NOT reject an update on a locked thread by default — editing is not posting', function () {
+        // config('parley.moderation.lock_blocks_edits') defaults to false:
+        // locking stops new posts and replies, not edits to what's already
+        // there. See PostServiceTest > "lock_blocks_edits" below for the
+        // site-owner-opted-in behaviour.
         $thread = Thread::factory()->create();
         $user = TestUser::factory()->create();
         $post = postService()->create($thread, $user, 'original');
@@ -78,6 +82,60 @@ describe('PostService', function () {
         $updated = postService()->update($post, 'edited');
 
         expect($updated->body)->toBe('edited');
+    });
+
+    it('does NOT reject a delete on a locked thread by default', function () {
+        $thread = Thread::factory()->create();
+        $post = Post::factory()->inThread($thread)->create();
+
+        $thread->update(['locked' => true]);
+
+        postService()->delete($post);
+
+        expect(Post::find($post->id))->toBeNull();
+    });
+
+    describe('with lock_blocks_edits enabled', function () {
+        beforeEach(function () {
+            config(['parley.moderation.lock_blocks_edits' => true]);
+        });
+
+        it('refuses an update once the thread is locked', function () {
+            $thread = Thread::factory()->create();
+            $user = TestUser::factory()->create();
+            $post = postService()->create($thread, $user, 'original');
+
+            $thread->update(['locked' => true]);
+
+            expect(fn () => postService()->update($post, 'edited'))
+                ->toThrow(ThreadLockedException::class);
+
+            expect($post->fresh()->body)->toBe('original');
+        });
+
+        it('refuses a delete once the thread is locked', function () {
+            $thread = Thread::factory()->create();
+            $post = Post::factory()->inThread($thread)->create();
+
+            $thread->update(['locked' => true]);
+
+            expect(fn () => postService()->delete($post))
+                ->toThrow(ThreadLockedException::class);
+
+            expect(Post::find($post->id))->not->toBeNull();
+        });
+
+        it('still allows editing and deleting while the thread is unlocked', function () {
+            $thread = Thread::factory()->create();
+            $user = TestUser::factory()->create();
+            $post = postService()->create($thread, $user, 'original');
+
+            $updated = postService()->update($post, 'edited');
+            expect($updated->body)->toBe('edited');
+
+            postService()->delete($post);
+            expect(Post::find($post->id))->toBeNull();
+        });
     });
 
     it('updates a post body and format together', function () {

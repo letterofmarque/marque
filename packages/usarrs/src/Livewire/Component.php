@@ -11,7 +11,7 @@ abstract class Component extends LivewireComponent
 {
     protected function usarrsLayout(): string
     {
-        return config('usarrs.layout', 'id::layouts.app');
+        return config('usarrs.layout', 'ise::layouts.app');
     }
 
     protected function usarrsView(string $view, array $data = []): View

@@ -14,7 +14,7 @@ Built by [Letter Of Marque Software](https://lom.software).
 | [marque/guise](packages/guise) | Livewire web frontend (authenticated) |
 | [marque/threepio](packages/threepio) | BitTorrent protocol primitives |
 | [marque/hound](packages/hound) | Public BitTorrent tracker (no auth) |
-| [marque/id](packages/id) | App layout shell (navigation, theming) |
+| [marque/ise](packages/ise) | App layout shell (navigation, theming) |
 | [marque/disguise](packages/disguise) | Public web frontend (browse without login) |
 | [marque/usarrs](packages/usarrs) | Auth, user profiles, invites, admin |
 | [marque/squidink](packages/squidink) | Format-agnostic text pipeline (Markdown, BBCode → HTML) |
@@ -68,7 +68,7 @@ composer require marque/parley
 ### Guise (Web UI)
 - Livewire components for torrent browsing, viewing, uploading, editing
 - Configurable layouts
-- Dependency-free Blade UI components (from marque/id), styled with Tailwind CSS
+- Dependency-free Blade UI components (from marque/ise), styled with Tailwind CSS
 
 ### SquidInk (Text)
 - Markdown and BBCode in, HTML and plain text out, one document model between
@@ -135,7 +135,7 @@ picks it up automatically. Two things to watch:
   more than three tags arrive in a single push — the tags land, nothing splits, and
   Packagist is never notified. It fails silently.
 - **Release in dependency order.** A package must be published before anything that
-  requires it: `threepio` → `trove` and `id` → everything else.
+  requires it: `threepio` → `trove` and `ise` → everything else.
 
 If a split is missed, re-trigger it from an existing tag:
 

@@ -6,7 +6,7 @@ namespace Marque\Usarrs\Tests;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\LivewireServiceProvider;
-use Marque\Id\IdServiceProvider;
+use Marque\Ise\IseServiceProvider;
 use Marque\Trove\TroveServiceProvider;
 use Marque\Usarrs\UsarrsServiceProvider;
 use Orchestra\Testbench\TestCase as BaseTestCase;
@@ -20,7 +20,7 @@ abstract class TestCase extends BaseTestCase
         return [
             LivewireServiceProvider::class,
             TroveServiceProvider::class,
-            IdServiceProvider::class,
+            IseServiceProvider::class,
             UsarrsServiceProvider::class,
         ];
     }

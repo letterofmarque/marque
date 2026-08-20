@@ -19,7 +19,7 @@ jobs:
         package:
           - threepio
           - trove
-          - id
+          - ise
           - squidink
           - bloodhound
           - hound

@@ -154,6 +154,42 @@ describe('CommentThread', function () {
         expect($post->fresh()->body)->toBe('edited');
     });
 
+    it('still lets the author edit their own post on a locked thread, by default', function () {
+        // config('parley.moderation.lock_blocks_edits') defaults to false —
+        // "locked" means no new posts, not "frozen". See PostServiceTest for
+        // the service-layer coverage of both config states.
+        $author = TestUser::factory()->create();
+        $subject = TestSubject::create(['name' => 'a thing']);
+        $thread = $subject->comments($author->id);
+        $post = Post::factory()->inThread($thread)->create(['user_id' => $author->id, 'body' => 'original']);
+        $thread->update(['locked' => true]);
+
+        Livewire::actingAs($author)
+            ->test(CommentThread::class, ['subject' => $subject])
+            ->call('startEdit', $post->id)
+            ->set('editingBody', 'edited')
+            ->call('saveEdit');
+
+        expect($post->fresh()->body)->toBe('edited');
+    });
+
+    it('hides edit and delete once a locked thread has lock_blocks_edits enabled', function () {
+        config(['parley.moderation.lock_blocks_edits' => true]);
+
+        $author = TestUser::factory()->create();
+        $subject = TestSubject::create(['name' => 'a thing']);
+        $thread = $subject->comments($author->id);
+        Post::factory()->inThread($thread)->create(['user_id' => $author->id, 'body' => 'original']);
+        $thread->update(['locked' => true]);
+
+        // Hidden at the view layer, not just refused server-side — an author
+        // should never see a button that would throw ThreadLockedException.
+        Livewire::actingAs($author)
+            ->test(CommentThread::class, ['subject' => $subject])
+            ->assertDontSee('wire:click="startEdit', escape: false)
+            ->assertDontSee('wire:click="delete', escape: false);
+    });
+
     it('refuses editing someone else\'s post', function () {
         $author = TestUser::factory()->create();
         $other = TestUser::factory()->create();

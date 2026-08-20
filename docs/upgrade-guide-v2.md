@@ -1,5 +1,12 @@
 # Upgrading to Marque v2.0
 
+> **Note (2026-08-20):** `marque/id`, introduced by this guide, was renamed to
+> `marque/ise` — same package, same content, new name (the old one collided
+> conceptually with `marque/usarrs`). `marque/id` is marked abandoned on
+> Packagist pointing at the replacement. This guide is left as-written for
+> historical accuracy; substitute `marque/ise` for `marque/id` throughout if
+> you're following it today.
+
 This guide covers migrating from Marque v1.x to v2.0. The major change is the extraction of shared protocol code into `marque/threepio` and the introduction of five new packages.
 
 ## Before You Start

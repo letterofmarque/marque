@@ -4,7 +4,7 @@
 
     // No component from the id package is referenced here, for the same reason as
     // the Blade editor: Blade resolves components at compile time, so guarding one
-    // with class_exists() does not stop the view exploding where marque/id is
+    // with class_exists() does not stop the view exploding where marque/ise is
     // absent.
 
     $controlClasses = 'w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 font-mono text-sm text-zinc-900

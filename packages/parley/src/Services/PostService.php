@@ -42,8 +42,14 @@ class PostService implements PostServiceInterface
         ]);
     }
 
+    /**
+     * @throws ThreadLockedException if config('parley.moderation.lock_blocks_edits')
+     *                                is true and the post's thread is locked
+     */
     public function update(Post $post, string $body, ?string $format = null): Post
     {
+        $this->assertEditable($post);
+
         $post->update(array_filter([
             'body' => $body,
             'body_format' => $format,
@@ -52,8 +58,14 @@ class PostService implements PostServiceInterface
         return $post;
     }
 
+    /**
+     * @throws ThreadLockedException if config('parley.moderation.lock_blocks_edits')
+     *                                is true and the post's thread is locked
+     */
     public function delete(Post $post): void
     {
+        $this->assertEditable($post);
+
         // Soft delete only. reply_to_id on any children nulls via the FK's
         // ON DELETE SET NULL when the row is force-deleted, but a soft delete
         // leaves the row (and the FK) in place — children keep pointing at a
@@ -79,5 +91,26 @@ class PostService implements PostServiceInterface
         if ($thread->locked) {
             throw ThreadLockedException::forThread($thread);
         }
+    }
+
+    /**
+     * Whether an existing post may be edited or deleted. Only relevant when
+     * the site has opted into config('parley.moderation.lock_blocks_edits')
+     * — off by default, in which case a locked thread stops new posts only
+     * and an author keeps the ability to fix or remove their own words.
+     *
+     * @throws ThreadLockedException
+     */
+    private function assertEditable(Post $post): void
+    {
+        if (! config('parley.moderation.lock_blocks_edits', false)) {
+            return;
+        }
+
+        // Loaded rather than assumed present, so a caller handed a post
+        // without its thread relation still gets the lock checked correctly.
+        $thread = $post->thread()->firstOrFail();
+
+        $this->assertUnlocked($thread);
     }
 }

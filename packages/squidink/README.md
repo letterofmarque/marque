@@ -289,7 +289,7 @@ Preview renders server-side through the real `HtmlRenderer`, so what the author 
 is what the post becomes. A JavaScript preview would be a second implementation that
 drifts from the first, which is the whole failure this package avoids.
 
-Livewire is optional. So is `marque/id` — the editor owns its own markup so a text
+Livewire is optional. So is `marque/ise` — the editor owns its own markup so a text
 pipeline never drags a UI package in behind it. To restyle, publish the views:
 
 ```bash
