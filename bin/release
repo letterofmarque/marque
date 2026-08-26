@@ -134,7 +134,8 @@ preflight() {
 }
 
 check_changelog() {
-    local pkg="$1" version="$2" file="$PACKAGES_DIR/$pkg/CHANGELOG.md"
+    local pkg="$1" version="$2"
+    local file="$PACKAGES_DIR/$pkg/CHANGELOG.md"
 
     [[ -f "$file" ]] \
         || die "$pkg has no CHANGELOG.md — add one before releasing (see packages/*/CHANGELOG.md for the format)"
