@@ -20,7 +20,7 @@ class AnnounceController extends Controller
     /**
      * Handle public announce request.
      *
-     * URL: /announce (no passkey)
+     * URL: /announce (no announce key)
      */
     public function __invoke(Request $request): Response
     {

@@ -31,7 +31,7 @@ class TestUser extends Authenticatable implements UserInterface
         'status' => 'active',
     ];
 
-    public function generatePasskey(): string
+    public function generateAnnounceKey(): string
     {
         return bin2hex(random_bytes(16));
     }

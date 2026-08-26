@@ -13,8 +13,8 @@ use Marque\Usarrs\Livewire\Auth\Login;
 use Marque\Usarrs\Livewire\Auth\Register;
 use Marque\Usarrs\Livewire\Invite\InviteCreate;
 use Marque\Usarrs\Livewire\Invite\InviteIndex;
+use Marque\Usarrs\Livewire\Profile\AnnounceKeyManagement;
 use Marque\Usarrs\Livewire\Profile\Edit;
-use Marque\Usarrs\Livewire\Profile\PasskeyManagement;
 use Marque\Usarrs\Livewire\Profile\Show;
 use Marque\Usarrs\Models\Invite;
 use Marque\Usarrs\Policies\InvitePolicy;
@@ -74,7 +74,7 @@ class UsarrsServiceProvider extends ServiceProvider
         \Livewire\Livewire::component('usarrs-register', Register::class);
         \Livewire\Livewire::component('usarrs-profile-show', Show::class);
         \Livewire\Livewire::component('usarrs-profile-edit', Edit::class);
-        \Livewire\Livewire::component('usarrs-passkey-management', PasskeyManagement::class);
+        \Livewire\Livewire::component('usarrs-announce-key-management', AnnounceKeyManagement::class);
         \Livewire\Livewire::component('usarrs-admin-user-index', UserIndex::class);
         \Livewire\Livewire::component('usarrs-admin-user-show', UserShow::class);
         \Livewire\Livewire::component('usarrs-invite-index', InviteIndex::class);

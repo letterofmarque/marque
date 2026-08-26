@@ -21,19 +21,19 @@ class AnnounceController extends Controller
     /**
      * Handle announce request.
      *
-     * URL: /announce/{passkey}
+     * URL: /announce/{announce_key}
      */
-    public function __invoke(Request $request, string $passkey): Response
+    public function __invoke(Request $request, string $announceKey): Response
     {
-        // Validate passkey format (alphanumeric, 32 chars)
-        if (! preg_match('/^[0-9a-zA-Z]{32}$/', $passkey)) {
-            return TrackerResponse::error('Invalid passkey');
+        // Validate announce key format (alphanumeric, 32 chars)
+        if (! preg_match('/^[0-9a-zA-Z]{32}$/', $announceKey)) {
+            return TrackerResponse::error('Invalid announce key');
         }
 
-        // Find user by passkey
-        $user = $this->findUserByPasskey($passkey);
+        // Find user by announce key
+        $user = $this->findUserByAnnounceKey($announceKey);
         if ($user === null) {
-            return TrackerResponse::error('Unknown passkey');
+            return TrackerResponse::error('Unknown announce key');
         }
 
         // Check if user is enabled
@@ -105,13 +105,13 @@ class AnnounceController extends Controller
     }
 
     /**
-     * Find user by passkey.
+     * Find user by announce key.
      */
-    private function findUserByPasskey(string $passkey): ?UserInterface
+    private function findUserByAnnounceKey(string $announceKey): ?UserInterface
     {
         $userModel = config('trove.user_model', 'App\\Models\\User');
 
-        return $userModel::where('passkey', $passkey)->first();
+        return $userModel::where('announce_key', $announceKey)->first();
     }
 
     /**

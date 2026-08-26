@@ -42,8 +42,8 @@ return [
     'profile' => [
         'show_ratio' => true,
         'show_seedtime' => true,
-        'show_passkey' => true,
-        'allow_passkey_regen' => true,
+        'show_announce_key' => true,
+        'allow_announce_key_regen' => true,
     ],
 
     /*

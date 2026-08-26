@@ -26,7 +26,7 @@ class TestUser extends Authenticatable implements UserInterface
         'role' => 'user',
     ];
 
-    public function generatePasskey(): string
+    public function generateAnnounceKey(): string
     {
         return Str::random(32);
     }

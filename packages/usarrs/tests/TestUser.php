@@ -27,7 +27,7 @@ class TestUser extends Authenticatable implements UserInterface
         'status' => 'active',
     ];
 
-    public function generatePasskey(): string
+    public function generateAnnounceKey(): string
     {
         return bin2hex(random_bytes(16));
     }
@@ -50,7 +50,7 @@ class TestUserFactory extends Factory
             'password' => bcrypt('password'),
             'role' => Role::User->value,
             'status' => 'active',
-            'passkey' => bin2hex(random_bytes(16)),
+            'announce_key' => bin2hex(random_bytes(16)),
         ];
     }
 

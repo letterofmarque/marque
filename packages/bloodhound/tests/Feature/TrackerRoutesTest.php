@@ -17,17 +17,17 @@ function trackerGet($test, string $url): \Illuminate\Testing\TestResponse
 
 describe('Tracker Routes', function () {
     describe('Announce Route', function () {
-        it('exists and responds to valid passkey format', function () {
-            // Create user with passkey
+        it('exists and responds to valid announce key format', function () {
+            // Create user with announce key
             $user = TestUser::create([
                 'name' => 'Test User',
                 'email' => 'test@example.com',
                 'password' => 'password',
-                'passkey' => 'aaaabbbbccccddddeeeeffffgggghhhh', // 32 char alphanumeric
+                'announce_key' => 'aaaabbbbccccddddeeeeffffgggghhhh', // 32 char alphanumeric
             ]);
 
             // Request without required params should get bencoded error
-            $response = trackerGet($this, '/announce/'.$user->passkey);
+            $response = trackerGet($this, '/announce/'.$user->announce_key);
 
             // Should be 200 with bencoded response (not 404)
             expect($response->getStatusCode())->toBe(200);
@@ -36,24 +36,24 @@ describe('Tracker Routes', function () {
             expect($decoded)->toHaveKey('failure reason');
         });
 
-        it('returns 404 for invalid passkey format', function () {
-            // Invalid passkey (too short)
+        it('returns 404 for invalid announce key format', function () {
+            // Invalid announce key (too short)
             $response = trackerGet($this, '/announce/invalid');
 
             expect($response->getStatusCode())->toBe(404);
         });
 
-        it('rejects unknown passkey', function () {
+        it('rejects unknown announce key', function () {
             $response = trackerGet($this, '/announce/aaaabbbbccccddddeeeeffffgggghhhh');
 
             $decoded = Bencode::decode($response->getContent());
-            expect($decoded['failure reason'])->toBe('Unknown passkey');
+            expect($decoded['failure reason'])->toBe('Unknown announce key');
         });
     });
 
     describe('Scrape Route', function () {
         it('exists and responds', function () {
-            // Scrape without passkey should still work (public scrape)
+            // Scrape without announce key should still work (public scrape)
             // But needs info_hash
             $response = trackerGet($this, '/scrape');
 
@@ -65,20 +65,20 @@ describe('Tracker Routes', function () {
             expect(isset($decoded['files']) || isset($decoded['failure reason']))->toBeTrue();
         });
 
-        it('accepts passkey parameter', function () {
+        it('accepts announce key parameter', function () {
             $user = TestUser::create([
                 'name' => 'Test User',
                 'email' => 'scrape@example.com',
                 'password' => 'password',
-                'passkey' => 'zzzzyyyyxxxxwwwwvvvvuuuuttttssss',
+                'announce_key' => 'zzzzyyyyxxxxwwwwvvvvuuuuttttssss',
             ]);
 
-            $response = trackerGet($this, '/scrape/'.$user->passkey);
+            $response = trackerGet($this, '/scrape/'.$user->announce_key);
 
             expect($response->getStatusCode())->toBe(200);
         });
 
-        it('returns 404 for invalid passkey format', function () {
+        it('returns 404 for invalid announce key format', function () {
             $response = trackerGet($this, '/scrape/invalid');
 
             expect($response->getStatusCode())->toBe(404);

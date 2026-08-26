@@ -20,13 +20,13 @@ use Marque\Threepio\Http\Middleware\BlockBrowsers;
 Route::middleware([BlockBrowsers::class])
     ->withoutMiddleware(['web', 'auth', 'csrf'])
     ->group(function () {
-        // Announce with passkey in URL
-        Route::get('announce/{passkey}', AnnounceController::class)
+        // Announce with announce key in URL
+        Route::get('announce/{announce_key}', AnnounceController::class)
             ->name('tracker.announce')
-            ->where('passkey', '[0-9a-zA-Z]{32}');
+            ->where('announce_key', '[0-9a-zA-Z]{32}');
 
-        // Scrape (passkey optional)
-        Route::get('scrape/{passkey?}', ScrapeController::class)
+        // Scrape (announce key optional)
+        Route::get('scrape/{announce_key?}', ScrapeController::class)
             ->name('tracker.scrape')
-            ->where('passkey', '[0-9a-zA-Z]{32}');
+            ->where('announce_key', '[0-9a-zA-Z]{32}');
     });

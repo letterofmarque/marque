@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->string('password');
             $table->string('role')->default('user');
-            $table->string('passkey', 32)->nullable()->unique();
+            $table->string('announce_key', 32)->nullable()->unique();
             $table->bigInteger('uploaded')->default(0);
             $table->bigInteger('downloaded')->default(0);
             $table->bigInteger('seedtime')->default(0);

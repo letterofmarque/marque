@@ -12,7 +12,7 @@ use Marque\Threepio\Http\Middleware\BlockBrowsers;
 | Hound Public Tracker Routes
 |--------------------------------------------------------------------------
 |
-| Open announce and scrape endpoints. No passkey, no auth.
+| Open announce and scrape endpoints. No announce key, no auth.
 |
 */
 

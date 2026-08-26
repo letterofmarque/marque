@@ -21,13 +21,13 @@ class ScrapeController extends Controller
      * Handle scrape request.
      *
      * Returns stats for one or more torrents.
-     * URL: /scrape or /scrape/{passkey}
+     * URL: /scrape or /scrape/{announce_key}
      */
-    public function __invoke(Request $request, ?string $passkey = null): Response
+    public function __invoke(Request $request, ?string $announceKey = null): Response
     {
-        // Passkey is optional for scrape but can be used for private trackers
-        if ($passkey !== null && ! preg_match('/^[0-9a-zA-Z]{32}$/', $passkey)) {
-            return TrackerResponse::error('Invalid passkey');
+        // Announce key is optional for scrape but can be used for private trackers
+        if ($announceKey !== null && ! preg_match('/^[0-9a-zA-Z]{32}$/', $announceKey)) {
+            return TrackerResponse::error('Invalid announce key');
         }
 
         // Get info_hash(es) - can be single or multiple

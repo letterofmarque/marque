@@ -9,7 +9,7 @@ use Illuminate\Support\Str;
 /**
  * Provides tracker stats functionality for User models.
  *
- * Handles upload/download tracking, ratio calculation, and passkey management.
+ * Handles upload/download tracking, ratio calculation, and announce key management.
  */
 trait HasTrackerStats
 {
@@ -18,7 +18,7 @@ trait HasTrackerStats
      */
     public function initializeHasTrackerStats(): void
     {
-        $this->mergeFillable(['passkey', 'uploaded', 'downloaded', 'seedtime']);
+        $this->mergeFillable(['announce_key', 'uploaded', 'downloaded', 'seedtime']);
 
         $this->mergeCasts([
             'uploaded' => 'integer',
@@ -33,29 +33,29 @@ trait HasTrackerStats
     public static function bootHasTrackerStats(): void
     {
         static::creating(function ($model) {
-            if (empty($model->passkey)) {
-                $model->passkey = $model->generatePasskey();
+            if (empty($model->announce_key)) {
+                $model->announce_key = $model->generateAnnounceKey();
             }
         });
     }
 
     /**
-     * Generate a new passkey.
+     * Generate a new announce key.
      */
-    public function generatePasskey(): string
+    public function generateAnnounceKey(): string
     {
         return Str::random(32);
     }
 
     /**
-     * Regenerate the user's passkey.
+     * Regenerate the user's announce key.
      */
-    public function regeneratePasskey(): string
+    public function regenerateAnnounceKey(): string
     {
-        $this->passkey = $this->generatePasskey();
+        $this->announce_key = $this->generateAnnounceKey();
         $this->save();
 
-        return $this->passkey;
+        return $this->announce_key;
     }
 
     /**

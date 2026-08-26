@@ -16,12 +16,12 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->string('password')->nullable();
             $table->string('role')->default('user');
-            $table->string('passkey', 32)->nullable()->unique();
-            $table->unsignedBigInteger('uploaded')->default(0);
-            $table->unsignedBigInteger('downloaded')->default(0);
-            $table->unsignedBigInteger('seedtime')->default(0);
             $table->boolean('enabled')->default(true);
         });
+
+        // announce_key, uploaded, downloaded, seedtime are added by the real
+        // package migration (add_tracker_fields_to_users_table), which also
+        // runs in this suite — defining them here too would collide with it.
     }
 
     public function down(): void

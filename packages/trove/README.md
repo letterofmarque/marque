@@ -20,7 +20,7 @@ php artisan migrate
 - **Torrent model** - info_hash, metadata, file storage, bencode parsing
 - **TorrentService** - CRUD, .torrent file upload/parsing, search
 - **Role system** - User, Uploader, Moderator, Admin hierarchy
-- **Tracker stats** - Passkey generation, upload/download/seedtime tracking per user
+- **Tracker stats** - Announce key generation, upload/download/seedtime tracking per user
 - **Authorization** - Policies for create, update, delete operations
 
 ## User Model Setup
@@ -50,7 +50,7 @@ $user->hasRoleAtLeast(Role::Moderator);
 `HasTrackerStats` gives you tracker integration:
 
 ```php
-$user->passkey;                    // Auto-generated 32-char key
+$user->announce_key;                // Auto-generated 32-char key
 $user->getRatio();                 // Upload/download ratio
 $user->getRatioForHumans();        // "1.25" or "Inf"
 $user->getUploadedForHumans();     // "4.2 GB"
@@ -98,7 +98,7 @@ Trove creates:
 
 - `torrents` table (info_hash, name, description, size, file_count, torrent_file, user_id)
 - Adds `role` column to users table
-- Adds `passkey`, `uploaded`, `downloaded`, `seedtime` columns to users table
+- Adds `announce_key`, `uploaded`, `downloaded`, `seedtime` columns to users table
 
 Publish migrations to customise them:
 

@@ -16,7 +16,7 @@ function trackerGet($test, string $url): \Illuminate\Testing\TestResponse
 
 describe('Public Tracker Routes', function () {
     describe('Announce Route', function () {
-        it('exists at /announce without passkey', function () {
+        it('exists at /announce without announce key', function () {
             $response = trackerGet($this, '/announce');
 
             // Should be 200 with bencoded error (missing params), not 404
@@ -86,7 +86,7 @@ describe('Public Tracker Routes', function () {
     });
 
     describe('Scrape Route', function () {
-        it('exists at /scrape without passkey', function () {
+        it('exists at /scrape without announce key', function () {
             $response = trackerGet($this, '/scrape');
 
             expect($response->getStatusCode())->toBe(200);

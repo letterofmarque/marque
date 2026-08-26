@@ -20,7 +20,7 @@ class ScrapeController extends Controller
     /**
      * Handle public scrape request.
      *
-     * URL: /scrape (no passkey)
+     * URL: /scrape (no announce key)
      */
     public function __invoke(Request $request): Response
     {

@@ -19,7 +19,7 @@ return new class extends Migration
             $table->string('role')->default('user');
             $table->string('status')->default('active');
             $table->text('bio')->nullable();
-            $table->string('passkey', 32)->nullable()->unique();
+            $table->string('announce_key', 32)->nullable()->unique();
             $table->bigInteger('uploaded')->default(0);
             $table->bigInteger('downloaded')->default(0);
             $table->bigInteger('seedtime')->default(0);
