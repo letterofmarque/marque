@@ -113,5 +113,12 @@ otherwise would be dishonest.
 
 ## Upgrade notes
 
-Every major ships with an upgrade guide in `docs/`. Minors with anything worth knowing —
-new config keys, deprecations, behaviour worth opting into — are covered in the changelog.
+Every package keeps its own `CHANGELOG.md` — every release, patch included, gets an
+entry there. That's the record of what changed in *that package*.
+
+Majors that are big enough to need explaining — a renamed package, a floor raise, a
+column rename — also get a plain-language write-up in [RELEASES.md](RELEASES.md), which
+groups whatever package versions moved together for one real reason and says who's
+affected and what to do, without assuming you know the codebase. Not every major package
+bump gets its own suite release entry — only ones where the "why" and "what do I do"
+aren't obvious from the changelog alone.

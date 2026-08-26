@@ -1,5 +1,9 @@
 # Upgrading to Bloodhound v4.0 / Usarrs v5.0
 
+> This is the technical, step-by-step checklist. For the plain-language "what
+> is this and do I need to care" version, see
+> [Marque 4.1](releases/4.1.md).
+
 This guide covers the `passkey` → `announce_key` rename. It's a breaking change
 across both packages, done to remove a naming collision with Laravel's own
 "passkey" (WebAuthn, via Fortify 1.38 + `laravel/passkeys`) — a feature every

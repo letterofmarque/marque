@@ -113,6 +113,9 @@ frequently, so you should not need to track `dev-main` to get a finished feature
 See [VERSIONING.md](VERSIONING.md) for the full policy — what counts as patch, minor and
 major, how the grey areas are decided, pre-releases, and the support window.
 
+Package versions move independently, but if you want the plain-language story of what's
+changed across the suite and what to do about it, see [RELEASES.md](RELEASES.md).
+
 ## Releasing
 
 Packages are versioned independently. Use the release script:
