@@ -7,14 +7,16 @@
 #   bin/release guise 3.1.0 usarrs 3.1.0     release several at once
 #   bin/release --dry-run guise 3.1.0        show the plan, change nothing
 #
-# Handles the three things that are easy to get wrong by hand:
+# Handles the four things that are easy to get wrong by hand:
 #
 #   1. Dependency order — a package must publish before anything requiring it.
 #      The order is derived from the composer.json files, not hardcoded.
-#   2. Tag batching — GitHub silently suppresses workflow triggers when more
+#   2. Changelog discipline — refuses to release a package whose CHANGELOG.md
+#      has no entry for the version being tagged. See VERSIONING.md.
+#   3. Tag batching — GitHub silently suppresses workflow triggers when more
 #      than three tags arrive in one push. Tags land, nothing splits, and
 #      Packagist is never notified. We push in batches of three and wait.
-#   3. Verification — confirms each version actually reached Packagist rather
+#   4. Verification — confirms each version actually reached Packagist rather
 #      than assuming the split succeeded.
 #
 set -euo pipefail
@@ -129,6 +131,16 @@ preflight() {
         || die "local main differs from origin/main — push or pull first"
 
     green "    clean tree, on main, in sync with origin"
+}
+
+check_changelog() {
+    local pkg="$1" version="$2" file="$PACKAGES_DIR/$pkg/CHANGELOG.md"
+
+    [[ -f "$file" ]] \
+        || die "$pkg has no CHANGELOG.md — add one before releasing (see packages/*/CHANGELOG.md for the format)"
+
+    grep -qF "[$version]" "$file" \
+        || die "$pkg/CHANGELOG.md has no entry for $version — add one and commit it before releasing"
 }
 
 run_tests_for() {
@@ -321,6 +333,17 @@ main() {
     echo
 
     preflight
+
+    # Every package needs a changelog entry for the version being released,
+    # checked before we spend time running test suites.
+    blue "==> Checking changelogs"
+    for p in "${ordered[@]}"; do
+        for entry in "${RELEASES[@]}"; do
+            [[ "${entry%% *}" == "$p" ]] && v="${entry##* }"
+        done
+        check_changelog "$p" "$v"
+    done
+    green "    every package has a CHANGELOG.md entry for its release version"
 
     # Test everything before tagging anything.
     for p in "${ordered[@]}"; do
