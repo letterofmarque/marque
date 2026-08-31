@@ -6,6 +6,7 @@ namespace Marque\Usarrs;
 
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Fortify\Fortify;
 use Marque\Usarrs\Contracts\InviteServiceInterface;
 use Marque\Usarrs\Livewire\Admin\UserIndex;
 use Marque\Usarrs\Livewire\Admin\UserShow;
@@ -28,6 +29,15 @@ class UsarrsServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/usarrs.php', 'usarrs');
 
         $this->app->bind(InviteServiceInterface::class, InviteService::class);
+
+        // usarrs is the only thing allowed to register /login, /register, and
+        // the rest of the auth surface. Fortify is used as an action library
+        // (2FA, passkeys) — never as usarrs' front door. Called here in
+        // register(), not boot(), because Fortify's own service provider reads
+        // this flag during its boot() to decide whether to bind its routes.
+        // Unconditional: this is what actually closes job #10583 — a Fortify
+        // route reachable underneath usarrs' own auth_driver checks.
+        Fortify::ignoreRoutes();
     }
 
     public function boot(): void

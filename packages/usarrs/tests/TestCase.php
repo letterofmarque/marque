@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Marque\Usarrs\Tests;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Fortify\FortifyServiceProvider;
 use Livewire\LivewireServiceProvider;
 use Marque\Ise\IseServiceProvider;
 use Marque\Trove\TroveServiceProvider;
@@ -21,6 +22,11 @@ abstract class TestCase extends BaseTestCase
             LivewireServiceProvider::class,
             TroveServiceProvider::class,
             IseServiceProvider::class,
+            // FortifyServiceProvider is registered explicitly here (not by
+            // usarrs' own composer.json alone) so the test suite proves usarrs
+            // actively suppresses Fortify's routes, not merely that Fortify
+            // was never installed to begin with.
+            FortifyServiceProvider::class,
             UsarrsServiceProvider::class,
         ];
     }
