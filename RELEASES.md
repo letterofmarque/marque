@@ -11,6 +11,20 @@ actually affected, and exactly what to do about it. If you run Marque and
 want to know "what do I need to know to catch up," start at the top and
 read down to whatever you're currently on.
 
+## Requirements
+
+**PHP 8.4+ and Laravel 13+**, as of [Marque 3.0](docs/releases/3.0.md). Composer
+enforces this — if your app doesn't meet it, installing or upgrading any Marque
+package will refuse with a dependency conflict.
+
+If you already have Marque installed and need to raise your Laravel version too,
+see [Marque 3.0's "What you need to do"](docs/releases/3.0.md#what-you-need-to-do) —
+the short version is that Laravel and every Marque package need to move together in
+one `composer require`, not as two separate steps.
+
+For the full ordered list of every upgrade guide and release doc, see
+[Upgrading Marque](docs/upgrading.md).
+
 ## Releases
 
 | Release | Date | Summary | Who's affected |

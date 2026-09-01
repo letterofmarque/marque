@@ -31,6 +31,21 @@ php artisan vendor:publish --tag=usarrs-migrations
 php artisan migrate
 ```
 
+### Layout
+
+usarrs' own pages (login, register, profile, admin, and everything else it renders)
+use `config('usarrs.layout')`, default `ise::layouts.app`. Set `USARRS_LAYOUT` in
+your `.env` or publish the config to point to your app's own layout:
+
+```env
+USARRS_LAYOUT=layouts.app
+```
+
+This is a **per-package** setting, not a suite-wide one — `guise` and `disguise`
+have their own equivalent keys (`GUISE_LAYOUT`, `DISGUISE_LAYOUT`) that default the
+same way but are set independently. If you're using more than one Marque frontend
+package pointed at the same custom layout, set each package's key to match.
+
 ## Auth Driver
 
 `config('usarrs.auth_driver')` controls the top-level login/registration flow. Set
