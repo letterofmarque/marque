@@ -22,6 +22,30 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Manage Auth (escape hatch)
+    |--------------------------------------------------------------------------
+    |
+    | Default true. When false, usarrs registers none of its own auth
+    | surface: routes/auth.php (login, register, two-factor-challenge,
+    | password reset, magic link, socialite, logout) and the Login/Register/
+    | 2FA/passkey Livewire components are all skipped entirely — not merely
+    | gated behind a mount() check, actually never bound. Fortify's own
+    | routes stay suppressed regardless (Fortify::ignoreRoutes() is always
+    | called). Roles, invites, admin, profile, and announce-key management
+    | are untouched by this flag in either state.
+    |
+    | This is a one-way *operational* decision, not a live toggle: it exists
+    | for the power-user building a fully custom login/register/2FA/passkey
+    | implementation. Flipping it back to true after doing so will
+    | re-register usarrs' own routes/components alongside whatever was
+    | custom-built, recreating a route collision. See the upgrade guide.
+    |
+    */
+
+    'manage_auth' => env('USARRS_MANAGE_AUTH', true),
+
+    /*
+    |--------------------------------------------------------------------------
     | Two-Factor Authentication
     |--------------------------------------------------------------------------
     |

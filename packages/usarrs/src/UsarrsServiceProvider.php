@@ -57,7 +57,17 @@ class UsarrsServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        $this->loadRoutesFrom(__DIR__.'/../routes/auth.php');
+        // manage_auth is the one-way escape hatch (Spec #92): routes/auth.php
+        // is usarrs' entire login/register/2FA-challenge/password-reset/
+        // magic-link/socialite/logout surface, and it's skipped outright when
+        // false — not registered and then 404ing via a mount() check the way
+        // e.g. admin.enabled does, but genuinely never bound. routes/web.php
+        // (profile, invites, admin) is unaffected either way.
+        $manageAuth = config('usarrs.manage_auth', true);
+
+        if ($manageAuth) {
+            $this->loadRoutesFrom(__DIR__.'/../routes/auth.php');
+        }
         $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'usarrs');
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
@@ -65,7 +75,10 @@ class UsarrsServiceProvider extends ServiceProvider
         $this->registerPolicies();
 
         if (class_exists(\Livewire\Livewire::class)) {
-            $this->registerLivewireComponents();
+            if ($manageAuth) {
+                $this->registerAuthLivewireComponents();
+            }
+            $this->registerNonAuthLivewireComponents();
         }
 
         if ($this->app->runningInConsole()) {
@@ -93,16 +106,27 @@ class UsarrsServiceProvider extends ServiceProvider
         }
     }
 
-    protected function registerLivewireComponents(): void
+    // The Login/Register/2FA-challenge/2FA-setup/passkey-management surface —
+    // gated by manage_auth alongside routes/auth.php. TwoFactorSetup and
+    // PasskeyManagement have no route of their own (they're mounted wherever
+    // the consuming app's own settings UI puts them), but they're still part
+    // of "the auth UI" a power-user going fully custom would replace, so they
+    // gate with the rest rather than living in the non-auth group below.
+    protected function registerAuthLivewireComponents(): void
     {
         \Livewire\Livewire::component('usarrs-login', Login::class);
         \Livewire\Livewire::component('usarrs-register', Register::class);
         \Livewire\Livewire::component('usarrs-two-factor-challenge', TwoFactorChallenge::class);
+        \Livewire\Livewire::component('usarrs-two-factor-setup', TwoFactorSetup::class);
+        \Livewire\Livewire::component('usarrs-passkey-management', PasskeyManagement::class);
+    }
+
+    // Profile, invites, admin — unaffected by manage_auth in either state.
+    protected function registerNonAuthLivewireComponents(): void
+    {
         \Livewire\Livewire::component('usarrs-profile-show', Show::class);
         \Livewire\Livewire::component('usarrs-profile-edit', Edit::class);
         \Livewire\Livewire::component('usarrs-announce-key-management', AnnounceKeyManagement::class);
-        \Livewire\Livewire::component('usarrs-two-factor-setup', TwoFactorSetup::class);
-        \Livewire\Livewire::component('usarrs-passkey-management', PasskeyManagement::class);
         \Livewire\Livewire::component('usarrs-admin-user-index', UserIndex::class);
         \Livewire\Livewire::component('usarrs-admin-user-show', UserShow::class);
         \Livewire\Livewire::component('usarrs-invite-index', InviteIndex::class);
