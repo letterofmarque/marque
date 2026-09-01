@@ -389,14 +389,22 @@ main() {
             major="${v%%.*}"
             expected="${major}.0.x-dev"
             current="$(jq -r '.extra."branch-alias"."dev-main" // empty' "$PACKAGES_DIR/$p/composer.json")"
-            [[ "$current" == "$expected" ]] \
-                || echo "    [dry-run] would sync $p: dev-main $current -> $expected"
+            if [[ "$current" != "$expected" ]]; then
+                echo "    [dry-run] would sync $p: dev-main $current -> $expected"
+                alias_changed+=("$p")
+            fi
         elif sync_branch_alias "$p" "$v"; then
             alias_changed+=("$PACKAGES_DIR/$p/composer.json")
         fi
     done
 
-    if (( ${#alias_changed[@]} > 0 )); then
+    if $DRY_RUN; then
+        if (( ${#alias_changed[@]} > 0 )); then
+            warn "    [dry-run] would sync branch-alias for ${#alias_changed[@]} package(s)"
+        else
+            green "    branch-alias already correct for every package"
+        fi
+    elif (( ${#alias_changed[@]} > 0 )); then
         git add "${alias_changed[@]}"
         git commit --quiet -m "chore: Sync branch-alias for release"
         git push --quiet origin main
