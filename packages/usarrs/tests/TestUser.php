@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Fortify\TwoFactorAuthenticatable;
 use Marque\Trove\Concerns\HasRoles;
 use Marque\Trove\Contracts\UserInterface;
 use Marque\Trove\Enums\Role;
@@ -17,6 +18,7 @@ class TestUser extends Authenticatable implements UserInterface
     use HasFactory;
     use HasRoles;
     use Notifiable;
+    use TwoFactorAuthenticatable;
 
     protected $table = 'users';
 

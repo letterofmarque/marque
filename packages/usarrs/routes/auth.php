@@ -9,6 +9,7 @@ use Marque\Usarrs\Http\Controllers\PasswordResetController;
 use Marque\Usarrs\Http\Controllers\SocialiteController;
 use Marque\Usarrs\Livewire\Auth\Login;
 use Marque\Usarrs\Livewire\Auth\Register;
+use Marque\Usarrs\Livewire\Auth\TwoFactorChallenge;
 
 /*
 |--------------------------------------------------------------------------
@@ -22,6 +23,7 @@ Route::middleware(config('usarrs.middleware', ['web']))
     ->group(function () {
         Route::get('login', Login::class)->name('login');
         Route::get('register', Register::class)->name('register');
+        Route::get('two-factor-challenge', TwoFactorChallenge::class)->name('two-factor.login');
 
         // Password reset
         Route::get('forgot-password', [PasswordResetController::class, 'showForgotForm'])->name('password.request');

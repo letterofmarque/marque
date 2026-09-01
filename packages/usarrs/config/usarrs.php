@@ -22,6 +22,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Two-Factor Authentication
+    |--------------------------------------------------------------------------
+    |
+    | Off by default. An additional factor layered on top of whichever
+    | auth_driver is active — not a driver itself. Add Laravel\Fortify\
+    | TwoFactorAuthenticatable to your User model to use it.
+    |
+    */
+
+    'two_factor' => [
+        'enabled' => env('USARRS_2FA_ENABLED', false),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Invites
     |--------------------------------------------------------------------------
     */
