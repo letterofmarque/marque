@@ -56,6 +56,43 @@ just having Fortify present for its 2FA/passkey actions, used to leave that seco
 front door open. See the [manage_auth](#manage_auth-escape-hatch) section below for
 the full opt-out story.
 
+## Email Verification & Password Confirmation
+
+usarrs registers both of these under the same route names Laravel's own core
+primitives already expect, so `verified` and `password.confirm` middleware — including
+usarrs' own `admin_middleware` default, `['web', 'auth', 'verified']` — work exactly
+as they would in a stock Laravel app:
+
+| Route name | Path | Purpose |
+|---|---|---|
+| `verification.notice` | `GET /email/verify` | "Check your email" prompt |
+| `verification.verify` | `GET /email/verify/{id}/{hash}` | The signed link from the verification email |
+| `verification.send` | `POST /email/verification-notification` | Resend the verification email |
+| `password.confirm` | `GET/POST /user/confirm-password` | Re-enter your password before a sensitive action |
+
+**Your `User` model needs `implements \Illuminate\Contracts\Auth\MustVerifyEmail`
+to use email verification** — not just the trait. This trips people up: Laravel's own
+base `Illuminate\Foundation\Auth\User` class `use`s the `MustVerifyEmail` *trait*
+(the methods), but does not `implements` the `MustVerifyEmail` *contract* (the
+interface). `EnsureEmailIsVerified` middleware checks `instanceof` the contract, so
+without the explicit `implements`, the `verified` middleware silently treats every
+user as already verified and does nothing — no error, it just never blocks anyone.
+If you're seeing verification routes work but the `verified` middleware never
+actually stopping an unverified user, this is almost certainly why:
+
+```php
+class User extends Authenticatable implements MustVerifyEmail
+{
+    use \Illuminate\Auth\MustVerifyEmail; // the trait — same short name, different thing
+}
+```
+
+Password confirmation needs no opt-in trait — it works against any authenticated user
+out of the box.
+
+Both are part of the auth surface [manage_auth](#manage_auth-escape-hatch) governs —
+absent entirely when `manage_auth=false`, same as login/register/2FA/passkey.
+
 ## Two-Factor Authentication
 
 Off by default (`config('usarrs.two_factor.enabled')`, `USARRS_2FA_ENABLED`). An

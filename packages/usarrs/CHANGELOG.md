@@ -7,6 +7,27 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [RELEASES.md](../../RELEASES.md) for the story up to this point.
 
+## [6.1.0] — 2026-09-02
+
+### Fixed
+
+- **Lockout:** usarrs never re-registered Fortify's email-verification or
+  password-confirmation routes after v6.0.0 suppressed Fortify's own routes
+  unconditionally — leaving Laravel's stock `verified` and `password.confirm`
+  middleware permanently unsatisfiable for any unverified user, with no route to
+  fix that. Notably, usarrs' own `admin_middleware` default
+  (`['web', 'auth', 'verified']`) was itself internally inconsistent as a result.
+  Found via a cold-upgrade test (job #10602). New `EmailVerificationController`
+  (`verification.notice`/`verification.verify`/`verification.send`) and
+  `PasswordConfirm` Livewire component (`password.confirm`) close the gap — same
+  route names and behaviour a stock Fortify app would have provided. See
+  [Marque 4.3](../../docs/releases/4.3.md) for the full story.
+
+### Added
+
+- Both new surfaces are gated by `manage_auth`, same as the rest of the auth
+  surface.
+
 ## [6.0.0] — 2026-09-01
 
 ### Added

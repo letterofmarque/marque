@@ -15,6 +15,7 @@ read down to whatever you're currently on.
 
 | Release | Date | Summary | Who's affected |
 |---|---|---|---|
+| [4.3](docs/releases/4.3.md) | 2026-09-02 | usarrs registers email verification + password confirmation routes, fixing a lockout for unverified users | usarrs users only, especially anyone using `verified`/`password.confirm` middleware or the admin panel |
 | [4.2](docs/releases/4.2.md) | 2026-09-01 | usarrs requires Fortify; adds off-by-default 2FA and passkeys; closes a Fortify route collision | usarrs users only |
 | [4.1](docs/releases/4.1.md) | 2026-08-26 | Tracker `passkey` renamed to `announce_key` (avoids collision with Laravel's own WebAuthn passkeys) | bloodhound, usarrs users only |
 | [4.0](docs/releases/4.0.md) | 2026-08-20 | `marque/id` renamed to `marque/ise`; squidink and parley added | guise, usarrs, disguise users; anyone wanting rich text/discussion |
