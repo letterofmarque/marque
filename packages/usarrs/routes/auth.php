@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
+use Marque\Usarrs\Http\Controllers\EmailVerificationController;
 use Marque\Usarrs\Http\Controllers\LogoutController;
 use Marque\Usarrs\Http\Controllers\MagicLinkController;
 use Marque\Usarrs\Http\Controllers\PasswordResetController;
@@ -45,4 +46,22 @@ Route::middleware(config('usarrs.auth_middleware', ['web', 'auth']))
     ->prefix(config('usarrs.prefix', ''))
     ->group(function () {
         Route::post('logout', LogoutController::class)->name('logout');
+    });
+
+// Email verification (requires auth — job #10602 Gap 7 / Spec #96). Route
+// names, paths, and the {id}/{hash} param shape are fixed by core Laravel's
+// own Illuminate\Auth\Notifications\VerifyEmail, which hardcodes
+// 'verification.verify' — not usarrs' choice to make.
+Route::middleware(config('usarrs.auth_middleware', ['web', 'auth']))
+    ->prefix(config('usarrs.prefix', ''))
+    ->group(function () {
+        Route::get('email/verify', [EmailVerificationController::class, 'notice'])
+            ->name('verification.notice');
+
+        Route::get('email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])
+            ->middleware('signed')
+            ->name('verification.verify');
+
+        Route::post('email/verification-notification', [EmailVerificationController::class, 'send'])
+            ->name('verification.send');
     });

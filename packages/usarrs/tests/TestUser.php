@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Marque\Usarrs\Tests;
 
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -15,7 +16,14 @@ use Marque\Trove\Concerns\HasRoles;
 use Marque\Trove\Contracts\UserInterface;
 use Marque\Trove\Enums\Role;
 
-class TestUser extends Authenticatable implements UserInterface, PasskeyUser
+// implements MustVerifyEmail (the CONTRACT) is required in addition to the
+// trait Illuminate\Foundation\Auth\User already `use`s — EnsureEmailIsVerified
+// middleware checks `instanceof \Illuminate\Contracts\Auth\MustVerifyEmail`,
+// not "has the trait's methods". Missing this silently makes 'verified'
+// middleware a permanent no-op rather than erroring — the exact trap job
+// #10602 Gap 7 exists to fix elsewhere; documented explicitly in usarrs'
+// README as a required step for consuming apps, not just implied here.
+class TestUser extends Authenticatable implements UserInterface, PasskeyUser, MustVerifyEmail
 {
     use HasFactory;
     use HasRoles;
@@ -65,6 +73,7 @@ class TestUserFactory extends Factory
         return [
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
+            'email_verified_at' => now(),
             'password' => bcrypt('password'),
             'role' => Role::User->value,
             'status' => 'active',
@@ -85,5 +94,10 @@ class TestUserFactory extends Factory
     public function banned(): static
     {
         return $this->state(fn () => ['status' => 'banned']);
+    }
+
+    public function unverified(): static
+    {
+        return $this->state(fn () => ['email_verified_at' => null]);
     }
 }

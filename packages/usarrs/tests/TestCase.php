@@ -58,6 +58,16 @@ abstract class TestCase extends BaseTestCase
         $app['config']->set('passkeys.allowed_origins', ['http://localhost']);
 
         $app['view']->addNamespace('usarrs-test', __DIR__.'/views');
+
+        // Orchestra Testbench's minimal app doesn't run through
+        // Illuminate\Foundation\Configuration\Middleware's default alias
+        // registration the way a real Laravel app (bootstrap/app.php) does
+        // — 'verified' isn't registered automatically, unlike 'signed',
+        // which Laravel core wires up independently of that bootstrapper.
+        // Registered here so tests can exercise the same 'verified'
+        // middleware a real consuming app's own routes/config would use
+        // (e.g. config('usarrs.admin_middleware')'s default).
+        $app['router']->aliasMiddleware('verified', \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class);
     }
 
     protected function defineDatabaseMigrations(): void
