@@ -33,4 +33,25 @@ describe('IseServiceProvider', function () {
 
         expect($view->exists('ise::components.navigation'))->toBeTrue();
     });
+
+    it('actually renders the layout without a missing-component error', function () {
+        // Regression test for job #10602 Gap 5: the shipped layout template
+        // referenced the pre-rename <livewire:id-navigation /> tag while
+        // IseServiceProvider registered the component as ise-navigation —
+        // exists()-only checks above never caught it because a view can
+        // exist as a file and still fail to compile/render. Render, don't
+        // just check existence.
+        //
+        // withoutVite() is needed because this test deliberately renders
+        // ise's OWN shipped layout — unlike every downstream package
+        // (guise, usarrs), whose tests render a test-local stub layout
+        // instead specifically to avoid needing a Vite build in test infra.
+        // That's exactly why this bug reached a tagged release without any
+        // suite catching it: nothing was actually rendering this file.
+        $this->withoutVite();
+
+        $html = view('ise::layouts.app', ['slot' => 'content'])->render();
+
+        expect($html)->toBeString();
+    });
 });

@@ -13,7 +13,7 @@
 <body class="min-h-screen bg-white dark:bg-zinc-800">
     <div class="flex min-h-screen flex-col">
         {{-- Navigation --}}
-        <livewire:id-navigation />
+        <livewire:ise-navigation />
 
         {{-- Page Content --}}
         <main class="flex-1">

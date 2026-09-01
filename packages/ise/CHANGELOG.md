@@ -5,6 +5,15 @@ All notable changes to `marque/ise` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
+## [1.0.1] — 2026-09-01
+
+### Fixed
+
+- The shipped layout (`layouts/app.blade.php`) referenced the pre-rename
+  `<livewire:id-navigation />` tag instead of `ise-navigation` — broke every page using
+  the ise-based layout on a fresh install. Found via twentyt's cold-upgrade test
+  (job #10602).
+
 ## [1.0.0] — 2026-08-20
 
 Initial release under this name — `marque/ise` replaces `marque/id`, which is now
