@@ -48,7 +48,8 @@
         "illuminate/auth": "^13.0",
         "illuminate/notifications": "^13.0",
         "livewire/livewire": "^4.0",
-        "laravel/fortify": "^1.30"
+        "laravel/fortify": "^1.30",
+        "laravel/passkeys": "^0.2.0"
     },
     "require-dev": {
         "orchestra/testbench": "^11.0",

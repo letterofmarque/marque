@@ -9,16 +9,19 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Laravel\Passkeys\Contracts\PasskeyUser;
+use Laravel\Passkeys\PasskeyAuthenticatable;
 use Marque\Trove\Concerns\HasRoles;
 use Marque\Trove\Contracts\UserInterface;
 use Marque\Trove\Enums\Role;
 
-class TestUser extends Authenticatable implements UserInterface
+class TestUser extends Authenticatable implements UserInterface, PasskeyUser
 {
     use HasFactory;
     use HasRoles;
     use Notifiable;
     use TwoFactorAuthenticatable;
+    use PasskeyAuthenticatable;
 
     protected $table = 'users';
 
@@ -32,6 +35,19 @@ class TestUser extends Authenticatable implements UserInterface
     public function generateAnnounceKey(): string
     {
         return bin2hex(random_bytes(16));
+    }
+
+    /**
+     * laravel/passkeys hardcodes 'user_id' on Passkey::user() but derives the
+     * hasMany foreign key from the consumer's class name on
+     * PasskeyAuthenticatable::passkeys() — the two only agree when the class
+     * is named `User`. Overridden here so this fixture (named TestUser, for
+     * clarity in test output) still resolves to the same column a real `User`
+     * model would use. See the passkeys migration for the full explanation.
+     */
+    public function getForeignKey()
+    {
+        return 'user_id';
     }
 
     protected static function newFactory(): Factory
