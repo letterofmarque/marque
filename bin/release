@@ -144,6 +144,35 @@ check_changelog() {
         || die "$pkg/CHANGELOG.md has no entry for $version — add one and commit it before releasing"
 }
 
+# extra.branch-alias.dev-main is composer metadata (what dev-main resolves to
+# for `^X.0@dev`-style constraints), not the release itself — nothing else
+# reads or updates it automatically, so it drifts from the actual latest
+# major unless someone remembers to bump it by hand. Unlike the changelog
+# check above (a human-written entry, correctly refused rather than
+# fabricated), the expected value here is fully mechanical — <major>.0.x-dev
+# for the version being tagged — so we just fix it rather than dying and
+# telling the caller to go edit JSON themselves. Returns 0 if it changed
+# anything (caller commits), 1 if it was already correct.
+sync_branch_alias() {
+    local pkg="$1" version="$2"
+    local file="$PACKAGES_DIR/$pkg/composer.json"
+    local major="${version%%.*}"
+    local expected="${major}.0.x-dev"
+
+    local current
+    current="$(jq -r '.extra."branch-alias"."dev-main" // empty' "$file")"
+
+    [[ "$current" == "$expected" ]] && return 1
+
+    jq --indent 4 --arg alias "$expected" \
+        '.extra."branch-alias"."dev-main" = $alias' \
+        "$file" > "$file.tmp"
+    mv "$file.tmp" "$file"
+
+    echo "    $pkg: dev-main $current -> $expected"
+    return 0
+}
+
 run_tests_for() {
     local pkg="$1"
     blue "==> Testing $pkg"
@@ -345,6 +374,36 @@ main() {
         check_changelog "$p" "$v"
     done
     green "    every package has a CHANGELOG.md entry for its release version"
+
+    # branch-alias is mechanical (see sync_branch_alias) — fix it and commit
+    # before testing/tagging rather than gating on it. In dry-run, just say
+    # what would change; don't touch the working tree.
+    blue "==> Syncing branch-alias"
+    local -a alias_changed=()
+    for p in "${ordered[@]}"; do
+        for entry in "${RELEASES[@]}"; do
+            [[ "${entry%% *}" == "$p" ]] && v="${entry##* }"
+        done
+        if $DRY_RUN; then
+            local current expected major
+            major="${v%%.*}"
+            expected="${major}.0.x-dev"
+            current="$(jq -r '.extra."branch-alias"."dev-main" // empty' "$PACKAGES_DIR/$p/composer.json")"
+            [[ "$current" == "$expected" ]] \
+                || echo "    [dry-run] would sync $p: dev-main $current -> $expected"
+        elif sync_branch_alias "$p" "$v"; then
+            alias_changed+=("$PACKAGES_DIR/$p/composer.json")
+        fi
+    done
+
+    if (( ${#alias_changed[@]} > 0 )); then
+        git add "${alias_changed[@]}"
+        git commit --quiet -m "chore: Sync branch-alias for release"
+        git push --quiet origin main
+        green "    branch-alias synced and pushed (${#alias_changed[@]} package(s))"
+    else
+        green "    branch-alias already correct for every package"
+    fi
 
     # Test everything before tagging anything.
     for p in "${ordered[@]}"; do
