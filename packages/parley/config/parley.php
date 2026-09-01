@@ -141,6 +141,35 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Rate Limiting
+    |--------------------------------------------------------------------------
+    |
+    | Off by default — see Spec #94. Enforced at the service layer
+    | (PostService::create()/reply()) via Laravel's own RateLimiter, keyed
+    | per-user, so it applies to any caller (Livewire, a REST endpoint, a
+    | script), not just parley's own UI.
+    |
+    | MUST be turned on before any public deployment accepting
+    | user-generated content — job #10543. Off by default only because
+    | flipping a config default silently on upgrade would be its own
+    | surprise (VERSIONING.md); there is currently no live exposure window
+    | between a fresh install and a site owner reading this before their own
+    | public launch.
+    |
+    | max_attempts posts per decay_seconds, per user. The defaults below
+    | (5 per minute) are a starting point, not a recommendation carved in
+    | stone — tune to your traffic and moderation capacity.
+    |
+    */
+
+    'rate_limiting' => [
+        'enabled' => env('PARLEY_RATE_LIMITING', false),
+        'max_attempts' => env('PARLEY_RATE_LIMIT_MAX', 5),
+        'decay_seconds' => env('PARLEY_RATE_LIMIT_DECAY', 60),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Routes
     |--------------------------------------------------------------------------
     |

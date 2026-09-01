@@ -6,8 +6,10 @@ namespace Marque\Parley\Services;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\RateLimiter;
 use Marque\Parley\Contracts\PostServiceInterface;
 use Marque\Parley\Exceptions\ThreadLockedException;
+use Marque\Parley\Exceptions\TooManyPostsException;
 use Marque\Parley\Models\Post;
 use Marque\Parley\Models\Thread;
 
@@ -15,6 +17,7 @@ class PostService implements PostServiceInterface
 {
     public function create(Thread $thread, Authenticatable $user, string $body, ?string $format = null): Post
     {
+        $this->assertNotThrottled($user);
         $this->assertUnlocked($thread);
 
         return Post::create([
@@ -27,6 +30,8 @@ class PostService implements PostServiceInterface
 
     public function reply(Post $parent, Authenticatable $user, string $body, ?string $format = null): Post
     {
+        $this->assertNotThrottled($user);
+
         // Loaded rather than assumed present, so a caller handed a parent post
         // without its thread relation still gets the lock checked correctly.
         $thread = $parent->thread()->firstOrFail();
@@ -90,6 +95,31 @@ class PostService implements PostServiceInterface
     {
         if ($thread->locked) {
             throw ThreadLockedException::forThread($thread);
+        }
+    }
+
+    /**
+     * Off by default (config('parley.rate_limiting.enabled')) — see Spec
+     * #94. When on, RateLimiter is consulted per-user before every post or
+     * reply; when off, RateLimiter is never touched at all, so posting
+     * stays exactly as unlimited as it is today.
+     *
+     * @throws TooManyPostsException
+     */
+    private function assertNotThrottled(Authenticatable $user): void
+    {
+        if (! config('parley.rate_limiting.enabled', false)) {
+            return;
+        }
+
+        $key = 'parley-post:'.$user->getAuthIdentifier();
+        $maxAttempts = (int) config('parley.rate_limiting.max_attempts', 5);
+        $decaySeconds = (int) config('parley.rate_limiting.decay_seconds', 60);
+
+        $allowed = RateLimiter::attempt($key, $maxAttempts, static fn () => true, $decaySeconds);
+
+        if (! $allowed) {
+            throw TooManyPostsException::forUser($user);
         }
     }
 

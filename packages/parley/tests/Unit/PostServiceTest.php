@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Marque\Parley\Contracts\PostServiceInterface;
 use Marque\Parley\Exceptions\ThreadLockedException;
+use Marque\Parley\Exceptions\TooManyPostsException;
 use Marque\Parley\Models\Post;
 use Marque\Parley\Models\Thread;
 use Marque\Parley\Tests\TestUser;
@@ -183,5 +184,89 @@ describe('PostService', function () {
         Post::factory()->count(5)->inThread($thread)->create();
 
         expect(postService()->latestForThread($thread, limit: 2))->toHaveCount(2);
+    });
+
+    describe('rate limiting', function () {
+        it('does not throttle when disabled — the default', function () {
+            // config('parley.rate_limiting.enabled') defaults to false, so
+            // RateLimiter is never consulted at all — posting stays unlimited
+            // until a site owner opts in. See Spec #94's "off by default"
+            // Decision: an upgrade to parley must not silently start
+            // rejecting a legitimate power-user's fast-typing session.
+            $thread = Thread::factory()->create();
+            $user = TestUser::factory()->create();
+
+            for ($i = 0; $i < 10; $i++) {
+                postService()->create($thread, $user, "post $i");
+            }
+
+            expect($thread->posts)->toHaveCount(10);
+        });
+
+        describe('with rate_limiting enabled', function () {
+            beforeEach(function () {
+                config([
+                    'parley.rate_limiting.enabled' => true,
+                    'parley.rate_limiting.max_attempts' => 3,
+                    'parley.rate_limiting.decay_seconds' => 60,
+                ]);
+            });
+
+            it('allows posting up to the configured limit', function () {
+                $thread = Thread::factory()->create();
+                $user = TestUser::factory()->create();
+
+                for ($i = 0; $i < 3; $i++) {
+                    postService()->create($thread, $user, "post $i");
+                }
+
+                expect($thread->posts)->toHaveCount(3);
+            });
+
+            it('refuses the post past the limit within the window', function () {
+                $thread = Thread::factory()->create();
+                $user = TestUser::factory()->create();
+
+                for ($i = 0; $i < 3; $i++) {
+                    postService()->create($thread, $user, "post $i");
+                }
+
+                expect(fn () => postService()->create($thread, $user, 'one too many'))
+                    ->toThrow(TooManyPostsException::class);
+
+                expect($thread->posts)->toHaveCount(3);
+            });
+
+            it('throttles replies using the same per-user limit as new posts', function () {
+                $thread = Thread::factory()->create();
+                $user = TestUser::factory()->create();
+                $root = postService()->create($thread, $user, 'root');
+
+                // root already consumed one attempt — two more replies reach
+                // the limit of 3, the fourth call throws.
+                postService()->reply($root, $user, 'reply 1');
+                postService()->reply($root, $user, 'reply 2');
+
+                expect(fn () => postService()->reply($root, $user, 'reply 3'))
+                    ->toThrow(TooManyPostsException::class);
+            });
+
+            it('keys the limit per-user — one user throttled does not affect another', function () {
+                $thread = Thread::factory()->create();
+                $flooder = TestUser::factory()->create();
+                $otherUser = TestUser::factory()->create();
+
+                for ($i = 0; $i < 3; $i++) {
+                    postService()->create($thread, $flooder, "post $i");
+                }
+
+                expect(fn () => postService()->create($thread, $flooder, 'blocked'))
+                    ->toThrow(TooManyPostsException::class);
+
+                // A different user has consumed none of their own limit yet.
+                $post = postService()->create($thread, $otherUser, 'still fine');
+                expect($post->user_id)->toBe($otherUser->id);
+            });
+        });
     });
 });
