@@ -146,8 +146,32 @@ button.
 
 ## Rate limiting
 
-Not included. Flood control for user-generated content is a deployment-specific decision —
-see the package's issue tracker if you're deciding this for a public-facing install.
+**Off by default. Turn this on before any public deployment.** An unlimited post/reply
+surface is fine for a private, trusted-user tracker — it is not fine for anything a
+stranger can reach.
+
+```php
+'rate_limiting' => [
+    'enabled' => env('PARLEY_RATE_LIMITING', false),
+    'max_attempts' => env('PARLEY_RATE_LIMIT_MAX', 5),
+    'decay_seconds' => env('PARLEY_RATE_LIMIT_DECAY', 60),
+],
+```
+
+`max_attempts` posts (or replies — they share one limit) per `decay_seconds`, per user.
+The defaults (5 per minute) are a starting point, not a rule — tune to your own traffic and
+moderation capacity. Enforced at the service layer (`PostService`) via Laravel's own
+`RateLimiter`, so it applies to any caller: the Livewire UI, a REST endpoint, a script —
+not just whichever component happens to check first.
+
+Breaching the limit surfaces as a normal validation error on the post form ("You're posting
+too quickly — try again in a moment"), the same as an empty or over-length post — never an
+unhandled exception.
+
+It ships off by default rather than on, matching every other opt-in toggle in the Marque
+suite (2FA, passkeys, `usarrs.manage_auth`) — an upgrade should never silently start
+rejecting a legitimate user's fast-typing session. That default is only safe because
+turning it on is a one-line config change you make *before* going live, not after.
 
 ## What's out of scope
 
