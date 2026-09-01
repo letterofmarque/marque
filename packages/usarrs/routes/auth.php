@@ -9,6 +9,7 @@ use Marque\Usarrs\Http\Controllers\MagicLinkController;
 use Marque\Usarrs\Http\Controllers\PasswordResetController;
 use Marque\Usarrs\Http\Controllers\SocialiteController;
 use Marque\Usarrs\Livewire\Auth\Login;
+use Marque\Usarrs\Livewire\Auth\PasswordConfirm;
 use Marque\Usarrs\Livewire\Auth\Register;
 use Marque\Usarrs\Livewire\Auth\TwoFactorChallenge;
 
@@ -64,4 +65,6 @@ Route::middleware(config('usarrs.auth_middleware', ['web', 'auth']))
 
         Route::post('email/verification-notification', [EmailVerificationController::class, 'send'])
             ->name('verification.send');
+
+        Route::get('user/confirm-password', PasswordConfirm::class)->name('password.confirm');
     });

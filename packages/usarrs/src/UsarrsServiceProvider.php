@@ -12,6 +12,7 @@ use Marque\Usarrs\Contracts\InviteServiceInterface;
 use Marque\Usarrs\Livewire\Admin\UserIndex;
 use Marque\Usarrs\Livewire\Admin\UserShow;
 use Marque\Usarrs\Livewire\Auth\Login;
+use Marque\Usarrs\Livewire\Auth\PasswordConfirm;
 use Marque\Usarrs\Livewire\Auth\Register;
 use Marque\Usarrs\Livewire\Auth\TwoFactorChallenge;
 use Marque\Usarrs\Livewire\Invite\InviteCreate;
@@ -119,6 +120,7 @@ class UsarrsServiceProvider extends ServiceProvider
         \Livewire\Livewire::component('usarrs-two-factor-challenge', TwoFactorChallenge::class);
         \Livewire\Livewire::component('usarrs-two-factor-setup', TwoFactorSetup::class);
         \Livewire\Livewire::component('usarrs-passkey-management', PasskeyManagement::class);
+        \Livewire\Livewire::component('usarrs-password-confirm', PasswordConfirm::class);
     }
 
     // Profile, invites, admin — unaffected by manage_auth in either state.
