@@ -15,6 +15,7 @@ read down to whatever you're currently on.
 
 | Release | Date | Summary | Who's affected |
 |---|---|---|---|
+| [4.2](docs/releases/4.2.md) | 2026-09-01 | usarrs requires Fortify; adds off-by-default 2FA and passkeys; closes a Fortify route collision | usarrs users only |
 | [4.1](docs/releases/4.1.md) | 2026-08-26 | Tracker `passkey` renamed to `announce_key` (avoids collision with Laravel's own WebAuthn passkeys) | bloodhound, usarrs users only |
 | [4.0](docs/releases/4.0.md) | 2026-08-20 | `marque/id` renamed to `marque/ise`; squidink and parley added | guise, usarrs, disguise users; anyone wanting rich text/discussion |
 | [3.0](docs/releases/3.0.md) | 2026-08-13 | PHP 8.4 / Laravel 13 now required | everyone |
