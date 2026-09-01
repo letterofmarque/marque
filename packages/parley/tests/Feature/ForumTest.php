@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Marque\Parley\Exceptions\TooManyPostsException;
 use Marque\Parley\Livewire\Forum\CategoryIndex;
 use Marque\Parley\Livewire\Forum\ThreadCreate;
 use Marque\Parley\Livewire\Forum\ThreadIndex;
@@ -90,6 +91,63 @@ describe('the forum, when enabled (the default)', function () {
             ->assertHasErrors(['title' => 'required']);
 
         expect(Thread::count())->toBe(0);
+    });
+
+    it('shows a friendly error instead of a raw exception when rate limited', function () {
+        // ThreadCreate is the second real call site into
+        // PostService::create() (alongside CommentThread) — Spec #94's
+        // Checkpoint #526 explicitly asked to check for exactly this rather
+        // than assume CommentThread was the only one.
+        config([
+            'parley.rate_limiting.enabled' => true,
+            'parley.rate_limiting.max_attempts' => 1,
+            'parley.rate_limiting.decay_seconds' => 60,
+        ]);
+
+        $user = TestUser::factory()->create();
+        $category = Category::factory()->create();
+
+        // Consume the one allowed attempt via a first thread.
+        \Livewire\Livewire::actingAs($user)
+            ->test(ThreadCreate::class, ['category' => $category])
+            ->set('title', 'First thread')
+            ->set('body', 'first post')
+            ->call('submit');
+
+        expect(Thread::count())->toBe(1);
+
+        \Livewire\Livewire::actingAs($user)
+            ->test(ThreadCreate::class, ['category' => $category])
+            ->set('title', 'Second thread')
+            ->set('body', 'second post, too fast')
+            ->call('submit')
+            ->assertHasErrors('body');
+
+        expect(Thread::count())->toBe(1);
+    });
+
+    it('does not throw TooManyPostsException as an unhandled exception from ThreadCreate', function () {
+        config([
+            'parley.rate_limiting.enabled' => true,
+            'parley.rate_limiting.max_attempts' => 1,
+            'parley.rate_limiting.decay_seconds' => 60,
+        ]);
+
+        $user = TestUser::factory()->create();
+        $category = Category::factory()->create();
+
+        \Livewire\Livewire::actingAs($user)
+            ->test(ThreadCreate::class, ['category' => $category])
+            ->set('title', 'First thread')
+            ->set('body', 'first post')
+            ->call('submit');
+
+        expect(fn () => \Livewire\Livewire::actingAs($user)
+            ->test(ThreadCreate::class, ['category' => $category])
+            ->set('title', 'Second thread')
+            ->set('body', 'second post')
+            ->call('submit'))
+            ->not->toThrow(TooManyPostsException::class);
     });
 
     it('lets a moderator pin, lock and delete a thread', function () {

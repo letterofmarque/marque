@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Livewire\Livewire;
 use Marque\Parley\Exceptions\ThreadLockedException;
+use Marque\Parley\Exceptions\TooManyPostsException;
 use Marque\Parley\Livewire\CommentThread;
 use Marque\Parley\Models\Post;
 use Marque\Parley\Models\Thread;
@@ -266,5 +267,55 @@ describe('CommentThread', function () {
 
         Livewire::test(CommentThread::class, ['subject' => $subject])
             ->assertDontSee('wire:submit="submit"', escape: false);
+    });
+
+    it('shows a friendly error instead of a raw exception when rate limited', function () {
+        // Unlike the locked-thread case above (which still bubbles as an
+        // unhandled exception — a pre-existing gap, out of scope here),
+        // TooManyPostsException must never reach the user as a 500. See
+        // Spec #94's Failure mode section.
+        config([
+            'parley.rate_limiting.enabled' => true,
+            'parley.rate_limiting.max_attempts' => 1,
+            'parley.rate_limiting.decay_seconds' => 60,
+        ]);
+
+        $user = TestUser::factory()->create();
+        $subject = TestSubject::create(['name' => 'a thing']);
+
+        $component = Livewire::actingAs($user)
+            ->test(CommentThread::class, ['subject' => $subject])
+            ->set('body', 'first post')
+            ->call('submit');
+
+        expect(Post::count())->toBe(1);
+
+        $component->set('body', 'second post, too fast')
+            ->call('submit')
+            ->assertHasErrors('body');
+
+        expect(Post::count())->toBe(1);
+    });
+
+    it('does not throw TooManyPostsException as an unhandled exception', function () {
+        config([
+            'parley.rate_limiting.enabled' => true,
+            'parley.rate_limiting.max_attempts' => 1,
+            'parley.rate_limiting.decay_seconds' => 60,
+        ]);
+
+        $user = TestUser::factory()->create();
+        $subject = TestSubject::create(['name' => 'a thing']);
+
+        Livewire::actingAs($user)
+            ->test(CommentThread::class, ['subject' => $subject])
+            ->set('body', 'first post')
+            ->call('submit');
+
+        expect(fn () => Livewire::actingAs($user)
+            ->test(CommentThread::class, ['subject' => $subject])
+            ->set('body', 'second post')
+            ->call('submit'))
+            ->not->toThrow(TooManyPostsException::class);
     });
 });

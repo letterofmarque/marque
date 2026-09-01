@@ -8,6 +8,7 @@ use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Title;
 use Marque\Parley\Contracts\PostServiceInterface;
 use Marque\Parley\Contracts\ThreadServiceInterface;
+use Marque\Parley\Exceptions\TooManyPostsException;
 use Marque\Parley\Livewire\Component as ParleyComponent;
 use Marque\Parley\Models\Category;
 use Marque\Parley\Models\Thread;
@@ -44,8 +45,21 @@ class ThreadCreate extends ParleyComponent
             'body' => ['required', 'string', 'max:'.config('parley.format.max_length', 20000)],
         ]);
 
-        $thread = $threads->create(auth()->user(), $this->category, $data['title']);
-        $posts->create($thread, auth()->user(), $data['body']);
+        $user = auth()->user();
+        $thread = $threads->create($user, $this->category, $data['title']);
+
+        try {
+            $posts->create($thread, $user, $data['body']);
+        } catch (TooManyPostsException) {
+            // A thread only ever exists together with its first post (see
+            // class docblock) — if the post is throttled, the thread just
+            // created a moment ago must not survive as an orphan.
+            $thread->delete();
+
+            $this->addError('body', __("You're posting too quickly — try again in a moment."));
+
+            return;
+        }
 
         $this->redirect(route('parley.forum.threads.show', $thread), navigate: true);
     }

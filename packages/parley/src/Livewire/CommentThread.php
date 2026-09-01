@@ -13,6 +13,7 @@ use Livewire\Component;
 use Marque\Parley\Contracts\PostServiceInterface;
 use Marque\Parley\Contracts\ThreadServiceInterface;
 use Marque\Parley\Exceptions\ThreadLockedException;
+use Marque\Parley\Exceptions\TooManyPostsException;
 use Marque\Parley\Models\Post;
 use Marque\Parley\Models\Thread;
 
@@ -85,18 +86,29 @@ class CommentThread extends Component
         $data = $this->validateBody();
         $user = auth()->user();
 
-        if ($this->replyingTo !== null) {
-            // A reply's thread already exists — it is the parent post's
-            // thread — so this goes through PostService::reply() rather than
-            // resolveThread(). Simpler, and correct for both mount shapes
-            // without needing to know which one this is.
-            $parent = Post::query()->findOrFail($this->replyingTo);
-            $post = $this->postService()->reply($parent, $user, $data['body']);
-            $this->threadId = $post->thread_id;
-        } else {
-            $thread = $this->resolveThread();
-            $this->postService()->create($thread, $user, $data['body']);
-            $this->threadId = $thread->getKey();
+        try {
+            if ($this->replyingTo !== null) {
+                // A reply's thread already exists — it is the parent post's
+                // thread — so this goes through PostService::reply() rather
+                // than resolveThread(). Simpler, and correct for both mount
+                // shapes without needing to know which one this is.
+                $parent = Post::query()->findOrFail($this->replyingTo);
+                $post = $this->postService()->reply($parent, $user, $data['body']);
+                $this->threadId = $post->thread_id;
+            } else {
+                $thread = $this->resolveThread();
+                $this->postService()->create($thread, $user, $data['body']);
+                $this->threadId = $thread->getKey();
+            }
+        } catch (TooManyPostsException) {
+            // Unlike ThreadLockedException (deliberately left to bubble —
+            // a pre-existing, separately-tracked gap), this must never
+            // surface as a raw exception: flooding is an expected, everyday
+            // occurrence for a UGC form once rate limiting is turned on,
+            // not an exceptional server error. See Spec #94.
+            $this->addError('body', __("You're posting too quickly — try again in a moment."));
+
+            return;
         }
 
         $this->reset(['body', 'replyingTo']);
