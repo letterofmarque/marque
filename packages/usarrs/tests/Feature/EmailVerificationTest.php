@@ -123,3 +123,37 @@ test('resending the verification notification flashes a status message', functio
 
     Notification::assertSentTo($user, \Illuminate\Auth\Notifications\VerifyEmail::class);
 });
+
+// The headline regression: this is the exact internal-inconsistency job
+// #10602 found. config('usarrs.admin_middleware') ships defaulting to
+// ['web', 'auth', 'verified'] — the package's own admin panel already
+// depended on 'verified' working. Uses the ACTUAL shipped config default,
+// not a hand-rolled route, so this genuinely proves the fix rather than
+// merely proving the middleware works in the abstract.
+test('admin_middleware default is actually satisfiable end-to-end for a newly-registered user', function () {
+    $newUser = TestUser::factory()->unverified()->create();
+
+    Route::middleware(config('usarrs.admin_middleware'))
+        ->get('/test-admin-only', fn () => 'admin area');
+
+    // Step 1: locked out, exactly as job #10602 found — but now redirected
+    // to a real page, not left with nowhere to go.
+    $this->actingAs($newUser)
+        ->get('/test-admin-only')
+        ->assertRedirect(route('verification.notice'));
+
+    // Step 2: the user follows their verification email's link.
+    $verifyUrl = URL::temporarySignedRoute('verification.verify', now()->addMinutes(60), [
+        'id' => $newUser->getKey(),
+        'hash' => sha1($newUser->getEmailForVerification()),
+    ]);
+    $this->actingAs($newUser)->get($verifyUrl);
+
+    expect($newUser->fresh()->hasVerifiedEmail())->toBeTrue();
+
+    // Step 3: the same admin_middleware-gated route now passes through.
+    $this->actingAs($newUser->fresh())
+        ->get('/test-admin-only')
+        ->assertOk()
+        ->assertSee('admin area');
+});

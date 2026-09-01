@@ -69,6 +69,23 @@ test('passkey management livewire component is not registered when manage_auth i
     expect(\Livewire\Livewire::exists('usarrs-passkey-management'))->toBeFalse();
 });
 
+test('email verification routes do not exist when manage_auth is false', function () {
+    // job #10602 Gap 7 / Spec #96. GET-only assertion for verification.verify
+    // (its {id}/{hash} segments make a bare GET without valid params a poor
+    // fit for assertNotFound() semantics anyway — the important thing is the
+    // route group as a whole, verification.notice/send, is unregistered).
+    $this->actingAs($this->user)->get('/email/verify')->assertNotFound();
+    $this->actingAs($this->user)->post('/email/verification-notification')->assertNotFound();
+});
+
+test('password confirm route does not exist when manage_auth is false', function () {
+    $this->actingAs($this->user)->get('/user/confirm-password')->assertNotFound();
+});
+
+test('password confirm livewire component is not registered when manage_auth is false', function () {
+    expect(\Livewire\Livewire::exists('usarrs-password-confirm'))->toBeFalse();
+});
+
 test('fortify routes remain suppressed when manage_auth is false', function () {
     $this->post('/register', [
         'name' => 'Evil User',
