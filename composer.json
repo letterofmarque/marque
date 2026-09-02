@@ -27,5 +27,13 @@
         }
     ],
     "minimum-stability": "stable",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "require-dev": {
+        "laravel/pint": "^1.30"
+    },
+    "scripts": {
+        "lint": "pint",
+        "lint:test": "pint --test",
+        "test": "for p in packages/*/; do (cd \"$p\" && composer test) || exit 1; done"
+    }
 }

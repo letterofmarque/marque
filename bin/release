@@ -443,6 +443,18 @@ main() {
         green "    branch-alias already correct for every package"
     fi
 
+    # Style is checked, never auto-fixed here: a reformatting commit created
+    # mid-release would not be covered by the test run that just passed.
+    blue "==> Checking code style"
+    if $DRY_RUN; then
+        echo "    [dry-run] would run: vendor/bin/pint --test"
+    elif vendor/bin/pint --test >/tmp/marque-pint.log 2>&1; then
+        green "    pint clean"
+    else
+        red "    style violations — run 'composer lint' and commit the result"
+        die "pint failed, nothing tagged (see /tmp/marque-pint.log)"
+    fi
+
     # Test everything before tagging anything.
     for p in "${ordered[@]}"; do
         run_tests_for "$p"

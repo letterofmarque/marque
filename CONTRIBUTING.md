@@ -99,8 +99,20 @@ Marque follows standard Laravel conventions:
 
 - PSR-4 autoloading
 - PSR-12 code style
+- `declare(strict_types=1)` in every PHP file
 - Type hints on method parameters and return types
 - Dependency injection via Laravel's service container
+
+Style is enforced by [Pint](https://laravel.com/docs/pint), installed once at the repo
+root and run across every package at once:
+
+```bash
+composer lint         # fix
+composer lint:test    # check only
+```
+
+Run `composer lint` before opening a pull request — releases are refused on a style
+violation.
 
 ## Reporting Issues
 
