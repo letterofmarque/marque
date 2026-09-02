@@ -6,9 +6,11 @@ namespace Marque\Bloodhound;
 
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
+use Marque\Bloodhound\Contracts\AnnounceLogServiceInterface;
 use Marque\Bloodhound\Events\TorrentCompleted;
 use Marque\Bloodhound\Listeners\RecordSnatch;
 use Marque\Bloodhound\Services\AntiCheatService;
+use Marque\Bloodhound\Services\AnnounceLogService;
 use Marque\Bloodhound\Services\AnnounceService;
 use Marque\Bloodhound\Services\ClientValidationService;
 
@@ -22,6 +24,11 @@ class BloodhoundServiceProvider extends ServiceProvider
         $this->app->singleton(ClientValidationService::class);
         $this->app->singleton(AntiCheatService::class);
         $this->app->singleton(AnnounceService::class);
+
+        // Bound to the interface (matching trove's TorrentServiceInterface
+        // pattern) so a consumer can swap the query implementation — e.g. to
+        // read the log from a warehouse rather than the table itself.
+        $this->app->bind(AnnounceLogServiceInterface::class, AnnounceLogService::class);
     }
 
     public function boot(): void

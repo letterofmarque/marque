@@ -126,7 +126,7 @@ final class AnnounceService
         string $userAgent,
         array $antiCheatCheck,
     ): Response {
-        $removedPeer = $this->peerService->removePeer($torrent->id, $peerId);
+        $this->peerService->removePeer($torrent->id, $peerId);
 
         // No further delta to report — the peer's last known upload/download
         // was already captured on its prior announce. This row's value is
