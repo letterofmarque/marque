@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Marque\Trove\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Marque\Trove\Enums\Role;
 use Marque\Trove\Models\Torrent;
 
 /**
@@ -63,6 +64,38 @@ class TorrentFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'description' => null,
+        ]);
+    }
+
+    /**
+     * Indicate that the torrent has an active swarm.
+     */
+    public function seeded(int $seeders = 3, int $leechers = 5): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'seeders' => $seeders,
+            'leechers' => $leechers,
+        ]);
+    }
+
+    /**
+     * Indicate that the torrent has no seeders.
+     */
+    public function dead(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'seeders' => 0,
+            'leechers' => 0,
+        ]);
+    }
+
+    /**
+     * Indicate that the torrent is restricted to a minimum role.
+     */
+    public function restrictedTo(Role $role): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'min_role' => $role,
         ]);
     }
 

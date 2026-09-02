@@ -7,6 +7,22 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [RELEASES.md](../../RELEASES.md) for the story up to this point.
 
+## [Unreleased]
+
+> Fixes an unbounded recursion that crashed the process when removing an expired peer.
+
+### Fixed
+
+- **`PeerService::removePeer()` recursed until the process segfaulted when the
+  peer being removed had expired.** It read the peer via `getPeer()`, which
+  self-heals an expired peer by calling `removePeer()` — which called
+  `getPeer()` again. Removal now does a raw read, since it does not care
+  whether the peer had expired, only that it was there.
+
+  Nothing exercised this until something swept expired peers:
+  `cleanupExpiredPeers()` calls `removePeer()` for every expired peer, so it
+  would crash on the first one it found.
+
 ## [3.0.0] — 2026-08-13
 
 > Raises the floor to PHP 8.4 and Laravel 13, and pins real versions for inter-package constraints.

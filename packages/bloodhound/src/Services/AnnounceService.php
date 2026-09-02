@@ -147,11 +147,19 @@ final class AnnounceService
             antiCheatCheck: $antiCheatCheck,
         );
 
+        // The stopped path is where a torrent actually goes dead, so the
+        // projection matters most here — this is the decrement the old
+        // `visible` flag never had.
+        $seeders = $this->peerService->getSeeders($torrent->id);
+        $leechers = $this->peerService->getLeechers($torrent->id);
+
+        $this->syncSwarmCounts($torrent, $seeders, $leechers);
+
         // Even on stopped, return a valid response
         return TrackerResponse::announce(
             peers: [],
-            complete: $this->peerService->getSeeders($torrent->id),
-            incomplete: $this->peerService->getLeechers($torrent->id),
+            complete: $seeders,
+            incomplete: $leechers,
             interval: (int) config('threepio.announce_interval', 1800),
             minInterval: (int) config('threepio.min_announce_interval', 300),
             compact: true,
@@ -256,11 +264,6 @@ final class AnnounceService
             );
         }
 
-        // Update torrent visibility if seeder
-        if ($isSeeder && ! $torrent->visible) {
-            $torrent->update(['visible' => true]);
-        }
-
         // Get peers for response
         $maxPeers = min($numWant, (int) config('threepio.max_peers_per_announce', 50));
         $peers = $this->peerService->getPeersForAnnounce(
@@ -273,14 +276,43 @@ final class AnnounceService
         // Determine response format
         $useCompact = $this->shouldUseCompact($compact);
 
+        // The response needs these anyway, so projecting them onto the torrent
+        // costs nothing extra. Redis stays the source of truth for live peers;
+        // the columns exist so the catalogue can filter and sort on swarm
+        // state, which it cannot do against Redis.
+        $seeders = $this->peerService->getSeeders($torrent->id);
+        $leechers = $this->peerService->getLeechers($torrent->id);
+
+        $this->syncSwarmCounts($torrent, $seeders, $leechers);
+
         return TrackerResponse::announce(
             peers: $peers,
-            complete: $this->peerService->getSeeders($torrent->id),
-            incomplete: $this->peerService->getLeechers($torrent->id),
+            complete: $seeders,
+            incomplete: $leechers,
             interval: (int) config('threepio.announce_interval', 1800),
             minInterval: (int) config('threepio.min_announce_interval', 300),
             compact: $useCompact,
         );
+    }
+
+    /**
+     * Project the live swarm counts onto the torrent row.
+     *
+     * Skips the write when nothing changed — announces arrive every few
+     * minutes per peer and the counts are stable most of the time, so an
+     * unconditional update would add a pointless write to the hottest path in
+     * the tracker.
+     */
+    private function syncSwarmCounts(Torrent $torrent, int $seeders, int $leechers): void
+    {
+        if ($torrent->seeders === $seeders && $torrent->leechers === $leechers) {
+            return;
+        }
+
+        $torrent->forceFill([
+            'seeders' => $seeders,
+            'leechers' => $leechers,
+        ])->save();
     }
 
     /**

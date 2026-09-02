@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\ServiceProvider;
 use Marque\Bloodhound\Console\Commands\PruneAnnounceLog;
+use Marque\Bloodhound\Console\Commands\SyncSwarmCounts;
 use Marque\Bloodhound\Contracts\AnnounceLogServiceInterface;
 use Marque\Bloodhound\Events\TorrentCompleted;
 use Marque\Bloodhound\Listeners\RecordSnatch;
@@ -78,8 +79,15 @@ class BloodhoundServiceProvider extends ServiceProvider
 
         $this->commands([
             PruneAnnounceLog::class,
+            SyncSwarmCounts::class,
         ]);
 
         Schedule::command('bloodhound:prune-announce-log')->daily();
+
+        // Hourly, not daily: this corrects torrents whose peers expired without
+        // a stopped announce, and until it runs they show a swarm they no
+        // longer have. A day of that is a catalogue full of torrents claiming
+        // seeders that left yesterday.
+        Schedule::command('bloodhound:sync-swarm-counts')->hourly();
     }
 }

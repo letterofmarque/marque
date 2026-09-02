@@ -27,9 +27,12 @@ class TorrentController extends Controller
      */
     public function index(Request $request): TorrentCollection
     {
+        // No viewer passed: the service resolves the authenticated user, or a
+        // guest on a deployment that has opened read access.
         $torrents = $this->service->list(
             perPage: $request->integer('per_page', 25),
             search: $request->string('search')->toString() ?: null,
+            includeDead: $request->boolean('include_dead'),
         );
 
         return new TorrentCollection($torrents);
@@ -65,6 +68,8 @@ class TorrentController extends Controller
      */
     public function show(Torrent $torrent): TorrentResource
     {
+        $this->authorize('view', $torrent);
+
         return new TorrentResource($torrent->load('user'));
     }
 

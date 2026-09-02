@@ -11,17 +11,37 @@ use Illuminate\Support\Facades\Storage;
 use Marque\Threepio\Support\Bencode;
 use Marque\Trove\Contracts\TorrentServiceInterface;
 use Marque\Trove\Models\Torrent;
+use Marque\Trove\Support\ViewerScope;
 
 class TorrentService implements TorrentServiceInterface
 {
     /**
      * Get paginated list of torrents.
      *
+     * Access filtering happens here rather than only in TorrentPolicy: a
+     * policy guards a single record, and would leave restricted torrents
+     * visible in every index, API collection and count. Because guise,
+     * disguise and cennad all read through this one method, filtering here
+     * covers all three at once.
+     *
      * @return LengthAwarePaginator<int, Torrent>
      */
-    public function list(int $perPage = 25, ?string $search = null): LengthAwarePaginator
-    {
+    public function list(
+        int $perPage = 25,
+        ?string $search = null,
+        ?ViewerScope $viewer = null,
+        bool $includeDead = false,
+    ): LengthAwarePaginator {
+        $viewer ??= ViewerScope::current();
+
+        // Hiding dead torrents is opt-in: a torrent has no seeders until its
+        // first announce, so filtering by default would hide fresh uploads and
+        // empty the catalogue of any install that has just upgraded.
+        $hideDead = config('trove.hide_dead_torrents', false) && ! $includeDead;
+
         return Torrent::with('user')
+            ->visibleTo($viewer->user)
+            ->when($hideDead, fn ($query) => $query->alive())
             ->when($search, fn ($query) => $query->whereRaw('LOWER(name) LIKE ?', ['%'.strtolower($search).'%']))
             ->latest()
             ->paginate($perPage);
@@ -29,10 +49,17 @@ class TorrentService implements TorrentServiceInterface
 
     /**
      * Get a single torrent by ID.
+     *
+     * Dead torrents are still returned — a direct link to one should show the
+     * torrent, not a 404. Only the listing hides them.
      */
-    public function find(int $id): ?Torrent
+    public function find(int $id, ?ViewerScope $viewer = null): ?Torrent
     {
-        return Torrent::with('user')->find($id);
+        $viewer ??= ViewerScope::current();
+
+        return Torrent::with('user')
+            ->visibleTo($viewer->user)
+            ->find($id);
     }
 
     /**

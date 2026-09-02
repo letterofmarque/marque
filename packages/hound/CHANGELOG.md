@@ -7,6 +7,18 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [RELEASES.md](../../RELEASES.md) for the story up to this point.
 
+## [Unreleased]
+
+> Records swarm counts on the announce path so a public catalogue can filter and sort on them.
+
+### Changed
+
+- The announce path writes `seeders`/`leechers` onto the torrent. Hound
+  otherwise touches the database only on a completed event, so this is a
+  deliberate addition to a hot path — without it a public catalogue cannot
+  filter or sort on swarm state, because live peers are in Redis. The write is
+  skipped when the counts have not changed.
+
 ## [3.0.0] — 2026-08-13
 
 > Raises the floor to PHP 8.4 and Laravel 13.

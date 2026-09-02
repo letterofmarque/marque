@@ -32,4 +32,20 @@ return [
     |
     */
     'storage_disk' => env('TROVE_STORAGE_DISK', 'local'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Hide Dead Torrents
+    |--------------------------------------------------------------------------
+    |
+    | When true, torrent listings exclude torrents with no seeders, and the
+    | frontends offer a "show dead torrents" toggle to include them.
+    |
+    | Off by default, deliberately. A torrent has no seeders until its first
+    | announce, so enabling this on a catalogue whose torrents have not
+    | announced yet — a fresh upload, or any install that has just upgraded —
+    | hides them. Turn it on once your tracker is actually serving announces.
+    |
+    */
+    'hide_dead_torrents' => env('TROVE_HIDE_DEAD_TORRENTS', false),
 ];

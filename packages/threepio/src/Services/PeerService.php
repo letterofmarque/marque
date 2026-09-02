@@ -135,7 +135,13 @@ final class PeerService
         $redis = $this->redis();
         $peerKey = $this->prefix."peers:{$torrentId}";
 
-        $existingPeer = $this->getPeer($torrentId, $peerId);
+        // Deliberately the raw read, not getPeer(): getPeer() self-heals an
+        // expired peer by calling removePeer(), so going through it here
+        // recurses without bound the moment the peer being removed is the
+        // expired one — which is every peer this is called for from
+        // cleanupExpiredPeers(). Removal does not care whether the peer was
+        // expired, only that it was there.
+        $existingPeer = $this->readPeer($torrentId, $peerId);
 
         if (! $existingPeer) {
             return null;
@@ -189,6 +195,20 @@ final class PeerService
         }
 
         return $peer;
+    }
+
+    /**
+     * Read a peer's stored data without the expiry check.
+     *
+     * getPeer() treats reading an expired peer as a cue to delete it, which is
+     * right for callers asking "is this peer live?" and wrong for removal
+     * itself — see removePeer().
+     */
+    private function readPeer(int $torrentId, string $peerId): ?array
+    {
+        $data = $this->redis()->hget($this->prefix."peers:{$torrentId}", $peerId);
+
+        return $data ? json_decode($data, true) : null;
     }
 
     /**

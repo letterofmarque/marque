@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use Marque\Trove\Enums\Role;
 use Marque\Trove\Models\Torrent;
+use Marque\Trove\Policies\TorrentPolicy;
 use Marque\Trove\Tests\TestUser;
 
 describe('TorrentPolicy', function () {
@@ -102,6 +104,43 @@ describe('TorrentPolicy', function () {
             $torrent = Torrent::factory()->for($owner, 'user')->create();
 
             expect($admin->can('delete', $torrent))->toBeTrue();
+        });
+    });
+    describe('view', function () {
+        it('allows anyone to view an unrestricted torrent', function () {
+            $torrent = Torrent::factory()->create();
+
+            expect(TestUser::factory()->create()->can('view', $torrent))->toBeTrue();
+        });
+
+        it('denies a user below the minimum role', function () {
+            $torrent = Torrent::factory()->restrictedTo(Role::Uploader)->create();
+
+            expect(TestUser::factory()->create()->can('view', $torrent))->toBeFalse();
+        });
+
+        it('allows a user at or above the minimum role', function () {
+            $torrent = Torrent::factory()->restrictedTo(Role::Uploader)->create();
+
+            expect(TestUser::factory()->uploader()->create()->can('view', $torrent))->toBeTrue()
+                ->and(TestUser::factory()->admin()->create()->can('view', $torrent))->toBeTrue();
+        });
+
+        it('denies a guest a restricted torrent but allows an unrestricted one', function () {
+            $policy = new TorrentPolicy;
+
+            expect($policy->view(null, Torrent::factory()->restrictedTo(Role::Uploader)->create()))->toBeFalse()
+                ->and($policy->view(null, Torrent::factory()->create()))->toBeTrue();
+        });
+
+        // The owner is deliberately not special-cased: an uploader demoted
+        // below a torrent's min_role loses access to their own upload, which
+        // is the point of a restriction level.
+        it('does not exempt the torrent owner from the restriction', function () {
+            $owner = TestUser::factory()->create();
+            $torrent = Torrent::factory()->for($owner, 'user')->restrictedTo(Role::Moderator)->create();
+
+            expect($owner->can('view', $torrent))->toBeFalse();
         });
     });
 });

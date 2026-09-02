@@ -8,15 +8,33 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Marque\Trove\Models\Torrent;
+use Marque\Trove\Support\ViewerScope;
 
 interface TorrentServiceInterface
 {
     /**
+     * List torrents the viewer is allowed to see.
+     *
+     * $viewer defaults to the authenticated user rather than to null. Null is
+     * a real value here — it means "a guest", and guests see only unrestricted
+     * torrents — so an omitted argument must not be mistaken for one, or a
+     * caller that forgets to pass a viewer silently gets the guest list
+     * instead of the caller's own. Pass null explicitly for genuine guest
+     * browsing.
+     *
      * @return LengthAwarePaginator<int, Torrent>
      */
-    public function list(int $perPage = 25, ?string $search = null): LengthAwarePaginator;
+    public function list(
+        int $perPage = 25,
+        ?string $search = null,
+        ?ViewerScope $viewer = null,
+        bool $includeDead = false,
+    ): LengthAwarePaginator;
 
-    public function find(int $id): ?Torrent;
+    /**
+     * @see self::list() for $viewer semantics.
+     */
+    public function find(int $id, ?ViewerScope $viewer = null): ?Torrent;
 
     public function findByInfoHash(string $infoHash): ?Torrent;
 

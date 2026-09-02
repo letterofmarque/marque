@@ -24,8 +24,16 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   installed Cennad alongside Guise and assumed Guise's auth gate covered the API — were
   exposing their full torrent catalogue to anyone who could reach the endpoint.
 
+### Added
+
+- `seeders` and `leechers` on the torrent resource, and an `include_dead` query
+  parameter on the index.
+
 ### Changed
 
+- `show` now authorizes `view` on the torrent, and the index is filtered by the
+  requesting user, so a torrent restricted by trove's `min_role` is not
+  readable over the API by someone below that role.
 - **Breaking:** `public_middleware` and `protected_middleware` are renamed to
   `read_middleware` and `write_middleware`. The old key names are still honoured and
   **take precedence** over the new ones, because Laravel merges the package defaults into

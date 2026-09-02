@@ -15,6 +15,17 @@
             icon="magnifying-glass"
             class="max-w-sm"
         />
+
+        @if ($canShowDead)
+            <label class="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+                <input
+                    type="checkbox"
+                    wire:model.live="showDead"
+                    class="rounded border-zinc-300 dark:border-zinc-600"
+                />
+                {{ __('Show dead torrents') }}
+            </label>
+        @endif
     </div>
 
     <div class="rounded-xl border border-zinc-200 dark:border-zinc-700">
@@ -24,6 +35,8 @@
                     <th class="px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">{{ __('Name') }}</th>
                     <th class="px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">{{ __('Size') }}</th>
                     <th class="px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">{{ __('Files') }}</th>
+                    <th class="px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">{{ __('Seeders') }}</th>
+                    <th class="px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">{{ __('Leechers') }}</th>
                     <th class="px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">{{ __('Uploaded by') }}</th>
                     <th class="px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">{{ __('Date') }}</th>
                     <th class="px-3 py-2"></th>
@@ -40,6 +53,10 @@
                         </td>
                         <td class="px-3 py-2">{{ $torrent->sizeForHumans() }}</td>
                         <td class="px-3 py-2">{{ $torrent->file_count }}</td>
+                        <td class="px-3 py-2 {{ $torrent->seeders === 0 ? 'text-zinc-400 dark:text-zinc-500' : 'text-green-600 dark:text-green-400' }}">
+                            {{ $torrent->seeders }}
+                        </td>
+                        <td class="px-3 py-2">{{ $torrent->leechers }}</td>
                         <td class="px-3 py-2">{{ $torrent->user->name }}</td>
                         <td class="px-3 py-2">{{ $torrent->created_at->diffForHumans() }}</td>
                         <td class="px-3 py-2">
@@ -50,7 +67,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="px-3 py-8 text-center">
+                        <td colspan="8" class="px-3 py-8 text-center">
                             <x-ise::text class="text-zinc-500">{{ __('No torrents found.') }}</x-ise::text>
                         </td>
                     </tr>
