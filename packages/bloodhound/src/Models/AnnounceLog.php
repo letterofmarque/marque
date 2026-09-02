@@ -36,7 +36,26 @@ use Marque\Trove\Models\Torrent;
  */
 class AnnounceLog extends Model
 {
+    protected $table = 'announce_log';
+
     public const UPDATED_AT = null;
+
+    protected $fillable = [
+        'user_id',
+        'torrent_id',
+        'peer_id',
+        'event',
+        'ip',
+        'port',
+        'user_agent',
+        'uploaded',
+        'downloaded',
+        'left',
+        'upload_delta',
+        'download_delta',
+        'anti_cheat_flagged',
+        'anti_cheat_reason',
+    ];
 
     /**
      * Swappable connection (Spec #98's "Storage" decision) — null means the

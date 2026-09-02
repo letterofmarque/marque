@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Marque\Bloodhound\Services;
 
+use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Http\Response;
 use Marque\Bloodhound\Events\TorrentCompleted;
+use Marque\Bloodhound\Jobs\LogAnnounce;
 use Marque\Bloodhound\Jobs\UpdateUserStats;
 use Marque\Threepio\Enums\AnnounceEvent;
 use Marque\Threepio\Services\PeerService;
@@ -62,6 +64,27 @@ final class AnnounceService
         );
 
         if (! $antiCheatCheck['passed']) {
+            // Still logged (Spec #98) — a rejected announce is itself part
+            // of the history worth keeping, not just the ones that passed.
+            // No PeerService::upsertPeer() ran, so there's no real delta to
+            // report here; the point of this row is that the announce
+            // happened and was rejected, and why.
+            $this->logAnnounce(
+                user: $user,
+                torrent: $torrent,
+                peerId: $peerId,
+                eventLabel: $this->eventLabel($event),
+                ip: $ip,
+                port: $port,
+                userAgent: $userAgent,
+                uploaded: $uploaded,
+                downloaded: $downloaded,
+                left: $left,
+                uploadDelta: 0,
+                downloadDelta: 0,
+                antiCheatCheck: $antiCheatCheck,
+            );
+
             return TrackerResponse::error($antiCheatCheck['reason'] ?? 'Request rejected');
         }
 
@@ -73,14 +96,17 @@ final class AnnounceService
 
         // Handle the event
         return match ($eventEnum) {
-            AnnounceEvent::Stopped => $this->handleStopped($torrent, $peerId),
+            AnnounceEvent::Stopped => $this->handleStopped(
+                $user, $torrent, $peerId, $ip, $port, $uploaded, $downloaded, $left, $userAgent, $antiCheatCheck
+            ),
             AnnounceEvent::Completed => $this->handleCompleted(
                 $user, $torrent, $peerId, $ip, $port,
-                $uploaded, $downloaded, $left, $userAgent, $isSeeder, $compact, $numWant
+                $uploaded, $downloaded, $left, $userAgent, $isSeeder, $compact, $numWant, $antiCheatCheck
             ),
             default => $this->handleRegular(
                 $user, $torrent, $peerId, $ip, $port,
-                $uploaded, $downloaded, $left, $userAgent, $isSeeder, $compact, $numWant
+                $uploaded, $downloaded, $left, $userAgent, $isSeeder, $compact, $numWant, $antiCheatCheck,
+                eventLabel: $eventEnum?->value ?? 'regular',
             ),
         };
     }
@@ -88,9 +114,38 @@ final class AnnounceService
     /**
      * Handle stopped event - peer is leaving the swarm.
      */
-    private function handleStopped(Torrent $torrent, string $peerId): Response
-    {
+    private function handleStopped(
+        UserInterface $user,
+        Torrent $torrent,
+        string $peerId,
+        string $ip,
+        int $port,
+        int $uploaded,
+        int $downloaded,
+        int $left,
+        string $userAgent,
+        array $antiCheatCheck,
+    ): Response {
         $removedPeer = $this->peerService->removePeer($torrent->id, $peerId);
+
+        // No further delta to report — the peer's last known upload/download
+        // was already captured on its prior announce. This row's value is
+        // recording that the peer left, and when.
+        $this->logAnnounce(
+            user: $user,
+            torrent: $torrent,
+            peerId: $peerId,
+            eventLabel: 'stopped',
+            ip: $ip,
+            port: $port,
+            userAgent: $userAgent,
+            uploaded: $uploaded,
+            downloaded: $downloaded,
+            left: $left,
+            uploadDelta: 0,
+            downloadDelta: 0,
+            antiCheatCheck: $antiCheatCheck,
+        );
 
         // Even on stopped, return a valid response
         return TrackerResponse::announce(
@@ -119,6 +174,7 @@ final class AnnounceService
         bool $isSeeder,
         bool $compact,
         int $numWant,
+        array $antiCheatCheck,
     ): Response {
         // Record the snatch/completion
         event(new TorrentCompleted(
@@ -131,15 +187,19 @@ final class AnnounceService
         // Update the torrent's completion count
         $torrent->increment('times_completed');
 
-        // Process as a regular announce
+        // Process as a regular announce, but logged as 'completed' — not
+        // delegated silently, or the announce_log row would say 'regular'
+        // for what a client and the operator both consider a completion.
         return $this->handleRegular(
             $user, $torrent, $peerId, $ip, $port,
-            $uploaded, $downloaded, $left, $userAgent, $isSeeder, $compact, $numWant
+            $uploaded, $downloaded, $left, $userAgent, $isSeeder, $compact, $numWant, $antiCheatCheck,
+            eventLabel: 'completed',
         );
     }
 
     /**
-     * Handle regular announce (started or interval).
+     * Handle regular announce (started or interval) — also the shared tail
+     * end of handleCompleted(), distinguished by $eventLabel.
      */
     private function handleRegular(
         UserInterface $user,
@@ -154,6 +214,8 @@ final class AnnounceService
         bool $isSeeder,
         bool $compact,
         int $numWant,
+        array $antiCheatCheck,
+        string $eventLabel = 'regular',
     ): Response {
         // Upsert peer and get stats deltas
         $result = $this->peerService->upsertPeer(
@@ -167,6 +229,22 @@ final class AnnounceService
             left: $left,
             userAgent: $userAgent,
             isSeeder: $isSeeder,
+        );
+
+        $this->logAnnounce(
+            user: $user,
+            torrent: $torrent,
+            peerId: $peerId,
+            eventLabel: $eventLabel,
+            ip: $ip,
+            port: $port,
+            userAgent: $userAgent,
+            uploaded: $uploaded,
+            downloaded: $downloaded,
+            left: $left,
+            uploadDelta: $result['upload_delta'],
+            downloadDelta: $result['download_delta'],
+            antiCheatCheck: $antiCheatCheck,
         );
 
         // Queue user stats update if there are deltas
@@ -217,6 +295,68 @@ final class AnnounceService
         } else {
             // Immediate update if queue disabled
             UpdateUserStats::dispatchSync($userId, $uploadDelta, $downloadDelta);
+        }
+    }
+
+    /**
+     * Map the raw request 'event' param to the label announce_log records.
+     * 'started' is a real AnnounceEvent case; an empty/missing event (a
+     * regular interval announce) has no case, hence the 'regular' fallback.
+     */
+    private function eventLabel(?string $event): string
+    {
+        return AnnounceEvent::tryFrom($event ?? '')?->value ?? 'regular';
+    }
+
+    /**
+     * Dispatch a LogAnnounce job (Spec #98), only when the feature is on —
+     * no dispatch call at all when disabled, not a job that no-ops.
+     */
+    private function logAnnounce(
+        UserInterface $user,
+        Torrent $torrent,
+        string $peerId,
+        string $eventLabel,
+        string $ip,
+        int $port,
+        string $userAgent,
+        int $uploaded,
+        int $downloaded,
+        int $left,
+        int $uploadDelta,
+        int $downloadDelta,
+        array $antiCheatCheck,
+    ): void {
+        if (! config('bloodhound.announce_log.enabled', false)) {
+            return;
+        }
+
+        $job = new LogAnnounce(
+            userId: $user->getAuthIdentifier(),
+            torrentId: $torrent->id,
+            peerId: $peerId,
+            event: $eventLabel,
+            ip: $ip,
+            port: $port,
+            userAgent: $userAgent,
+            uploaded: $uploaded,
+            downloaded: $downloaded,
+            left: $left,
+            uploadDelta: $uploadDelta,
+            downloadDelta: $downloadDelta,
+            antiCheatFlagged: ! $antiCheatCheck['passed'],
+            antiCheatReason: $antiCheatCheck['reason'] ?? null,
+        );
+
+        // Same queue-or-sync choice as queueStatsUpdate() — reuses
+        // bloodhound.queue.*, not a second queue config for this feature.
+        if (config('bloodhound.queue.enabled', true)) {
+            app(Dispatcher::class)->dispatch(
+                $job->onConnection(config('bloodhound.queue.connection'))
+                    ->onQueue(config('bloodhound.queue.queue', 'tracker'))
+            );
+        } else {
+            app(Dispatcher::class)->dispatchSync($job);
         }
     }
 
