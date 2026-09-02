@@ -9,6 +9,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [3.0.0] — 2026-08-13
 
+> Raises the floor to PHP 8.4 and Laravel 13.
+
 ### Changed
 
 - **Breaking:** now requires PHP 8.4 and Laravel 13. See

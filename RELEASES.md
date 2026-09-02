@@ -11,6 +11,10 @@ actually affected, and exactly what to do about it. If you run Marque and
 want to know "what do I need to know to catch up," start at the top and
 read down to whatever you're currently on.
 
+Looking for *everything* rather than the curated bundles? The root
+[CHANGELOG.md](CHANGELOG.md) is a flat, dated feed of every release of every
+package, including the small ones that never warranted an entry here.
+
 ## Requirements
 
 **PHP 8.4+ and Laravel 13+**, as of [Marque 3.0](docs/releases/3.0.md). Composer

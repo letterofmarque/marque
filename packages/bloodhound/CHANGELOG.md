@@ -9,6 +9,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [4.1.0] — 2026-09-02
 
+> Adds an opt-in announce log for investigating cheating reports and settling disputed ratios.
+
 ### Added
 
 - **Announce log** — an opt-in, full-detail history of every announce, for
@@ -45,6 +47,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [4.0.0] — 2026-08-26
 
+> Renames the tracker `passkey` column to `announce_key`, avoiding a collision with Laravel's WebAuthn passkeys.
+
 ### Changed
 
 - **Breaking:** the tracker `passkey` column, and everything referencing it
@@ -54,6 +58,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   [full upgrade guide](../../docs/upgrade-guide-bloodhound-v4-usarrs-v5.md).
 
 ## [3.0.0] — 2026-08-13
+
+> Raises the floor to PHP 8.4 and Laravel 13.
 
 ### Changed
 

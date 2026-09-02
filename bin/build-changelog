@@ -1,0 +1,172 @@
+#!/usr/bin/env bash
+#
+# Regenerate the root CHANGELOG.md — one flat, dated feed of every package
+# release, newest first.
+#
+#   bin/build-changelog           rewrite CHANGELOG.md
+#   bin/build-changelog --check   exit non-zero if it would change (CI / release gate)
+#
+# Why this exists: RELEASES.md is a curated view of the releases significant
+# enough to need a story, and the per-package CHANGELOG.md files are eleven
+# separate documents nobody reads side by side. Neither answers "what has
+# changed across Marque lately." This does.
+#
+# It is GENERATED, never hand-edited — the per-package changelogs are the source
+# of truth, so this file cannot drift from them. bin/release regenerates it as
+# part of every release, so it updates on the same trigger as a version bump
+# rather than relying on anyone remembering.
+#
+# Each package release needs a `> summary` line directly under its version
+# heading:
+#
+#   ## [4.1.0] — 2026-09-02
+#
+#   > Opt-in announce log for investigating cheating reports and disputed ratios.
+#
+# One sentence, present tense, plain language — it is read by people scanning
+# for whether a release affects them. Following the same rule as
+# sync_branch_alias in bin/release: mechanical values get filled in
+# automatically, human-written prose gets refused rather than fabricated. A
+# release with no summary line is an error, not a blank row.
+#
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+readonly PACKAGES_DIR="packages"
+readonly OUTPUT="CHANGELOG.md"
+
+CHECK_ONLY=false
+[[ "${1:-}" == "--check" ]] && CHECK_ONLY=true
+[[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { sed -n '3,9p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'; exit 0; }
+
+red()   { printf '\033[31m%s\033[0m\n' "$*"; }
+green() { printf '\033[32m%s\033[0m\n' "$*"; }
+die()   { red "error: $*" >&2; exit 1; }
+
+# Emit "date<TAB>package<TAB>version<TAB>summary" for every released version.
+# Unreleased sections are skipped — they have no date and are not yet news.
+collect_entries() {
+    local file pkg
+    for file in "$PACKAGES_DIR"/*/CHANGELOG.md; do
+        [[ -f "$file" ]] || continue
+        pkg="$(basename "$(dirname "$file")")"
+
+        awk -v pkg="$pkg" -v file="$file" '
+            # ## [1.2.3] — 2026-09-02   (em dash, en dash or hyphen)
+            /^## \[/ {
+                version = ""; date = ""; summary = ""; want_summary = 0
+
+                if (match($0, /\[[0-9]+\.[0-9]+\.[0-9]+\]/)) {
+                    version = substr($0, RSTART + 1, RLENGTH - 2)
+                    rest = substr($0, RSTART + RLENGTH)
+                    if (match(rest, /[0-9]{4}-[0-9]{2}-[0-9]{2}/)) {
+                        date = substr(rest, RSTART, RLENGTH)
+                        want_summary = 1
+                    } else {
+                        printf "MISSING_DATE\t%s\t%s\n", pkg, version
+                    }
+                }
+                next
+            }
+
+            # First blockquote after the heading is the summary.
+            want_summary && /^> / {
+                summary = substr($0, 3)
+                gsub(/[ \t]+$/, "", summary)
+                printf "%s\t%s\t%s\t%s\n", date, pkg, version, summary
+                want_summary = 0
+                next
+            }
+
+            # A new section starts before any summary was found.
+            want_summary && /^### / {
+                printf "MISSING_SUMMARY\t%s\t%s\n", pkg, version
+                want_summary = 0
+                next
+            }
+
+            want_summary && /^## \[/ {
+                printf "MISSING_SUMMARY\t%s\t%s\n", pkg, version
+                want_summary = 0
+            }
+
+            END {
+                if (want_summary) printf "MISSING_SUMMARY\t%s\t%s\n", pkg, version
+            }
+        ' "$file"
+    done
+}
+
+main() {
+    local entries
+    entries="$(collect_entries)"
+
+    # Refuse to generate anything from an incomplete source.
+    local problems
+    problems="$(grep -E '^MISSING_(SUMMARY|DATE)' <<<"$entries" || true)"
+    if [[ -n "$problems" ]]; then
+        red "Cannot build $OUTPUT — some releases are missing their summary line or date:"
+        echo
+        while IFS=$'\t' read -r kind pkg version; do
+            if [[ "$kind" == "MISSING_DATE" ]]; then
+                echo "    $pkg $version — heading has no YYYY-MM-DD date"
+            else
+                echo "    $pkg $version — no '> summary' line under the version heading"
+            fi
+        done <<<"$problems"
+        echo
+        echo "Add a one-sentence summary directly under the version heading:"
+        echo
+        echo "    ## [1.2.3] — 2026-09-02"
+        echo
+        echo "    > What changed, in one sentence, for someone deciding if it affects them."
+        echo
+        die "fix the changelogs above, then re-run"
+    fi
+
+    local released
+    released="$(grep -vE '^MISSING_' <<<"$entries" || true)"
+    [[ -n "$released" ]] || die "no released versions found in $PACKAGES_DIR/*/CHANGELOG.md"
+
+    local generated
+    generated="$(
+        cat <<'HEADER'
+# Marque Changelog
+
+Every released version of every Marque package, newest first. For the curated
+story of which packages moved together and why, see
+[RELEASES.md](RELEASES.md); for the full detail of any single release, follow
+the package link.
+
+*This file is generated by `bin/build-changelog` from the per-package
+changelogs — edit those, not this.*
+
+HEADER
+
+        local current_date=""
+        while IFS=$'\t' read -r date pkg version summary; do
+            if [[ "$date" != "$current_date" ]]; then
+                [[ -n "$current_date" ]] && echo
+                echo "## $date"
+                echo
+                current_date="$date"
+            fi
+            echo "- **[$pkg $version](packages/$pkg/CHANGELOG.md)** — $summary"
+        done < <(sort -t$'\t' -k1,1r -k2,2 <<<"$released")
+    )"
+
+    if $CHECK_ONLY; then
+        if [[ -f "$OUTPUT" ]] && diff -q <(echo "$generated") "$OUTPUT" >/dev/null 2>&1; then
+            green "$OUTPUT is up to date"
+            return 0
+        fi
+        red "$OUTPUT is out of date — run bin/build-changelog"
+        return 1
+    fi
+
+    echo "$generated" > "$OUTPUT"
+    green "Wrote $OUTPUT ($(grep -c '^- ' "$OUTPUT") releases)"
+}
+
+main "$@"

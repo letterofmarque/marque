@@ -7,6 +7,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
 ## [1.0.1] — 2026-09-01
 
+> Fixes a stray pre-rename `id-navigation` tag that broke every page using the shipped layout.
+
 ### Fixed
 
 - The shipped layout (`layouts/app.blade.php`) referenced the pre-rename
@@ -15,6 +17,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md).
   (job #10602).
 
 ## [1.0.0] — 2026-08-20
+
+> First release under this name — the app shell and shared Blade components, replacing `marque/id`.
 
 Initial release under this name — `marque/ise` replaces `marque/id`, which is now
 abandoned on Packagist and points here. Same package, same purpose (the shared app

@@ -9,6 +9,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [6.1.0] — 2026-09-02
 
+> Fixes a lockout where unverified users had no route to verify, leaving `verified` middleware unsatisfiable.
+
 ### Fixed
 
 - **Lockout:** usarrs never re-registered Fortify's email-verification or
@@ -29,6 +31,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   surface.
 
 ## [6.0.0] — 2026-09-01
+
+> Requires Fortify; adds off-by-default two-factor auth and passkeys, plus a `manage_auth` escape hatch.
 
 ### Added
 
@@ -62,6 +66,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [5.0.0] — 2026-08-26
 
+> Renames the profile page's `PasskeyManagement` component.
+
 ### Changed
 
 - **Breaking:** the profile page's `PasskeyManagement` component is renamed
@@ -73,12 +79,16 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [4.0.0] — 2026-08-20
 
+> Depends on `marque/ise` instead of the renamed `marque/id`.
+
 ### Changed
 
 - **Breaking:** now depends on `marque/ise` instead of `marque/id`. See
   [Marque 4.0](../../docs/releases/4.0.md).
 
 ## [3.0.0] — 2026-08-13
+
+> Raises the floor to PHP 8.4 and Laravel 13.
 
 ### Changed
 

@@ -9,6 +9,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [Unreleased]
 
+> API read endpoints now require authentication by default; a public tracker opts out explicitly.
+
 ### Security
 
 - **The API's read endpoints (`index`, `show`) now require authentication by default.**
@@ -57,6 +59,8 @@ Leave `write_middleware` alone when you do — uploads, edits and deletes stay g
 Trove's `TorrentPolicy` on top of whatever middleware you set.
 
 ## [3.0.0] — 2026-08-13
+
+> Raises the floor to PHP 8.4 and Laravel 13.
 
 ### Changed
 

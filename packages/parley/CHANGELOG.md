@@ -7,6 +7,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
 ## [2.1.0] — 2026-09-01
 
+> Adds off-by-default rate limiting for posts and replies; turn it on before any public deployment.
+
 ### Added
 
 - Rate limiting for post/reply creation, off by default
@@ -17,12 +19,16 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
 ## [2.0.0] — 2026-08-20
 
+> Depends on `marque/ise` instead of the renamed `marque/id`.
+
 ### Changed
 
 - **Breaking:** now depends on `marque/ise` instead of `marque/id`, following the rest
   of the frontend-facing packages. See [Marque 4.0](../../docs/releases/4.0.md).
 
 ## [1.0.0] — 2026-08-20
+
+> First release — polymorphic threaded discussion for torrent comments and forum-lite.
 
 Initial release. Polymorphic threaded discussion — torrent comments and an optional
 lightweight forum from one model, rendered through `marque/squidink`.

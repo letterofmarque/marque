@@ -9,12 +9,16 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [4.0.0] — 2026-08-20
 
+> Depends on `marque/ise` instead of the renamed `marque/id`.
+
 ### Changed
 
 - **Breaking:** now depends on `marque/ise` instead of `marque/id`. See
   [Marque 4.0](../../docs/releases/4.0.md).
 
 ## [3.0.0] — 2026-08-13
+
+> Raises the floor to PHP 8.4 and Laravel 13.
 
 ### Changed
 

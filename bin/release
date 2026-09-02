@@ -142,6 +142,18 @@ check_changelog() {
 
     grep -qF "[$version]" "$file" \
         || die "$pkg/CHANGELOG.md has no entry for $version — add one and commit it before releasing"
+
+    # The root CHANGELOG.md is generated from these entries and needs a
+    # one-sentence summary per release. Checked here, with everything else that
+    # must be written before we tag, rather than failing at generation time
+    # once tags are already pushed.
+    awk -v want="[$version]" '
+        index($0, "## " want) == 1 { found = 1; next }
+        found && /^> / { ok = 1; exit }
+        found && (/^## \[/ || /^### /) { exit }
+        END { exit ok ? 0 : 1 }
+    ' "$file" \
+        || die "$pkg/CHANGELOG.md has no '> summary' line under [$version] — add a one-sentence summary for the root changelog (see bin/build-changelog)"
 }
 
 # extra.branch-alias.dev-main is composer metadata (what dev-main resolves to
@@ -373,7 +385,25 @@ main() {
         done
         check_changelog "$p" "$v"
     done
-    green "    every package has a CHANGELOG.md entry for its release version"
+    green "    every package has a CHANGELOG.md entry and summary for its release version"
+
+    # Regenerate the root changelog from the per-package entries. Done here,
+    # before tagging, so the tagged commit contains the updated feed rather
+    # than it trailing a release by one commit.
+    blue "==> Rebuilding root changelog"
+    if $DRY_RUN; then
+        echo "    [dry-run] would run: bin/build-changelog"
+    else
+        bin/build-changelog | sed 's/^/    /'
+        if ! git diff --quiet -- CHANGELOG.md; then
+            git add CHANGELOG.md
+            git commit --quiet -m "docs: Rebuild root changelog for release"
+            git push --quiet origin main
+            green "    CHANGELOG.md updated and pushed"
+        else
+            green "    CHANGELOG.md already up to date"
+        fi
+    fi
 
     # branch-alias is mechanical (see sync_branch_alias) — fix it and commit
     # before testing/tagging rather than gating on it. In dry-run, just say
