@@ -113,6 +113,91 @@ Violations fire a `CheatDetected` event and are logged to Redis for admin review
 
 Upload/download deltas are dispatched as queued jobs to avoid database writes on the announce path.
 
+### Announce Log
+
+**Off by default.** A full-detail, permanent history of every announce - each started, regular-interval, completed, and stopped request, with deltas, cumulative totals, client fingerprint, and the anti-cheat verdict for that announce.
+
+Nothing else in Bloodhound keeps this. Redis peer state is overwritten on every announce and expires within the hour; the `snatches` table records one row per completed user+torrent, not a history; and the anti-cheat `suspicious` list is a 1000-entry ring buffer that only gets an entry when a check *fails*. Once a peer's Redis entry expires there is nothing left to look at.
+
+Turn this on if you want to investigate a cheating report or settle a disputed ratio after the fact. It is off by default because full-detail logging on a busy tracker is real, ongoing storage growth, and that shouldn't be imposed on every install.
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `announce_log.enabled` | `false` | Master switch |
+| `announce_log.connection` | `null` | Database connection (null = app default) |
+| `announce_log.retention_days` | `null` | Days to keep rows (null = forever) |
+
+```env
+BLOODHOUND_ANNOUNCE_LOG=true
+BLOODHOUND_ANNOUNCE_LOG_CONNECTION=announce_log
+BLOODHOUND_ANNOUNCE_LOG_RETENTION_DAYS=90
+```
+
+Writes go through a queued job (`LogAnnounce`), the same pattern as stats updates, so the announce path never blocks on the write. No job is dispatched at all when the feature is disabled.
+
+#### What gets logged
+
+One row per announce: user, torrent, peer ID, event, IP, port, user agent, the cumulative `uploaded`/`downloaded`/`left` the client reported, the calculated `upload_delta`/`download_delta` since that peer's last announce, and whether anti-cheat flagged it (with the reason when it did).
+
+Both the cumulative totals and the deltas are kept deliberately. The delta is what actually happened this announce; the cumulative is the client's own claim. Storing both lets you cross-check a client's arithmetic against its own delta history - a client whose claimed total doesn't match the sum of its reported deltas is lying about something.
+
+The table is append-only. Rows are never modified after they're written, so there is no `updated_at`.
+
+#### Isolating it on a separate database
+
+`announce_log.connection` takes any connection name from `config/database.php`. Point it at a second database - same engine or not - and all reads and writes for this one table go there, with no other change. Migrations follow it too.
+
+This is the mechanism for keeping a high-write-volume table off your main database. Note that `user_id` and `torrent_id` carry no foreign key constraints precisely so this works: a real FK would require those tables to live on the same connection, which is the thing you're trying to avoid.
+
+#### Retention and pruning
+
+`retention_days` is `null` by default, which means **keep everything forever**. With logging enabled and no retention set, this table grows without bound on a busy tracker. That default is deliberate - once you've opted into logging, how long to keep it is your call, not ours - but it is your job to make it.
+
+Set `retention_days` and the scheduled `bloodhound:prune-announce-log` command keeps the table bounded:
+
+```bash
+php artisan bloodhound:prune-announce-log
+```
+
+It's registered on Laravel's scheduler to run daily, so it needs [the scheduler running](https://laravel.com/docs/scheduling#running-the-scheduler). It no-ops safely when no retention is configured, and reports what it did either way.
+
+#### Private trackers only
+
+This is a Bloodhound feature and has no equivalent in [marque/hound](https://packagist.org/packages/marque/hound). Public trackers are deliberately anonymous - `hound` records no user against an announce at all - so ratio verification and cheat investigation aren't concepts that apply there.
+
+The existing anti-cheat Redis `suspicious` list keeps working exactly as before whether or not you enable this, since it has no toggle of its own and operators who haven't opted in still need it.
+
+#### Querying the log
+
+`AnnounceLogServiceInterface` is the read side. Resolve it from the container:
+
+```php
+use Marque\Bloodhound\Contracts\AnnounceLogServiceInterface;
+
+public function __construct(
+    private readonly AnnounceLogServiceInterface $log,
+) {}
+```
+
+| Method | Answers |
+|--------|---------|
+| `forUser(int $userId, ?Carbon $since = null)` | What has this user been doing? |
+| `forTorrent(int $torrentId, ?Carbon $since = null)` | What happened on this torrent? |
+| `forUserAndTorrent(int $userId, int $torrentId)` | This user's session history on one torrent - the ratio-dispute query |
+| `flagged(?Carbon $since = null)` | Everything anti-cheat rejected |
+| `byIp(string $ip, ?Carbon $since = null)` | Multi-account / IP correlation |
+
+All return a `Collection` of `AnnounceLog` models, newest first.
+
+```php
+$recent = $this->log->forUser($user->id, now()->subDays(7));
+$disputed = $this->log->forUserAndTorrent($user->id, $torrent->id);
+```
+
+Results aren't paginated. The log is queried deliberately - an investigation, a dispute - not rendered on a hot path, and `$since` is the intended way to bound a result set on a tracker with real volume. Each method's query is shaped to use the table's indexes, so passing `$since` is cheap rather than a post-filter.
+
+Bloodhound ships no UI for this. Browsing the log is left to your application.
+
 ### Port Blacklist
 
 Default blocked ports include Direct Connect (411-413), Kazaa (1214), eMule (4662), Gnutella (6346-6347), and legacy BitTorrent defaults (6881-6889).
