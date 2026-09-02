@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Marque\Bloodhound\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Marque\Trove\Models\Torrent;
@@ -16,7 +17,7 @@ use Marque\Trove\Models\Torrent;
  * @property int $torrent_id
  * @property string $ip
  * @property string|null $user_agent
- * @property \Carbon\Carbon $completed_at
+ * @property Carbon $completed_at
  */
 class Snatch extends Model
 {

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Livewire\Livewire;
 use Marque\Guise\Tests\TestUser;
 use Marque\Parley\Livewire\CommentThread;
 use Marque\Parley\Models\Post;
@@ -60,7 +61,7 @@ test('a comment posted on a torrent shows up rendered through squidink', functio
         'user_id' => $this->user->id,
     ]);
 
-    \Livewire\Livewire::actingAs($this->user)
+    Livewire::actingAs($this->user)
         ->test(CommentThread::class, ['subject' => $torrent])
         ->set('body', 'looks **great**')
         ->call('submit')
@@ -76,7 +77,7 @@ test('editing and deleting a comment works through the torrent page component', 
         'user_id' => $this->user->id,
     ]);
 
-    $component = \Livewire\Livewire::actingAs($this->user)
+    $component = Livewire::actingAs($this->user)
         ->test(CommentThread::class, ['subject' => $torrent])
         ->set('body', 'first draft')
         ->call('submit');

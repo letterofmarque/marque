@@ -13,6 +13,7 @@ declare(strict_types=1);
 // during defineEnvironment(), before boot runs — a runtime config()->set()
 // in the test body is too late.
 
+use Livewire\Livewire;
 use Marque\Usarrs\Tests\TestUser;
 
 beforeEach(function () {
@@ -54,19 +55,19 @@ test('logout route does not exist when manage_auth is false', function () {
 // registered. Livewire::exists() is the alias-lookup Blade's <livewire:.../>
 // actually uses, so it's what proves the tag is gone.
 test('auth livewire components are not registered when manage_auth is false', function () {
-    expect(\Livewire\Livewire::exists('usarrs-login'))->toBeFalse();
+    expect(Livewire::exists('usarrs-login'))->toBeFalse();
 });
 
 test('register livewire component is not registered when manage_auth is false', function () {
-    expect(\Livewire\Livewire::exists('usarrs-register'))->toBeFalse();
+    expect(Livewire::exists('usarrs-register'))->toBeFalse();
 });
 
 test('two factor setup livewire component is not registered when manage_auth is false', function () {
-    expect(\Livewire\Livewire::exists('usarrs-two-factor-setup'))->toBeFalse();
+    expect(Livewire::exists('usarrs-two-factor-setup'))->toBeFalse();
 });
 
 test('passkey management livewire component is not registered when manage_auth is false', function () {
-    expect(\Livewire\Livewire::exists('usarrs-passkey-management'))->toBeFalse();
+    expect(Livewire::exists('usarrs-passkey-management'))->toBeFalse();
 });
 
 test('email verification routes do not exist when manage_auth is false', function () {
@@ -83,7 +84,7 @@ test('password confirm route does not exist when manage_auth is false', function
 });
 
 test('password confirm livewire component is not registered when manage_auth is false', function () {
-    expect(\Livewire\Livewire::exists('usarrs-password-confirm'))->toBeFalse();
+    expect(Livewire::exists('usarrs-password-confirm'))->toBeFalse();
 });
 
 test('fortify routes remain suppressed when manage_auth is false', function () {

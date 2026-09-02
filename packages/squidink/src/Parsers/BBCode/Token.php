@@ -15,7 +15,9 @@ namespace Marque\SquidInk\Parsers\BBCode;
 final class Token
 {
     public const TEXT = 'text';
+
     public const OPEN = 'open';
+
     public const CLOSE = 'close';
 
     public function __construct(

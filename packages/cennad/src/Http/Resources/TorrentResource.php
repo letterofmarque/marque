@@ -7,9 +7,10 @@ namespace Marque\Cennad\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Route;
+use Marque\Trove\Models\Torrent;
 
 /**
- * @mixin \Marque\Trove\Models\Torrent
+ * @mixin Torrent
  */
 class TorrentResource extends JsonResource
 {

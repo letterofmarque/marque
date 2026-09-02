@@ -24,8 +24,8 @@ interface ThreadServiceInterface
      * get lazy creation.
      *
      * @throws \LogicException if $subject does not use HasThreads — use
-     *                          threadFor() instead for a model that can't
-     *                          take the trait (see docs/integration.md).
+     *                         threadFor() instead for a model that can't
+     *                         take the trait (see docs/integration.md).
      */
     public function forSubject(Model $subject, Authenticatable $user): Thread;
 

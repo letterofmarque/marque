@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Marque\Ise\View\Components;
 
+use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
 /**
@@ -25,7 +26,7 @@ class Navigation extends Component
         $this->items = $this->detectNavItems();
     }
 
-    public function render(): \Illuminate\Contracts\View\View
+    public function render(): View
     {
         return view('ise::components.navigation');
     }

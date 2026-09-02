@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 use Marque\Parley\ParleyServiceProvider;
+use Marque\Parley\Tests\TestSubject;
+use Marque\Parley\Tests\TestUser;
+use Marque\SquidInk\SquidInk;
 
 describe('the package boots', function () {
     it('registers its service provider', function () {
@@ -36,7 +39,7 @@ describe('its dependencies are present', function () {
     });
 
     it('has squidink, which post bodies render through', function () {
-        $squidInk = app(\Marque\SquidInk\SquidInk::class);
+        $squidInk = app(SquidInk::class);
 
         expect($squidInk->hasParser('markdown'))->toBeTrue()
             ->and($squidInk->hasParser('bbcode'))->toBeTrue()
@@ -44,7 +47,7 @@ describe('its dependencies are present', function () {
     });
 
     it('renders text through squidink rather than owning a format', function () {
-        $html = app(\Marque\SquidInk\SquidInk::class)->convert('**hi**', 'markdown', 'html');
+        $html = app(SquidInk::class)->convert('**hi**', 'markdown', 'html');
 
         expect($html)->toBe('<p><strong>hi</strong></p>');
     });
@@ -52,14 +55,14 @@ describe('its dependencies are present', function () {
 
 describe('the host app supplies its own models', function () {
     it('resolves the configured user model', function () {
-        $user = \Marque\Parley\Tests\TestUser::factory()->create();
+        $user = TestUser::factory()->create();
 
         expect($user->exists)->toBeTrue()
-            ->and(config('trove.user_model'))->toBe(\Marque\Parley\Tests\TestUser::class);
+            ->and(config('trove.user_model'))->toBe(TestUser::class);
     });
 
     it('can attach discussion to an arbitrary model, not just torrents', function () {
-        $subject = \Marque\Parley\Tests\TestSubject::create(['name' => 'anything']);
+        $subject = TestSubject::create(['name' => 'anything']);
 
         expect($subject->exists)->toBeTrue();
     });

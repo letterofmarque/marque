@@ -24,8 +24,11 @@ final class Tag
      * How a tag's content is treated.
      */
     public const INLINE = 'inline';   // Emits a mark on its text: [b], [color]
+
     public const BLOCK = 'block';     // Emits a structural node: [quote], [list]
+
     public const VERBATIM = 'verbatim'; // Content is not parsed at all: [code]
+
     public const LEAF = 'leaf';       // Self-contained, content is its argument: [img]
 
     /**

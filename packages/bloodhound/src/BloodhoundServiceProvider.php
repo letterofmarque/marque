@@ -11,9 +11,9 @@ use Marque\Bloodhound\Console\Commands\PruneAnnounceLog;
 use Marque\Bloodhound\Contracts\AnnounceLogServiceInterface;
 use Marque\Bloodhound\Events\TorrentCompleted;
 use Marque\Bloodhound\Listeners\RecordSnatch;
-use Marque\Bloodhound\Services\AntiCheatService;
 use Marque\Bloodhound\Services\AnnounceLogService;
 use Marque\Bloodhound\Services\AnnounceService;
+use Marque\Bloodhound\Services\AntiCheatService;
 use Marque\Bloodhound\Services\ClientValidationService;
 
 class BloodhoundServiceProvider extends ServiceProvider

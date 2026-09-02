@@ -6,6 +6,7 @@ namespace Marque\Ise;
 
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
 use Marque\Ise\View\Components\Navigation;
 
 class IseServiceProvider extends ServiceProvider
@@ -21,8 +22,8 @@ class IseServiceProvider extends ServiceProvider
 
         Blade::anonymousComponentNamespace(__DIR__.'/../resources/views/components', 'ise');
 
-        if (class_exists(\Livewire\Livewire::class)) {
-            \Livewire\Livewire::component('ise-navigation', Navigation::class);
+        if (class_exists(Livewire::class)) {
+            Livewire::component('ise-navigation', Navigation::class);
         }
 
         if ($this->app->runningInConsole()) {

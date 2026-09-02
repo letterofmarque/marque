@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Marque\Usarrs\Tests;
 
+use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Fortify\FortifyServiceProvider;
 use Laravel\Passkeys\PasskeysServiceProvider;
+use Livewire\Livewire;
 use Livewire\LivewireServiceProvider;
 use Marque\Ise\IseServiceProvider;
 use Marque\Trove\TroveServiceProvider;
@@ -67,7 +69,7 @@ abstract class TestCase extends BaseTestCase
         // Registered here so tests can exercise the same 'verified'
         // middleware a real consuming app's own routes/config would use
         // (e.g. config('usarrs.admin_middleware')'s default).
-        $app['router']->aliasMiddleware('verified', \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class);
+        $app['router']->aliasMiddleware('verified', EnsureEmailIsVerified::class);
     }
 
     protected function defineDatabaseMigrations(): void
@@ -79,7 +81,7 @@ abstract class TestCase extends BaseTestCase
     protected function getPackageAliases($app): array
     {
         return [
-            'Livewire' => \Livewire\Livewire::class,
+            'Livewire' => Livewire::class,
         ];
     }
 }

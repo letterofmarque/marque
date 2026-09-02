@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 use Marque\SquidInk\Document\Marks\Size;
+use Marque\SquidInk\Document\Node;
 use Marque\SquidInk\Document\Nodes\BlockQuote;
 use Marque\SquidInk\Document\Nodes\CodeBlock;
+use Marque\SquidInk\Document\Nodes\Document;
 use Marque\SquidInk\Document\Nodes\Image;
 use Marque\SquidInk\Document\Nodes\OrderedList;
 use Marque\SquidInk\Document\Nodes\Text;
@@ -12,7 +14,7 @@ use Marque\SquidInk\Document\Schema;
 use Marque\SquidInk\Parsers\BBCodeParser;
 use Marque\SquidInk\Renderers\HtmlRenderer;
 
-function parseBBCode(string $source, ?Schema $schema = null): \Marque\SquidInk\Document\Nodes\Document
+function parseBBCode(string $source, ?Schema $schema = null): Document
 {
     return (new BBCodeParser)->parse($source, $schema ?? Schema::permissive());
 }
@@ -25,7 +27,7 @@ function renderBBCode(string $source): string
 /**
  * The first Text node in a tree, for asserting marks.
  */
-function firstText(\Marque\SquidInk\Document\Node $node): ?Text
+function firstText(Node $node): ?Text
 {
     foreach ($node->walk() as $candidate) {
         if ($candidate instanceof Text) {

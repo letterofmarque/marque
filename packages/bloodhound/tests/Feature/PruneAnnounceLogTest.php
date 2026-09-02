@@ -8,6 +8,7 @@ declare(strict_types=1);
 // have to discover and override. So "does nothing when null" is the behaviour
 // under test, not an edge case.
 
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Carbon;
 use Marque\Bloodhound\Models\AnnounceLog;
 
@@ -126,7 +127,7 @@ describe('retention_days set', function () {
 
 describe('scheduling', function () {
     it('is registered on the scheduler', function () {
-        $events = collect(app(\Illuminate\Console\Scheduling\Schedule::class)->events())
+        $events = collect(app(Schedule::class)->events())
             ->map(fn ($e) => $e->command ?? '')
             ->filter(fn ($c) => str_contains($c, 'bloodhound:prune-announce-log'));
 

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\QueryException;
 use Marque\Trove\Models\Torrent;
 use Marque\Trove\Tests\TestUser;
 
@@ -70,7 +71,7 @@ describe('Torrent Model', function () {
             'info_hash' => str_repeat('d', 40),
             'name' => 'Second Torrent',
             'user_id' => $this->user->id,
-        ]))->toThrow(\Illuminate\Database\QueryException::class);
+        ]))->toThrow(QueryException::class);
     });
 
     test('hasTorrentFile returns correct value', function () {

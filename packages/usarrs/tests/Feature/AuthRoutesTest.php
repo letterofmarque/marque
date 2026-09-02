@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use Livewire\Livewire;
+use Marque\Usarrs\Livewire\Auth\Login;
 use Marque\Usarrs\Tests\TestUser;
 
 beforeEach(function () {
@@ -49,7 +51,7 @@ test('login authenticates user with valid credentials', function () {
         'password' => bcrypt('password123'),
     ]);
 
-    \Livewire\Livewire::test(\Marque\Usarrs\Livewire\Auth\Login::class)
+    Livewire::test(Login::class)
         ->set('email', 'test@example.com')
         ->set('password', 'password123')
         ->call('login')
@@ -57,7 +59,7 @@ test('login authenticates user with valid credentials', function () {
 });
 
 test('login fails with invalid credentials', function () {
-    \Livewire\Livewire::test(\Marque\Usarrs\Livewire\Auth\Login::class)
+    Livewire::test(Login::class)
         ->set('email', 'test@example.com')
         ->set('password', 'wrong')
         ->call('login')

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Marque\Bloodhound\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Marque\Trove\Models\Torrent;
@@ -32,7 +33,7 @@ use Marque\Trove\Models\Torrent;
  * @property int $download_delta
  * @property bool $anti_cheat_flagged
  * @property string|null $anti_cheat_reason
- * @property \Carbon\Carbon $created_at
+ * @property Carbon $created_at
  */
 class AnnounceLog extends Model
 {

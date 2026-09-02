@@ -49,7 +49,7 @@ class PostService implements PostServiceInterface
 
     /**
      * @throws ThreadLockedException if config('parley.moderation.lock_blocks_edits')
-     *                                is true and the post's thread is locked
+     *                               is true and the post's thread is locked
      */
     public function update(Post $post, string $body, ?string $format = null): Post
     {
@@ -65,7 +65,7 @@ class PostService implements PostServiceInterface
 
     /**
      * @throws ThreadLockedException if config('parley.moderation.lock_blocks_edits')
-     *                                is true and the post's thread is locked
+     *                               is true and the post's thread is locked
      */
     public function delete(Post $post): void
     {

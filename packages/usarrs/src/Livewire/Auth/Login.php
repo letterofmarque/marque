@@ -6,10 +6,12 @@ namespace Marque\Usarrs\Livewire\Auth;
 
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
+use Laravel\Fortify\TwoFactorAuthenticatable;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Validate;
 use Marque\Usarrs\Enums\AuthDriver;
 use Marque\Usarrs\Livewire\Component;
+use Marque\Usarrs\Notifications\MagicLinkNotification;
 
 #[Title('Login')]
 class Login extends Component
@@ -66,7 +68,7 @@ class Login extends Component
             return false;
         }
 
-        if (! $user || ! in_array(\Laravel\Fortify\TwoFactorAuthenticatable::class, class_uses_recursive($user), true)) {
+        if (! $user || ! in_array(TwoFactorAuthenticatable::class, class_uses_recursive($user), true)) {
             return false;
         }
 
@@ -91,7 +93,7 @@ class Login extends Component
             $token = app('auth.password.broker')->createToken($user);
             $url = url('/auth/magic-link/verify?token='.$token.'&email='.urlencode($this->email));
 
-            $user->notify(new \Marque\Usarrs\Notifications\MagicLinkNotification($url));
+            $user->notify(new MagicLinkNotification($url));
         }
 
         session()->flash('status', __('If an account exists, a login link has been sent.'));

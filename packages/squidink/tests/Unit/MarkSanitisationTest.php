@@ -45,7 +45,7 @@ describe('Link href sanitisation', function () {
         "java\tscript:alert(1)",
         "java\nscript:alert(1)",
         "java\rscript:alert(1)",
-        " javascript:alert(1)",
+        ' javascript:alert(1)',
         "jav\0ascript:alert(1)",
     ]);
 

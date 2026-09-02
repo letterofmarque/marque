@@ -7,8 +7,8 @@ namespace Marque\Usarrs\Livewire\Invite;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Title;
 use Livewire\WithPagination;
-use Marque\Usarrs\Enums\InviteStatus;
 use Marque\Usarrs\Livewire\Component;
+use Marque\Usarrs\Models\Invite;
 use Marque\Usarrs\Services\InviteService;
 
 #[Title('My Invites')]
@@ -23,7 +23,7 @@ class InviteIndex extends Component
 
     public function revoke(int $inviteId, InviteService $service): void
     {
-        $invite = \Marque\Usarrs\Models\Invite::findOrFail($inviteId);
+        $invite = Invite::findOrFail($inviteId);
         abort_unless(
             auth()->id() === $invite->creator_id || auth()->user()->isAdmin(),
             403

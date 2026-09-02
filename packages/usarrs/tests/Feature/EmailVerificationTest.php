@@ -9,6 +9,7 @@ declare(strict_types=1);
 // lockout, not a security hole). See Spec #96.
 
 use Illuminate\Auth\Events\Verified;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Route;
@@ -121,7 +122,7 @@ test('resending the verification notification flashes a status message', functio
         ->post(route('verification.send'))
         ->assertRedirect();
 
-    Notification::assertSentTo($user, \Illuminate\Auth\Notifications\VerifyEmail::class);
+    Notification::assertSentTo($user, VerifyEmail::class);
 });
 
 // The headline regression: this is the exact internal-inconsistency job

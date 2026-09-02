@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Eloquent\Model;
 use Marque\Parley\Contracts\ThreadServiceInterface;
 use Marque\Parley\Models\Category;
 use Marque\Parley\Models\Thread;
@@ -52,7 +53,8 @@ describe('ThreadService', function () {
         // HasThreads to the model itself — see docs/integration.md,
         // "attaching to a model you don't own". Deliberately a bare model
         // with no HasThreads, unlike every other test in this file.
-        $subject = new class extends \Illuminate\Database\Eloquent\Model {
+        $subject = new class extends Model
+        {
             protected $table = 'test_subjects';
 
             protected $guarded = [];
@@ -69,7 +71,8 @@ describe('ThreadService', function () {
     });
 
     it('returns the same thread from threadFor on a second call rather than creating another', function () {
-        $subject = new class extends \Illuminate\Database\Eloquent\Model {
+        $subject = new class extends Model
+        {
             protected $table = 'test_subjects';
 
             protected $guarded = [];
@@ -100,7 +103,8 @@ describe('ThreadService', function () {
     });
 
     it('refuses a subject that does not use HasThreads', function () {
-        $subject = new class extends \Illuminate\Database\Eloquent\Model {
+        $subject = new class extends Model
+        {
             protected $table = 'test_subjects';
 
             protected $guarded = [];

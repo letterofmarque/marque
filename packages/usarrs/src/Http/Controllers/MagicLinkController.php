@@ -7,7 +7,6 @@ namespace Marque\Usarrs\Http\Controllers;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Password;
 use Illuminate\View\View;
 
 class MagicLinkController

@@ -23,13 +23,13 @@ use Marque\Trove\Enums\Role;
 // middleware a permanent no-op rather than erroring — the exact trap job
 // #10602 Gap 7 exists to fix elsewhere; documented explicitly in usarrs'
 // README as a required step for consuming apps, not just implied here.
-class TestUser extends Authenticatable implements UserInterface, PasskeyUser, MustVerifyEmail
+class TestUser extends Authenticatable implements MustVerifyEmail, PasskeyUser, UserInterface
 {
     use HasFactory;
     use HasRoles;
     use Notifiable;
-    use TwoFactorAuthenticatable;
     use PasskeyAuthenticatable;
+    use TwoFactorAuthenticatable;
 
     protected $table = 'users';
 

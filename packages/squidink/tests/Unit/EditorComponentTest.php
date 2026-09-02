@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Livewire\Livewire;
 use Marque\SquidInk\SquidInk;
 
 /**
@@ -90,7 +91,7 @@ describe('optional dependencies stay optional', function () {
         // Livewire is not installed in this package's test environment. The
         // provider guards its registration, so booting must not have failed and
         // the plain component must still work.
-        expect(class_exists(\Livewire\Livewire::class))->toBeFalse()
+        expect(class_exists(Livewire::class))->toBeFalse()
             ->and(Blade::render('<x-squidink::editor name="body" />'))->toContain('<textarea');
     });
 

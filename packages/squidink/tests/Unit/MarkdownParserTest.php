@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use Marque\SquidInk\Document\Node;
 use Marque\SquidInk\Document\Nodes\CodeBlock;
+use Marque\SquidInk\Document\Nodes\Document;
 use Marque\SquidInk\Document\Nodes\Heading;
 use Marque\SquidInk\Document\Nodes\Image;
 use Marque\SquidInk\Document\Nodes\OrderedList;
@@ -10,7 +12,7 @@ use Marque\SquidInk\Document\Nodes\Text;
 use Marque\SquidInk\Document\Schema;
 use Marque\SquidInk\Parsers\MarkdownParser;
 
-function parseMarkdown(string $source, ?Schema $schema = null): \Marque\SquidInk\Document\Nodes\Document
+function parseMarkdown(string $source, ?Schema $schema = null): Document
 {
     return (new MarkdownParser)->parse($source, $schema ?? Schema::permissive());
 }
@@ -18,7 +20,7 @@ function parseMarkdown(string $source, ?Schema $schema = null): \Marque\SquidInk
 /**
  * @return list<string>
  */
-function nodeTypes(\Marque\SquidInk\Document\Node $node): array
+function nodeTypes(Node $node): array
 {
     return array_map(
         static fn ($n) => $n->type(),

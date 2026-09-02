@@ -9,13 +9,15 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Redis;
+use Illuminate\Testing\TestResponse;
 use Marque\Bloodhound\Models\AnnounceLog;
+use Marque\Bloodhound\Services\AntiCheatService;
 use Marque\Bloodhound\Tests\TestCase;
 use Marque\Bloodhound\Tests\TestUser;
 use Marque\Threepio\Http\Middleware\BlockBrowsers;
 use Marque\Trove\Models\Torrent;
 
-function announceGet(TestCase $test, string $url): \Illuminate\Testing\TestResponse
+function announceGet(TestCase $test, string $url): TestResponse
 {
     return $test->withoutMiddleware(BlockBrowsers::class)
         ->withHeaders(['User-Agent' => 'qBittorrent/4.5.0'])
@@ -189,7 +191,7 @@ describe('the existing Redis suspicious list', function () {
             'left' => 0,
         ]));
 
-        $antiCheat = app(\Marque\Bloodhound\Services\AntiCheatService::class);
+        $antiCheat = app(AntiCheatService::class);
         $suspicious = $antiCheat->getSuspiciousActivity();
 
         expect($suspicious)->not->toBeEmpty();

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Laravel\Passkeys\Contracts\PasskeyUser;
 use Laravel\Passkeys\Passkey;
 use Livewire\Livewire;
 use Marque\Usarrs\Livewire\Profile\PasskeyManagement;
@@ -95,7 +96,7 @@ test('user cannot delete another users passkey', function () {
 });
 
 test('test user model satisfies the PasskeyUser contract', function () {
-    expect($this->user)->toBeInstanceOf(\Laravel\Passkeys\Contracts\PasskeyUser::class);
+    expect($this->user)->toBeInstanceOf(PasskeyUser::class);
     expect($this->user->hasPasskeysEnabled())->toBeFalse();
     expect($this->user->getPasskeyUserHandle())->toBeString();
     expect($this->user->getPasskeyDisplayName())->toBe($this->user->name);

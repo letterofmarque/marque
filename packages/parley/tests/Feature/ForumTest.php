@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Livewire\Livewire;
 use Marque\Parley\Exceptions\TooManyPostsException;
 use Marque\Parley\Livewire\Forum\CategoryIndex;
 use Marque\Parley\Livewire\Forum\ThreadCreate;
@@ -65,7 +66,7 @@ describe('the forum, when enabled (the default)', function () {
         $user = TestUser::factory()->create();
         $category = Category::factory()->create();
 
-        \Livewire\Livewire::actingAs($user)
+        Livewire::actingAs($user)
             ->test(ThreadCreate::class, ['category' => $category])
             ->set('title', 'My new thread')
             ->set('body', 'the opening post')
@@ -83,7 +84,7 @@ describe('the forum, when enabled (the default)', function () {
         $user = TestUser::factory()->create();
         $category = Category::factory()->create();
 
-        \Livewire\Livewire::actingAs($user)
+        Livewire::actingAs($user)
             ->test(ThreadCreate::class, ['category' => $category])
             ->set('title', '')
             ->set('body', 'a body')
@@ -108,7 +109,7 @@ describe('the forum, when enabled (the default)', function () {
         $category = Category::factory()->create();
 
         // Consume the one allowed attempt via a first thread.
-        \Livewire\Livewire::actingAs($user)
+        Livewire::actingAs($user)
             ->test(ThreadCreate::class, ['category' => $category])
             ->set('title', 'First thread')
             ->set('body', 'first post')
@@ -116,7 +117,7 @@ describe('the forum, when enabled (the default)', function () {
 
         expect(Thread::count())->toBe(1);
 
-        \Livewire\Livewire::actingAs($user)
+        Livewire::actingAs($user)
             ->test(ThreadCreate::class, ['category' => $category])
             ->set('title', 'Second thread')
             ->set('body', 'second post, too fast')
@@ -136,13 +137,13 @@ describe('the forum, when enabled (the default)', function () {
         $user = TestUser::factory()->create();
         $category = Category::factory()->create();
 
-        \Livewire\Livewire::actingAs($user)
+        Livewire::actingAs($user)
             ->test(ThreadCreate::class, ['category' => $category])
             ->set('title', 'First thread')
             ->set('body', 'first post')
             ->call('submit');
 
-        expect(fn () => \Livewire\Livewire::actingAs($user)
+        expect(fn () => Livewire::actingAs($user)
             ->test(ThreadCreate::class, ['category' => $category])
             ->set('title', 'Second thread')
             ->set('body', 'second post')
@@ -154,14 +155,14 @@ describe('the forum, when enabled (the default)', function () {
         $moderator = TestUser::factory()->moderator()->create();
         $thread = Thread::factory()->create();
 
-        \Livewire\Livewire::actingAs($moderator)
+        Livewire::actingAs($moderator)
             ->test(ThreadShow::class, ['thread' => $thread])
             ->call('pin')
             ->assertSet('thread.pinned', true)
             ->call('lock')
             ->assertSet('thread.locked', true);
 
-        \Livewire\Livewire::actingAs($moderator)
+        Livewire::actingAs($moderator)
             ->test(ThreadShow::class, ['thread' => $thread])
             ->call('delete');
 
@@ -172,7 +173,7 @@ describe('the forum, when enabled (the default)', function () {
         $user = TestUser::factory()->create();
         $thread = Thread::factory()->create();
 
-        \Livewire\Livewire::actingAs($user)
+        Livewire::actingAs($user)
             ->test(ThreadShow::class, ['thread' => $thread])
             ->call('pin')
             ->assertForbidden();

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Marque\Trove\Models;
 
+use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Marque\Trove\Database\Factories\TorrentFactory;
 
 class Torrent extends Model
 {
@@ -64,8 +66,8 @@ class Torrent extends Model
     /**
      * Create a new factory instance for the model.
      */
-    protected static function newFactory(): \Illuminate\Database\Eloquent\Factories\Factory
+    protected static function newFactory(): Factory
     {
-        return \Marque\Trove\Database\Factories\TorrentFactory::new();
+        return TorrentFactory::new();
     }
 }

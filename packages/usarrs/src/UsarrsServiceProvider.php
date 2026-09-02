@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Fortify\Fortify;
 use Laravel\Passkeys\Passkeys;
+use Livewire\Livewire;
 use Marque\Usarrs\Contracts\InviteServiceInterface;
 use Marque\Usarrs\Livewire\Admin\UserIndex;
 use Marque\Usarrs\Livewire\Admin\UserShow;
@@ -75,7 +76,7 @@ class UsarrsServiceProvider extends ServiceProvider
 
         $this->registerPolicies();
 
-        if (class_exists(\Livewire\Livewire::class)) {
+        if (class_exists(Livewire::class)) {
             if ($manageAuth) {
                 $this->registerAuthLivewireComponents();
             }
@@ -115,23 +116,23 @@ class UsarrsServiceProvider extends ServiceProvider
     // gate with the rest rather than living in the non-auth group below.
     protected function registerAuthLivewireComponents(): void
     {
-        \Livewire\Livewire::component('usarrs-login', Login::class);
-        \Livewire\Livewire::component('usarrs-register', Register::class);
-        \Livewire\Livewire::component('usarrs-two-factor-challenge', TwoFactorChallenge::class);
-        \Livewire\Livewire::component('usarrs-two-factor-setup', TwoFactorSetup::class);
-        \Livewire\Livewire::component('usarrs-passkey-management', PasskeyManagement::class);
-        \Livewire\Livewire::component('usarrs-password-confirm', PasswordConfirm::class);
+        Livewire::component('usarrs-login', Login::class);
+        Livewire::component('usarrs-register', Register::class);
+        Livewire::component('usarrs-two-factor-challenge', TwoFactorChallenge::class);
+        Livewire::component('usarrs-two-factor-setup', TwoFactorSetup::class);
+        Livewire::component('usarrs-passkey-management', PasskeyManagement::class);
+        Livewire::component('usarrs-password-confirm', PasswordConfirm::class);
     }
 
     // Profile, invites, admin — unaffected by manage_auth in either state.
     protected function registerNonAuthLivewireComponents(): void
     {
-        \Livewire\Livewire::component('usarrs-profile-show', Show::class);
-        \Livewire\Livewire::component('usarrs-profile-edit', Edit::class);
-        \Livewire\Livewire::component('usarrs-announce-key-management', AnnounceKeyManagement::class);
-        \Livewire\Livewire::component('usarrs-admin-user-index', UserIndex::class);
-        \Livewire\Livewire::component('usarrs-admin-user-show', UserShow::class);
-        \Livewire\Livewire::component('usarrs-invite-index', InviteIndex::class);
-        \Livewire\Livewire::component('usarrs-invite-create', InviteCreate::class);
+        Livewire::component('usarrs-profile-show', Show::class);
+        Livewire::component('usarrs-profile-edit', Edit::class);
+        Livewire::component('usarrs-announce-key-management', AnnounceKeyManagement::class);
+        Livewire::component('usarrs-admin-user-index', UserIndex::class);
+        Livewire::component('usarrs-admin-user-show', UserShow::class);
+        Livewire::component('usarrs-invite-index', InviteIndex::class);
+        Livewire::component('usarrs-invite-create', InviteCreate::class);
     }
 }

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Pagination\LengthAwarePaginator;
 use Marque\Trove\Models\Torrent;
 use Marque\Trove\Services\TorrentService;
 use Marque\Trove\Tests\TestUser;
@@ -27,7 +28,7 @@ describe('TorrentService', function () {
 
         $result = $this->service->list();
 
-        expect($result)->toBeInstanceOf(\Illuminate\Pagination\LengthAwarePaginator::class)
+        expect($result)->toBeInstanceOf(LengthAwarePaginator::class)
             ->and($result->total())->toBe(2);
     });
 

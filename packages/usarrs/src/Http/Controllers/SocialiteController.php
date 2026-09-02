@@ -7,6 +7,7 @@ namespace Marque\Usarrs\Http\Controllers;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Laravel\Socialite\Facades\Socialite;
 use Symfony\Component\HttpFoundation\RedirectResponse as SymfonyRedirect;
 
 class SocialiteController
@@ -15,14 +16,14 @@ class SocialiteController
     {
         $this->validateProvider($provider);
 
-        return \Laravel\Socialite\Facades\Socialite::driver($provider)->redirect();
+        return Socialite::driver($provider)->redirect();
     }
 
     public function callback(string $provider): RedirectResponse
     {
         $this->validateProvider($provider);
 
-        $socialUser = \Laravel\Socialite\Facades\Socialite::driver($provider)->user();
+        $socialUser = Socialite::driver($provider)->user();
 
         $model = config('trove.user_model', 'App\\Models\\User');
         $user = $model::where('email', $socialUser->getEmail())->first();

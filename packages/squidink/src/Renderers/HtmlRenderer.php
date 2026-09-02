@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Marque\SquidInk\Renderers;
 
 use Marque\SquidInk\Contracts\Renderer;
+use Marque\SquidInk\Document\Mark;
 use Marque\SquidInk\Document\Marks\Colour;
 use Marque\SquidInk\Document\Marks\Link;
 use Marque\SquidInk\Document\Marks\Size;
@@ -205,8 +206,8 @@ final class HtmlRenderer implements Renderer
      * order — a mark a consumer added is applied closest to the text rather than
      * silently dropped or reordered against its peers.
      *
-     * @param  list<\Marque\SquidInk\Document\Mark>  $marks
-     * @return list<\Marque\SquidInk\Document\Mark>
+     * @param  list<Mark>  $marks
+     * @return list<Mark>
      */
     private function ordered(array $marks): array
     {

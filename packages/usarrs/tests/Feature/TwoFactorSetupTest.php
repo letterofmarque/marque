@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
+use Laravel\Fortify\Fortify;
 use Livewire\Livewire;
 use Marque\Usarrs\Livewire\Profile\TwoFactorSetup;
 use Marque\Usarrs\Tests\TestUser;
+use PragmaRX\Google2FA\Google2FA;
 
 beforeEach(function () {
     $this->user = TestUser::factory()->create();
@@ -42,8 +44,8 @@ test('user can confirm two factor authentication with a valid code', function ()
         ->call('enable');
 
     $this->user->refresh();
-    $validCode = app(\PragmaRX\Google2FA\Google2FA::class)
-        ->getCurrentOtp(\Laravel\Fortify\Fortify::currentEncrypter()->decrypt($this->user->two_factor_secret));
+    $validCode = app(Google2FA::class)
+        ->getCurrentOtp(Fortify::currentEncrypter()->decrypt($this->user->two_factor_secret));
 
     $component->set('code', $validCode)->call('confirm');
 
@@ -71,7 +73,7 @@ test('user can disable two factor authentication', function () {
 
     $this->actingAs($this->user);
     $this->user->forceFill([
-        'two_factor_secret' => \Laravel\Fortify\Fortify::currentEncrypter()->encrypt('secret'),
+        'two_factor_secret' => Fortify::currentEncrypter()->encrypt('secret'),
         'two_factor_confirmed_at' => now(),
     ])->save();
 

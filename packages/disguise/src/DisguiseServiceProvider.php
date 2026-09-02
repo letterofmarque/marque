@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Marque\Disguise;
 
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
 use Marque\Disguise\Livewire\Torrent\Edit;
 use Marque\Disguise\Livewire\Torrent\Index;
 use Marque\Disguise\Livewire\Torrent\Show;
@@ -22,7 +23,7 @@ class DisguiseServiceProvider extends ServiceProvider
         $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'disguise');
 
-        if (class_exists(\Livewire\Livewire::class)) {
+        if (class_exists(Livewire::class)) {
             $this->registerLivewireComponents();
         }
 
@@ -39,9 +40,9 @@ class DisguiseServiceProvider extends ServiceProvider
 
     protected function registerLivewireComponents(): void
     {
-        \Livewire\Livewire::component('disguise-torrent-index', Index::class);
-        \Livewire\Livewire::component('disguise-torrent-show', Show::class);
-        \Livewire\Livewire::component('disguise-torrent-upload', Upload::class);
-        \Livewire\Livewire::component('disguise-torrent-edit', Edit::class);
+        Livewire::component('disguise-torrent-index', Index::class);
+        Livewire::component('disguise-torrent-show', Show::class);
+        Livewire::component('disguise-torrent-upload', Upload::class);
+        Livewire::component('disguise-torrent-edit', Edit::class);
     }
 }

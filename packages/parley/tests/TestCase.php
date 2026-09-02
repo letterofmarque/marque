@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Marque\Parley\Tests;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Livewire\LivewireServiceProvider;
 use Marque\Ise\IseServiceProvider;
 use Marque\Parley\ParleyServiceProvider;
@@ -74,7 +75,7 @@ abstract class TestCase extends BaseTestCase
     protected function getPackageAliases($app): array
     {
         return [
-            'Livewire' => \Livewire\Livewire::class,
+            'Livewire' => Livewire::class,
         ];
     }
 }

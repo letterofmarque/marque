@@ -45,7 +45,7 @@ describe('HtmlRenderer blocks', function () {
 
     it('renders ordered lists, including a start offset', function () {
         expect(renderMarkdown("1. a\n2. b"))->toBe('<ol><li>a</li><li>b</li></ol>')
-            ->and(renderMarkdown("5. a"))->toBe('<ol start="5"><li>a</li></ol>');
+            ->and(renderMarkdown('5. a'))->toBe('<ol start="5"><li>a</li></ol>');
     });
 
     it('renders thematic breaks', function () {

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Marque\Parley\Policies;
 
+use Marque\Parley\Models\Thread;
 use Marque\Trove\Contracts\UserInterface;
 use Marque\Trove\Enums\Role;
-use Marque\Parley\Models\Thread;
 
 class ThreadPolicy
 {

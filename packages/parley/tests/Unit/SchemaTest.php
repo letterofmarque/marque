@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -24,7 +25,7 @@ describe('the test environment enforces referential integrity', function () {
             'body' => 'orphan',
             'created_at' => now(),
             'updated_at' => now(),
-        ]))->toThrow(Illuminate\Database\QueryException::class);
+        ]))->toThrow(QueryException::class);
     });
 });
 

@@ -46,7 +46,7 @@ class ParleyServiceProvider extends ServiceProvider
         // policies work without it — an API-only consumer can use the package
         // headlessly. Guarded for the same reason every other package in the
         // suite guards it.
-        if (class_exists(\Livewire\Livewire::class)) {
+        if (class_exists(Livewire::class)) {
             $this->registerLivewireComponents();
         }
 
