@@ -182,12 +182,38 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Logging
+    | Announce Log
     |--------------------------------------------------------------------------
+    |
+    | Off by default. Full-detail history of every announce — every started,
+    | regular-interval, completed, and stopped request, with deltas, cumulative
+    | totals, client fingerprint, and the anti-cheat verdict for that announce.
+    | Nothing else in bloodhound persists this: Redis peer state expires within
+    | hours, the snatches table only records one row per completed download,
+    | and the anti-cheat "suspicious" list caps at 1000 entries. This is for
+    | operators who specifically want to investigate a cheating report or
+    | verify a disputed ratio after the fact — a real, ongoing storage cost,
+    | not something imposed on every install. See Spec #98.
+    |
+    | 'connection' lets you write this table to a SEPARATE database from the
+    | rest of the app — set it to any connection name defined in
+    | config/database.php. null (default) uses the app's default connection,
+    | same DB as everything else. This is the actual mechanism for isolating
+    | a high-write-volume table without Marque needing to know or care what
+    | database engine is on the other end.
+    |
+    | 'retention_days' is null (keep forever) until you set it. With logging
+    | enabled and no retention configured, this table grows without bound on
+    | a busy tracker — set retention_days and bloodhound:prune-announce-log
+    | (scheduled) will keep it bounded. This default is deliberate: once
+    | you've opted into logging at all, retention is your call to make, not
+    | a paternalistic default you'd have to discover and override.
+    |
     */
 
-    'logging' => [
-        'enabled' => env('BLOODHOUND_LOGGING', false),
-        'channel' => env('BLOODHOUND_LOG_CHANNEL', 'stack'),
+    'announce_log' => [
+        'enabled' => env('BLOODHOUND_ANNOUNCE_LOG', false),
+        'connection' => env('BLOODHOUND_ANNOUNCE_LOG_CONNECTION'),
+        'retention_days' => env('BLOODHOUND_ANNOUNCE_LOG_RETENTION_DAYS'),
     ],
 ];
