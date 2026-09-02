@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Marque\Bloodhound;
 
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\ServiceProvider;
+use Marque\Bloodhound\Console\Commands\PruneAnnounceLog;
 use Marque\Bloodhound\Contracts\AnnounceLogServiceInterface;
 use Marque\Bloodhound\Events\TorrentCompleted;
 use Marque\Bloodhound\Listeners\RecordSnatch;
@@ -37,6 +39,7 @@ class BloodhoundServiceProvider extends ServiceProvider
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
 
         $this->registerEventListeners();
+        $this->registerConsole();
 
         if ($this->app->runningInConsole()) {
             $this->publishes([
@@ -55,5 +58,28 @@ class BloodhoundServiceProvider extends ServiceProvider
     protected function registerEventListeners(): void
     {
         Event::listen(TorrentCompleted::class, RecordSnatch::class);
+    }
+
+    /**
+     * Register Artisan commands and their schedules.
+     *
+     * The prune schedule is registered unconditionally rather than gated on
+     * announce_log.enabled: config can change after boot (and an operator who
+     * disables logging still wants the existing rows aged out), and the
+     * command already no-ops when there's no retention window. A scheduled
+     * task that decides at run time is more predictable than one whose
+     * existence depends on boot-time config.
+     */
+    protected function registerConsole(): void
+    {
+        if (! $this->app->runningInConsole()) {
+            return;
+        }
+
+        $this->commands([
+            PruneAnnounceLog::class,
+        ]);
+
+        Schedule::command('bloodhound:prune-announce-log')->daily();
     }
 }
