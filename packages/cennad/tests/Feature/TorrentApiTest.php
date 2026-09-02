@@ -10,13 +10,45 @@ beforeEach(function () {
 });
 
 describe('GET /api/torrents', function () {
-    test('is publicly accessible', function () {
+    test('requires authentication by default', function () {
+        $this->getJson('/api/torrents')
+            ->assertUnauthorized();
+    });
+
+    test('is accessible to an authenticated user', function () {
+        $this->actingAs($this->user);
+
+        $this->getJson('/api/torrents')
+            ->assertOk();
+    });
+
+    // Routes bind their middleware at registration, so these two rebuild the
+    // application with the config in place rather than setting it at runtime.
+
+    test('can be opened to guests by dropping auth from read_middleware', function () {
+        $this->rebootWithConfig(['cennad.read_middleware' => ['api']]);
+
+        $this->getJson('/api/torrents')
+            ->assertOk();
+    });
+
+    // A published config from 3.x still carries public_middleware, and
+    // mergeConfigFrom() will have injected read_middleware alongside it. The old
+    // key has to win, or an explicit setting is silently discarded.
+    test('honours the deprecated public_middleware key over the merged default', function () {
+        $this->rebootWithConfig([
+            'cennad.read_middleware' => ['api', 'auth'],
+            'cennad.public_middleware' => ['api'],
+        ]);
+
         $this->getJson('/api/torrents')
             ->assertOk();
     });
 
     test('returns paginated torrents', function () {
         Torrent::factory()->count(3)->create();
+
+        $this->actingAs($this->user);
 
         $this->getJson('/api/torrents')
             ->assertOk()
@@ -47,6 +79,8 @@ describe('GET /api/torrents', function () {
         Torrent::factory()->create(['name' => 'Finding Nemo']);
         Torrent::factory()->create(['name' => 'Other Movie']);
 
+        $this->actingAs($this->user);
+
         $this->getJson('/api/torrents?search=Nemo')
             ->assertOk()
             ->assertJsonCount(1, 'data')
@@ -56,6 +90,8 @@ describe('GET /api/torrents', function () {
     test('can set per_page', function () {
         Torrent::factory()->count(10)->create();
 
+        $this->actingAs($this->user);
+
         $this->getJson('/api/torrents?per_page=5')
             ->assertOk()
             ->assertJsonCount(5, 'data')
@@ -64,8 +100,17 @@ describe('GET /api/torrents', function () {
 });
 
 describe('GET /api/torrents/{torrent}', function () {
-    test('is publicly accessible', function () {
+    test('requires authentication by default', function () {
         $torrent = Torrent::factory()->create();
+
+        $this->getJson("/api/torrents/{$torrent->id}")
+            ->assertUnauthorized();
+    });
+
+    test('is accessible to an authenticated user', function () {
+        $torrent = Torrent::factory()->create();
+
+        $this->actingAs($this->user);
 
         $this->getJson("/api/torrents/{$torrent->id}")
             ->assertOk();
@@ -76,6 +121,8 @@ describe('GET /api/torrents/{torrent}', function () {
             'name' => 'Test Torrent',
             'description' => 'Test description',
         ]);
+
+        $this->actingAs($this->user);
 
         $this->getJson("/api/torrents/{$torrent->id}")
             ->assertOk()
@@ -100,6 +147,8 @@ describe('GET /api/torrents/{torrent}', function () {
     });
 
     test('returns 404 for non-existent torrent', function () {
+        $this->actingAs($this->user);
+
         $this->getJson('/api/torrents/99999')
             ->assertNotFound();
     });

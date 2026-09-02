@@ -18,12 +18,14 @@ php artisan vendor:publish --tag=cennad-config
 
 ## Endpoints
 
-All endpoints require authentication and return JSON.
+All endpoints require authentication by default and return JSON. Read endpoints can be
+opened to guests for a public tracker — see [Authentication](#authentication).
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/torrents` | List torrents (paginated, searchable) |
 | GET | `/api/torrents/{id}` | Get torrent details |
+| POST | `/api/torrents` | Upload a torrent (Uploader+) |
 | PUT | `/api/torrents/{id}` | Update torrent (name, description) |
 | DELETE | `/api/torrents/{id}` | Delete torrent |
 
@@ -107,14 +109,33 @@ Published to `config/cennad.php`:
 | Key | Default | Description |
 |-----|---------|-------------|
 | `prefix` | `api` | URL prefix for all endpoints |
-| `middleware` | `['api', 'auth:api']` | Middleware stack |
+| `read_middleware` | `['api', 'auth:api']` | Middleware for `index` and `show` |
+| `write_middleware` | `['api', 'auth:api']` | Middleware for `store`, `update`, `destroy` |
 | `route_names.prefix` | `cennad` | Route name prefix |
 | `route_names.download` | `torrents.download` | Download route name (for link generation) |
 | `rate_limit` | `60` | Requests per minute |
 
+`public_middleware` and `protected_middleware` are the pre-4.0 names for `read_middleware`
+and `write_middleware`. They still work and still take precedence, but they emit a
+deprecation notice and are removed in 5.0.
+
 ## Authentication
 
 Cennad uses Laravel's standard `auth:api` guard. Configure authentication in your application - Sanctum, Passport, or any guard that satisfies `auth:api` will work.
+
+Reads and writes are configured separately so a public tracker can expose its catalogue
+without exposing its write endpoints. **Both default to requiring authentication**, because
+Cennad cannot tell whether it is serving a private tracker (bloodhound/guise) or a public
+one (hound/disguise), and the safe assumption is the private one.
+
+To open the catalogue to unauthenticated visitors, drop the guard from `read_middleware`:
+
+```php
+'read_middleware' => ['api'],
+```
+
+Leave `write_middleware` alone when you do — uploads, edits, and deletes are still
+governed by Trove's `TorrentPolicy` on top of whatever middleware you set.
 
 ## Requirements
 
