@@ -84,3 +84,111 @@ test('cleanupExpiredPeers leaves live peers alone', function () {
     expect($this->peers->cleanupExpiredPeers(1))->toBe(0)
         ->and($this->peers->getSeeders(1))->toBe(1);
 });
+
+// The seam bloodhound fills to recover a baseline Redis has lost (Spec #99
+// CP3). Threepio itself has no durable record — it depends on nothing that
+// could hold one — so it exposes the hook and stays agnostic about what
+// answers it.
+describe('baseline resolver', function () {
+    test('is not consulted when Redis knows the peer', function () {
+        addPeer($this->peers, 1, '-qB4210-aaaaaaaaaaaa');
+
+        $called = false;
+        $this->peers->resolveBaselineUsing(function () use (&$called) {
+            $called = true;
+
+            return null;
+        });
+
+        addPeer($this->peers, 1, '-qB4210-aaaaaaaaaaaa');
+
+        expect($called)->toBeFalse();
+    });
+
+    test('recovers the delta when Redis has lost the peer', function () {
+        $this->peers->resolveBaselineUsing(fn () => ['uploaded' => 1_000, 'downloaded' => 2_000]);
+
+        $result = $this->peers->upsertPeer(
+            torrentId: 1,
+            peerId: '-qB4210-bbbbbbbbbbbb',
+            userId: 1,
+            ip: '10.0.0.1',
+            port: 51413,
+            uploaded: 5_000,
+            downloaded: 9_000,
+            left: 0,
+            userAgent: 'test',
+            isSeeder: true,
+        );
+
+        expect($result['upload_delta'])->toBe(4_000)
+            ->and($result['download_delta'])->toBe(7_000)
+            ->and($result['prior_up'])->toBe(1_000)
+            ->and($result['baseline_recovered'])->toBeTrue();
+    });
+
+    test('treats a null answer as a genuinely new peer', function () {
+        $this->peers->resolveBaselineUsing(fn () => null);
+
+        $result = $this->peers->upsertPeer(
+            torrentId: 1,
+            peerId: '-qB4210-cccccccccccc',
+            userId: 1,
+            ip: '10.0.0.1',
+            port: 51413,
+            uploaded: 5_000,
+            downloaded: 9_000,
+            left: 0,
+            userAgent: 'test',
+            isSeeder: true,
+        );
+
+        expect($result['upload_delta'])->toBe(0)
+            ->and($result['prior_up'])->toBeNull()
+            ->and($result['baseline_recovered'])->toBeFalse();
+    });
+
+    // Without a resolver — hound, or any consumer that has no ledger —
+    // behaviour is exactly as before.
+    test('is optional, and its absence keeps the old behaviour', function () {
+        $result = $this->peers->upsertPeer(
+            torrentId: 1,
+            peerId: '-qB4210-dddddddddddd',
+            userId: 1,
+            ip: '10.0.0.1',
+            port: 51413,
+            uploaded: 5_000,
+            downloaded: 9_000,
+            left: 0,
+            userAgent: 'test',
+            isSeeder: true,
+        );
+
+        expect($result['upload_delta'])->toBe(0)
+            ->and($result['prior_up'])->toBeNull()
+            ->and($result['baseline_recovered'])->toBeFalse();
+    });
+
+    // A recovered peer has a baseline but is still absent from Redis, so it
+    // must count toward the swarm as a new peer.
+    test('a recovered peer still increments the swarm count', function () {
+        $this->peers->resolveBaselineUsing(fn () => ['uploaded' => 1_000, 'downloaded' => 0]);
+
+        expect($this->peers->getSeeders(7))->toBe(0);
+
+        $this->peers->upsertPeer(
+            torrentId: 7,
+            peerId: '-qB4210-eeeeeeeeeeee',
+            userId: 1,
+            ip: '10.0.0.1',
+            port: 51413,
+            uploaded: 5_000,
+            downloaded: 0,
+            left: 0,
+            userAgent: 'test',
+            isSeeder: true,
+        );
+
+        expect($this->peers->getSeeders(7))->toBe(1);
+    });
+});

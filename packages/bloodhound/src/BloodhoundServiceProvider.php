@@ -12,10 +12,12 @@ use Marque\Bloodhound\Console\Commands\SyncSwarmCounts;
 use Marque\Bloodhound\Contracts\AnnounceLogServiceInterface;
 use Marque\Bloodhound\Events\TorrentCompleted;
 use Marque\Bloodhound\Listeners\RecordSnatch;
+use Marque\Bloodhound\Models\AnnounceLog;
 use Marque\Bloodhound\Services\AnnounceLogService;
 use Marque\Bloodhound\Services\AnnounceService;
 use Marque\Bloodhound\Services\AntiCheatService;
 use Marque\Bloodhound\Services\ClientValidationService;
+use Marque\Threepio\Services\PeerService;
 
 class BloodhoundServiceProvider extends ServiceProvider
 {
@@ -32,6 +34,54 @@ class BloodhoundServiceProvider extends ServiceProvider
         // pattern) so a consumer can swap the query implementation — e.g. to
         // read the log from a warehouse rather than the table itself.
         $this->app->bind(AnnounceLogServiceInterface::class, AnnounceLogService::class);
+
+        // Teach threepio's peer store to recover a lost baseline from the
+        // ledger (Spec #99 CP3).
+        //
+        // threepio cannot do this itself: bloodhound depends on threepio, so
+        // threepio has no access to announce_log and no notion of a durable
+        // record. It exposes the seam; the private tracker fills it. hound
+        // leaves it unfilled and keeps the old behaviour, which is right —
+        // a public tracker has no ledger and nothing to recover from.
+        $this->app->extend(PeerService::class, function (PeerService $peers) {
+            $peers->resolveBaselineUsing($this->recoverBaselineFromLedger(...));
+
+            return $peers;
+        });
+    }
+
+    /**
+     * Recover a peer's last known cumulative counters from the ledger.
+     *
+     * Called only when Redis has no record of the peer, so this is the outage
+     * path, not the hot path — a warm session never reaches it. Scoped to the
+     * exact (torrent, peer) pair: a different peer_id is a different client
+     * session with its own counters starting from zero, and a different
+     * torrent is unrelated entirely. Inheriting either one's baseline would be
+     * worse than having none.
+     *
+     * @return array{uploaded: int, downloaded: int}|null
+     */
+    protected function recoverBaselineFromLedger(int $torrentId, string $peerId): ?array
+    {
+        if (! config('bloodhound.announce_log.enabled', true)) {
+            return null;
+        }
+
+        $last = AnnounceLog::query()
+            ->where('torrent_id', $torrentId)
+            ->where('peer_id', $peerId)
+            ->orderByDesc('id')
+            ->first();
+
+        if ($last === null) {
+            return null;
+        }
+
+        return [
+            'uploaded' => $last->uploaded,
+            'downloaded' => $last->downloaded,
+        ];
     }
 
     public function boot(): void
