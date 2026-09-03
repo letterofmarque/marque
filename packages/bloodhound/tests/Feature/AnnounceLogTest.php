@@ -64,7 +64,15 @@ function announceUrl(TestUser $user, Torrent $torrent, array $params = []): stri
     return "/announce/{$user->announce_key}?{$query}";
 }
 
-describe('announce log disabled (the default)', function () {
+// Spec #99 (CP1) inverted the default to enabled — the ledger is the source of
+// truth for ratio and cannot be opt-in. Turning it off is still supported, and
+// still has to actually turn it off, so these set the config explicitly rather
+// than leaning on whatever the default happens to be.
+describe('announce log explicitly disabled', function () {
+    beforeEach(function () {
+        config(['bloodhound.announce_log.enabled' => false]);
+    });
+
     it('dispatches no LogAnnounce job at all', function () {
         Queue::fake();
 
@@ -82,7 +90,7 @@ describe('announce log disabled (the default)', function () {
     });
 });
 
-describe('announce log enabled', function () {
+describe('announce log enabled (the default)', function () {
     beforeEach(function () {
         config(['bloodhound.announce_log.enabled' => true]);
         config(['bloodhound.queue.enabled' => false]); // dispatchSync-equivalent for the test

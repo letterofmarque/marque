@@ -31,12 +31,25 @@ use Marque\Trove\Models\Torrent;
  * @property int $left
  * @property int $upload_delta
  * @property int $download_delta
+ * @property int|null $prior_up
+ * @property int|null $prior_down
  * @property bool $anti_cheat_flagged
  * @property string|null $anti_cheat_reason
  * @property Carbon $created_at
  */
 class AnnounceLog extends Model
 {
+    /**
+     * Marks a synthetic row carrying a user's pre-ledger totals forward.
+     *
+     * Deliberately not a case on threepio's `AnnounceEvent`: that enum is the
+     * BitTorrent protocol's event set, and no client ever sends this. It exists
+     * so reconciliation has a known starting point on an install that predates
+     * the ledger, rather than reporting every user's entire history as drift.
+     * See Spec #99's opening-balance decision.
+     */
+    public const EVENT_OPENING_BALANCE = 'opening_balance';
+
     protected $table = 'announce_log';
 
     public const UPDATED_AT = null;
@@ -54,6 +67,8 @@ class AnnounceLog extends Model
         'left',
         'upload_delta',
         'download_delta',
+        'prior_up',
+        'prior_down',
         'anti_cheat_flagged',
         'anti_cheat_reason',
     ];
@@ -72,6 +87,14 @@ class AnnounceLog extends Model
     protected function casts(): array
     {
         return [
+            'uploaded' => 'integer',
+            'downloaded' => 'integer',
+            'left' => 'integer',
+            'upload_delta' => 'integer',
+            'download_delta' => 'integer',
+            // Nullable — a first announce has no baseline to diff against.
+            'prior_up' => 'integer',
+            'prior_down' => 'integer',
             'anti_cheat_flagged' => 'boolean',
             'created_at' => 'datetime',
         ];

@@ -185,15 +185,21 @@ return [
     | Announce Log
     |--------------------------------------------------------------------------
     |
-    | Off by default. Full-detail history of every announce — every started,
-    | regular-interval, completed, and stopped request, with deltas, cumulative
-    | totals, client fingerprint, and the anti-cheat verdict for that announce.
-    | Nothing else in bloodhound persists this: Redis peer state expires within
-    | hours, the snatches table only records one row per completed download,
-    | and the anti-cheat "suspicious" list caps at 1000 entries. This is for
-    | operators who specifically want to investigate a cheating report or
-    | verify a disputed ratio after the fact — a real, ongoing storage cost,
-    | not something imposed on every install. See Spec #98.
+    | The ledger. Full-detail history of every announce — every started,
+    | regular-interval, completed, and stopped request, with the cumulative
+    | totals the client reported, the delta we credited, and the baseline that
+    | delta was computed against.
+    |
+    | ON by default, and this is deliberate (Spec #99, inverting Spec #98).
+    | This table is the source of truth for ratio. User and per-torrent totals
+    | are projections rebuilt from it, and a wrong number can only be detected
+    | — let alone corrected — by comparing it against this. A source of truth
+    | cannot be opt-in: an install running without it has no way to know its
+    | ratios are wrong, and ratio is what gets people banned.
+    |
+    | Turning it off is supported, but it disables reconciliation, the rebuild
+    | command, and the arithmetic audit along with it. You are choosing to
+    | accumulate numbers nothing can verify.
     |
     | 'connection' lets you write this table to a SEPARATE database from the
     | rest of the app — set it to any connection name defined in
@@ -202,17 +208,20 @@ return [
     | a high-write-volume table without Marque needing to know or care what
     | database engine is on the other end.
     |
-    | 'retention_days' is null (keep forever) until you set it. With logging
-    | enabled and no retention configured, this table grows without bound on
-    | a busy tracker — set retention_days and bloodhound:prune-announce-log
-    | (scheduled) will keep it bounded. This default is deliberate: once
-    | you've opted into logging at all, retention is your call to make, not
-    | a paternalistic default you'd have to discover and override.
+    | 'retention_days' is null (keep forever) until you set it. This table
+    | grows without bound on a busy tracker — set retention_days and
+    | bloodhound:prune-announce-log (scheduled) will keep it bounded. Keeping
+    | everything stays the default because retention is an operator judgement
+    | about storage, not something to guess on their behalf.
+    |
+    | Note that pruning below the reconciliation watermark destroys the ability
+    | to rebuild the totals derived from those rows — the prune command will
+    | refuse to do that.
     |
     */
 
     'announce_log' => [
-        'enabled' => env('BLOODHOUND_ANNOUNCE_LOG', false),
+        'enabled' => env('BLOODHOUND_ANNOUNCE_LOG', true),
         'connection' => env('BLOODHOUND_ANNOUNCE_LOG_CONNECTION'),
         'retention_days' => env('BLOODHOUND_ANNOUNCE_LOG_RETENTION_DAYS'),
     ],
