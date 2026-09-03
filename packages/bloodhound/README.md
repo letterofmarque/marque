@@ -157,11 +157,23 @@ BLOODHOUND_ANNOUNCE_LOG_CONNECTION=announce_log
 BLOODHOUND_ANNOUNCE_LOG_RETENTION_DAYS=90
 ```
 
-Writes go through a queued job (`LogAnnounce`), the same pattern as stats updates, so the announce path never blocks on the write. No job is dispatched at all when the feature is disabled.
+The row is written **synchronously**, before the announce response goes back to the
+client. This is deliberate: the ledger is the durable record everything else is
+rebuilt from, so it has to exist the moment the announce completes. Putting it behind
+a queue would mean the only copy of a byte count lived in a job payload, and a lost
+job would be a lost credit with nothing left to re-derive it from.
 
 #### What gets logged
 
-One row per announce: user, torrent, peer ID, event, IP, port, user agent, the cumulative `uploaded`/`downloaded`/`left` the client reported, the calculated `upload_delta`/`download_delta` since that peer's last announce, and whether anti-cheat flagged it (with the reason when it did).
+One row per announce: user, torrent, peer ID, event, IP, port, user agent, the cumulative `uploaded`/`downloaded`/`left` the client reported, the calculated `upload_delta`/`download_delta` since that peer's last announce, the
+`prior_up`/`prior_down` baseline those deltas were computed against, and whether
+anti-cheat flagged it (with the reason when it did).
+
+Storing the baseline alongside the delta is what lets a row be checked on its own:
+`delta == reported - prior` holds per row, and each row's `prior` should equal the
+previous row's reported value for that peer. A break in that chain is the signature of
+a lost baseline — which is how a Redis outage becomes visible after the fact instead
+of silently costing users their credit.
 
 Both the cumulative totals and the deltas are kept deliberately. The delta is what actually happened this announce; the cumulative is the client's own claim. Storing both lets you cross-check a client's arithmetic against its own delta history - a client whose claimed total doesn't match the sum of its reported deltas is lying about something.
 

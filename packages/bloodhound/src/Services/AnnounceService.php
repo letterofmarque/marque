@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace Marque\Bloodhound\Services;
 
-use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Http\Response;
 use Marque\Bloodhound\Events\TorrentCompleted;
-use Marque\Bloodhound\Jobs\LogAnnounce;
 use Marque\Bloodhound\Jobs\UpdateUserStats;
+use Marque\Bloodhound\Models\AnnounceLog;
 use Marque\Threepio\Enums\AnnounceEvent;
 use Marque\Threepio\Services\PeerService;
 use Marque\Threepio\Support\TrackerResponse;
@@ -253,6 +252,8 @@ final class AnnounceService
             uploadDelta: $result['upload_delta'],
             downloadDelta: $result['download_delta'],
             antiCheatCheck: $antiCheatCheck,
+            priorUp: $result['prior_up'],
+            priorDown: $result['prior_down'],
         );
 
         // Queue user stats update if there are deltas
@@ -341,8 +342,12 @@ final class AnnounceService
     }
 
     /**
-     * Dispatch a LogAnnounce job (Spec #98), only when the feature is on —
-     * no dispatch call at all when disabled, not a job that no-ops.
+     * Write the ledger row for this announce (Spec #99).
+     *
+     * Synchronous and inline: this is the durable record the tracker's whole
+     * accounting is rebuilt from, so it must exist before the response does.
+     * Was a queued job under Spec #98, when the table was an optional
+     * investigative log rather than the source of truth.
      */
     private function logAnnounce(
         UserInterface $user,
@@ -358,38 +363,42 @@ final class AnnounceService
         int $uploadDelta,
         int $downloadDelta,
         array $antiCheatCheck,
+        ?int $priorUp = null,
+        ?int $priorDown = null,
     ): void {
-        if (! config('bloodhound.announce_log.enabled', false)) {
+        if (! config('bloodhound.announce_log.enabled', true)) {
             return;
         }
 
-        $job = new LogAnnounce(
-            userId: $user->getAuthIdentifier(),
-            torrentId: $torrent->id,
-            peerId: $peerId,
-            event: $eventLabel,
-            ip: $ip,
-            port: $port,
-            userAgent: $userAgent,
-            uploaded: $uploaded,
-            downloaded: $downloaded,
-            left: $left,
-            uploadDelta: $uploadDelta,
-            downloadDelta: $downloadDelta,
-            antiCheatFlagged: ! $antiCheatCheck['passed'],
-            antiCheatReason: $antiCheatCheck['reason'] ?? null,
-        );
-
-        // Same queue-or-sync choice as queueStatsUpdate() — reuses
-        // bloodhound.queue.*, not a second queue config for this feature.
-        if (config('bloodhound.queue.enabled', true)) {
-            app(Dispatcher::class)->dispatch(
-                $job->onConnection(config('bloodhound.queue.connection'))
-                    ->onQueue(config('bloodhound.queue.queue', 'tracker'))
-            );
-        } else {
-            app(Dispatcher::class)->dispatchSync($job);
-        }
+        // Written synchronously, before the response goes back to the client.
+        //
+        // This row is the durable record of what the tracker credited, and
+        // everything else — user totals, per-torrent totals, the reconciliation
+        // that proves them right — is a projection rebuilt from it. Dispatching
+        // it to a queue would mean the only copy of a byte count lived in a job
+        // payload, and a lost job would be a lost credit with nothing left to
+        // re-derive it from. See Spec #99.
+        //
+        // The cost is one insert on the announce path, which at tracker volumes
+        // is a fraction of the request. That is the trade, made deliberately.
+        AnnounceLog::create([
+            'user_id' => $user->getAuthIdentifier(),
+            'torrent_id' => $torrent->id,
+            'peer_id' => $peerId,
+            'event' => $eventLabel,
+            'ip' => $ip,
+            'port' => $port,
+            'user_agent' => $userAgent,
+            'uploaded' => $uploaded,
+            'downloaded' => $downloaded,
+            'left' => $left,
+            'upload_delta' => $uploadDelta,
+            'download_delta' => $downloadDelta,
+            'prior_up' => $priorUp,
+            'prior_down' => $priorDown,
+            'anti_cheat_flagged' => ! $antiCheatCheck['passed'],
+            'anti_cheat_reason' => $antiCheatCheck['reason'] ?? null,
+        ]);
     }
 
     /**

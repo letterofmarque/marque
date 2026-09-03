@@ -122,6 +122,15 @@ final class PeerService
         return [
             'upload_delta' => $uploadDelta,
             'download_delta' => $downloadDelta,
+            // The baseline the deltas were diffed against. Null for a peer with
+            // no prior announce — that is a real state, not missing data, and
+            // recording it as 0 would claim a baseline nobody observed.
+            //
+            // Returned so the caller can persist it: a stored delta cannot be
+            // checked without the value it was derived from, so a wrong
+            // baseline would otherwise leave no trace anywhere.
+            'prior_up' => $existingPeer['uploaded'] ?? null,
+            'prior_down' => $existingPeer['downloaded'] ?? null,
             'was_existing' => $existingPeer !== null,
             'status_changed' => $existingPeer && $existingPeer['is_seeder'] !== $isSeeder,
         ];
