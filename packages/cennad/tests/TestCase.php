@@ -67,6 +67,12 @@ abstract class TestCase extends BaseTestCase
                 'driver' => 'sqlite',
                 'database' => ':memory:',
                 'prefix' => '',
+                // SQLite defaults to foreign keys OFF, which silently makes
+                // every cascadeOnDelete and constrained() in the schema
+                // untested. MySQL and Postgres enforce them unconditionally,
+                // so leaving this off means the cheapest engine to run is also
+                // the one that proves the least.
+                'foreign_key_constraints' => true,
             ],
         });
 
