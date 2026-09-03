@@ -2,16 +2,19 @@
 
 declare(strict_types=1);
 
-// Probe: does times_completed agree with the snatches table?
+// Probe: does torrents.times_completed agree with per-user completions?
 //
-// snatches has a UNIQUE(user_id, torrent_id) and RecordSnatch uses
-// updateOrCreate, so "one snatch per user per torrent" is enforced twice over
-// and clearly deliberate. times_completed is incremented on the same event
-// with no such guard, and `event` is a client-supplied URL parameter.
+// torrent_user has a UNIQUE(user_id, torrent_id) and dedupes completions per
+// user, so "one row per user per torrent" is deliberate and enforced. The
+// torrents.times_completed counter is incremented on the same event with no
+// such guard, and `event` is a client-supplied URL parameter.
+//
+// (Was written against `snatches`, which torrent_user absorbed in CP4 — the
+// divergence is unchanged, only the table it is measured against.)
 
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Testing\TestResponse;
-use Marque\Bloodhound\Models\Snatch;
+use Marque\Bloodhound\Models\TorrentUser;
 use Marque\Bloodhound\Tests\TestUser;
 use Marque\Threepio\Http\Middleware\BlockBrowsers;
 use Marque\Trove\Models\Torrent;
@@ -58,10 +61,10 @@ function hitAnnounce(TestCase $test, string $url): TestResponse
         ->get($url);
 }
 
-test('a single completion records one snatch and one completion', function () {
+test('a single completion records one torrent_user row and one completion', function () {
     hitAnnounce($this, completedUrl($this->user, $this->torrent))->assertOk();
 
-    expect(Snatch::count())->toBe(1)
+    expect(TorrentUser::count())->toBe(1)
         ->and($this->torrent->fresh()->times_completed)->toBe(1);
 });
 
@@ -70,29 +73,29 @@ test('a single completion records one snatch and one completion', function () {
 // A different peer_id is not an exotic attack — it is the same user on a
 // second machine, or the same client after a restart, since peer_id is
 // regenerated per session.
-test('the same user completing from several peer ids records one snatch', function () {
+test('the same user completing from several peer ids records one torrent_user row', function () {
     foreach (['aaaa', 'bbbb', 'cccc', 'dddd', 'eeee'] as $suffix) {
         hitAnnounce($this, completedUrl($this->user, $this->torrent, "-qB4210-{$suffix}12345678"))
             ->assertOk();
     }
 
-    expect(Snatch::count())->toBe(1);
+    expect(TorrentUser::count())->toBe(1);
 });
 
 // KNOWN BUG, pinned deliberately — see Spec #99 (the announce ledger).
 //
-// snatches dedupes on (user_id, torrent_id); times_completed is a blind
+// torrent_user dedupes on (user_id, torrent_id); times_completed is a blind
 // increment on a client-supplied `event` parameter with no validation
 // anywhere. Five completions from one user produce times_completed = 3 and
-// one snatch. Three, not five, because anti-cheat's frequency check is keyed
-// on (torrent, peer_id) and caught two of them — so the inflation is not just
-// wrong, it is arbitrary.
+// one torrent_user row. Three, not five, because anti-cheat's frequency check
+// is keyed on (torrent, peer_id) and caught two of them — so the inflation is
+// not just wrong, it is arbitrary.
 //
 // This asserts the CURRENT, WRONG behaviour so the suite stays green while
 // the bug is on record. When Spec #99 makes times_completed a projection of
-// deduped ledger events, this assertion flips to `toBe(Snatch::count())` and
+// deduped ledger events, this assertion flips to `toBe(TorrentUser::count())` and
 // becomes an ordinary regression test.
-test('times_completed diverges from the snatch count across peer ids', function () {
+test('times_completed diverges from the per-user completion count across peer ids', function () {
     foreach (['aaaa', 'bbbb', 'cccc', 'dddd', 'eeee'] as $suffix) {
         hitAnnounce($this, completedUrl($this->user, $this->torrent, "-qB4210-{$suffix}12345678"))
             ->assertOk();
@@ -100,6 +103,6 @@ test('times_completed diverges from the snatch count across peer ids', function 
 
     $timesCompleted = $this->torrent->fresh()->times_completed;
 
-    expect(Snatch::count())->toBe(1)
-        ->and($timesCompleted)->toBeGreaterThan(Snatch::count());
+    expect(TorrentUser::count())->toBe(1)
+        ->and($timesCompleted)->toBeGreaterThan(TorrentUser::count());
 });

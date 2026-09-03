@@ -11,7 +11,7 @@ use Marque\Bloodhound\Console\Commands\PruneAnnounceLog;
 use Marque\Bloodhound\Console\Commands\SyncSwarmCounts;
 use Marque\Bloodhound\Contracts\AnnounceLogServiceInterface;
 use Marque\Bloodhound\Events\TorrentCompleted;
-use Marque\Bloodhound\Listeners\RecordSnatch;
+use Marque\Bloodhound\Listeners\RecordCompletion;
 use Marque\Bloodhound\Models\AnnounceLog;
 use Marque\Bloodhound\Services\AnnounceLogService;
 use Marque\Bloodhound\Services\AnnounceService;
@@ -108,7 +108,7 @@ class BloodhoundServiceProvider extends ServiceProvider
      */
     protected function registerEventListeners(): void
     {
-        Event::listen(TorrentCompleted::class, RecordSnatch::class);
+        Event::listen(TorrentCompleted::class, RecordCompletion::class);
     }
 
     /**
