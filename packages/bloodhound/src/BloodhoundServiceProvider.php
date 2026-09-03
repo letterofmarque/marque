@@ -8,7 +8,10 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\ServiceProvider;
 use Marque\Bloodhound\Console\Commands\AggregateLedger;
+use Marque\Bloodhound\Console\Commands\AuditLedger;
 use Marque\Bloodhound\Console\Commands\PruneAnnounceLog;
+use Marque\Bloodhound\Console\Commands\RebuildTotals;
+use Marque\Bloodhound\Console\Commands\ReconcileLedger;
 use Marque\Bloodhound\Console\Commands\SyncSwarmCounts;
 use Marque\Bloodhound\Contracts\AnnounceLogServiceInterface;
 use Marque\Bloodhound\Events\TorrentCompleted;
@@ -130,7 +133,10 @@ class BloodhoundServiceProvider extends ServiceProvider
 
         $this->commands([
             AggregateLedger::class,
+            AuditLedger::class,
             PruneAnnounceLog::class,
+            RebuildTotals::class,
+            ReconcileLedger::class,
             SyncSwarmCounts::class,
         ]);
 
@@ -147,5 +153,10 @@ class BloodhoundServiceProvider extends ServiceProvider
         // longer have. A day of that is a catalogue full of torrents claiming
         // seeders that left yesterday.
         Schedule::command('bloodhound:sync-swarm-counts')->hourly();
+
+        // Daily. This is the mechanism that turns a wrong number from
+        // permanent-and-invisible into something an operator is told about,
+        // so it runs unconditionally rather than being something to enable.
+        Schedule::command('bloodhound:reconcile-ledger')->daily();
     }
 }

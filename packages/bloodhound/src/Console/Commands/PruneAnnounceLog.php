@@ -7,6 +7,8 @@ namespace Marque\Bloodhound\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Marque\Bloodhound\Models\AnnounceLog;
+use Marque\Bloodhound\Models\LedgerCursor;
+use Marque\Bloodhound\Services\LedgerAggregator;
 
 /**
  * Enforces config('bloodhound.announce_log.retention_days') (Spec #98).
@@ -39,9 +41,25 @@ class PruneAnnounceLog extends Command
 
         $cutoff = Carbon::now()->subDays((int) $days);
 
-        $deleted = AnnounceLog::where('created_at', '<', $cutoff)->delete();
+        // The floor, and it is not negotiable (Spec #99). A rebuild replays
+        // the ledger up to the reconciliation watermark; deleting rows the
+        // aggregator has not consumed would make the totals derived from them
+        // permanently unverifiable. A retention policy must never be able to
+        // destroy the thing the ledger exists to protect, so age alone is not
+        // sufficient grounds for deletion.
+        $watermark = LedgerCursor::positionFor(LedgerAggregator::STREAM);
+
+        $aged = AnnounceLog::where('created_at', '<', $cutoff);
+
+        $withheld = (clone $aged)->where('id', '>', $watermark)->count();
+
+        $deleted = $aged->where('id', '<=', $watermark)->delete();
 
         $this->info("Pruned {$deleted} announce log row(s) older than {$cutoff->toDateTimeString()}.");
+
+        if ($withheld > 0) {
+            $this->warn("Kept {$withheld} aged row(s) that are not yet aggregated — pruning them would leave the totals they feed unverifiable.");
+        }
 
         return self::SUCCESS;
     }

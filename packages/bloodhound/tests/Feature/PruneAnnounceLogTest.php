@@ -11,6 +11,8 @@ declare(strict_types=1);
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Carbon;
 use Marque\Bloodhound\Models\AnnounceLog;
+use Marque\Bloodhound\Models\LedgerCursor;
+use Marque\Bloodhound\Services\LedgerAggregator;
 
 function seedLogRow(int $daysAgo, array $overrides = []): AnnounceLog
 {
@@ -63,6 +65,11 @@ describe('retention_days is null (the default)', function () {
 });
 
 describe('retention_days set', function () {
+    // These predate the reconciliation floor added in CP7. Pruning now also
+    // requires a row to have been aggregated, so each marks the ledger as
+    // consumed AFTER seeding — otherwise it asserts the floor's behaviour
+    // rather than the retention window's, which is covered separately below.
+
     it('deletes only rows older than the cutoff', function () {
         config(['bloodhound.announce_log.retention_days' => 30]);
 
@@ -70,6 +77,8 @@ describe('retention_days set', function () {
         $keepEdge = seedLogRow(29);
         $dropEdge = seedLogRow(31);
         $drop = seedLogRow(365);
+
+        markLedgerFullyAggregated();
 
         $this->artisan('bloodhound:prune-announce-log')->assertSuccessful();
 
@@ -86,6 +95,8 @@ describe('retention_days set', function () {
         seedLogRow(90);
         seedLogRow(90);
         seedLogRow(1);
+
+        markLedgerFullyAggregated();
 
         $this->artisan('bloodhound:prune-announce-log')
             ->expectsOutputToContain('2')
@@ -119,6 +130,8 @@ describe('retention_days set', function () {
         seedLogRow(90);
         seedLogRow(1);
 
+        markLedgerFullyAggregated();
+
         $this->artisan('bloodhound:prune-announce-log')->assertSuccessful();
 
         expect(AnnounceLog::count())->toBe(1);
@@ -132,5 +145,62 @@ describe('scheduling', function () {
             ->filter(fn ($c) => str_contains($c, 'bloodhound:prune-announce-log'));
 
         expect($events)->not->toBeEmpty();
+    });
+});
+
+// CP7 (Spec #99). The floor: pruning below the reconciliation watermark would
+// destroy the rows a rebuild replays, so a "cleanup" job could silently make
+// every total unverifiable — the exact opposite of what the ledger is for.
+/**
+ * Mark every existing ledger row as consumed by the aggregator.
+ */
+function markLedgerFullyAggregated(): void
+{
+    $highest = (int) AnnounceLog::max('id');
+
+    LedgerCursor::updateOrCreate(
+        ['stream' => LedgerAggregator::STREAM],
+        ['position' => $highest],
+    );
+}
+
+describe('the reconciliation floor', function () {
+    it('refuses to delete rows the aggregator has not yet consumed', function () {
+        config(['bloodhound.announce_log.retention_days' => 1]);
+
+        $old = seedLogRow(daysAgo: 30);
+
+        // Nothing aggregated: the watermark is 0, so this row is still needed.
+        LedgerCursor::query()->delete();
+
+        test()->artisan('bloodhound:prune-announce-log')->assertSuccessful();
+
+        expect(AnnounceLog::find($old->id))->not->toBeNull();
+    });
+
+    it('deletes aged rows once they are safely below the watermark', function () {
+        config(['bloodhound.announce_log.retention_days' => 1]);
+
+        $old = seedLogRow(daysAgo: 30);
+
+        LedgerCursor::create([
+            'stream' => LedgerAggregator::STREAM,
+            'position' => $old->id,
+        ]);
+
+        test()->artisan('bloodhound:prune-announce-log')->assertSuccessful();
+
+        expect(AnnounceLog::find($old->id))->toBeNull();
+    });
+
+    it('says why it kept rows it would otherwise have pruned', function () {
+        config(['bloodhound.announce_log.retention_days' => 1]);
+
+        seedLogRow(daysAgo: 30);
+        LedgerCursor::query()->delete();
+
+        test()->artisan('bloodhound:prune-announce-log')
+            ->expectsOutputToContain('not yet aggregated')
+            ->assertSuccessful();
     });
 });
