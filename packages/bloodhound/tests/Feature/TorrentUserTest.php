@@ -115,11 +115,17 @@ describe('recording a completion', function () {
     // completions, ~5GB transferred — not 8GB. Completion count and byte
     // volume are independent and neither can be derived from the other.
     test('completion count says nothing about bytes transferred', function () {
+        Carbon::setTestNow('2026-01-01 10:00:00');
         $row = TorrentUser::recordCompletion($this->user->id, $this->torrent->id);
         $row->forceFill(['downloaded' => 4_000_000_000])->save();
 
+        // Months later, after re-fetching the corrupt file. Two completions,
+        // ~5GB moved in total — not 8GB.
+        Carbon::setTestNow('2026-07-01 10:00:00');
         $row = TorrentUser::recordCompletion($this->user->id, $this->torrent->id);
         $row->forceFill(['downloaded' => 5_000_000_000])->save();
+
+        Carbon::setTestNow();
 
         $row = $row->fresh();
 

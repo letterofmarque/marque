@@ -97,7 +97,15 @@ final class AnnounceService
         bool $compact,
         int $numWant,
     ): Response {
-        // Increment completion counter (the only DB write hound does)
+        // Deliberately a blind increment, unlike bloodhound.
+        //
+        // hound records no user against an announce, so there is nobody to
+        // dedupe a completion against — a client restarting mid-download looks
+        // exactly like a second person finishing. On a public tracker
+        // times_completed therefore means "completed events seen", not
+        // "distinct completions", and the two numbers are not comparable
+        // across the packages. That is the honest best a tracker with no
+        // accountable user can do. See Spec #99.
         $torrent->increment('times_completed');
 
         return $this->handleRegular($torrent, $peerId, $ip, $port, $uploaded, $downloaded, $left, $isSeeder, $compact, $numWant);

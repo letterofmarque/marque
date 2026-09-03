@@ -86,11 +86,50 @@ class TorrentUser extends Model
 
         $row->first_completed_at ??= $at;
         $row->last_completed_at = $at;
-        $row->times_completed = ($row->times_completed ?? 0) + 1;
+
+        if ($row->countsAsNewCompletion($at)) {
+            $row->times_completed = ($row->times_completed ?? 0) + 1;
+        }
 
         $row->save();
 
         return $row;
+    }
+
+    /**
+     * Is this a new completion, or the same download announcing again?
+     *
+     * `event=completed` is a client-supplied parameter that nothing validates,
+     * and peer_id is regenerated per client session — so one download reports
+     * completion repeatedly whenever a client restarts or the user runs a
+     * second machine. Counting each one inflated the total arbitrarily,
+     * bounded only by how many happened to slip past an anti-cheat check aimed
+     * at something else entirely.
+     *
+     * Time is the only honest discriminator here. Two announces minutes apart
+     * are one download; two six months apart are a genuine redownload — the
+     * user deleted it and fetched it again, or refetched a corrupt piece.
+     * Nothing in the announce itself distinguishes them, so the cooldown does.
+     *
+     * The default is a day: comfortably longer than any client-restart churn,
+     * comfortably shorter than a real return to a torrent. An operator who
+     * disagrees can set `bloodhound.completion_cooldown`.
+     */
+    protected function countsAsNewCompletion(Carbon $at): bool
+    {
+        if ($this->times_completed === null || $this->times_completed === 0) {
+            return true;
+        }
+
+        $previous = $this->getOriginal('last_completed_at');
+
+        if ($previous === null) {
+            return true;
+        }
+
+        $cooldown = (int) config('bloodhound.completion_cooldown', 86400);
+
+        return Carbon::parse($previous)->addSeconds($cooldown)->lte($at);
     }
 
     /**

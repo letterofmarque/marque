@@ -167,10 +167,16 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Stats Queue
+    | Stats Queue — DEPRECATED, no longer read
     |--------------------------------------------------------------------------
     |
-    | User stats updates can be queued to reduce database load.
+    | Stats no longer travel through a queue. Byte counts are written to the
+    | ledger on the announce path and folded into totals by
+    | bloodhound:aggregate-ledger, so nothing in this package reads these keys
+    | any more (Spec #99).
+    |
+    | Kept for one release so an existing published config does not break, and
+    | removed in the next major.
     |
     */
 
@@ -179,6 +185,28 @@ return [
         'connection' => env('BLOODHOUND_QUEUE_CONNECTION', null), // null = default
         'queue' => env('BLOODHOUND_QUEUE_NAME', 'tracker'),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Completion Cooldown
+    |--------------------------------------------------------------------------
+    |
+    | How long after a user completes a torrent before another `completed`
+    | announce from them counts as a genuinely new completion.
+    |
+    | `event=completed` is client-supplied and nothing validates it, and peer_id
+    | is regenerated per client session — so one download reports completion
+    | repeatedly whenever a client restarts or the user runs a second machine.
+    | Counting each one inflates the total arbitrarily.
+    |
+    | Nothing in an announce distinguishes "the same download announcing again"
+    | from "they deleted it and fetched it again months later", so time does.
+    | A day is comfortably longer than client-restart churn and comfortably
+    | shorter than a real return to a torrent.
+    |
+    */
+
+    'completion_cooldown' => env('BLOODHOUND_COMPLETION_COOLDOWN', 86400),
 
     /*
     |--------------------------------------------------------------------------

@@ -2,7 +2,8 @@
 
 declare(strict_types=1);
 
-// Probe: does torrents.times_completed agree with per-user completions?
+// Does torrents.times_completed agree with per-user completions? Since CP6,
+// yes — this file is the record of how it did not, and now does.
 //
 // torrent_user has a UNIQUE(user_id, torrent_id) and dedupes completions per
 // user, so "one row per user per torrent" is deliberate and enforced. The
@@ -82,27 +83,21 @@ test('the same user completing from several peer ids records one torrent_user ro
     expect(TorrentUser::count())->toBe(1);
 });
 
-// KNOWN BUG, pinned deliberately — see Spec #99 (the announce ledger).
+// FIXED by CP6. This was pinned as a known bug in 91f78dc, asserting the wrong
+// behaviour to keep the suite green while it stood on record; it is now an
+// ordinary regression test.
 //
-// torrent_user dedupes on (user_id, torrent_id); times_completed is a blind
-// increment on a client-supplied `event` parameter with no validation
-// anywhere. Five completions from one user produce times_completed = 3 and
-// one torrent_user row. Three, not five, because anti-cheat's frequency check
-// is keyed on (torrent, peer_id) and caught two of them — so the inflation is
-// not just wrong, it is arbitrary.
-//
-// This asserts the CURRENT, WRONG behaviour so the suite stays green while
-// the bug is on record. When Spec #99 makes times_completed a projection of
-// deduped ledger events, this assertion flips to `toBe(TorrentUser::count())` and
-// becomes an ordinary regression test.
-test('times_completed diverges from the per-user completion count across peer ids', function () {
+// Five completions from one user used to give times_completed = 3 against one
+// torrent_user row — three rather than five because anti-cheat's frequency
+// check (keyed on torrent+peer_id) caught two, which made the inflation
+// arbitrary as well as wrong. Completions are now deduped per user per
+// download session, so both numbers agree.
+test('times_completed agrees with the per-user completion count across peer ids', function () {
     foreach (['aaaa', 'bbbb', 'cccc', 'dddd', 'eeee'] as $suffix) {
         hitAnnounce($this, completedUrl($this->user, $this->torrent, "-qB4210-{$suffix}12345678"))
             ->assertOk();
     }
 
-    $timesCompleted = $this->torrent->fresh()->times_completed;
-
     expect(TorrentUser::count())->toBe(1)
-        ->and($timesCompleted)->toBeGreaterThan(TorrentUser::count());
+        ->and($this->torrent->fresh()->times_completed)->toBe(1);
 });

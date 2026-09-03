@@ -190,8 +190,9 @@ final class AnnounceService
             userAgent: $userAgent,
         ));
 
-        // Update the torrent's completion count
-        $torrent->increment('times_completed');
+        // The torrent's completion count is bumped by RecordCompletion,
+        // which only counts a completion the user's own row counted — so a
+        // client restarting mid-download no longer inflates it. See Spec #99.
 
         // Process as a regular announce, but logged as 'completed' — not
         // delegated silently, or the announce_log row would say 'regular'
