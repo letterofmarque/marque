@@ -88,8 +88,11 @@ describe('one download session counts once', function () {
             completeAs($this, "-qB4210-{$suffix}12345678")->assertOk();
         }
 
+        // Cast: MySQL returns SUM() as a string, SQLite and Postgres as an
+        // integer, and toBe() is strict. The sibling assertions in
+        // LedgerAggregationTest already do this; this one was missed.
         expect($this->torrent->fresh()->times_completed)
-            ->toBe(TorrentUser::sum('times_completed'));
+            ->toBe((int) TorrentUser::sum('times_completed'));
     });
 
     test('the per-user row also counts one', function () {
