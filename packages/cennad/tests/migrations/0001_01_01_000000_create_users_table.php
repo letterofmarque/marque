@@ -31,6 +31,15 @@ return new class extends Migration
 
     public function down(): void
     {
+        // Package migrations register before this fixture (providers call
+        // loadMigrationsFrom in boot), so rollback reverses that order and
+        // reaches `users` while tables referencing it still exist. SQLite does
+        // not enforce foreign keys by default and never noticed; MySQL and
+        // PostgreSQL both refuse.
+        //
+        // Postgres ignores disableForeignKeyConstraints for DROP TABLE, so the
+        // portable fix is to take the dependants down first.
+        Schema::dropIfExists('torrents');
         Schema::dropIfExists('users');
     }
 };

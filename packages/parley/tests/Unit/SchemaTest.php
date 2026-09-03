@@ -15,17 +15,37 @@ describe('the test environment enforces referential integrity', function () {
         // SQLite defaults to OFF, which would make every cascadeOnDelete and
         // nullOnDelete in the schema silently untested. If this ever goes back
         // to 0, the referential assertions elsewhere stop meaning anything.
+        //
+        // MySQL and Postgres enforce foreign keys unconditionally, and PRAGMA
+        // is not valid syntax there — so this asserts nothing on them and is
+        // skipped rather than failing with a syntax error that would read like
+        // a broken package.
+        if (DB::connection()->getDriverName() !== 'sqlite') {
+            test()->markTestSkipped('PRAGMA is SQLite-only; other engines enforce foreign keys unconditionally.');
+        }
+
         expect(DB::select('PRAGMA foreign_keys')[0]->foreign_keys)->toBe(1);
     });
 
     it('actually rejects an orphan row', function () {
-        expect(fn () => DB::table('parley_posts')->insert([
-            'thread_id' => 99999,
-            'user_id' => 99999,
-            'body' => 'orphan',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]))->toThrow(QueryException::class);
+        // Inside a savepoint: Postgres aborts the whole surrounding
+        // transaction on a constraint violation, so without one the deliberate
+        // failure poisons every statement after it — including the test
+        // harness's own bookkeeping. The rollback confines the damage to the
+        // statement that was supposed to fail.
+        DB::beginTransaction();
+
+        try {
+            expect(fn () => DB::table('parley_posts')->insert([
+                'thread_id' => 99999,
+                'user_id' => 99999,
+                'body' => 'orphan',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]))->toThrow(QueryException::class);
+        } finally {
+            DB::rollBack();
+        }
     });
 });
 

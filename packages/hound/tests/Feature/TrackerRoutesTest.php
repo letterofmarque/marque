@@ -2,10 +2,23 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use Marque\Threepio\Http\Middleware\BlockBrowsers;
 use Marque\Threepio\Support\Bencode;
 use Marque\Trove\Models\Torrent;
+
+// Torrents foreign-key to users, which the host app owns. These tests create
+// torrents with user_id 1 and relied on SQLite not enforcing the constraint;
+// MySQL and PostgreSQL both reject the insert outright.
+beforeEach(function () {
+    DB::table('users')->insert([
+        'id' => 1,
+        'name' => 'Test User',
+        'email' => 'host@example.com',
+        'password' => 'password',
+    ]);
+});
 
 // Helper to make tracker requests (without browser headers that would be blocked)
 function trackerGet($test, string $url): TestResponse
