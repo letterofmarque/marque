@@ -21,6 +21,12 @@ use Illuminate\Support\Facades\DB;
 use Marque\Bloodhound\Contracts\AnnounceLogServiceInterface;
 use Marque\Bloodhound\Models\AnnounceLog;
 
+beforeEach(function () {
+    if (DB::connection()->getDriverName() !== 'sqlite') {
+        test()->markTestSkipped('EXPLAIN QUERY PLAN is SQLite-only; this probes the planner, not the package.');
+    }
+});
+
 /**
  * Capture the SQL the service actually emits, then ask SQLite how it plans to
  * run it.
