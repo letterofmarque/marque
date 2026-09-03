@@ -17,6 +17,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Testing\TestResponse;
 use Marque\Bloodhound\Models\AnnounceLog;
+use Marque\Bloodhound\Services\LedgerAggregator;
 use Marque\Bloodhound\Tests\TestUser;
 use Marque\Threepio\Http\Middleware\BlockBrowsers;
 use Marque\Trove\Models\Torrent;
@@ -89,13 +90,15 @@ describe('losing Redis mid-session', function () {
             ->and($row->upload_delta)->toBe(2_000_000_000);
     });
 
+    // Since CP5 the announce path only writes the ledger; totals are folded
+    // from it by the aggregator. So the credit is asserted after aggregation,
+    // not immediately after the announce.
     test('the user is credited those bytes on their total', function () {
-        config(['bloodhound.queue.enabled' => false]);
-
         recoveryAnnounce($this, recoveryUrl($this->user, $this->torrent, [
             'event' => 'started', 'uploaded' => 10_000_000_000,
         ]))->assertOk();
 
+        app(LedgerAggregator::class)->run();
         $afterFirst = $this->user->fresh()->uploaded;
 
         flushPeerState();
@@ -103,6 +106,8 @@ describe('losing Redis mid-session', function () {
         recoveryAnnounce($this, recoveryUrl($this->user, $this->torrent, [
             'uploaded' => 12_000_000_000,
         ]))->assertOk();
+
+        app(LedgerAggregator::class)->run();
 
         expect($this->user->fresh()->uploaded - $afterFirst)->toBe(2_000_000_000);
     });

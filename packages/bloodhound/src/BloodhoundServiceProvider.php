@@ -7,6 +7,7 @@ namespace Marque\Bloodhound;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\ServiceProvider;
+use Marque\Bloodhound\Console\Commands\AggregateLedger;
 use Marque\Bloodhound\Console\Commands\PruneAnnounceLog;
 use Marque\Bloodhound\Console\Commands\SyncSwarmCounts;
 use Marque\Bloodhound\Contracts\AnnounceLogServiceInterface;
@@ -128,9 +129,16 @@ class BloodhoundServiceProvider extends ServiceProvider
         }
 
         $this->commands([
+            AggregateLedger::class,
             PruneAnnounceLog::class,
             SyncSwarmCounts::class,
         ]);
+
+        // Every minute. This is the fallback that makes the queue optional
+        // rather than load-bearing: even if every queued job were lost, this
+        // tick folds the ledger and the totals catch up. Cheap when there is
+        // nothing pending — one indexed lookup against the cursor.
+        Schedule::command('bloodhound:aggregate-ledger')->everyMinute()->withoutOverlapping();
 
         Schedule::command('bloodhound:prune-announce-log')->daily();
 

@@ -6,7 +6,6 @@ namespace Marque\Bloodhound\Services;
 
 use Illuminate\Http\Response;
 use Marque\Bloodhound\Events\TorrentCompleted;
-use Marque\Bloodhound\Jobs\UpdateUserStats;
 use Marque\Bloodhound\Models\AnnounceLog;
 use Marque\Threepio\Enums\AnnounceEvent;
 use Marque\Threepio\Services\PeerService;
@@ -256,14 +255,11 @@ final class AnnounceService
             priorDown: $result['prior_down'],
         );
 
-        // Queue user stats update if there are deltas
-        if ($result['upload_delta'] > 0 || $result['download_delta'] > 0) {
-            $this->queueStatsUpdate(
-                userId: $user->getAuthIdentifier(),
-                uploadDelta: $result['upload_delta'],
-                downloadDelta: $result['download_delta'],
-            );
-        }
+        // No stats dispatch here any more. The deltas were just written to
+        // the ledger above, and bloodhound:aggregate-ledger folds them into
+        // user and per-torrent totals from there. Sending them through a queue
+        // as well would put a second, losable copy of the same number in
+        // flight — which is the failure this design removes. See Spec #99.
 
         // Get peers for response
         $maxPeers = min($numWant, (int) config('threepio.max_peers_per_announce', 50));
@@ -314,21 +310,6 @@ final class AnnounceService
             'seeders' => $seeders,
             'leechers' => $leechers,
         ])->save();
-    }
-
-    /**
-     * Queue a stats update for the user.
-     */
-    private function queueStatsUpdate(int $userId, int $uploadDelta, int $downloadDelta): void
-    {
-        if (config('bloodhound.queue.enabled', true)) {
-            UpdateUserStats::dispatch($userId, $uploadDelta, $downloadDelta)
-                ->onConnection(config('bloodhound.queue.connection'))
-                ->onQueue(config('bloodhound.queue.queue', 'tracker'));
-        } else {
-            // Immediate update if queue disabled
-            UpdateUserStats::dispatchSync($userId, $uploadDelta, $downloadDelta);
-        }
     }
 
     /**
