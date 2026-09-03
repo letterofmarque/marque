@@ -17,7 +17,14 @@ test('uses the app default connection when none is configured', function () {
 });
 
 test('uses the configured connection name when set', function () {
-    config(['bloodhound.announce_log.connection' => 'announce_log_db']);
+    // Registered as a real connection, not just a name: the model resolves the
+    // name lazily, but the test harness's own teardown tries to USE whatever
+    // connection is configured. SQLite let a dangling name through because the
+    // teardown never reached it; on a real engine it fails hard.
+    config([
+        'database.connections.announce_log_db' => config('database.connections.testing'),
+        'bloodhound.announce_log.connection' => 'announce_log_db',
+    ]);
 
     expect((new AnnounceLog)->getConnectionName())->toBe('announce_log_db');
 });

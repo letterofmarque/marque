@@ -97,15 +97,38 @@ abstract class TestCase extends BaseTestCase
      */
     protected function rebootWithConfig(array $config): void
     {
+        // RefreshDatabase wraps each test in a transaction. Rebuilding the
+        // application abandons that transaction without rolling it back, which
+        // SQLite tolerates and Postgres does not — the orphaned transaction
+        // holds locks that the next reboot blocks on, and the suite hangs with
+        // no output rather than failing.
+        //
+        // Close it deliberately before the connection is thrown away.
+        foreach (array_keys($this->app['db']->getConnections()) as $name) {
+            $connection = $this->app['db']->connection($name);
+
+            while ($connection->transactionLevel() > 0) {
+                $connection->rollBack();
+            }
+
+            $connection->disconnect();
+        }
+
         $this->pendingConfig = $config;
 
         $this->refreshApplication();
 
-        // The rebooted app gets a fresh :memory: database, so the schema has
-        // to be laid down again — same paths, same order as
-        // defineDatabaseMigrations().
-        $this->loadMigrationsFrom(__DIR__.'/migrations');
-        $this->loadMigrationsFrom(__DIR__.'/../../trove/database/migrations');
+        // An in-memory SQLite database dies with the application that owned
+        // it, so the schema has to be laid down again — same paths, same order
+        // as defineDatabaseMigrations().
+        //
+        // A real engine keeps its tables across the reboot, and re-running the
+        // migrations there conflicts with the schema already present rather
+        // than recreating it. Only rebuild when the database was ephemeral.
+        if ($this->app['config']->get('database.connections.testing.driver') === 'sqlite') {
+            $this->loadMigrationsFrom(__DIR__.'/migrations');
+            $this->loadMigrationsFrom(__DIR__.'/../../trove/database/migrations');
+        }
     }
 
     protected function defineDatabaseMigrations(): void

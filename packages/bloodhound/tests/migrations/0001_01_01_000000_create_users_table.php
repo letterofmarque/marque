@@ -40,6 +40,10 @@ return new class extends Migration
         //
         // Postgres ignores disableForeignKeyConstraints for DROP TABLE, so the
         // portable fix is to take the dependants down first.
+        // The CP4 migration's down() recreates `snatches` with a foreign key
+        // to users, so it has to come down before users does.
+        Schema::dropIfExists('snatches');
+        Schema::dropIfExists('torrent_user');
         Schema::dropIfExists('torrents');
         Schema::dropIfExists('users');
     }

@@ -35,6 +35,34 @@ function seedLegacySnatches(array $rows): void
         $table->unique(['user_id', 'torrent_id']);
     });
 
+    // Real users: the migration's down() recreates snatches WITH a foreign
+    // key, and MySQL/Postgres enforce it. SQLite never did, which is how rows
+    // referencing users 1 and 2 went unnoticed.
+    foreach (array_unique(array_column($rows, 'user_id')) as $userId) {
+        if (! DB::table('users')->where('id', $userId)->exists()) {
+            DB::table('users')->insert([
+                'id' => $userId,
+                'name' => "User {$userId}",
+                'email' => "carryover{$userId}@example.com",
+                'password' => 'password',
+            ]);
+        }
+    }
+
+    foreach (array_unique(array_column($rows, 'torrent_id')) as $torrentId) {
+        if (! DB::table('torrents')->where('id', $torrentId)->exists()) {
+            DB::table('torrents')->insert([
+                'id' => $torrentId,
+                'name' => "Torrent {$torrentId}",
+                'info_hash' => str_pad((string) $torrentId, 40, '0', STR_PAD_LEFT),
+                'size' => 1_000,
+                'user_id' => array_values($rows)[0]['user_id'],
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+    }
+
     DB::table('snatches')->insert(array_map(fn (array $row) => [
         'user_id' => $row['user_id'],
         'torrent_id' => $row['torrent_id'],
