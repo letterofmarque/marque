@@ -7,33 +7,9 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [RELEASES.md](../../RELEASES.md) for the story up to this point.
 
-## [Unreleased]
+## [5.0.0] — 2026-09-03
 
-> Adds an hourly reaper that keeps torrent swarm counts honest, and stops writing the dead `visible` flag.
-
-### Added
-
-- **`bloodhound:sync-swarm-counts`**, scheduled hourly — reconciles each
-  torrent's `seeders`/`leechers` against live Redis peer state.
-
-  This is what makes the counts trustworthy. The announce path keeps them fresh
-  while peers are announcing, but a peer that simply vanishes — client killed,
-  machine off — never sends `stopped`; its Redis entry expires silently and
-  nothing announces afterwards to correct the row. Without a sweep the counts
-  rot exactly the way the `visible` flag did: a write path with no invalidation
-  path. Hourly rather than daily because until it runs, the catalogue advertises
-  swarms that are gone.
-
-### Changed
-
-- The announce path writes `seeders`/`leechers` onto the torrent (skipping the
-  write when unchanged, since counts are stable between most announces).
-- Stopped writing `visible`, which trove has removed. The write was a no-op: it
-  could only ever set the flag true, and nothing set it false.
-
-## [Unreleased]
-
-> Makes the announce log the durable source of truth for ratio, and adds the reconciliation, rebuild and audit that make a wrong number detectable.
+> Makes the announce log the durable source of truth for ratio, adds the reconciliation, rebuild and audit that make a wrong number detectable, and keeps swarm counts honest with an hourly reaper.
 
 ### Security
 
@@ -63,6 +39,16 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   the per-peer baseline chain — a break is what a past Redis outage looks like.
   **`bloodhound:rebuild-totals`** recomputes everything from the ledger.
 - `completion_cooldown` config (default 1 day).
+- **`bloodhound:sync-swarm-counts`**, scheduled hourly — reconciles each
+  torrent's `seeders`/`leechers` against live Redis peer state.
+
+  This is what makes the counts trustworthy. The announce path keeps them fresh
+  while peers are announcing, but a peer that simply vanishes — client killed,
+  machine off — never sends `stopped`; its Redis entry expires silently and
+  nothing announces afterwards to correct the row. Without a sweep the counts
+  rot exactly the way the `visible` flag did: a write path with no invalidation
+  path. Hourly rather than daily because until it runs, the catalogue advertises
+  swarms that are gone.
 
 ### Changed
 
@@ -76,7 +62,12 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   client-supplied `event` parameter, and peer_id is regenerated per client session, so a
   restart or second machine inflated it — five completions from one user counted as three.
 - Pruning now refuses to delete rows the aggregator has not consumed, whatever their age.
+- The announce path writes `seeders`/`leechers` onto the torrent (skipping the
+  write when unchanged, since counts are stable between most announces).
+- Stopped writing `visible`, which trove has removed. The write was a no-op: it
+  could only ever set the flag true, and nothing set it false.
 - **Deprecated:** `queue.*` is no longer read and is removed in the next major.
+- `marque/trove` constraint widened to `^3.0|^4.0` to allow trove 4.x.
 
 ### Upgrading
 

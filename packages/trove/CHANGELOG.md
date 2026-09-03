@@ -7,7 +7,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [RELEASES.md](../../RELEASES.md) for the story up to this point.
 
-## [Unreleased]
+## [4.0.0] — 2026-09-03
 
 > Adds per-torrent access control and swarm counts, and filters both in the listing.
 

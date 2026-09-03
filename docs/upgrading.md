@@ -25,6 +25,7 @@ fetching the whole repo tree and grepping for `upgrad|migrat|changelog`.
 | 6 | [Release: Marque 4.2](releases/4.2.md) | usarrs requires Fortify; adds 2FA/passkeys; closes a Fortify route collision |
 | 7 | [Upgrade guide: usarrs v6](upgrade-guide-usarrs-v6.md) | Technical checklist for the 4.2 changes |
 | 8 | [Release: Marque 4.3](releases/4.3.md) | usarrs registers email verification + password confirmation routes (fixes a lockout) |
+| 9 | [Release: Marque 5.0](releases/5.0.md) | Durable, auditable ratio accounting; per-torrent access control; API reads require auth by default |
 
 If you're picking up an old install: start at whichever row matches the version
 you're currently on, and read down to the bottom. If you don't know your version,

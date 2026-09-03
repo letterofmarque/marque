@@ -7,7 +7,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [RELEASES.md](../../RELEASES.md) for the story up to this point.
 
-## [Unreleased]
+## [4.1.0] — 2026-09-03
 
 > Enforces per-torrent restrictions for guests, and shows swarm counts.
 
@@ -20,6 +20,11 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 - The torrent detail page and `.torrent` download now check `view`, so a
   restricted torrent is not reachable by guests via a direct URL.
+
+### Changed
+
+- `marque/trove` constraint widened to `^3.0|^4.0` to allow trove 4.x.
+
 
 ## [4.0.0] — 2026-08-20
 

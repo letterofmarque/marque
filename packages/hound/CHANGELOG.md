@@ -7,7 +7,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [RELEASES.md](../../RELEASES.md) for the story up to this point.
 
-## [Unreleased]
+## [3.1.0] — 2026-09-03
 
 > Records swarm counts on the announce path so a public catalogue can filter and sort on them.
 
@@ -22,6 +22,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   deliberate addition to a hot path — without it a public catalogue cannot
   filter or sort on swarm state, because live peers are in Redis. The write is
   skipped when the counts have not changed.
+- `marque/trove` constraint widened to `^3.0|^4.0` to allow trove 4.x.
 
 ## [3.0.0] — 2026-08-13
 

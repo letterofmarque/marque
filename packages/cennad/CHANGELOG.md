@@ -7,7 +7,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [RELEASES.md](../../RELEASES.md) for the story up to this point.
 
-## [Unreleased]
+## [4.0.0] — 2026-09-03
 
 > API read endpoints now require authentication by default; a public tracker opts out explicitly.
 
@@ -46,6 +46,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   the deprecation notice tells you so. Rename the key to take the new default.
 - **Breaking:** `read_middleware` defaults to `['api', 'auth:api']` (was `['api']`).
   `write_middleware` is unchanged at `['api', 'auth:api']`.
+- `marque/trove` constraint widened to `^3.0|^4.0` to allow trove 4.x.
 
 ### Upgrading
 

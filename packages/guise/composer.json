@@ -53,7 +53,7 @@
     ],
     "require": {
         "php": "^8.4",
-        "marque/trove": "^3.0",
+        "marque/trove": "^3.0|^4.0",
         "marque/threepio": "^3.0",
         "marque/ise": "^1.0",
         "illuminate/support": "^13.0",

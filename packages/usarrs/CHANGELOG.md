@@ -7,6 +7,17 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [RELEASES.md](../../RELEASES.md) for the story up to this point.
 
+## [6.1.1] — 2026-09-03
+
+> Widens the `marque/trove` constraint to allow trove 4.x. No functional change.
+
+### Changed
+
+- `marque/trove` constraint widened to `^3.0|^4.0`. Trove 4.0 changes
+  `TorrentServiceInterface` signatures and removes a column, neither of which
+  usarrs touches — but Composer would otherwise refuse to install usarrs
+  alongside the rest of the suite. Nothing in this package behaves differently.
+
 ## [6.1.0] — 2026-09-02
 
 > Fixes a lockout where unverified users had no route to verify, leaving `verified` middleware unsatisfiable.
