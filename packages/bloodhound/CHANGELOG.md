@@ -31,6 +31,63 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 - Stopped writing `visible`, which trove has removed. The write was a no-op: it
   could only ever set the flag true, and nothing set it false.
 
+## [Unreleased]
+
+> Makes the announce log the durable source of truth for ratio, and adds the reconciliation, rebuild and audit that make a wrong number detectable.
+
+### Security
+
+- **Ratio could be silently wrong, permanently, with nothing able to detect it.** Byte
+  deltas were computed against a baseline held only in Redis and then carried as a queued
+  job payload. A lost job was a lost credit, unrecoverable because Redis had already
+  advanced the baseline — and since bloodhound requires Redis, most deployments point the
+  queue at the same instance, so one restart could take both halves. `users.uploaded` was
+  a pure accumulator with no durable record behind it, so a wrong number stayed wrong and
+  nothing anywhere could tell. Ratio is what gets people banned.
+
+### Added
+
+- **The ledger.** `announce_log` is now the source of truth, written **synchronously** on
+  the announce path (0.5ms) rather than dispatched. New `prior_up`/`prior_down` columns
+  record the baseline each delta was computed against, so every credit carries its own
+  arithmetic proof.
+- **Baseline recovery.** A Redis miss now recovers the peer's last cumulative counters
+  from the ledger instead of crediting zero. A total Redis loss costs latency, not bytes.
+- **`torrent_user`** — per-user-per-torrent bytes, seedtime and completions. This
+  intersection was computed on every announce and thrown away, which made hit-and-run
+  enforcement impossible to build.
+- **`bloodhound:aggregate-ledger`** (every minute) folds ledger rows into totals via a
+  watermark cursor advanced in the same transaction as the write.
+- **`bloodhound:reconcile-ledger`** (daily) compares totals against the ledger and reports
+  drift loudly. **`bloodhound:audit-ledger`** checks the ledger's own coherence, including
+  the per-peer baseline chain — a break is what a past Redis outage looks like.
+  **`bloodhound:rebuild-totals`** recomputes everything from the ledger.
+- `completion_cooldown` config (default 1 day).
+
+### Changed
+
+- **Breaking:** `announce_log.enabled` now defaults to **true**. A source of truth cannot
+  be opt-in: an install without it has no way to know its ratios are wrong.
+- **Breaking:** `snatches` is absorbed into `torrent_user`. It was read by nothing, and
+  its `updateOrCreate` overwrote `completed_at` on a redownload — a January completion
+  re-completed in July left one row dated July, destroying the date a hit-and-run rule
+  measures from. Existing rows are carried over.
+- `times_completed` is deduped per download session. It was a blind increment on a
+  client-supplied `event` parameter, and peer_id is regenerated per client session, so a
+  restart or second machine inflated it — five completions from one user counted as three.
+- Pruning now refuses to delete rows the aggregator has not consumed, whatever their age.
+- **Deprecated:** `queue.*` is no longer read and is removed in the next major.
+
+### Upgrading
+
+The migration carries each user's pre-ledger totals in as an `opening_balance` row and
+folds it immediately, so reconciliation starts clean rather than reporting every user's
+entire history as drift. That row asserts the old total was correct as of migration; it is
+not evidence it ever was.
+
+Per-torrent history starts empty — it was never recorded — so hit-and-run enforcement only
+means anything for torrents grabbed after the upgrade.
+
 ## [4.1.0] — 2026-09-02
 
 > Adds an opt-in announce log for investigating cheating reports and settling disputed ratios.

@@ -9,6 +9,18 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [Unreleased]
 
+> Adds an optional durable fallback for a peer baseline Redis has lost, and returns the baseline each delta was diffed against.
+
+### Added
+
+- `PeerService::resolveBaselineUsing()` — an optional hook consulted only when Redis has
+  no record of a peer. Threepio has no durable store and cannot depend on the package that
+  does, so it exposes the seam; bloodhound fills it from the ledger, and hound leaves it
+  unset and behaves exactly as before.
+- `upsertPeer()` returns `prior_up`/`prior_down` (the baseline diffed against, null for a
+  new peer) and `baseline_recovered`.
+
+
 > Fixes an unbounded recursion that crashed the process when removing an expired peer.
 
 ### Fixed

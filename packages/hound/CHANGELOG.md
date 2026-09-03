@@ -13,6 +13,10 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ### Changed
 
+- Documented that `times_completed` on a public tracker counts **completed events seen**,
+  not distinct completions. hound records no user, so there is nobody to dedupe against —
+  a client restarting mid-download is indistinguishable from a second person finishing.
+  bloodhound's equivalent is deduped per user; the two numbers are not comparable.
 - The announce path writes `seeders`/`leechers` onto the torrent. Hound
   otherwise touches the database only on a completed event, so this is a
   deliberate addition to a hot path — without it a public catalogue cannot

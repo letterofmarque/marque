@@ -127,21 +127,41 @@ Anti-cheat runs these checks on every announce:
 
 Violations fire a `CheatDetected` event and are logged to Redis for admin review.
 
-### Stats Queue
+### Stats Queue — deprecated
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `queue.enabled` | `true` | Queue user stat updates |
-| `queue.connection` | `null` | Queue connection (null = default) |
-| `queue.queue` | `tracker` | Queue name |
+| `queue.enabled` | `true` | **No longer read** |
+| `queue.connection` | `null` | **No longer read** |
+| `queue.queue` | `tracker` | **No longer read** |
 
-Upload/download deltas are dispatched as queued jobs to avoid database writes on the announce path.
+Byte counts no longer travel through a queue. They are written to the ledger on the
+announce path and folded into totals by `bloodhound:aggregate-ledger`. These keys are
+kept for one release so an existing published config does not break, and are removed in
+the next major.
 
-### Announce Log
+> **A note on your queue connection.** Bloodhound requires Redis for peer storage, so
+> most deployments have one, and Laravel's path of least resistance is to point
+> `QUEUE_CONNECTION` at the same instance. That used to couple two failure modes into
+> one: a Redis restart lost both the pending byte count and the baseline it was derived
+> from. That is no longer possible — the queue carries no data — but pointing your queue
+> at a separate backend is still the safer arrangement.
 
-**Off by default.** A full-detail, permanent history of every announce - each started, regular-interval, completed, and stopped request, with deltas, cumulative totals, client fingerprint, and the anti-cheat verdict for that announce.
+### Announce Log — the ledger
 
-Nothing else in Bloodhound keeps this. Redis peer state is overwritten on every announce and expires within the hour; the `snatches` table records one row per completed user+torrent, not a history; and the anti-cheat `suspicious` list is a 1000-entry ring buffer that only gets an entry when a check *fails*. Once a peer's Redis entry expires there is nothing left to look at.
+**On by default, and this is deliberate.** A full-detail, permanent history of every
+announce — each started, regular-interval, completed, and stopped request, with the
+cumulative totals the client reported, the delta credited, and the baseline that delta
+was computed against.
+
+This table is the **source of truth for ratio**. User totals and per-torrent totals are
+projections rebuilt from it, and a wrong number can only be detected — let alone
+corrected — by comparing it against this. A source of truth cannot be opt-in: an install
+running without one has no way to know its ratios are wrong, and ratio is what gets
+people banned.
+
+Turning it off is supported, but it disables reconciliation, the rebuild command, and the
+arithmetic audit along with it. You are choosing to accumulate numbers nothing can verify.
 
 Turn this on if you want to investigate a cheating report or settle a disputed ratio after the fact. It is off by default because full-detail logging on a busy tracker is real, ongoing storage growth, and that shouldn't be imposed on every install.
 
@@ -233,6 +253,54 @@ $disputed = $this->log->forUserAndTorrent($user->id, $torrent->id);
 Results aren't paginated. The log is queried deliberately - an investigation, a dispute - not rendered on a hot path, and `$since` is the intended way to bound a result set on a tracker with real volume. Each method's query is shaped to use the table's indexes, so passing `$since` is cheap rather than a post-filter.
 
 Bloodhound ships no UI for this. Browsing the log is left to your application.
+
+### Verifying the numbers
+
+Three commands, and the reason they exist: before the ledger, a byte count could be lost
+or corrupted and **nothing anywhere would know**. The totals were accumulators with
+nothing behind them, so a wrong number stayed wrong forever and the first anyone heard of
+it was a user disputing a ban.
+
+```bash
+php artisan bloodhound:aggregate-ledger    # fold pending rows into totals (scheduled, every minute)
+php artisan bloodhound:reconcile-ledger    # do the totals match the ledger? (scheduled, daily)
+php artisan bloodhound:audit-ledger        # is the ledger itself coherent?
+php artisan bloodhound:rebuild-totals      # recompute totals from the ledger
+```
+
+**Reconciliation reports; it does not repair.** You should learn a number went wrong
+before anything changes it back. Rows not yet aggregated are reported as a backlog rather
+than as drift — an alert that cries wolf is an alert nobody reads.
+
+**The audit is the interesting one.** Every ledger row stores the baseline its delta was
+computed against, so two things are checkable that were not before: that each row's
+arithmetic holds, and that each peer's chain of baselines runs unbroken. A chain break
+means a baseline went missing between two announces — which is what a Redis outage looks
+like after the fact. Those bytes were never credited and cannot be recovered, but you
+find out it happened instead of never knowing.
+
+**Rebuild** recomputes user and per-torrent totals by replaying the ledger, for everyone
+or `--user=`. It deliberately does not move the aggregation watermark, and it restores
+byte columns only — completion dates are not derivable from deltas.
+
+### Pruning and the floor
+
+`bloodhound:prune-announce-log` deletes rows past `retention_days`, but **only rows the
+aggregator has already consumed**. Age alone is not sufficient grounds for deletion:
+pruning below the reconciliation watermark would make the totals derived from those rows
+permanently unverifiable, which is a cleanup job quietly destroying the thing the ledger
+exists to protect. The command says so when it withholds rows.
+
+### Upgrading an existing install
+
+The migration writes one `opening_balance` ledger row per user, carrying their pre-ledger
+`uploaded`/`downloaded` forward, then folds it immediately so nobody reads as having zero
+ratio.
+
+That row asserts the old total was correct **as of migration**. It is not evidence that
+it ever was — the per-announce history was never kept, which is exactly why the ledger now
+exists. Per-torrent history likewise starts empty, so hit-and-run enforcement is only
+meaningful for torrents grabbed after the upgrade.
 
 ### Port Blacklist
 
