@@ -58,7 +58,15 @@ cd packages/trove
 composer test
 ```
 
-Or using Pest directly:
+Output is a single line of JSON rather than a line per test — that's
+[PAO](https://github.com/nunomaduro/pao), installed as a dev dependency in every package:
+
+```json
+{"tool":"pest","result":"passed","tests":61,"passed":61,"assertions":121,"duration_ms":967}
+```
+
+Failures include the test name, file, line and message, and the exit code is non-zero as
+usual. If you'd rather see the full reporter while working on a test, run Pest directly:
 
 ```bash
 cd packages/bloodhound

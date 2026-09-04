@@ -43,7 +43,8 @@
         "orchestra/testbench": "^11.0",
         "pestphp/pest": "^4.7",
         "mockery/mockery": "^1.6",
-        "laravel/sanctum": "^4.0"
+        "laravel/sanctum": "^4.0",
+        "nunomaduro/pao": "^1.1"
     },
     "autoload": {
         "psr-4": {

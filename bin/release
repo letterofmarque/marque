@@ -185,6 +185,25 @@ sync_branch_alias() {
     return 0
 }
 
+# PAO (nunomaduro/pao) collapses a whole Pest run to one line of JSON, so the
+# "  Tests: 39 passed (86 assertions)" line this used to grep no longer exists.
+# Read the counts out of the JSON instead, falling back to the old format so
+# this keeps working if PAO is removed or does not engage.
+test_summary_for() {
+    local log="/tmp/marque-test-$1.log" summary
+    local plain
+    plain="$(sed 's/\x1b\[[0-9;]*m//g' "$log")"
+
+    summary="$(jq -rs 'map(select(.tool? == "pest")) | last
+                       | select(. != null)
+                       | "Tests: \(.passed) passed (\(.assertions) assertions)"' \
+        <<<"$plain" 2>/dev/null)"
+
+    [[ -n "$summary" ]] || summary="$(grep -E '^  Tests:' <<<"$plain" | head -1)"
+
+    echo "$summary"
+}
+
 run_tests_for() {
     local pkg="$1"
     blue "==> Testing $pkg"
@@ -195,7 +214,7 @@ run_tests_for() {
     fi
 
     if ( cd "$PACKAGES_DIR/$pkg" && composer test >/tmp/marque-test-$pkg.log 2>&1 ); then
-        green "    $(sed 's/\x1b\[[0-9;]*m//g' /tmp/marque-test-$pkg.log | grep -E '^  Tests:' | head -1)"
+        green "    $(test_summary_for "$pkg")"
     else
         red "    FAILED — see /tmp/marque-test-$pkg.log"
         tail -20 /tmp/marque-test-$pkg.log | sed 's/^/    /'
