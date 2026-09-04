@@ -10,7 +10,18 @@ changelogs — edit those, not this.*
 
 ## 2026-09-04
 
+- **[bloodhound 5.1.0](packages/bloodhound/CHANGELOG.md)** — Lowers the PHP floor to 8.3, matching Laravel 13's own requirement.
+- **[cennad 4.1.0](packages/cennad/CHANGELOG.md)** — Lowers the PHP floor to 8.3, matching Laravel 13's own requirement.
+- **[disguise 4.2.0](packages/disguise/CHANGELOG.md)** — Lowers the PHP floor to 8.3, matching Laravel 13's own requirement.
+- **[guise 4.2.0](packages/guise/CHANGELOG.md)** — Lowers the PHP floor to 8.3, matching Laravel 13's own requirement.
+- **[hound 3.2.0](packages/hound/CHANGELOG.md)** — Lowers the PHP floor to 8.3, matching Laravel 13's own requirement.
+- **[ise 1.1.0](packages/ise/CHANGELOG.md)** — Lowers the PHP floor to 8.3, matching Laravel 13's own requirement.
+- **[parley 2.2.0](packages/parley/CHANGELOG.md)** — Lowers the PHP floor to 8.3, matching Laravel 13's own requirement.
+- **[squidink 1.1.0](packages/squidink/CHANGELOG.md)** — Lowers the PHP floor to 8.3, matching Laravel 13's own requirement.
+- **[threepio 3.2.0](packages/threepio/CHANGELOG.md)** — Lowers the PHP floor to 8.3, matching Laravel 13's own requirement.
+- **[trove 4.1.0](packages/trove/CHANGELOG.md)** — Lowers the PHP floor to 8.3, matching Laravel 13's own requirement.
 - **[usarrs 6.1.2](packages/usarrs/CHANGELOG.md)** — Fixes the passkeys migration assuming an `App\Models\User` class that need not exist.
+- **[usarrs 6.2.0](packages/usarrs/CHANGELOG.md)** — Lowers the PHP floor to 8.3, matching Laravel 13's own requirement.
 
 ## 2026-09-03
 

@@ -104,7 +104,7 @@ If you need to reference the components directly:
 
 ## Requirements
 
-- PHP 8.4+
+- PHP 8.3+
 - Laravel 13+
 - Livewire 4+
 - Tailwind CSS

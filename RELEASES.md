@@ -17,9 +17,13 @@ package, including the small ones that never warranted an entry here.
 
 ## Requirements
 
-**PHP 8.4+ and Laravel 13+**, as of [Marque 3.0](docs/releases/3.0.md). Composer
-enforces this — if your app doesn't meet it, installing or upgrading any Marque
-package will refuse with a dependency conflict.
+**PHP 8.3+ and Laravel 13+.** Composer enforces this — if your app doesn't meet it,
+installing or upgrading any Marque package will refuse with a dependency conflict.
+
+The Laravel floor has been 13 since [Marque 3.0](docs/releases/3.0.md). The PHP floor
+was 8.4 from 3.0 until Marque 5.1 **lowered** it to 8.3, which is Laravel 13's own
+floor — nothing in Marque ever needed 8.4. Lowering a floor never breaks an existing
+install, so there is nothing to do about this on an upgrade.
 
 If you already have Marque installed and need to raise your Laravel version too,
 see [Marque 3.0's "What you need to do"](docs/releases/3.0.md#what-you-need-to-do) —
@@ -33,6 +37,7 @@ For the full ordered list of every upgrade guide and release doc, see
 
 | Release | Date | Summary | Who's affected |
 |---|---|---|---|
+| [5.1](docs/releases/5.1.md) | 2026-09-04 | PHP floor lowered to 8.3, matching Laravel 13's own requirement | nobody negatively; unblocks Laravel 13 apps on PHP 8.3 |
 | [5.0](docs/releases/5.0.md) | 2026-09-03 | Ratio becomes durable and auditable; per-torrent access control; API reads now require auth by default | everyone — especially bloodhound and cennad users |
 | [4.3](docs/releases/4.3.md) | 2026-09-02 | usarrs registers email verification + password confirmation routes, fixing a lockout for unverified users | usarrs users only, especially anyone using `verified`/`password.confirm` middleware or the admin panel |
 | [4.2](docs/releases/4.2.md) | 2026-09-01 | usarrs requires Fortify; adds off-by-default 2FA and passkeys; closes a Fortify route collision | usarrs users only |

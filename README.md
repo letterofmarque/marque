@@ -22,7 +22,7 @@ Built by [Letter Of Marque Software](https://lom.software).
 
 ## Requirements
 
-- PHP 8.4+
+- PHP 8.3+
 - Laravel 13+
 - Redis (for tracker peer storage)
 

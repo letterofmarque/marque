@@ -139,7 +139,7 @@ governed by Trove's `TorrentPolicy` on top of whatever middleware you set.
 
 ## Requirements
 
-- PHP 8.4+
+- PHP 8.3+
 - Laravel 13+
 - [marque/trove](https://packagist.org/packages/marque/trove)
 

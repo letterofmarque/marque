@@ -26,6 +26,7 @@ fetching the whole repo tree and grepping for `upgrad|migrat|changelog`.
 | 7 | [Upgrade guide: usarrs v6](upgrade-guide-usarrs-v6.md) | Technical checklist for the 4.2 changes |
 | 8 | [Release: Marque 4.3](releases/4.3.md) | usarrs registers email verification + password confirmation routes (fixes a lockout) |
 | 9 | [Release: Marque 5.0](releases/5.0.md) | Durable, auditable ratio accounting; per-torrent access control; API reads require auth by default |
+| 10 | [Release: Marque 5.1](releases/5.1.md) | PHP floor lowered to 8.3 (nothing to do; unblocks PHP 8.3 apps) |
 
 If you're picking up an old install: start at whichever row matches the version
 you're currently on, and read down to the bottom. If you don't know your version,

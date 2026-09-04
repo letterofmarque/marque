@@ -174,7 +174,7 @@ that has not announced yet hides everything in it.
 
 ## Requirements
 
-- PHP 8.4+
+- PHP 8.3+
 - Laravel 13+
 
 ## License

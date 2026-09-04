@@ -52,7 +52,7 @@
         }
     ],
     "require": {
-        "php": "^8.4",
+        "php": "^8.3",
         "marque/trove": "^3.0|^4.0",
         "marque/threepio": "^3.0",
         "marque/ise": "^1.0",
@@ -63,7 +63,7 @@
     },
     "require-dev": {
         "orchestra/testbench": "^11.0",
-        "pestphp/pest": "^5.0",
+        "pestphp/pest": "^4.7",
         "mockery/mockery": "^1.6",
         "marque/squidink": "^1.0",
         "marque/parley": "^2.0"

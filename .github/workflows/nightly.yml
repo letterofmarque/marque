@@ -30,3 +30,8 @@ jobs:
     with:
       databases: '["sqlite", "mysql", "mariadb", "pgsql"]'
       dependency-versions: '["highest", "lowest"]'
+      # Both ends of the declared `php: ^8.3` range. 8.3 is the floor a
+      # consumer is entitled to run on, and Laravel 13's own floor; 8.4 is what
+      # development happens on. Testing only the top of a declared range is the
+      # same mistake --prefer-lowest exists to catch on the composer side.
+      php-versions: '["8.3", "8.4"]'

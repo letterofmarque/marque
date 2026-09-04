@@ -171,7 +171,7 @@ to close registration without an invite system.
 
 ## Requirements
 
-- PHP 8.4+
+- PHP 8.3+
 - Laravel 13+
 - `laravel/fortify` ^1.37 (pulled in automatically)
 - `laravel/passkeys` (pulled in automatically; only used if passkeys are enabled)
