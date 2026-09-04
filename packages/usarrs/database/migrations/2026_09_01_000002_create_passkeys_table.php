@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Laravel\Passkeys\Passkeys;
 
 // Reproduces laravel/passkeys' own migration (vendor/laravel/passkeys/
 // database/migrations) under usarrs' own migration set, per Spec #92 Open
@@ -30,9 +29,19 @@ return new class extends Migration
             return;
         }
 
-        Schema::create('passkeys', function (Blueprint $table) {
+        // Read from config rather than Passkeys::userModel(). That static is
+        // only set by UsarrsServiceProvider when usarrs.passkeys.enabled is
+        // true, but this migration runs unconditionally — so with passkeys off
+        // (the default) it still held the package default 'App\Models\User',
+        // a class that need not exist in a consumer's app at all. It survived
+        // only because Testbench 11.4.0 ships an App\Models\User stub; on
+        // 11.3.5, the floor usarrs actually declares, every test in the
+        // package failed. Caught by the nightly --prefer-lowest matrix.
+        $userModel = config('trove.user_model', 'App\\Models\\User');
+
+        Schema::create('passkeys', function (Blueprint $table) use ($userModel) {
             $table->id();
-            $table->foreignIdFor(Passkeys::userModel(), 'user_id')->constrained()->cascadeOnDelete();
+            $table->foreignIdFor($userModel, 'user_id')->constrained()->cascadeOnDelete();
             $table->string('name');
             $table->string('credential_id')->unique();
             $table->json('credential');

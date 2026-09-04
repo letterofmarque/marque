@@ -7,6 +7,28 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [RELEASES.md](../../RELEASES.md) for the story up to this point.
 
+## [6.1.2] — 2026-09-04
+
+> Fixes the passkeys migration assuming an `App\Models\User` class that need not exist.
+
+### Fixed
+
+- **The passkeys migration failed on any app without an `App\Models\User` class.**
+  It resolved the foreign key via `Passkeys::userModel()`, but usarrs only sets that
+  static when `usarrs.passkeys.enabled` is true — and it defaults to false. With
+  passkeys off, the migration still ran and still read the static, getting
+  `laravel/passkeys`' own default of `App\Models\User`: a class usarrs cannot assume
+  a consumer has, whatever `trove.user_model` points at.
+
+  It now reads `trove.user_model` from config, the same source the service provider
+  uses, so it no longer depends on a feature flag being on.
+
+  This was invisible because `orchestra/testbench` 11.4.0 ships an `App\Models\User`
+  stub. On 11.3.5 — within the `^11.0` range usarrs declares — every test in the
+  package failed. Found by a `--prefer-lowest` CI matrix run, which is also what
+  guards it: the migration runs once during `RefreshDatabase`, before any test body
+  executes, so nothing in-process can reproduce the condition.
+
 ## [6.1.1] — 2026-09-03
 
 > Widens the `marque/trove` constraint to allow trove 4.x. No functional change.
