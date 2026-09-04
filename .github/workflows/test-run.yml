@@ -33,6 +33,19 @@ jobs:
         php: ${{ fromJSON(inputs.php-versions) }}
         database: ${{ fromJSON(inputs.databases) }}
         dependencies: ${{ fromJSON(inputs.dependency-versions) }}
+        # Ports are carried alongside the engine rather than derived from it in
+        # an expression: a chain of ternaries that silently hands MariaDB the
+        # Postgres port fails as a connection error, which reads like a broken
+        # service rather than a wrong string. sqlite's value is never used.
+        include:
+          - database: sqlite
+            port: 0
+          - database: mysql
+            port: 3306
+          - database: mariadb
+            port: 3307
+          - database: pgsql
+            port: 5432
         package:
           - threepio
           - trove
@@ -81,6 +94,28 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
+      # MariaDB is a distinct target, not a MySQL alias — Laravel ships its own
+      # MariaDbConnection, connector and grammar. It diverges on JSON storage
+      # (native binary type in MySQL 8, a LONGTEXT alias with a CHECK
+      # constraint here), index length limits, and RETURNING support. Mapped to
+      # 3307 because MySQL already holds 3306 on the host side; inside Actions
+      # each service has its own namespace, but keeping the port consistent
+      # with local dev means one less thing that only breaks in one place.
+      mariadb:
+        image: mariadb:11
+        env:
+          MARIADB_ROOT_PASSWORD: marque
+          MARIADB_DATABASE: marque_test
+          MARIADB_USER: marque
+          MARIADB_PASSWORD: marque
+        ports:
+          - 3307:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
       postgres:
         image: postgres:17
         env:
@@ -119,7 +154,7 @@ jobs:
           # match the defaults there, so only DB_CONNECTION and the port need
           # setting; sqlite ignores all of it and runs in memory.
           DB_CONNECTION: ${{ matrix.database }}
-          DB_PORT: ${{ matrix.database == 'mysql' && '3306' || '5432' }}
+          DB_PORT: ${{ matrix.port }}
           DB_DATABASE: marque_test
           DB_USERNAME: marque
           DB_PASSWORD: marque

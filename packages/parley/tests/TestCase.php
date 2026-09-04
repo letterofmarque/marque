@@ -59,6 +59,17 @@ abstract class TestCase extends BaseTestCase
                 'collation' => 'utf8mb4_unicode_ci',
                 'prefix' => '',
             ],
+            'mariadb' => [
+                'driver' => 'mariadb',
+                'host' => env('DB_HOST', '127.0.0.1'),
+                'port' => env('DB_PORT', '3306'),
+                'database' => env('DB_DATABASE', 'marque_test'),
+                'username' => env('DB_USERNAME', 'marque'),
+                'password' => env('DB_PASSWORD', 'marque'),
+                'charset' => 'utf8mb4',
+                'collation' => 'utf8mb4_unicode_ci',
+                'prefix' => '',
+            ],
             'pgsql' => [
                 'driver' => 'pgsql',
                 'host' => env('DB_HOST', '127.0.0.1'),
@@ -73,6 +84,12 @@ abstract class TestCase extends BaseTestCase
                 'driver' => 'sqlite',
                 'database' => ':memory:',
                 'prefix' => '',
+                // SQLite defaults to foreign keys OFF, which silently makes
+                // every cascadeOnDelete and constrained() in the schema
+                // untested. MySQL and Postgres enforce them unconditionally,
+                // so leaving this off means the cheapest engine to run is also
+                // the one that proves the least.
+                'foreign_key_constraints' => true,
             ],
         });
 

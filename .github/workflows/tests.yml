@@ -1,15 +1,19 @@
 # Tiered so the cost lands where it buys something.
 #
 # A pull request runs SQLite only: fast feedback, and it catches the great
-# majority of breakage. Pushes to main add MySQL and PostgreSQL, because
-# "DB-agnostic" is a stated non-negotiable (docs/why.md) and the first real
-# run of the suite on MySQL and Postgres — job #10548, 2026-09-03 — found
+# majority of breakage. Pushes to main add MySQL, MariaDB and PostgreSQL,
+# because "DB-agnostic" is a stated non-negotiable (docs/why.md) and the first
+# real run of the suite on MySQL and Postgres — job #10548, 2026-09-03 — found
 # eight test-only bugs that had been invisible for the life of the project.
 # Nothing stops them coming back except a gate.
 #
-# MySQL is deliberately not on the PR path: bloodhound takes 586s there
-# against seconds on in-memory SQLite (real DDL per test), which is a fine
-# price once per merge and a bad one per push.
+# MariaDB joined 2026-09-04 (job #10616): docs/product.md had claimed support
+# for it since the beginning and it had never once been run. It is a separate
+# Laravel driver with its own connection and grammar, not a MySQL alias.
+#
+# The real engines are deliberately not on the PR path: bloodhound takes 586s
+# on MySQL against seconds on in-memory SQLite (real DDL per test), which is a
+# fine price once per merge and a bad one per push.
 #
 # The full matrix, including --prefer-lowest, runs in nightly.yml.
 
@@ -61,4 +65,4 @@ jobs:
     if: github.event_name == 'push'
     uses: ./.github/workflows/test-run.yml
     with:
-      databases: '["sqlite", "mysql", "pgsql"]'
+      databases: '["sqlite", "mysql", "mariadb", "pgsql"]'
