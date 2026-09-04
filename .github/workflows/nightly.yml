@@ -1,0 +1,32 @@
+# The full matrix: every package, every engine, both ends of every declared
+# dependency range. 66 jobs, which is why it runs once a night rather than on
+# every push.
+#
+# The axis that only exists here is --prefer-lowest, and for a *package* it is
+# arguably the most valuable one in the whole file. Every package declares
+# `illuminate/*: ^13.0`, which is a promise about the entire 13.x range — but
+# `composer update` always resolves the newest, so only the top of that range
+# is ever exercised. Nothing else catches "we used a method added in 13.10 and
+# claimed 13.0"; a consumer pinned to 13.0 finds it instead, at which point it
+# is their bug report and our broken constraint.
+#
+# Runs on schedule and on demand. Not a merge gate — a nightly failure means
+# a constraint or an engine assumption is wrong, which wants a considered fix
+# rather than a blocked merge.
+
+name: Nightly
+
+on:
+  schedule:
+    # 16:00 UTC — early morning in AEST, so a failure is waiting at the start
+    # of the day rather than landing mid-session.
+    - cron: '0 16 * * *'
+  workflow_dispatch:
+
+jobs:
+  full-matrix:
+    name: Full
+    uses: ./.github/workflows/test-run.yml
+    with:
+      databases: '["sqlite", "mysql", "pgsql"]'
+      dependency-versions: '["highest", "lowest"]'

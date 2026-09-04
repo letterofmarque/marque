@@ -1,0 +1,126 @@
+# Reusable test matrix, called by tests.yml (PR + main) and nightly.yml.
+#
+# Exists so the package list and the setup steps are written once. The callers
+# differ only in which axes they turn on: a PR runs SQLite alone, main adds the
+# real engines, and the nightly adds --prefer-lowest on top.
+name: Test run
+
+on:
+  workflow_call:
+    inputs:
+      databases:
+        description: 'JSON array of database engines to test against.'
+        required: true
+        type: string
+      dependency-versions:
+        description: 'JSON array of composer resolutions: highest, lowest.'
+        required: false
+        type: string
+        default: '["highest"]'
+      php-versions:
+        description: 'JSON array of PHP versions.'
+        required: false
+        type: string
+        default: '["8.4"]'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ${{ fromJSON(inputs.php-versions) }}
+        database: ${{ fromJSON(inputs.databases) }}
+        dependencies: ${{ fromJSON(inputs.dependency-versions) }}
+        package:
+          - threepio
+          - trove
+          - ise
+          - squidink
+          - bloodhound
+          - hound
+          - cennad
+          - guise
+          - disguise
+          - usarrs
+          - parley
+
+    name: ${{ matrix.package }} (${{ matrix.database }}, PHP ${{ matrix.php }}, ${{ matrix.dependencies }})
+
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      # Both engines start on every job in the matrix, including SQLite-only
+      # ones. GitHub Actions has no conditional `services:` — the alternative
+      # is duplicating this whole workflow per engine, which is worse than a
+      # container that goes unused. Each job gets its own runner and so its own
+      # database server: running two packages against one database concurrently
+      # produced 172 phantom failures locally (job #10548), and per-job
+      # isolation is what makes the matrix safe to parallelise.
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: marque
+          MYSQL_DATABASE: marque_test
+          MYSQL_USER: marque
+          MYSQL_PASSWORD: marque
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping --silent"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: marque_test
+          POSTGRES_USER: marque
+          POSTGRES_PASSWORD: marque
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, sqlite3, pdo_sqlite, pdo_mysql, pdo_pgsql, redis
+          coverage: none
+
+      - name: Install dependencies (${{ matrix.dependencies }})
+        uses: ramsey/composer-install@v3
+        with:
+          working-directory: packages/${{ matrix.package }}
+          dependency-versions: ${{ matrix.dependencies }}
+          composer-options: '--prefer-dist'
+
+      - name: Run tests
+        working-directory: packages/${{ matrix.package }}
+        env:
+          # Read by every package's tests/TestCase.php. Host and credentials
+          # match the defaults there, so only DB_CONNECTION and the port need
+          # setting; sqlite ignores all of it and runs in memory.
+          DB_CONNECTION: ${{ matrix.database }}
+          DB_PORT: ${{ matrix.database == 'mysql' && '3306' || '5432' }}
+          DB_DATABASE: marque_test
+          DB_USERNAME: marque
+          DB_PASSWORD: marque
+        run: composer test
