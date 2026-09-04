@@ -1,0 +1,24 @@
+# PHPStan runs per package, not from the root: Larastan needs a bootable
+# Laravel to resolve models and facades, and that lives in each package's own
+# vendor/ — the monorepo root has no framework install at all. The binary and
+# the Larastan extension are shared from the root (see composer.json's `stan`
+# script), so there is one version of each rather than eleven.
+includes:
+    - ../../vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 1
+    paths:
+        - src
+    excludePaths:
+        analyseAndScan:
+            # Livewire is an optional dependency (composer `suggest`) — the
+            # Editor component is only reachable in an app that installed it,
+            # and squidink works fine without it. Excluded rather than ignored
+            # because an unresolvable *parent class* is non-ignorable: PHPStan
+            # cannot reason about the subclass at all without it.
+            #
+            # Not in require-dev either: pulling Livewire in just for analysis
+            # broke all 296 tests, because squidink's own TestCase does not
+            # register Livewire's service provider.
+            - src/Livewire/Editor.php

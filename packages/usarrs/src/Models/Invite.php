@@ -6,8 +6,20 @@ namespace Marque\Usarrs\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 use Marque\Usarrs\Enums\InviteStatus;
 
+/**
+ * @property int $id
+ * @property string $code
+ * @property int $creator_id
+ * @property string|null $recipient_email
+ * @property int|null $used_by_id
+ * @property InviteStatus $status
+ * @property Carbon|null $expires_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ */
 class Invite extends Model
 {
     protected $fillable = [

@@ -9,10 +9,27 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 use Marque\Trove\Contracts\UserInterface;
 use Marque\Trove\Database\Factories\TorrentFactory;
 use Marque\Trove\Enums\Role;
 
+/**
+ * @property int $id
+ * @property string $info_hash
+ * @property string $name
+ * @property string|null $description
+ * @property int $size
+ * @property int $file_count
+ * @property string $torrent_file
+ * @property int $user_id
+ * @property Role|null $min_role
+ * @property int $seeders
+ * @property int $leechers
+ * @property int $times_completed
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ */
 class Torrent extends Model
 {
     use HasFactory;

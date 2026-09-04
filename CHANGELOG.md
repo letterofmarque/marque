@@ -17,6 +17,7 @@ changelogs — edit those, not this.*
 - **[hound 3.2.0](packages/hound/CHANGELOG.md)** — Lowers the PHP floor to 8.3, matching Laravel 13's own requirement.
 - **[ise 1.1.0](packages/ise/CHANGELOG.md)** — Lowers the PHP floor to 8.3, matching Laravel 13's own requirement.
 - **[parley 2.2.0](packages/parley/CHANGELOG.md)** — Lowers the PHP floor to 8.3, matching Laravel 13's own requirement.
+- **[parley 2.3.0](packages/parley/CHANGELOG.md)** — Replaces `$guarded = []` with explicit `$fillable` on all three models, closing an unintended mass-assignment surface.
 - **[squidink 1.1.0](packages/squidink/CHANGELOG.md)** — Lowers the PHP floor to 8.3, matching Laravel 13's own requirement.
 - **[threepio 3.2.0](packages/threepio/CHANGELOG.md)** — Lowers the PHP floor to 8.3, matching Laravel 13's own requirement.
 - **[trove 4.1.0](packages/trove/CHANGELOG.md)** — Lowers the PHP floor to 8.3, matching Laravel 13's own requirement.

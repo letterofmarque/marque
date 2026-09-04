@@ -135,6 +135,41 @@ done
 - Follows existing code patterns (Laravel conventions, service/contract pattern)
 - Config options have sensible defaults and are documented
 
+## Static Analysis
+
+PHPStan (with Larastan) runs at level 1 across every package:
+
+```bash
+composer stan                                          # all packages
+cd packages/trove && ../../vendor/bin/phpstan analyse   # just one
+```
+
+Unlike Pint, it runs **per package** — Larastan needs each package's own `vendor/` to
+resolve models and facades. The binary is shared from the repo root, so run
+`composer install` at the root once before using it.
+
+Two rules if you hit an error:
+
+- **Fix the cause, not the symptom.** Do not add `@phpstan-ignore` comments, baseline
+  entries, `assert()`, inline `@var`, or type casts to silence something.
+- **Model properties need `@property` docblocks.** PHPStan cannot know a column exists
+  without a database to inspect. Add the annotation to the model — consumers get IDE
+  autocompletion out of it too.
+
+## Mass assignment
+
+Every Marque model declares an explicit `$fillable`. **Never use `$guarded = []`, and never
+rely on `Model::unguard()`.**
+
+That is a rule for packages specifically. `unguard()` is an application-level call, and a
+package cannot assume its consumers have made it — or that they have not. A model shipped
+with `$guarded = []` is fully mass-assignable in every app that installs it, including
+columns that only privileged code should ever write. `parley`'s models shipped that way
+until 2026-09-04; nothing had gone wrong, but the exposure was real and free to remove.
+
+`packages/parley/tests/Unit/MassAssignmentTest.php` enforces this. Copy it into any package
+that gains models.
+
 ## Code Style
 
 Marque follows standard Laravel conventions:

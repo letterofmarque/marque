@@ -60,5 +60,8 @@
         "allow-plugins": {
             "pestphp/pest-plugin": true
         }
+    },
+    "suggest": {
+        "livewire/livewire": "Required for the Editor Livewire component (^4.0)"
     }
 }

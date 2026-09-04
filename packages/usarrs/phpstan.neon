@@ -1,0 +1,23 @@
+# PHPStan runs per package, not from the root: Larastan needs a bootable
+# Laravel to resolve models and facades, and that lives in each package's own
+# vendor/ — the monorepo root has no framework install at all. The binary and
+# the Larastan extension are shared from the root (see composer.json's `stan`
+# script), so there is one version of each rather than eleven.
+includes:
+    - ../../vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 1
+    paths:
+        - src
+
+
+    ignoreErrors:
+        # Socialite is an optional dependency (composer `suggest`) — the
+        # socialite auth_driver is off unless a consumer installs it. It is not
+        # in require-dev either, because Socialite pins guzzle <=7 while the
+        # rest of the suite is on 8. Analysing the file without the class is
+        # the accurate state, not a gap to paper over.
+        -
+            identifier: class.notFound
+            path: src/Http/Controllers/SocialiteController.php

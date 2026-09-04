@@ -53,6 +53,51 @@ jobs:
       - name: Check the root changelog is current
         run: bin/build-changelog --check
 
+  # PHPStan cannot join the lint job: it needs each package's own vendor/ to
+  # resolve models and facades, so it installs per package the way the test
+  # matrix does. Level 1 across all eleven — see docs/how.md for why that
+  # level and what it would take to raise it.
+  static-analysis:
+    name: PHPStan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - threepio
+          - trove
+          - ise
+          - squidink
+          - bloodhound
+          - hound
+          - cennad
+          - guise
+          - disguise
+          - usarrs
+          - parley
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+
+      - name: Install root dependencies (phpstan + larastan)
+        uses: ramsey/composer-install@v3
+
+      - name: Install package dependencies
+        uses: ramsey/composer-install@v3
+        with:
+          working-directory: packages/${{ matrix.package }}
+          composer-options: '--prefer-dist'
+
+      - name: Analyse
+        working-directory: packages/${{ matrix.package }}
+        run: ../../vendor/bin/phpstan analyse --no-progress
+
   # Both ends of the declared `php: ^8.3` range, on SQLite. The PHP axis and
   # the database axis are independent — a syntax or stdlib difference does not
   # care which engine is behind it — so they are split across tiers rather than

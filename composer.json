@@ -29,11 +29,14 @@
     "minimum-stability": "stable",
     "prefer-stable": true,
     "require-dev": {
-        "laravel/pint": "^1.30"
+        "laravel/pint": "^1.30",
+        "phpstan/phpstan": "^2.1",
+        "larastan/larastan": "^3.0"
     },
     "scripts": {
         "lint": "pint",
         "lint:test": "pint --test",
-        "test": "for p in packages/*/; do (cd \"$p\" && composer test) || exit 1; done"
+        "test": "for p in packages/*/; do (cd \"$p\" && composer test) || exit 1; done",
+        "stan": "for p in packages/*/; do (cd \"$p\" && ../../vendor/bin/phpstan analyse --no-progress) || exit 1; done"
     }
 }
