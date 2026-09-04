@@ -20,9 +20,16 @@ packages/
 
 ### Prerequisites
 
-- PHP 8.4+
+- PHP 8.3+ (8.4 works too — CI tests both)
 - Composer
 - Redis (for Bloodhound tests)
+- Optionally MySQL, MariaDB and/or PostgreSQL — see [Testing](#testing)
+
+**PHP 8.3 is the floor deliberately**, matching Laravel 13's own. One consequence worth
+knowing before you touch `composer.json`: the test suite is pinned to **Pest 4**, because
+Pest 5 requires PHP 8.4 and adopting it would raise the floor for every consumer — a MAJOR
+across all eleven packages. See [VERSIONING.md](VERSIONING.md#dependencies-and-floors) for
+the full reasoning and the transitive traps that go with it.
 
 ### Clone and Install
 
@@ -58,7 +65,42 @@ cd packages/bloodhound
 ./vendor/bin/pest
 ```
 
-Tests use SQLite in-memory databases, so no database setup is needed. Bloodhound tests require a Redis connection.
+Tests default to SQLite in-memory, so no database setup is needed to get started.
+Bloodhound tests require a Redis connection.
+
+### Running against a real database
+
+**A green SQLite run proves less than it looks like.** SQLite ignores `->after()` column
+positioning, tolerates an abandoned transaction, and defaults foreign keys off (Marque
+turns them on explicitly). The first real-engine run of this suite found eight test-only
+bugs that had been invisible for the life of the project.
+
+Marque is DB-agnostic, and the suite can be pointed at any of the four supported engines:
+
+```bash
+DB_CONNECTION=mysql   composer test
+DB_CONNECTION=pgsql   composer test
+DB_CONNECTION=mariadb DB_PORT=3307 composer test
+```
+
+Defaults to database `marque_test`, user `marque`/`marque` on the engine's standard port;
+override with `DB_HOST` / `DB_PORT` / `DB_DATABASE` / `DB_USERNAME` / `DB_PASSWORD`.
+
+MariaDB is a distinct engine, not a MySQL alias — Laravel ships its own `MariaDbConnection`
+and grammar, and the two diverge on JSON storage, index length limits and `RETURNING`. It
+cannot be installed alongside MySQL from apt (both packages claim `virtual-mysql-server`),
+so a container on a spare port is the practical way to run both.
+
+Two things to know when running real engines:
+
+- **They are much slower.** Real DDL runs per test, so a large package takes minutes rather
+  than seconds.
+- **Never run two packages against the same database at once.** They share the same
+  database name and will destroy each other's schema mid-run, producing a flood of failures
+  that have nothing to do with your change.
+
+A handful of tests are SQLite-specific by nature (`EXPLAIN QUERY PLAN` index probes, a
+`PRAGMA foreign_keys` assertion). They skip on other engines rather than failing.
 
 ### Running All Tests
 

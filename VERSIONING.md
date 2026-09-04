@@ -90,6 +90,66 @@ backfill or making an existing column stricter is **major**.
 wrong, fixing it is **patch**. If the documented behaviour changes, it is **major**,
 regardless of how small the fix looks.
 
+## Dependencies and floors
+
+Every Marque package declares the same four constraints. They are set deliberately, and
+the reasoning matters if you are planning an upgrade.
+
+| Dependency | Constraint | Why this floor |
+|---|---|---|
+| `php` | `^8.3` | Laravel 13's own floor. Nothing in Marque needs 8.4. |
+| `illuminate/*` | `^13.0` | The framework Marque targets. |
+| `orchestra/testbench` | `^11.0` (dev) | Matches Laravel 13. |
+| `pestphp/pest` | `^4.7` (dev) | Pest 5 requires PHP 8.4, which would raise our floor. |
+
+**Lowering a floor is a MINOR. Raising one is a MAJOR.** That asymmetry is the thing to
+plan around: a floor is easy to give away and expensive to take back.
+
+### Why the PHP floor is 8.3, and what it costs
+
+Marque required PHP 8.4 from [3.0](docs/releases/3.0.md) until
+[5.1](docs/releases/5.1.md) lowered it. Nothing in the code ever needed 8.4 — no property
+hooks, no asymmetric visibility, none of the 8.4 array or `mb_*` functions — and Laravel 13
+itself only requires `^8.3`, so the old floor turned away working Laravel 13 apps for no
+technical reason.
+
+The cost is that **the test suite is pinned to Pest 4**, because Pest 5 requires PHP 8.4.
+Adopting any Pest 5 feature means raising the PHP floor back to 8.4, which is a MAJOR for
+all eleven packages. As of 5.1 the suite uses only `it`, `test`, `expect`, `describe`,
+`beforeEach` and `uses` — the Pest 1-era core — so nothing is lost today. But TIA
+(test-impact analysis), the agent browser plugin, built-in Rector and agent evals are all
+Pest 5-only and stay out of reach while the floor is 8.3.
+
+If you are weighing that trade later: standalone PHPStan gives you the static-analysis half
+without the coupling, and TIA's appeal is smallest here anyway — the suite runs in seconds
+on SQLite, and the slow path is the cross-engine CI matrix, where you want everything run
+rather than a subset.
+
+### Transitive traps
+
+Two dependencies resolve *above* our floor by default and will fail on PHP 8.3 if they get
+in. Both are already handled; they are recorded here because the symptom is a confusing
+platform error rather than an obvious constraint conflict.
+
+- **`symfony/error-handler` v8 requires `>= 8.4.1`**, and Laravel 13 accepts
+  `^7.4.0 || ^8.0.0`, so Composer takes v8 given the chance. With Pest 4 in place the
+  resolver picks 7.4 on its own and no pin is needed — but if a future change reintroduces
+  this, pin `symfony/error-handler: ^7.4` in `require-dev` rather than raising the PHP floor.
+- **`orchestra/testbench` 11.4.0 ships an `App\Models\User` stub** that 11.3.5 does not.
+  Package code must never assume that class exists; it is a test-harness artefact, not
+  something a consumer's app is required to provide. This masked a real bug in usarrs until
+  a `--prefer-lowest` run exposed it (see [5.0](docs/releases/5.0.md) and usarrs 6.1.2).
+
+### How these stay honest
+
+The nightly CI matrix runs every package against both ends of every declared range: PHP 8.3
+and 8.4, `--prefer-lowest` and highest, on SQLite, MySQL, MariaDB and PostgreSQL. A
+constraint that claims more than it delivers fails there rather than in a consumer's
+`composer update`.
+
+`--prefer-lowest` is the load-bearing one. `^13.0` is a promise about an entire range, and
+`composer update` only ever exercises the top of it.
+
 ## Pre-releases
 
 When a feature is finished but wants real-world soak time before it is blessed, we tag a
