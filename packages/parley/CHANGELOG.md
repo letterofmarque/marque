@@ -5,6 +5,32 @@ All notable changes to `marque/parley` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
+## [2.3.0] — 2026-09-04
+
+> Replaces `$guarded = []` with explicit `$fillable` on all three models, closing an unintended mass-assignment surface.
+
+### Security
+
+- **All three models were fully mass-assignable in any app that installed parley.**
+  `Category`, `Post` and `Thread` shipped with `$guarded = []`, which disables Laravel's
+  mass-assignment protection entirely. That is a reasonable choice in an application you
+  control — it is the wrong default for a package, which cannot assume anything about how
+  its consumers configure Eloquent.
+
+  In practice every one of these models is only ever written through a service with a
+  fixed payload, so there is no known exploit path through parley's own code. The exposure
+  was to consumer code passing unfiltered request input to `create()` or `update()` —
+  including `Thread::$pinned` and `Thread::$locked`, which only moderation should set.
+
+  Each model now declares an explicit `$fillable` covering exactly the columns its
+  services write. No behaviour changes for correct callers.
+
+### Added
+
+- An architecture test asserting no model ships `$guarded = []` and that each `$fillable`
+  still matches what the services actually write — a missing column fails silently on
+  `create()` rather than raising, so it is worth pinning.
+
 ## [2.2.0] — 2026-09-04
 
 > Lowers the PHP floor to 8.3, matching Laravel 13's own requirement.

@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 use Marque\Parley\Database\Factories\PostFactory;
 use Marque\SquidInk\SquidInk;
 
@@ -19,6 +20,16 @@ use Marque\SquidInk\SquidInk;
  * never as rendered HTML. Rendering happens through squidink on read, so a post
  * written in BBCode and a torrent description written in Markdown come out of
  * the same pipeline with the same safety guarantees.
+ *
+ * @property int $id
+ * @property int $thread_id
+ * @property int $user_id
+ * @property string $body
+ * @property string $body_format
+ * @property int|null $reply_to_id
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property Carbon|null $deleted_at
  */
 class Post extends Model
 {
@@ -27,7 +38,13 @@ class Post extends Model
 
     protected $table = 'parley_posts';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'thread_id',
+        'user_id',
+        'body',
+        'body_format',
+        'reply_to_id',
+    ];
 
     /**
      * @return BelongsTo<Thread, $this>

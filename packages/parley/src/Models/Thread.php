@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 use Marque\Parley\Database\Factories\ThreadFactory;
 
 /**
@@ -19,6 +20,18 @@ use Marque\Parley\Database\Factories\ThreadFactory;
  * The same model is a torrent's comment thread, a forum thread, and an
  * announcement — they differ in which columns are set, not in type. See the
  * migration for the shape of each.
+ *
+ * @property int $id
+ * @property string|null $threadable_type
+ * @property int|null $threadable_id
+ * @property int|null $category_id
+ * @property string|null $title
+ * @property int $user_id
+ * @property bool $pinned
+ * @property bool $locked
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property Carbon|null $deleted_at
  */
 class Thread extends Model
 {
@@ -27,7 +40,15 @@ class Thread extends Model
 
     protected $table = 'parley_threads';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'threadable_type',
+        'threadable_id',
+        'category_id',
+        'title',
+        'user_id',
+        'pinned',
+        'locked',
+    ];
 
     protected function casts(): array
     {

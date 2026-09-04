@@ -21,7 +21,12 @@ class Category extends Model
 
     protected $table = 'parley_categories';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'slug',
+        'description',
+        'position',
+    ];
 
     protected function casts(): array
     {
