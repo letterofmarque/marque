@@ -47,6 +47,13 @@ composer install
 
 Packages reference each other via path repositories, so local changes are reflected immediately.
 
+## Adding a new package
+
+Read **[docs/new-package.md](docs/new-package.md)** first. It carries the conventions
+(starting version, optional-dependency detection, mass assignment, the four-engine test
+harness) and, more usefully, the handful of steps that fail *silently* rather than
+loudly — two of which have caught out every new package added so far.
+
 ## Testing
 
 Each package has its own test suite using [Pest](https://pestphp.com/) and [Orchestra Testbench](https://packages.tools/testbench/).
