@@ -75,6 +75,18 @@ pgsql. Do not write a fresh one. The SQLite foreign-key line in particular was m
 from parley for the life of the package and nobody noticed (job #10548, and again
 2026-09-04).
 
+**`tests/migrations/`** — if you depend on `trove`, you need a fixture creating the
+`users` table. No package in the suite ships it (it is the host app's, reached via
+`trove.user_model`), but trove's own migrations add columns to it, so without the
+fixture every test in a brand-new package dies on `no such table: users`. Copy
+parley's or taxonomy's, and load it *before* the package migrations in
+`defineDatabaseMigrations()`.
+
+Its `down()` matters as much as its `up()`: package migrations register first, so
+rollback reaches `users` while tables referencing it still exist. SQLite shrugs;
+MySQL and PostgreSQL refuse. Drop the dependants explicitly rather than relying on
+`disableForeignKeyConstraints`, which Postgres ignores for `DROP TABLE`.
+
 **`phpstan.neon`** — level 1, matching the others, and run via `composer stan` from
 the repo root. Note it runs *per package*, not from the root like Pint: Larastan needs
 each package's own `vendor/` to resolve models and facades.
@@ -95,7 +107,7 @@ Four places, and missing any of them fails quietly rather than loudly:
 
 | File | What to add |
 |---|---|
-| `.github/workflows/split.yml` | **Both** matrices — `split_branch` *and* the tag split |
+| `.github/workflows/split.yml` | The `split_branch` matrix. **Only that one** — `split_tag` parses the package name out of the tag (`<package>/v<version>`) and takes no matrix entry |
 | `.github/workflows/test-run.yml` | The package list |
 | `.github/workflows/tests.yml` | The PHPStan matrix |
 | `bin/release` | Nothing — it derives order from `composer.json` |
