@@ -55,7 +55,7 @@ jobs:
 
   # PHPStan cannot join the lint job: it needs each package's own vendor/ to
   # resolve models and facades, so it installs per package the way the test
-  # matrix does. Level 1 across all eleven — see docs/how.md for why that
+  # matrix does. Level 1 across all twelve — see docs/how.md for why that
   # level and what it would take to raise it.
   static-analysis:
     name: PHPStan
@@ -75,6 +75,7 @@ jobs:
           - disguise
           - usarrs
           - parley
+          - taxonomy
 
     steps:
       - uses: actions/checkout@v4

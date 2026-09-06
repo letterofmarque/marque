@@ -19,6 +19,7 @@ Built by [Letter Of Marque Software](https://lom.software).
 | [marque/usarrs](packages/usarrs) | Auth, user profiles, invites, admin |
 | [marque/squidink](packages/squidink) | Format-agnostic text pipeline (Markdown, BBCode → HTML) |
 | [marque/parley](packages/parley) | Polymorphic threaded discussion (torrent comments + forum) |
+| [marque/taxonomy](packages/taxonomy) | Declarative content-type engine (YAML-defined levels + facets) |
 
 ## Requirements
 
@@ -48,6 +49,9 @@ composer require marque/squidink
 
 # Torrent comments and a lightweight forum
 composer require marque/parley
+
+# Declarative taxonomy engine (usually pulled in by a marque/taxonomy-* package)
+composer require marque/taxonomy
 ```
 
 ## Features
@@ -89,6 +93,17 @@ composer require marque/parley
 - Forum behind a config toggle that genuinely removes its routes, not just its nav links
 - Post bodies render through marque/squidink — no formatting or escaping of its own
 
+### Taxonomy (Content types)
+- A tracker's shape — its hierarchy levels, its facets — declared in YAML, not hardcoded
+  in schema. Adding a domain is a file, not a fork
+- Levels are scoped to a content type, so `Week` on NFL Game and `Week` on a TV type
+  cannot collide, and neither uploader sees the other's fields
+- Levels are typed dimensions rather than tree nodes, so "all 2006 games" and "all week 12
+  games" are single queries spanning every league
+- Definitions are parsed at runtime, never into migrations — a bad file leaves the tracker
+  running on its previous definitions rather than half-applying a schema change
+- Ships no domain vocabulary at all; `marque/taxonomy-*` packages supply that
+
 ## Configuration
 
 Publish the config files:
@@ -99,6 +114,7 @@ php artisan vendor:publish --tag=bloodhound-config
 php artisan vendor:publish --tag=guise-config
 php artisan vendor:publish --tag=cennad-config
 php artisan vendor:publish --tag=parley-config
+php artisan vendor:publish --tag=taxonomy-config
 ```
 
 ## Versioning

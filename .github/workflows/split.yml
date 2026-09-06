@@ -43,6 +43,8 @@ jobs:
             repo_name: 'squidink'
           - local_path: 'packages/parley'
             repo_name: 'parley'
+          - local_path: 'packages/taxonomy'
+            repo_name: 'taxonomy'
 
     steps:
       - uses: actions/checkout@v4

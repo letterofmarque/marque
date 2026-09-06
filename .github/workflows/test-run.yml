@@ -58,6 +58,7 @@ jobs:
           - disguise
           - usarrs
           - parley
+          - taxonomy
 
     name: ${{ matrix.package }} (${{ matrix.database }}, PHP ${{ matrix.php }}, ${{ matrix.dependencies }})
 
