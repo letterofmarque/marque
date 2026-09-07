@@ -22,6 +22,7 @@ final class ContentType
     /**
      * @param  list<Level>  $levels
      * @param  list<string>  $facets
+     * @param  list<Migration>  $migrations
      */
     public function __construct(
         public readonly string $name,
@@ -29,6 +30,7 @@ final class ContentType
         public readonly int $version,
         public readonly array $levels,
         public readonly array $facets = [],
+        public readonly array $migrations = [],
     ) {}
 
     /**
@@ -71,7 +73,53 @@ final class ContentType
                 $definition['facets'] ?? [],
                 is_string(...),
             )),
+            migrations: array_map(
+                Migration::fromArray(...),
+                array_values(array_filter(
+                    $definition['migrations'] ?? [],
+                    is_array(...),
+                )),
+            ),
         );
+    }
+
+    /**
+     * The ordered steps taking an installed version up to this one.
+     *
+     * Returns an empty array when already current, and **null when the chain
+     * is broken** — a tracker on v1 with only a v2→v3 step declared cannot be
+     * upgraded, and pretending otherwise would silently skip a step and leave
+     * the catalogue in a shape nobody described.
+     *
+     * @return list<Migration>|null
+     */
+    public function migrationPathFrom(int $installed): ?array
+    {
+        if ($installed >= $this->version) {
+            return [];
+        }
+
+        $steps = [];
+
+        for ($v = $installed; $v < $this->version; $v++) {
+            $step = null;
+
+            foreach ($this->migrations as $migration) {
+                if ($migration->from === $v) {
+                    $step = $migration;
+
+                    break;
+                }
+            }
+
+            if ($step === null) {
+                return null;
+            }
+
+            $steps[] = $step;
+        }
+
+        return $steps;
     }
 
     /**

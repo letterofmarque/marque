@@ -46,6 +46,7 @@ return new class extends Migration
         // classifications and assignments still point at it. Copying parley's
         // fixture verbatim missed that, and MySQL failed the whole suite while
         // passing every file in isolation.
+        Schema::dropIfExists('taxonomy_installed_versions');
         Schema::dropIfExists('taxonomy_assignments');
         Schema::dropIfExists('taxonomy_classifications');
         Schema::dropIfExists('taxonomy_facet_values');

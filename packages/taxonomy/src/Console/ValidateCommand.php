@@ -8,6 +8,7 @@ use Illuminate\Console\Command;
 use Marque\Taxonomy\Definitions\ContentType;
 use Marque\Taxonomy\Definitions\Loader;
 use Marque\Taxonomy\Exceptions\InvalidDefinitionException;
+use Marque\Taxonomy\Services\Upgrader;
 
 /**
  * Check every taxonomy definition without loading them into a running tracker.
@@ -24,6 +25,11 @@ final class ValidateCommand extends Command
     protected $signature = 'marque:taxonomy:validate';
 
     protected $description = 'Validate taxonomy content-type definitions';
+
+    public function __construct(private readonly Upgrader $upgrader)
+    {
+        parent::__construct();
+    }
 
     public function handle(Loader $loader): int
     {
@@ -72,6 +78,28 @@ final class ValidateCommand extends Command
                 $shadowed['app_version'],
                 $shadowed['package_version'],
             ));
+        }
+
+        // Pending version upgrades surface here as well as in the upgrade
+        // command itself: an admin running the routine check should learn a
+        // definition changed underneath them without having to already know
+        // the upgrade command exists.
+        foreach ($this->upgrader->pending(array_values($types)) as $pending) {
+            $this->newLine();
+
+            $message = sprintf(
+                '%s has an update available (v%d → v%d). %d torrent(s) are classified under it. ',
+                $pending['content_type'],
+                $pending['from'],
+                $pending['to'],
+                $pending['affected'],
+            );
+
+            $message .= $pending['path']
+                ? sprintf('Run `marque:taxonomy:upgrade %s` to review and apply.', $pending['content_type'])
+                : 'It declares no migration path, so it cannot be applied — that is the package author\'s to fix.';
+
+            $this->components->warn($message);
         }
 
         $this->newLine();

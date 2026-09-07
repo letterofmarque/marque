@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Marque\Taxonomy;
 
 use Illuminate\Support\ServiceProvider;
+use Marque\Taxonomy\Console\UpgradeCommand;
 use Marque\Taxonomy\Console\ValidateCommand;
 use Marque\Taxonomy\Contracts\ClassifiesTorrents;
 use Marque\Taxonomy\Definitions\Loader;
@@ -44,6 +45,7 @@ class TaxonomyServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 ValidateCommand::class,
+                UpgradeCommand::class,
             ]);
 
             $this->publishes([

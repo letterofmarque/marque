@@ -130,7 +130,7 @@ describe('precedence — the app wins', function () {
     it('reports that an override is shadowing a newer package version', function () {
         // "A package update never silently changes a definition the admin has
         // overridden — but the admin is told a newer version exists."
-        writeDefinition($this->pkgDir, 'nfl.yaml', "content_type: nfl_game\nlabel: pkg\nversion: 2\nlevels:\n  - season: { type: year }\n");
+        writeDefinition($this->pkgDir, 'nfl.yaml', "content_type: nfl_game\nlabel: pkg\nversion: 2\nlevels:\n  - season: { type: year }\nmigrations:\n  - from: 1\n    add_facet: [source]\n");
         writeDefinition($this->appDir, 'nfl.yaml', "content_type: nfl_game\nlabel: app\nversion: 1\nlevels:\n  - season: { type: year }\n");
 
         $loader = new Loader([$this->pkgDir], $this->appDir);

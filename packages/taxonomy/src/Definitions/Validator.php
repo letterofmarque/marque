@@ -41,6 +41,7 @@ final class Validator
         $this->validateVersion($definition, $errors);
         $this->validateLevels($definition, $errors);
         $this->validateFacets($definition, $errors);
+        $this->validateMigrations($definition, $errors);
 
         return $errors;
     }
@@ -180,6 +181,101 @@ final class Validator
 
         if ((int) $range[0] > (int) $range[1]) {
             $errors[] = sprintf('Invalid range on level "%s": %s is greater than %s.', $name, (string) $range[0], (string) $range[1]);
+        }
+    }
+
+    /**
+     * A version bump with no migration path is refused, not warned about.
+     *
+     * That refusal is the forcing function. The package author is the only
+     * person who knows both the old shape and the new one, so the work belongs
+     * with them rather than with the admin who would otherwise have to guess
+     * what the change meant for their catalogue.
+     *
+     * @param  array<string, mixed>  $definition
+     * @param  list<string>  $errors
+     */
+    private function validateMigrations(array $definition, array &$errors): void
+    {
+        $version = $definition['version'] ?? 1;
+
+        if (! is_int($version) || $version < 1) {
+            // Already reported by validateVersion; nothing coherent to check.
+            return;
+        }
+
+        $migrations = $definition['migrations'] ?? [];
+
+        if (! is_array($migrations)) {
+            $errors[] = 'migrations must be a list of steps.';
+
+            return;
+        }
+
+        // v1 has nothing to come from, so it needs no path.
+        if ($version === 1) {
+            if ($migrations !== []) {
+                $errors[] = 'Version 1 declares migrations, but there is no earlier version to migrate from.';
+            }
+
+            return;
+        }
+
+        $froms = [];
+
+        foreach ($migrations as $step) {
+            if (! is_array($step)) {
+                $errors[] = 'Each migration step must be a map with a "from" key.';
+
+                continue;
+            }
+
+            $from = $step['from'] ?? null;
+
+            if (! is_int($from) || $from < 1 || $from >= $version) {
+                $errors[] = sprintf(
+                    'Invalid migration "from" value %s: must be an integer between 1 and %d.',
+                    is_scalar($from) ? (string) $from : gettype($from),
+                    $version - 1,
+                );
+
+                continue;
+            }
+
+            if (isset($froms[$from])) {
+                $errors[] = sprintf('Duplicate migration step from version %d.', $from);
+            }
+
+            $froms[$from] = true;
+
+            if (Migration::fromArray($step)->declaresNothing()) {
+                $errors[] = sprintf(
+                    'Migration step from version %d declares no changes. '
+                    .'Remove it, or say what changed (add_level, rename_level, remove_level, add_facet, remove_facet).',
+                    $from,
+                );
+            }
+        }
+
+        // The chain must be dense: every version from 1 up to the current one
+        // needs a step, or a tracker sitting on the missing version has no way
+        // forward.
+        $missing = [];
+
+        for ($v = 1; $v < $version; $v++) {
+            if (! isset($froms[$v])) {
+                $missing[] = $v;
+            }
+        }
+
+        if ($missing !== []) {
+            $errors[] = sprintf(
+                'Version %d declares no migration path from version(s) %s. '
+                .'A version bump without a migration path is refused: a tracker running one of those versions '
+                .'has no way to upgrade, and guessing what your change meant is not something an admin should have to do.',
+                $version,
+                implode(', ', $missing),
+            );
         }
     }
 

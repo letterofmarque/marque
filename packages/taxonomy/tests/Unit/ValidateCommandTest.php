@@ -58,7 +58,10 @@ it('warns when an override is behind the package version', function () {
     $packageDir = $this->dir.'-pkg';
     mkdir($packageDir, 0777, true);
 
-    file_put_contents($packageDir.'/nfl.yaml', "content_type: nfl_game\nlabel: pkg\nversion: 2\nlevels:\n  - season: { type: year }\n");
+    // Declares a migration path because CP5 made that mandatory: a version
+    // bump carrying none is now refused outright, so a v2 fixture without one
+    // no longer represents anything a package could legitimately ship.
+    file_put_contents($packageDir.'/nfl.yaml', "content_type: nfl_game\nlabel: pkg\nversion: 2\nlevels:\n  - season: { type: year }\nmigrations:\n  - from: 1\n    add_facet: [source]\n");
     file_put_contents($this->dir.'/nfl.yaml', "content_type: nfl_game\nlabel: app\nversion: 1\nlevels:\n  - season: { type: year }\n");
 
     config()->set('taxonomy.definitions.packages', [$packageDir]);

@@ -12,6 +12,7 @@ use Marque\Taxonomy\Exceptions\InvalidClassificationException;
 use Marque\Taxonomy\Models\Classification;
 use Marque\Taxonomy\Models\Facet;
 use Marque\Taxonomy\Models\FacetValue;
+use Marque\Taxonomy\Models\InstalledVersion;
 use Marque\Taxonomy\Models\Term;
 use Marque\Trove\Models\Torrent;
 
@@ -46,6 +47,13 @@ class Classifier implements ClassifiesTorrents
         $this->assertFacetsAreDeclared($type, $facets);
 
         return DB::transaction(function () use ($torrent, $type, $path, $facets, $groupingKey): Classification {
+            // First use of a content type pins the version this tracker is
+            // running. Without that, "has a package author changed this
+            // underneath me?" has nothing to compare against — and it never
+            // moves on its own, so `composer update` cannot adopt a new shape
+            // by itself.
+            InstalledVersion::remember($type->name, $type->version);
+
             $term = $this->resolvePath($type, $path);
 
             $classification = Classification::updateOrCreate(
