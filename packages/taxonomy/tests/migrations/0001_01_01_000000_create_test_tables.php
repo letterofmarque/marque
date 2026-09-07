@@ -38,7 +38,19 @@ return new class extends Migration
         // PostgreSQL both refuse.
         //
         // Postgres ignores disableForeignKeyConstraints for DROP TABLE, so the
-        // portable fix is to take the dependants down first.
+        // portable fix is to take the dependants down first, deepest first.
+        //
+        // The taxonomy tables are listed here as well as in their own
+        // migrations' down(): this fixture is what tears the environment down
+        // between test FILES, and by then `torrents` is about to go while
+        // classifications and assignments still point at it. Copying parley's
+        // fixture verbatim missed that, and MySQL failed the whole suite while
+        // passing every file in isolation.
+        Schema::dropIfExists('taxonomy_assignments');
+        Schema::dropIfExists('taxonomy_classifications');
+        Schema::dropIfExists('taxonomy_facet_values');
+        Schema::dropIfExists('taxonomy_facets');
+        Schema::dropIfExists('taxonomy_terms');
         Schema::dropIfExists('torrents');
         Schema::dropIfExists('users');
     }

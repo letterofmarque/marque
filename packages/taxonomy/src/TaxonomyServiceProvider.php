@@ -6,7 +6,12 @@ namespace Marque\Taxonomy;
 
 use Illuminate\Support\ServiceProvider;
 use Marque\Taxonomy\Console\ValidateCommand;
+use Marque\Taxonomy\Contracts\ClassifiesTorrents;
 use Marque\Taxonomy\Definitions\Loader;
+use Marque\Taxonomy\Models\Classification;
+use Marque\Taxonomy\Models\FacetValue;
+use Marque\Taxonomy\Services\Classifier;
+use Marque\Trove\Models\Torrent;
 
 class TaxonomyServiceProvider extends ServiceProvider
 {
@@ -26,11 +31,15 @@ class TaxonomyServiceProvider extends ServiceProvider
                 appPath: $config->get('taxonomy.definitions.path'),
             );
         });
+
+        $this->app->bind(ClassifiesTorrents::class, Classifier::class);
     }
 
     public function boot(): void
     {
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+
+        $this->registerTorrentRelations();
 
         if ($this->app->runningInConsole()) {
             $this->commands([
@@ -45,5 +54,38 @@ class TaxonomyServiceProvider extends ServiceProvider
                 __DIR__.'/../database/migrations' => database_path('migrations'),
             ], 'taxonomy-migrations');
         }
+    }
+
+    /**
+     * Give trove's Torrent its taxonomy relations without trove knowing this
+     * package exists.
+     *
+     * `resolveRelationUsing` registers a relation on a model class at runtime,
+     * which is what keeps the dependency one-directional: taxonomy requires
+     * trove, trove requires nothing. An install that never classifies anything
+     * does not install this package, and `torrents` carries no taxonomy
+     * columns and no taxonomy relations.
+     *
+     * This is the PHP-side seam Spec #83 identified as the one that actually
+     * composes — a view-layer equivalent would not, because Blade resolves
+     * components at compile time and a class_exists() guard around one still
+     * throws.
+     */
+    protected function registerTorrentRelations(): void
+    {
+        Torrent::resolveRelationUsing(
+            'taxonomyClassifications',
+            fn (Torrent $torrent) => $torrent->hasMany(Classification::class, 'torrent_id'),
+        );
+
+        Torrent::resolveRelationUsing(
+            'taxonomyFacetValues',
+            fn (Torrent $torrent) => $torrent->belongsToMany(
+                FacetValue::class,
+                'taxonomy_assignments',
+                'torrent_id',
+                'facet_value_id',
+            )->withTimestamps(),
+        );
     }
 }

@@ -31,6 +31,11 @@ abstract class TestCase extends BaseTestCase
     {
         $app['config']->set('app.key', 'base64:'.base64_encode(random_bytes(32)));
 
+        // Torrents need an owner, and trove reaches the host's user model
+        // through config rather than shipping one.
+        $app['config']->set('trove.user_model', TestUser::class);
+        $app['config']->set('auth.providers.users.model', TestUser::class);
+
         $app['config']->set('database.default', 'testing');
         // SQLite in memory by default. Marque is DB-agnostic (docs/why.md) and
         // that claim is only worth anything if it is exercised, so the suite
