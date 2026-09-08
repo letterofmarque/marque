@@ -109,7 +109,11 @@ final class Validator
 
         foreach ($levels as $entry) {
             if (! is_array($entry)) {
-                $errors[] = 'Each level must be a single-key map, e.g. "- season: { type: year }".';
+                // The example is deliberately abstract. A concrete one ("- season:
+                // ...") reads better, but core is not supposed to know what a
+                // season is — and an example in help text is exactly how that
+                // knowledge starts leaking in. MultiDomainTest greps for it.
+                $errors[] = 'Each level must be a single-key map, e.g. "- <name>: { type: string }".';
 
                 continue;
             }
