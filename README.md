@@ -102,6 +102,12 @@ composer require marque/taxonomy
   games" are single queries spanning every league
 - Definitions are parsed at runtime, never into migrations — a bad file leaves the tracker
   running on its previous definitions rather than half-applying a schema change
+- A version bump with no declared migration path is refused, not warned about; a declared
+  `rename_level` preserves every existing classification through a rename
+- Classification data is never deleted by a definition edit — orphaned rows remain and are
+  recoverable, enforced by foreign keys rather than by convention
+- Cascading upload form and an admin screen that populates declared levels but deliberately
+  cannot create or remove one
 - Ships no domain vocabulary at all; `marque/taxonomy-*` packages supply that
 
 ## Configuration
