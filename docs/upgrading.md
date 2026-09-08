@@ -27,6 +27,7 @@ fetching the whole repo tree and grepping for `upgrad|migrat|changelog`.
 | 8 | [Release: Marque 4.3](releases/4.3.md) | usarrs registers email verification + password confirmation routes (fixes a lockout) |
 | 9 | [Release: Marque 5.0](releases/5.0.md) | Durable, auditable ratio accounting; per-torrent access control; API reads require auth by default |
 | 10 | [Release: Marque 5.1](releases/5.1.md) | PHP floor lowered to 8.3 (nothing to do; unblocks PHP 8.3 apps) |
+| 11 | [Release: Marque 5.2](releases/5.2.md) | `marque/taxonomy` added — declare your catalogue's structure in YAML (nothing to do; optional new package) |
 
 If you're picking up an old install: start at whichever row matches the version
 you're currently on, and read down to the bottom. If you don't know your version,

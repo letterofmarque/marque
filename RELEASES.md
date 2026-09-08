@@ -37,6 +37,7 @@ For the full ordered list of every upgrade guide and release doc, see
 
 | Release | Date | Summary | Who's affected |
 |---|---|---|---|
+| [5.2](docs/releases/5.2.md) | 2026-09-09 | `marque/taxonomy` added — declare your catalogue's structure in YAML instead of hardcoding it | nobody negatively; optional new package |
 | [5.1](docs/releases/5.1.md) | 2026-09-04 | PHP floor lowered to 8.3, matching Laravel 13's own requirement | nobody negatively; unblocks Laravel 13 apps on PHP 8.3 |
 | [5.0](docs/releases/5.0.md) | 2026-09-03 | Ratio becomes durable and auditable; per-torrent access control; API reads now require auth by default | everyone — especially bloodhound and cennad users |
 | [4.3](docs/releases/4.3.md) | 2026-09-02 | usarrs registers email verification + password confirmation routes, fixing a lockout for unverified users | usarrs users only, especially anyone using `verified`/`password.confirm` middleware or the admin panel |
