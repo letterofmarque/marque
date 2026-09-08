@@ -87,6 +87,26 @@ rollback reaches `users` while tables referencing it still exist. SQLite shrugs;
 MySQL and PostgreSQL refuse. Drop the dependants explicitly rather than relying on
 `disableForeignKeyConstraints`, which Postgres ignores for `DROP TABLE`.
 
+**Copying that `down()` verbatim is not enough — add your own tables to it.** The
+fixture is what tears the environment down *between test files*, so by the time it
+runs, `torrents` is about to go while **your** package's tables still point at it.
+Parley's version drops `torrents` then `users` and knows nothing about yours.
+
+This cost a debugging session on taxonomy (Build #95 CP4): the whole suite failed on
+MySQL while **every test file passed in isolation** — the signature of a teardown
+problem rather than a logic one. SQLite does not enforce foreign keys during that
+drop and never noticed. List your tables deepest-first, above `torrents`:
+
+```php
+Schema::dropIfExists('yourpkg_assignments');   // deepest dependant first
+Schema::dropIfExists('yourpkg_things');
+Schema::dropIfExists('torrents');
+Schema::dropIfExists('users');
+```
+
+If a suite passes file-by-file but fails as a whole on a real engine, look here
+before looking at your code.
+
 **`phpstan.neon`** — level 1, matching the others, and run via `composer stan` from
 the repo root. Note it runs *per package*, not from the root like Pint: Larastan needs
 each package's own `vendor/` to resolve models and facades.
