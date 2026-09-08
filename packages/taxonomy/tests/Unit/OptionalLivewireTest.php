@@ -27,9 +27,52 @@ it('guards every Livewire use in the service provider', function () {
             && ! str_starts_with(trim($line), '//'),
     ));
 
-    expect($lines)->toHaveCount(2)
-        ->and($lines[0])->toContain('class_exists')
-        ->and($lines[1])->toContain('Livewire::component');
+    // Asserted structurally rather than by line count. The count version broke
+    // the moment a second component was registered — a change that should not
+    // need this test edited. What matters is that every Livewire use sits
+    // INSIDE the guard block, not how many there are.
+    expect($lines)->not->toBeEmpty()
+        ->and($lines[0])->toContain('class_exists');
+
+    // Walk braces from the guard to find where its block ends, then confirm
+    // no Livewire use appears after it.
+    $body = explode("\n", $provider);
+    $guardLine = null;
+
+    foreach ($body as $i => $line) {
+        if (str_contains($line, 'class_exists') && str_contains($line, 'Livewire')) {
+            $guardLine = $i;
+
+            break;
+        }
+    }
+
+    expect($guardLine)->not->toBeNull();
+
+    $depth = 0;
+    $closesAt = null;
+
+    for ($i = $guardLine; $i < count($body); $i++) {
+        $depth += substr_count($body[$i], '{') - substr_count($body[$i], '}');
+
+        if ($depth === 0 && $i > $guardLine) {
+            $closesAt = $i;
+
+            break;
+        }
+    }
+
+    expect($closesAt)->not->toBeNull();
+
+    for ($i = $closesAt + 1; $i < count($body); $i++) {
+        $line = trim($body[$i]);
+
+        if (str_starts_with($line, '*') || str_starts_with($line, '//')) {
+            continue;
+        }
+
+        expect($line)->not->toContain('Livewire');
+    }
 });
 
 it('keeps Livewire out of the engine entirely', function () {

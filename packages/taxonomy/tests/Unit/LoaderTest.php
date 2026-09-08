@@ -227,3 +227,22 @@ describe('a bad file is rejected whole', function () {
             ->toThrow(InvalidDefinitionException::class);
     });
 });
+
+describe('the container binding', function () {
+    it('sees a configuration change rather than caching the old paths', function () {
+        // Registered as a bind, not a singleton. A singleton captures the
+        // configured paths at construction, so a later change to
+        // `taxonomy.definitions.path` is invisible and the tracker silently
+        // runs on stale definitions — a nasty thing to diagnose, and exactly
+        // the staleness the no-cache decision exists to avoid.
+        writeDefinition($this->pkgDir, 'a.yaml', "content_type: first\nlabel: First\nlevels:\n  - a: { type: string }\n");
+        config()->set('taxonomy.definitions.path', $this->pkgDir);
+
+        expect(app(Loader::class)->load())->toHaveKey('first');
+
+        writeDefinition($this->appDir, 'b.yaml', "content_type: second\nlabel: Second\nlevels:\n  - b: { type: string }\n");
+        config()->set('taxonomy.definitions.path', $this->appDir);
+
+        expect(app(Loader::class)->load())->toHaveKey('second');
+    });
+});

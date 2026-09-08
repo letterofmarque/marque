@@ -11,6 +11,7 @@ use Marque\Taxonomy\Console\ValidateCommand;
 use Marque\Taxonomy\Contracts\ClassifiesTorrents;
 use Marque\Taxonomy\Definitions\Loader;
 use Marque\Taxonomy\Livewire\ClassifierForm;
+use Marque\Taxonomy\Livewire\TaxonomyAdmin;
 use Marque\Taxonomy\Models\Classification;
 use Marque\Taxonomy\Models\FacetValue;
 use Marque\Taxonomy\Services\Classifier;
@@ -22,11 +23,19 @@ class TaxonomyServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__.'/../config/taxonomy.php', 'taxonomy');
 
-        // Singleton rather than bound: the definitions are read from disk, and
-        // re-reading them per resolution within one request would be pure
-        // waste. Whether they should also be cached ACROSS requests is a
-        // separate question — see the note in config/taxonomy.php.
-        $this->app->singleton(Loader::class, function ($app): Loader {
+        // Bound rather than singleton, deliberately.
+        //
+        // A singleton captures the configured paths at construction, so any
+        // later change to `taxonomy.definitions.path` is invisible — the
+        // container hands back a Loader still pointing at the old directory
+        // and the tracker silently runs on stale definitions. That is a nasty
+        // failure to diagnose, and it is exactly the kind of staleness the
+        // no-cache decision in config/taxonomy.php exists to avoid.
+        //
+        // Rebuilding is cheap: the Loader itself does no work until load() is
+        // called, and reading a handful of small YAML files costs about what
+        // reading a config file costs.
+        $this->app->bind(Loader::class, function ($app): Loader {
             $config = $app['config'];
 
             return new Loader(
@@ -53,6 +62,7 @@ class TaxonomyServiceProvider extends ServiceProvider
         // without pulling in a frontend stack.
         if (class_exists(Livewire::class)) {
             Livewire::component('taxonomy-classifier-form', ClassifierForm::class);
+            Livewire::component('taxonomy-admin', TaxonomyAdmin::class);
         }
 
         if ($this->app->runningInConsole()) {
