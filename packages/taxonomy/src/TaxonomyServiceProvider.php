@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Marque\Taxonomy;
 
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
 use Marque\Taxonomy\Console\UpgradeCommand;
 use Marque\Taxonomy\Console\ValidateCommand;
 use Marque\Taxonomy\Contracts\ClassifiesTorrents;
 use Marque\Taxonomy\Definitions\Loader;
+use Marque\Taxonomy\Livewire\ClassifierForm;
 use Marque\Taxonomy\Models\Classification;
 use Marque\Taxonomy\Models\FacetValue;
 use Marque\Taxonomy\Services\Classifier;
@@ -39,8 +41,19 @@ class TaxonomyServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+        $this->loadViewsFrom(__DIR__.'/../resources/views', 'taxonomy');
 
         $this->registerTorrentRelations();
+
+        // Guarded on a PHP class, which composes — as against a Blade
+        // component guard, which does not, because Blade resolves components
+        // at compile time (Spec #83). livewire/livewire is a `suggest` rather
+        // than a `require`: taxonomy is an engine, and an API-only install
+        // (trove + threepio + bloodhound + cennad) must be able to classify
+        // without pulling in a frontend stack.
+        if (class_exists(Livewire::class)) {
+            Livewire::component('taxonomy-classifier-form', ClassifierForm::class);
+        }
 
         if ($this->app->runningInConsole()) {
             $this->commands([
@@ -55,6 +68,12 @@ class TaxonomyServiceProvider extends ServiceProvider
             $this->publishes([
                 __DIR__.'/../database/migrations' => database_path('migrations'),
             ], 'taxonomy-migrations');
+
+            // Consumers publish and restyle rather than fork: the shipped
+            // views are deliberately unstyled plain Blade.
+            $this->publishes([
+                __DIR__.'/../resources/views' => resource_path('views/vendor/taxonomy'),
+            ], 'taxonomy-views');
         }
     }
 

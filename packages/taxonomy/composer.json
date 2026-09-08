@@ -1,6 +1,6 @@
 {
     "name": "marque/taxonomy",
-    "description": "Declarative content-type engine for Marque — a tracker's taxonomy declared in YAML rather than hardcoded in schema",
+    "description": "Declarative content-type engine for Marque \u2014 a tracker's taxonomy declared in YAML rather than hardcoded in schema",
     "type": "library",
     "license": "MIT",
     "keywords": [
@@ -41,7 +41,8 @@
         "orchestra/testbench": "^11.0",
         "pestphp/pest": "^4.7",
         "mockery/mockery": "^1.6",
-        "nunomaduro/pao": "^1.1"
+        "nunomaduro/pao": "^1.1",
+        "livewire/livewire": "^4.0"
     },
     "autoload": {
         "psr-4": {
@@ -72,5 +73,8 @@
         "allow-plugins": {
             "pestphp/pest-plugin": true
         }
+    },
+    "suggest": {
+        "livewire/livewire": "Required for the ClassifierForm upload component (^4.0)"
     }
 }

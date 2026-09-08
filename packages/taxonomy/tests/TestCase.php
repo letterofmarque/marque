@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Marque\Taxonomy\Tests;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\LivewireServiceProvider;
 use Marque\Taxonomy\TaxonomyServiceProvider;
 use Marque\Trove\TroveServiceProvider;
 use Orchestra\Testbench\TestCase as BaseTestCase;
@@ -22,6 +23,7 @@ abstract class TestCase extends BaseTestCase
     protected function getPackageProviders($app): array
     {
         return [
+            LivewireServiceProvider::class,
             TroveServiceProvider::class,
             TaxonomyServiceProvider::class,
         ];
