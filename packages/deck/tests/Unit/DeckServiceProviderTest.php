@@ -2,42 +2,42 @@
 
 declare(strict_types=1);
 
-describe('IseServiceProvider', function () {
+describe('DeckServiceProvider', function () {
     it('registers ise config', function () {
-        expect(config('ise.app_name'))->toBe('Marque');
-        expect(config('ise.show_footer'))->toBeTrue();
-        expect(config('ise.theme'))->toBe('default');
+        expect(config('deck.app_name'))->toBe('Marque');
+        expect(config('deck.show_footer'))->toBeTrue();
+        expect(config('deck.theme'))->toBe('default');
     });
 
     it('registers ise views namespace', function () {
         $finder = $this->app['view']->getFinder();
         $hints = $finder->getHints();
 
-        expect($hints)->toHaveKey('ise');
+        expect($hints)->toHaveKey('deck');
     });
 
     it('can resolve layout view', function () {
         $view = $this->app['view'];
 
-        expect($view->exists('ise::layouts.app'))->toBeTrue();
+        expect($view->exists('deck::layouts.app'))->toBeTrue();
     });
 
     it('can resolve footer component view', function () {
         $view = $this->app['view'];
 
-        expect($view->exists('ise::components.footer'))->toBeTrue();
+        expect($view->exists('deck::components.footer'))->toBeTrue();
     });
 
     it('can resolve navigation component view', function () {
         $view = $this->app['view'];
 
-        expect($view->exists('ise::components.navigation'))->toBeTrue();
+        expect($view->exists('deck::components.navigation'))->toBeTrue();
     });
 
     it('actually renders the layout without a missing-component error', function () {
         // Regression test for job #10602 Gap 5: the shipped layout template
         // referenced the pre-rename <livewire:id-navigation /> tag while
-        // IseServiceProvider registered the component as ise-navigation —
+        // DeckServiceProvider registered the component as deck-navigation —
         // exists()-only checks above never caught it because a view can
         // exist as a file and still fail to compile/render. Render, don't
         // just check existence.
@@ -50,7 +50,7 @@ describe('IseServiceProvider', function () {
         // suite catching it: nothing was actually rendering this file.
         $this->withoutVite();
 
-        $html = view('ise::layouts.app', ['slot' => 'content'])->render();
+        $html = view('deck::layouts.app', ['slot' => 'content'])->render();
 
         expect($html)->toBeString();
     });

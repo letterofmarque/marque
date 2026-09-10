@@ -1,27 +1,27 @@
 <div class="flex h-full w-full flex-1 flex-col gap-6" x-data="usarrsPasskeys()">
-    <x-ise::heading size="xl">{{ __('Passkeys') }}</x-ise::heading>
+    <x-deck::heading size="xl">{{ __('Passkeys') }}</x-deck::heading>
 
     @if (session('status'))
         <div class="rounded-lg bg-green-50 p-4 dark:bg-green-900/20">
-            <x-ise::text class="text-sm text-green-700 dark:text-green-300">{{ session('status') }}</x-ise::text>
+            <x-deck::text class="text-sm text-green-700 dark:text-green-300">{{ session('status') }}</x-deck::text>
         </div>
     @endif
 
     <div class="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-900">
         @forelse ($passkeys as $passkey)
             <div class="flex items-center justify-between py-2">
-                <x-ise::text>{{ $passkey->name }}</x-ise::text>
-                <x-ise::button variant="ghost" size="sm" wire:click="delete({{ $passkey->id }})"
+                <x-deck::text>{{ $passkey->name }}</x-deck::text>
+                <x-deck::button variant="ghost" size="sm" wire:click="delete({{ $passkey->id }})"
                     wire:confirm="{{ __('Remove this passkey?') }}">
                     {{ __('Remove') }}
-                </x-ise::button>
+                </x-deck::button>
             </div>
         @empty
-            <x-ise::text class="text-sm text-zinc-500">{{ __('No passkeys registered yet.') }}</x-ise::text>
+            <x-deck::text class="text-sm text-zinc-500">{{ __('No passkeys registered yet.') }}</x-deck::text>
         @endforelse
     </div>
 
-    <x-ise::button x-on:click="register">{{ __('Add a Passkey') }}</x-ise::button>
+    <x-deck::button x-on:click="register">{{ __('Add a Passkey') }}</x-deck::button>
 
     {{-- The actual WebAuthn ceremony (navigator.credentials.create) talks
          directly to Passkeys' own JSON endpoints (/user/passkeys/options,

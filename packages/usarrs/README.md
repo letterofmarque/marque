@@ -22,7 +22,7 @@ its own. For a complete private tracker, install the set:
 composer require marque/trove marque/bloodhound marque/guise marque/usarrs marque/cennad
 ```
 
-That resolves `marque/threepio` and `marque/ise` for you. Verified working as a set,
+That resolves `marque/threepio` and `marque/deck` for you. Verified working as a set,
 2026-09-10.
 
 ## Installation
@@ -46,7 +46,7 @@ php artisan migrate
 ### Layout
 
 usarrs' own pages (login, register, profile, admin, and everything else it renders)
-use `config('usarrs.layout')`, default `ise::layouts.app`. Set `USARRS_LAYOUT` in
+use `config('usarrs.layout')`, default `deck::layouts.app`. Set `USARRS_LAYOUT` in
 your `.env` or publish the config to point to your app's own layout:
 
 ```env

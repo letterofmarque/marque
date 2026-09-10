@@ -1,4 +1,4 @@
-# Marque Ise
+# Marque Deck
 
 App layout shell and shared Blade UI components for the [Marque](https://github.com/letterofmarque/marque) tracker platform.
 
@@ -9,7 +9,7 @@ packages it was built to serve.
 
 > Formerly published as `marque/id`. That name collided conceptually with `usarrs`
 > (user management) despite having nothing to do with auth or identity — renamed to
-> `marque/ise` to stop that confusion at the source rather than document around it.
+> `marque/deck` to stop that confusion at the source rather than document around it.
 > `marque/id` is marked abandoned on Packagist, pointing here.
 
 There is no UI-kit dependency. The components are plain Blade and Tailwind CSS, so
@@ -18,41 +18,41 @@ consumers can publish and restyle them without forking views.
 ## Installation
 
 ```bash
-composer require marque/ise
+composer require marque/deck
 ```
 
 Publish the config and views:
 
 ```bash
 php artisan vendor:publish --tag=ise-config
-php artisan vendor:publish --tag=ise-views
+php artisan vendor:publish --tag=deck-views
 ```
 
-Published views land in `resources/views/vendor/ise` and override the packaged ones.
+Published views land in `resources/views/vendor/deck` and override the packaged ones.
 
 ## Components
 
-All components live under the `ise::` namespace.
+All components live under the `deck::` namespace.
 
 | Component | Purpose |
 |-----------|---------|
-| `<x-ise::button>` | Button or link. `variant` (default, primary, outline, ghost, danger), `size` (sm, base, lg), `icon`, `iconTrailing`, `href` |
-| `<x-ise::input>` | Text input. `type`, optional leading `icon` |
-| `<x-ise::textarea>` | Multi-line input. `rows` |
-| `<x-ise::field>` | Groups label + control + validation error. `label`, `name` |
-| `<x-ise::label>` | Standalone label. `for` |
-| `<x-ise::error>` | Validation error. Pass `name`, or content via the slot |
-| `<x-ise::heading>` | Headings. `size` (sm, base, lg, xl, 2xl), optional `level` to force the tag |
-| `<x-ise::text>` | Body text. `as` to change the tag |
-| `<x-ise::table>` | Scroll container plus base table styling. Use standard `thead`/`tbody`/`tr`/`td` inside |
-| `<x-ise::icon>` | Inline Heroicon by `name` |
+| `<x-deck::button>` | Button or link. `variant` (default, primary, outline, ghost, danger), `size` (sm, base, lg), `icon`, `iconTrailing`, `href` |
+| `<x-deck::input>` | Text input. `type`, optional leading `icon` |
+| `<x-deck::textarea>` | Multi-line input. `rows` |
+| `<x-deck::field>` | Groups label + control + validation error. `label`, `name` |
+| `<x-deck::label>` | Standalone label. `for` |
+| `<x-deck::error>` | Validation error. Pass `name`, or content via the slot |
+| `<x-deck::heading>` | Headings. `size` (sm, base, lg, xl, 2xl), optional `level` to force the tag |
+| `<x-deck::text>` | Body text. `as` to change the tag |
+| `<x-deck::table>` | Scroll container plus base table styling. Use standard `thead`/`tbody`/`tr`/`td` inside |
+| `<x-deck::icon>` | Inline Heroicon by `name` |
 
-Passing `name` to `<x-ise::field>` renders the label and wires up the validation error:
+Passing `name` to `<x-deck::field>` renders the label and wires up the validation error:
 
 ```blade
-<x-ise::field :label="__('Name')" name="name">
-    <x-ise::input wire:model="name" required />
-</x-ise::field>
+<x-deck::field :label="__('Name')" name="name">
+    <x-deck::input wire:model="name" required />
+</x-deck::field>
 ```
 
 Any extra attributes (including `wire:model`, `class`, `required`) pass through to the
@@ -60,7 +60,7 @@ underlying element, and `class` merges with the component's own classes.
 
 ### Icons
 
-`<x-ise::icon>` ships the Heroicons used by the Marque views — `arrow-left`,
+`<x-deck::icon>` ships the Heroicons used by the Marque views — `arrow-left`,
 `arrow-down-tray`, `magnifying-glass`, `pencil`, `plus` — inlined as SVG to avoid an
 icon-package dependency. Add more by extending `resources/views/components/icon.blade.php`.
 

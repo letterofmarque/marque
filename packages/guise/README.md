@@ -11,7 +11,7 @@ them or handle login. For a complete private tracker, install the set:
 composer require marque/trove marque/bloodhound marque/guise marque/usarrs marque/cennad
 ```
 
-That resolves `marque/threepio` and `marque/ise` for you. Verified working as a set,
+That resolves `marque/threepio` and `marque/deck` for you. Verified working as a set,
 2026-09-10.
 
 Browsing without accounts is [marque/disguise](https://packagist.org/packages/marque/disguise)
@@ -19,7 +19,7 @@ instead.
 
 ## Installation
 
-Requires [marque/trove](https://packagist.org/packages/marque/trove) and [marque/ise](https://packagist.org/packages/marque/ise), which supplies the Blade UI components.
+Requires [marque/trove](https://packagist.org/packages/marque/trove) and [marque/deck](https://packagist.org/packages/marque/deck), which supplies the Blade UI components.
 
 ```bash
 composer require marque/guise
@@ -124,7 +124,7 @@ If you need to reference the components directly:
 - Livewire 4+
 - Tailwind CSS
 - [marque/trove](https://packagist.org/packages/marque/trove)
-- [marque/ise](https://packagist.org/packages/marque/ise)
+- [marque/deck](https://packagist.org/packages/marque/deck)
 
 ## License
 

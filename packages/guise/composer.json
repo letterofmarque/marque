@@ -31,7 +31,7 @@
         },
         {
             "type": "path",
-            "url": "../ise",
+            "url": "../deck",
             "options": {
                 "symlink": true
             }
@@ -55,7 +55,7 @@
         "php": "^8.3",
         "marque/trove": "^3.0|^4.0",
         "marque/threepio": "^3.0",
-        "marque/ise": "^1.0",
+        "marque/deck": "^1.0",
         "illuminate/support": "^13.0",
         "illuminate/routing": "^13.0",
         "illuminate/view": "^13.0",

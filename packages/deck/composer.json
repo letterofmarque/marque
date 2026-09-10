@@ -1,5 +1,5 @@
 {
-    "name": "marque/ise",
+    "name": "marque/deck",
     "description": "App layout shell for Marque platform - navigation, footer, theming",
     "type": "library",
     "license": "MIT",
@@ -28,12 +28,12 @@
     },
     "autoload": {
         "psr-4": {
-            "Marque\\Ise\\": "src/"
+            "Marque\\Deck\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Marque\\Ise\\Tests\\": "tests/"
+            "Marque\\Deck\\Tests\\": "tests/"
         }
     },
     "extra": {
@@ -42,7 +42,7 @@
         },
         "laravel": {
             "providers": [
-                "Marque\\Ise\\IseServiceProvider"
+                "Marque\\Deck\\DeckServiceProvider"
             ]
         }
     },

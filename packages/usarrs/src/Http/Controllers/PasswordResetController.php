@@ -15,7 +15,7 @@ class PasswordResetController
     public function showForgotForm(): View
     {
         return view('usarrs::auth.forgot-password')
-            ->layout(config('usarrs.layout', 'ise::layouts.app'));
+            ->layout(config('usarrs.layout', 'deck::layouts.app'));
     }
 
     public function sendResetLink(Request $request): RedirectResponse
@@ -32,7 +32,7 @@ class PasswordResetController
         return view('usarrs::auth.reset-password', [
             'token' => $token,
             'email' => $request->query('email', ''),
-        ])->layout(config('usarrs.layout', 'ise::layouts.app'));
+        ])->layout(config('usarrs.layout', 'deck::layouts.app'));
     }
 
     public function reset(Request $request): RedirectResponse

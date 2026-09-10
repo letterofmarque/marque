@@ -2,6 +2,6 @@
 
 declare(strict_types=1);
 
-use Marque\Ise\Tests\TestCase;
+use Marque\Deck\Tests\TestCase;
 
 pest()->extend(TestCase::class)->in('Unit');

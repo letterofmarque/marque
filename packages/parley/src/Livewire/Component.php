@@ -16,7 +16,7 @@ abstract class Component extends LivewireComponent
 {
     protected function parleyLayout(): string
     {
-        return config('parley.layout', 'ise::layouts.app');
+        return config('parley.layout', 'deck::layouts.app');
     }
 
     protected function parleyView(string $view, array $data = []): View

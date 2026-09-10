@@ -189,9 +189,9 @@ return [
     |--------------------------------------------------------------------------
     |
     | The Blade layout parley's own pages extend. Defaults to the shell that
-    | marque/ise provides.
+    | marque/deck provides.
     |
     */
 
-    'layout' => 'ise::layouts.app',
+    'layout' => 'deck::layouts.app',
 ];

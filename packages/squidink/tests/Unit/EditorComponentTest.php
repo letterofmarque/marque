@@ -8,7 +8,7 @@ use Marque\SquidInk\SquidInk;
 /**
  * The editor rendered as a Blade component.
  *
- * Neither Livewire nor marque/ise is installed in this package's test
+ * Neither Livewire nor marque/deck is installed in this package's test
  * environment, which is the point: these tests are what prove squidink is
  * genuinely usable without either. A text pipeline that will not install without
  * a UI package or a frontend framework is the coupling the suite exists to
@@ -23,7 +23,7 @@ describe('the editor without Livewire or ise installed', function () {
             ->and($html)->toContain('data-squidink-input');
     });
 
-    it('does not fail when marque/ise is absent', function () {
+    it('does not fail when marque/deck is absent', function () {
         // The ise package is not installed here; a label must still render.
         $html = Blade::render('<x-squidink::editor name="body" label="Description" />');
 
@@ -95,13 +95,13 @@ describe('optional dependencies stay optional', function () {
             ->and(Blade::render('<x-squidink::editor name="body" />'))->toContain('<textarea');
     });
 
-    it('references no marque/ise component in its own views', function (string $view) {
+    it('references no marque/deck component in its own views', function (string $view) {
         $source = file_get_contents(__DIR__.'/../../resources/views/'.$view);
 
         // Blade resolves components at compile time, so a class_exists() guard
-        // around <x-ise::...> does not prevent an explosion where ise is absent.
+        // around <x-deck::...> does not prevent an explosion where ise is absent.
         // The only safe answer is not to reference them at all.
-        expect($source)->not->toContain('<x-ise::');
+        expect($source)->not->toContain('<x-deck::');
     })->with([
         'components/editor.blade.php',
         'livewire/editor.blade.php',

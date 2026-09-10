@@ -14,7 +14,7 @@ Built by [Letter Of Marque Software](https://lom.software).
 | [marque/guise](packages/guise) | Livewire web frontend (authenticated) |
 | [marque/threepio](packages/threepio) | BitTorrent protocol primitives |
 | [marque/hound](packages/hound) | Public BitTorrent tracker (no auth) |
-| [marque/ise](packages/ise) | App layout shell (navigation, theming) |
+| [marque/deck](packages/ise) | App layout shell (navigation, theming) |
 | [marque/disguise](packages/disguise) | Public web frontend (browse without login) |
 | [marque/usarrs](packages/usarrs) | Auth, user profiles, invites, admin |
 | [marque/squidink](packages/squidink) | Format-agnostic text pipeline (Markdown, BBCode → HTML) |
@@ -45,7 +45,7 @@ composer require marque/trove marque/guise marque/usarrs
 ```
 
 Each pulls in whatever it needs (`marque/threepio` for the BitTorrent protocol,
-`marque/ise` for the shared UI shell) — you don't name those yourself. All three
+`marque/deck` for the shared UI shell) — you don't name those yourself. All three
 verified installing cleanly as sets on 2026-09-10.
 
 Then add whatever else you want from the list below: rich text, discussion, a
@@ -96,7 +96,7 @@ composer require marque/taxonomy
 ### Guise (Web UI)
 - Livewire components for torrent browsing, viewing, uploading, editing
 - Configurable layouts
-- Dependency-free Blade UI components (from marque/ise), styled with Tailwind CSS
+- Dependency-free Blade UI components (from marque/deck), styled with Tailwind CSS
 
 ### SquidInk (Text)
 - Markdown and BBCode in, HTML and plain text out, one document model between

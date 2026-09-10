@@ -10,7 +10,7 @@ use Laravel\Fortify\FortifyServiceProvider;
 use Laravel\Passkeys\PasskeysServiceProvider;
 use Livewire\Livewire;
 use Livewire\LivewireServiceProvider;
-use Marque\Ise\IseServiceProvider;
+use Marque\Deck\DeckServiceProvider;
 use Marque\Trove\TroveServiceProvider;
 use Marque\Usarrs\UsarrsServiceProvider;
 use Orchestra\Testbench\TestCase as BaseTestCase;
@@ -24,7 +24,7 @@ abstract class TestCase extends BaseTestCase
         return [
             LivewireServiceProvider::class,
             TroveServiceProvider::class,
-            IseServiceProvider::class,
+            DeckServiceProvider::class,
             // FortifyServiceProvider is registered explicitly here (not by
             // usarrs' own composer.json alone) so the test suite proves usarrs
             // actively suppresses Fortify's routes, not merely that Fortify

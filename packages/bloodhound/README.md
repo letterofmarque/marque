@@ -11,7 +11,7 @@ complete private tracker, install the set:
 composer require marque/trove marque/bloodhound marque/guise marque/usarrs marque/cennad
 ```
 
-That resolves `marque/threepio` and `marque/ise` for you. Verified working as a set,
+That resolves `marque/threepio` and `marque/deck` for you. Verified working as a set,
 2026-09-10.
 
 Prefer a public, no-login tracker? Use [marque/hound](https://packagist.org/packages/marque/hound)

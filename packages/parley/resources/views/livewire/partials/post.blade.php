@@ -25,27 +25,27 @@
 <div class="flex flex-col gap-3 {{ $indentClass }}" wire:key="parley-post-{{ $post->id }}">
     <div class="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
         @if ($isDeleted)
-            <x-ise::text class="text-sm text-zinc-400 italic">{{ __('[deleted]') }}</x-ise::text>
+            <x-deck::text class="text-sm text-zinc-400 italic">{{ __('[deleted]') }}</x-deck::text>
         @else
             <div class="flex items-center justify-between gap-2">
-                <x-ise::text class="text-sm font-medium">
+                <x-deck::text class="text-sm font-medium">
                     {{ $post->user->name }}
                     <span class="font-normal text-zinc-500">· {{ $post->created_at->diffForHumans() }}</span>
                     @if ($post->updated_at->gt($post->created_at))
                         <span class="font-normal text-zinc-400">({{ __('edited') }})</span>
                     @endif
-                </x-ise::text>
+                </x-deck::text>
             </div>
 
             @if ($editingPost === $post->id)
                 <form wire:submit="saveEdit" class="mt-2 flex flex-col gap-2">
-                    <x-ise::field name="editingBody">
-                        <x-ise::textarea wire:model="editingBody" rows="3" />
-                    </x-ise::field>
+                    <x-deck::field name="editingBody">
+                        <x-deck::textarea wire:model="editingBody" rows="3" />
+                    </x-deck::field>
 
                     <div class="flex items-center gap-2">
-                        <x-ise::button type="submit" variant="primary" size="sm">{{ __('Save') }}</x-ise::button>
-                        <x-ise::button variant="ghost" size="sm" wire:click="cancelEdit">{{ __('Cancel') }}</x-ise::button>
+                        <x-deck::button type="submit" variant="primary" size="sm">{{ __('Save') }}</x-deck::button>
+                        <x-deck::button variant="ghost" size="sm" wire:click="cancelEdit">{{ __('Cancel') }}</x-deck::button>
                     </div>
                 </form>
             @else
@@ -88,13 +88,13 @@
     @if ($replyingTo === $post->id)
         <div class="{{ $depth < $maxDepth ? 'ml-6' : '' }}">
             <form wire:submit="submit" class="flex flex-col gap-2">
-                <x-ise::field name="body">
-                    <x-ise::textarea wire:model="body" rows="2" placeholder="{{ __('Write a reply…') }}" autofocus />
-                </x-ise::field>
+                <x-deck::field name="body">
+                    <x-deck::textarea wire:model="body" rows="2" placeholder="{{ __('Write a reply…') }}" autofocus />
+                </x-deck::field>
 
                 <div class="flex items-center gap-2">
-                    <x-ise::button type="submit" variant="primary" size="sm">{{ __('Reply') }}</x-ise::button>
-                    <x-ise::button variant="ghost" size="sm" wire:click="cancelReply">{{ __('Cancel') }}</x-ise::button>
+                    <x-deck::button type="submit" variant="primary" size="sm">{{ __('Reply') }}</x-deck::button>
+                    <x-deck::button variant="ghost" size="sm" wire:click="cancelReply">{{ __('Cancel') }}</x-deck::button>
                 </div>
             </form>
         </div>

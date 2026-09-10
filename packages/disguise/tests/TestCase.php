@@ -7,8 +7,8 @@ namespace Marque\Disguise\Tests;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Livewire\LivewireServiceProvider;
+use Marque\Deck\DeckServiceProvider;
 use Marque\Disguise\DisguiseServiceProvider;
-use Marque\Ise\IseServiceProvider;
 use Marque\Trove\TroveServiceProvider;
 use Orchestra\Testbench\TestCase as BaseTestCase;
 
@@ -21,7 +21,7 @@ abstract class TestCase extends BaseTestCase
         return [
             LivewireServiceProvider::class,
             TroveServiceProvider::class,
-            IseServiceProvider::class,
+            DeckServiceProvider::class,
             DisguiseServiceProvider::class,
         ];
     }

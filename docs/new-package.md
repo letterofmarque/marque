@@ -148,7 +148,7 @@ This keeps the dependent package at a MINOR bump and keeps the new package genui
 optional.
 
 **PHP-side seams compose; view-layer ones do not.** Blade resolves components at
-*compile* time, so a `class_exists()` guard around `<x-ise::button>` still throws
+*compile* time, so a `class_exists()` guard around `<x-deck::button>` still throws
 wherever `ise` is absent. Own your markup, publish views, or take a hard dependency —
 never attempt a conditional. This is Spec #83's central finding and it cost a
 checkpoint to discover.

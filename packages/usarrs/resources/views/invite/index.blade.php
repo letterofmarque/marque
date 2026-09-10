@@ -1,21 +1,21 @@
 <div class="flex h-full w-full flex-1 flex-col gap-4">
     <div class="flex items-center justify-between">
-        <x-ise::heading size="xl">{{ __('My Invites') }}</x-ise::heading>
+        <x-deck::heading size="xl">{{ __('My Invites') }}</x-deck::heading>
         @if ($canCreate)
-            <x-ise::button variant="primary" :href="route('invites.create')" icon="plus" wire:navigate>
+            <x-deck::button variant="primary" :href="route('invites.create')" icon="plus" wire:navigate>
                 {{ __('Create Invite') }}
-            </x-ise::button>
+            </x-deck::button>
         @endif
     </div>
 
     @if (session('status'))
         <div class="rounded-lg bg-green-50 p-4 dark:bg-green-900/20">
-            <x-ise::text class="text-sm text-green-700 dark:text-green-300">{{ session('status') }}</x-ise::text>
+            <x-deck::text class="text-sm text-green-700 dark:text-green-300">{{ session('status') }}</x-deck::text>
         </div>
     @endif
 
     <div class="rounded-xl border border-zinc-200 dark:border-zinc-700">
-        <x-ise::table>
+        <x-deck::table>
             <thead>
                 <tr class="border-b border-zinc-200 dark:border-zinc-700">
                     <th class="px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">{{ __('Code') }}</th>
@@ -35,21 +35,21 @@
                         <td class="px-3 py-2">{{ $invite->expires_at?->diffForHumans() ?? '-' }}</td>
                         <td class="px-3 py-2">
                             @if ($invite->status === \Marque\Usarrs\Enums\InviteStatus::Pending)
-                                <x-ise::button variant="ghost" size="sm" wire:click="revoke({{ $invite->id }})" wire:confirm="{{ __('Revoke this invite?') }}">
+                                <x-deck::button variant="ghost" size="sm" wire:click="revoke({{ $invite->id }})" wire:confirm="{{ __('Revoke this invite?') }}">
                                     {{ __('Revoke') }}
-                                </x-ise::button>
+                                </x-deck::button>
                             @endif
                         </td>
                     </tr>
                 @empty
                     <tr>
                         <td colspan="5" class="px-3 py-8 text-center">
-                            <x-ise::text class="text-zinc-500">{{ __('No invites yet.') }}</x-ise::text>
+                            <x-deck::text class="text-zinc-500">{{ __('No invites yet.') }}</x-deck::text>
                         </td>
                     </tr>
                 @endforelse
             </tbody>
-        </x-ise::table>
+        </x-deck::table>
     </div>
 
     @if ($invites->hasPages())

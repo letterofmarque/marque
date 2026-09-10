@@ -7,7 +7,7 @@ namespace Marque\Parley\Tests;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Livewire\LivewireServiceProvider;
-use Marque\Ise\IseServiceProvider;
+use Marque\Deck\DeckServiceProvider;
 use Marque\Parley\ParleyServiceProvider;
 use Marque\SquidInk\SquidInkServiceProvider;
 use Marque\Trove\TroveServiceProvider;
@@ -21,14 +21,14 @@ abstract class TestCase extends BaseTestCase
      * Every dependency is listed explicitly: Laravel's package auto-discovery
      * does not run under Testbench, so a provider left out here is simply
      * absent. guise's suite broke exactly this way on a missing
-     * IseServiceProvider.
+     * DeckServiceProvider.
      */
     protected function getPackageProviders($app): array
     {
         return [
             LivewireServiceProvider::class,
             TroveServiceProvider::class,
-            IseServiceProvider::class,
+            DeckServiceProvider::class,
             SquidInkServiceProvider::class,
             ParleyServiceProvider::class,
         ];
@@ -97,7 +97,7 @@ abstract class TestCase extends BaseTestCase
         $app['config']->set('auth.providers.users.model', TestUser::class);
 
         // The forum's full-page components render through parley's own
-        // layout, which defaults to ise::layouts.app — that pulls in Laravel's
+        // layout, which defaults to deck::layouts.app — that pulls in Laravel's
         // Vite helper, which has no manifest under Testbench. A minimal test
         // layout sidesteps it, same fix guise's own suite already needed.
         $app['view']->addNamespace('parley-test', __DIR__.'/views');

@@ -134,5 +134,5 @@ return [
     'admin_middleware' => ['web', 'auth', 'verified'],
 
     // Layout for Livewire components
-    'layout' => env('USARRS_LAYOUT', 'ise::layouts.app'),
+    'layout' => env('USARRS_LAYOUT', 'deck::layouts.app'),
 ];

@@ -28,7 +28,7 @@ class EmailVerificationController
     public function notice(): View
     {
         return view('usarrs::auth.verify-email')
-            ->layout(config('usarrs.layout', 'ise::layouts.app'));
+            ->layout(config('usarrs.layout', 'deck::layouts.app'));
     }
 
     /**

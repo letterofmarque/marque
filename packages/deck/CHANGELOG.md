@@ -1,9 +1,48 @@
 # Changelog
 
-All notable changes to `marque/ise` are documented here.
+All notable changes to `marque/deck` are documented here.
+
+*This package was named `marque/ise` up to 1.1.0, and `marque/id` before that. Entries below
+those versions describe the package under its former names.*
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
+
+## [2.0.0] — 2026-09-10
+
+> Renames the package from `marque/ise` to `marque/deck` — same components, new name and namespace.
+
+### Changed
+
+- **BREAKING: the package is now `marque/deck`.** `marque/ise` is abandoned on
+  Packagist, pointing here. Nothing about the components changed — same layout,
+  same eleven Blade components, same markup and behaviour.
+
+  `ise` was named as the shared suffix of gu-*ise* and dis-gu*ise*, the two
+  frontend packages it originally served. It is now the shell that guise,
+  disguise, usarrs, parley, squidink, taxonomy and skipper all build on, so a
+  name taken from two of its tenants had stopped describing it. See
+  [`docs/why.md`](../../docs/why.md) and Spec #108.
+
+- **BREAKING: namespace `Marque\\Ise` → `Marque\\Deck`**, and
+  `IseServiceProvider` → `DeckServiceProvider`.
+
+- **BREAKING: view namespace `ise::` → `deck::`.** Component tags become
+  `<x-deck::button>`, layouts `deck::layouts.app`.
+
+- **BREAKING: the Livewire navigation component is now `deck-navigation`.**
+
+- **BREAKING: config file `ise.php` → `deck.php`**, keys `config('ise.*')` →
+  `config('deck.*')`, env var `ISE_THEME` → `DECK_THEME`, publish tags
+  `ise-config`/`ise-views` → `deck-config`/`deck-views`, and published views move
+  to `resources/views/vendor/deck`.
+
+  **A published config in your own app is not fixed by upgrading the package** —
+  rename `config/ise.php` yourself, and update the `layout` default in any
+  published `guise.php` / `disguise.php` / `usarrs.php` / `parley.php` from
+  `ise::layouts.app` to `deck::layouts.app`.
+
+Full checklist: [upgrade guide](../../docs/upgrade-guide-ise-to-deck.md).
 
 ## [1.1.0] — 2026-09-04
 

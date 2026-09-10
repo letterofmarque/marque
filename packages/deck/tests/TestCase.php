@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Marque\Ise\Tests;
+namespace Marque\Deck\Tests;
 
 use Livewire\LivewireServiceProvider;
-use Marque\Ise\IseServiceProvider;
+use Marque\Deck\DeckServiceProvider;
 use Orchestra\Testbench\TestCase as BaseTestCase;
 
 abstract class TestCase extends BaseTestCase
@@ -14,7 +14,7 @@ abstract class TestCase extends BaseTestCase
     {
         return [
             LivewireServiceProvider::class,
-            IseServiceProvider::class,
+            DeckServiceProvider::class,
         ];
     }
 

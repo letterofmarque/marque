@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>{{ $title ?? config('ise.app_name', 'Marque') }}</title>
+    <title>{{ $title ?? config('deck.app_name', 'Marque') }}</title>
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
@@ -13,7 +13,7 @@
 <body class="min-h-screen bg-white dark:bg-zinc-800">
     <div class="flex min-h-screen flex-col">
         {{-- Navigation --}}
-        <livewire:ise-navigation />
+        <livewire:deck-navigation />
 
         {{-- Page Content --}}
         <main class="flex-1">
@@ -23,8 +23,8 @@
         </main>
 
         {{-- Footer --}}
-        @if(config('ise.show_footer', true))
-            @include('ise::components.footer')
+        @if(config('deck.show_footer', true))
+            @include('deck::components.footer')
         @endif
     </div>
 

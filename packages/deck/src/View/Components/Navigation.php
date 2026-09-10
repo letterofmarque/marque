@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Marque\Ise\View\Components;
+namespace Marque\Deck\View\Components;
 
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
@@ -22,13 +22,13 @@ class Navigation extends Component
 
     public function mount(): void
     {
-        $this->appName = config('ise.app_name', 'Marque');
+        $this->appName = config('deck.app_name', 'Marque');
         $this->items = $this->detectNavItems();
     }
 
     public function render(): View
     {
-        return view('ise::components.navigation');
+        return view('deck::components.navigation');
     }
 
     /**
