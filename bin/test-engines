@@ -1,0 +1,179 @@
+#!/usr/bin/env bash
+#
+# Run the full suite against one or more database engines, serially.
+#
+#   bin/test-engines                    # all four
+#   bin/test-engines mysql              # just one
+#   bin/test-engines sqlite pgsql       # a subset
+#   bin/test-engines --packages trove,skipper mysql
+#
+# Why this exists
+# ---------------
+# Running two engines at once makes the whole thing slower AND unreliable:
+# trove took 251s against MySQL while MariaDB was competing, and 97s once it
+# had the machine to itself. Job #10548 recorded the sharper version of the
+# same mistake — two packages against one database produced 172 phantom
+# failures. So this script is serial by construction. There is no --parallel
+# flag and there should not be one.
+#
+# It also writes each package's result to its own file rather than capturing
+# it through nested command substitution, which is what produced a screen of
+# fake PARSE_FAILs the first time this was done by hand.
+#
+# A green SQLite run proves very little (docs/how.md): SQLite does not enforce
+# foreign keys by default, ignores ->after() column positioning, and tolerates
+# an abandoned transaction. The real engines are the point.
+
+set -uo pipefail
+
+cd "$(dirname "$0")/.."
+ROOT=$(pwd)
+RESULTS="${TMPDIR:-/tmp}/marque-engines-$$"
+mkdir -p "$RESULTS"
+trap 'rm -rf "$RESULTS"' EXIT
+
+ALL_ENGINES=(sqlite mysql mariadb pgsql)
+PACKAGES=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --packages) PACKAGES="$2"; shift 2 ;;
+        --packages=*) PACKAGES="${1#*=}"; shift ;;
+        -h|--help) sed -n '2,28p' "$0" | sed 's/^# \?//'; exit 0 ;;
+        *) ENGINES+=("$1"); shift ;;
+    esac
+done
+
+ENGINES=("${ENGINES[@]:-${ALL_ENGINES[@]}}")
+
+if [[ -n "$PACKAGES" ]]; then
+    IFS=',' read -ra PKG_LIST <<< "$PACKAGES"
+else
+    PKG_LIST=()
+    for d in packages/*/; do PKG_LIST+=("$(basename "$d")"); done
+fi
+
+# Per-engine connection settings. MariaDB is on 3307 because it cannot be
+# installed alongside MySQL from apt — it runs in Docker (see docs/how.md).
+engine_env() {
+    case "$1" in
+        sqlite)  echo "DB_CONNECTION=sqlite" ;;
+        mysql)   echo "DB_CONNECTION=mysql DB_DATABASE=marque_test" ;;
+        mariadb) echo "DB_CONNECTION=mariadb DB_PORT=3307 DB_DATABASE=marque_test" ;;
+        pgsql)   echo "DB_CONNECTION=pgsql DB_DATABASE=marque_test" ;;
+        *) echo "unknown engine: $1" >&2; return 1 ;;
+    esac
+}
+
+# A killed run leaves its tables behind, and the leftovers produce DIFFERENT
+# failures on the next run that look exactly like code bugs. Reset between
+# packages so each one starts from nothing — this cost an hour of chasing a
+# phantom foreign-key error that was really residue from an interrupted run.
+reset_db() {
+    case "$1" in
+        sqlite) return 0 ;;
+        mysql)   mysql -h127.0.0.1 -umarque -pmarque \
+                   -e 'DROP DATABASE IF EXISTS marque_test; CREATE DATABASE marque_test;' 2>/dev/null ;;
+        mariadb) mysql -h127.0.0.1 -P3307 -umarque -pmarque \
+                   -e 'DROP DATABASE IF EXISTS marque_test; CREATE DATABASE marque_test;' 2>/dev/null ;;
+        pgsql)   PGPASSWORD=marque psql -h 127.0.0.1 -U marque -d postgres -q \
+                   -c 'DROP DATABASE IF EXISTS marque_test' \
+                   -c 'CREATE DATABASE marque_test' 2>/dev/null ;;
+    esac
+}
+
+# Fail fast and clearly if an engine is not actually reachable, rather than
+# letting every package fail one at a time with a connection error.
+check_engine() {
+    case "$1" in
+        sqlite) return 0 ;;
+        mysql)   mysql -h127.0.0.1 -umarque -pmarque -e 'SELECT 1' >/dev/null 2>&1 ;;
+        mariadb) mysql -h127.0.0.1 -P3307 -umarque -pmarque -e 'SELECT 1' >/dev/null 2>&1 ;;
+        pgsql)   PGPASSWORD=marque psql -h 127.0.0.1 -U marque -d marque_test -c 'SELECT 1' >/dev/null 2>&1 ;;
+    esac
+}
+
+OVERALL=0
+
+for engine in "${ENGINES[@]}"; do
+    if ! check_engine "$engine"; then
+        printf '\n\033[31m%s is not reachable — skipping.\033[0m\n' "$engine"
+        [[ "$engine" == mariadb ]] && echo "  (docker start marque-mariadb)"
+        OVERALL=1
+        continue
+    fi
+
+    printf '\n\033[1m=== %s ===\033[0m\n' "$engine"
+    engine_start=$(date +%s)
+    total=0
+    failed=()
+
+    for pkg in "${PKG_LIST[@]}"; do
+        if [[ ! -d "$ROOT/packages/$pkg" ]]; then
+            printf '  \033[31m✗\033[0m %-12s no such package\n' "$pkg"
+            failed+=("$pkg"); OVERALL=1; continue
+        fi
+
+        reset_db "$engine"
+
+        out="$RESULTS/$engine-$pkg.json"
+        start=$(date +%s)
+
+        # Each result goes to its own file. Capturing through nested command
+        # substitution is what produced fake failures when this was done by hand.
+        ( cd "$ROOT/packages/$pkg" && env $(engine_env "$engine") composer test 2>&1 | tail -1 ) > "$out" 2>&1
+
+        elapsed=$(( $(date +%s) - start ))
+
+        # A package whose TestCase has no matcher for this engine falls back to
+        # SQLite and reports a cheerful green for an engine it never touched.
+        # A real-engine run that finishes suspiciously fast is the tell.
+        if [[ "$engine" != sqlite && $elapsed -lt 2 ]]; then
+            printf '  \033[33m!\033[0m %-12s suspiciously fast (%ds) — did it fall back to SQLite?\n' "$pkg" "$elapsed"
+        fi
+
+        read -r result tests <<< "$(
+            python3 - "$out" <<'PY'
+import json, sys
+try:
+    with open(sys.argv[1]) as fh:
+        d = json.loads(fh.read().strip().splitlines()[-1])
+    print(d.get('result', 'unknown'), d.get('tests', 0))
+except Exception:
+    print('UNPARSEABLE 0')
+PY
+        )"
+
+        total=$(( total + tests ))
+
+        if [[ "$result" == passed ]]; then
+            printf '  \033[32m✓\033[0m %-12s %4s tests  %3ds\n' "$pkg" "$tests" "$elapsed"
+        else
+            printf '  \033[31m✗\033[0m %-12s %-11s %3ds\n' "$pkg" "$result" "$elapsed"
+            failed+=("$pkg")
+            OVERALL=1
+        fi
+    done
+
+    engine_elapsed=$(( $(date +%s) - engine_start ))
+
+    if [[ ${#failed[@]} -eq 0 ]]; then
+        printf '  \033[32m%s: %d tests, all green (%ds)\033[0m\n' "$engine" "$total" "$engine_elapsed"
+    else
+        printf '  \033[31m%s: %d tests, FAILING: %s (%ds)\033[0m\n' \
+            "$engine" "$total" "${failed[*]}" "$engine_elapsed"
+        for pkg in "${failed[@]}"; do
+            [[ -f "$RESULTS/$engine-$pkg.json" ]] || continue
+            printf '\n    --- %s/%s ---\n' "$engine" "$pkg"
+            sed 's/^/    /' "$RESULTS/$engine-$pkg.json" | head -20
+        done
+    fi
+done
+
+echo
+if [[ $OVERALL -eq 0 ]]; then
+    printf '\033[32mAll engines green.\033[0m\n'
+else
+    printf '\033[31mSome engines failed — see above.\033[0m\n'
+fi
+exit "$OVERALL"

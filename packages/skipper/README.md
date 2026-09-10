@@ -61,6 +61,16 @@ later.
 Registration is legal any time up to `booted`, so it does not matter whether your provider
 boots before or after skipper's.
 
+## Stability
+
+**The registration contract is public API from 1.0.0.** `Marque\Trove\Registry\` —
+`AdminScreen`, `AdminScreenRegistry`, and their public surface — follows semver on
+`marque/trove`. Build against it.
+
+What is *not* covered by that promise: how skipper renders the panel. The views, the
+grouping presentation and the layout are skipper's own surface and version with skipper.
+Your screen is a Livewire component you own; the panel just lists and routes it.
+
 ## Permissions
 
 `minimumRole` is checked twice, against the same registry entry: once when building the

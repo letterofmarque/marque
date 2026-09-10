@@ -98,10 +98,99 @@ Concretely: the fix here is for `deck` (formerly `ise`, and `id` before that —
 
 This doesn't apply to *every* duplication — the Testbench/Vite test-layout-namespace fix (job #10561) is test scaffolding, not runtime code a package depends on, so it's a documentation fix, not a promotion. The test is: **does the third package need to `require`/`extend`/`use` something to get this for free, or does it just need to know the fact?** If the former, promote it into the shared package. If the latter, document it.
 
+## Pattern 5: a registry in `trove`, when packages contribute to a shell they don't own
+
+This is Pattern 4 carried out. The navigation case it names above — `deck`'s nav component
+holding a hardcoded `if` per package, each naming a consumer's service provider as a string
+literal — was fixed by promotion rather than by better documentation, and the same mechanism
+solved the admin-panel problem alongside it (Spec #108, Build #101).
+
+**The problem shape:** a package wants to contribute *something* to a shell — a nav entry, an
+admin screen — and the shell must not know that package exists. The naive version has the
+shell enumerate its consumers, which inverts the dependency, makes third-party contribution
+impossible, and means adding an entry requires editing and releasing a *different* package
+than the one gaining it.
+
+**The mechanism:** a plain-PHP registry in `trove`, under `Marque\Trove\Registry\`.
+
+```php
+// The contributing package, from its own service provider's boot():
+$this->app->make(AdminScreenRegistry::class)->register(new AdminScreen(
+    identifier: 'client-whitelist',
+    label: 'Client Whitelist',
+    component: 'my-package-client-whitelist',
+    path: 'admin/clients',
+    minimumRole: Role::Moderator,
+    group: 'Tracker',
+));
+```
+
+The contributing package depends on **trove alone** — which every deployment already installs
+— and never on the shell that renders the entry. Install `skipper` and the screen appears;
+leave it out and the registration is never read, which costs nothing. That one-way arrow is
+the whole point: it is what makes a third-party package's screen possible at all.
+
+### Why the registries live in trove and not in the renderer
+
+`trove` is mandatory and has no view layer. Putting the contract there costs it nothing —
+no `illuminate/view`, no Livewire, no new dependency of any kind — and it is the only
+package a contributor can rely on being present. Putting the contract in `skipper` or `deck`
+instead would force every contributing package to depend on the renderer, i.e. exactly the
+coupling the arrangement exists to avoid.
+
+### Two registries, not one, and no shared base class
+
+`NavRegistry` and `AdminScreenRegistry` look similar and behave differently:
+
+- A **nav item** is evaluated per request against the current user, with an arbitrary
+  visibility closure — "show Invites only if this user has any" is a query, not a rank.
+- An **admin screen** must be enumerable **without** a user, because the route table is built
+  from it during `booted()`.
+
+One contract spanning both would mean a visibility callback invoked in two very different
+contexts. They also share almost nothing worth extracting — hold an array, push, return
+filtered — so there is no base class. Per Pattern 4's own test, a third registry is the
+trigger to look for a shared parent, not the second.
+
+### Things that bit, and are worth not rediscovering
+
+**Livewire serialises public component properties into a `wire:snapshot` attribute in the page
+source.** Two consequences: a registry entry carrying a `Closure` cannot be a public property
+at all (it throws `Property type not supported`), and anything filtered only in the template
+still ships to the browser. Flatten to primitives in `mount()`, and filter there too.
+
+**Register routes in `booted()`, never in `boot()`.** A `boot()`-time walk of a registry
+misses every package whose provider boots later — silently, with no error. `booted()` fires
+once every provider has booted and is still early enough for `route:cache` to serialise what
+it registers.
+
+**Never generate a route over a URI another package already bound.** skipper generating
+`admin/users` on top of usarrs' own route silently *replaced* `admin.users.index` — published
+API vanishing with no error. Collect the bound URIs first and skip any path already claimed;
+the contributing package's route is canonical and the shell links to it.
+
+**Testbench cannot verify any of the three above.** The app is already booted before a test
+body runs, so `booted()` has fired and `route:cache` re-bootstraps a fresh application
+without Testbench's dynamically-injected providers. Route behaviour needs a real Laravel app;
+the package suite proves the registry, not the routing.
+
+### The contract is public API
+
+`Marque\Trove\Registry\` follows semver on trove from 4.x onward — third-party packages are
+expected to register against it, and CP #588's nav test exercises a non-Marque fixture
+provider to keep that path honest. What is *not* promised is how any given shell renders the
+result; skipper's views and grouping version with skipper.
+
+Committing this early was safe precisely because of the trove/renderer split: the expensive
+promise (the contract) and the volatile code (the panel) sit in different packages. Measured
+before deciding — the contract changed exactly once after creation, additively, at its first
+tenant, and its second tenant needed nothing (Spec #108 OQ2).
+
 ## Checklist for the next optional→required wiring
 
 1. Composer: optional package is `suggest`, never `require`, on the consuming side.
 2. Provider: guard registration with `class_exists()` on a class from the optional package — this narrower case is fine, since you control whether your own registration depends on the other package having booted first. For a check that decides whether to *render* the other package's UI (a view, a Livewire tag), use `app()->providerIsLoaded()` instead (Pattern 1).
 3. Views: guard the *inclusion* of optional-package UI at the parent template, never inside the optional package's own view. If a view must render either way, own its markup rather than referencing the optional package's components.
 4. Models: never add an optional package's trait to a model owned by a mandatory package. Give the optional package a service entry point that works against a bare `Model` (morph class + key), and let the *consuming, optional-aware* package do the wiring.
-5. Before shipping the wiring: is this the *second* time this shape of integration has been built? If so, stop and check whether it belongs as an attachment point in `ise`/`trove` instead of a second hand-copy (Pattern 4).
+5. Before shipping the wiring: is this the *second* time this shape of integration has been built? If so, stop and check whether it belongs as an attachment point in `deck`/`trove` instead of a second hand-copy (Pattern 4).
+6. Contributing a nav entry or an admin screen? Don't invent a mechanism — register with the trove registries (Pattern 5). Depend on trove, never on the renderer.

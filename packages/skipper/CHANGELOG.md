@@ -5,7 +5,7 @@ All notable changes to `marque/skipper` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
-## [1.0.0] — unreleased
+## [1.0.0] — 2026-09-10
 
 > The admin panel — renders the admin screens packages register, and depends on none of them.
 

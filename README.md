@@ -14,12 +14,13 @@ Built by [Letter Of Marque Software](https://lom.software).
 | [marque/guise](packages/guise) | Livewire web frontend (authenticated) |
 | [marque/threepio](packages/threepio) | BitTorrent protocol primitives |
 | [marque/hound](packages/hound) | Public BitTorrent tracker (no auth) |
-| [marque/deck](packages/ise) | App layout shell (navigation, theming) |
+| [marque/deck](packages/deck) | App layout shell (navigation, theming) |
 | [marque/disguise](packages/disguise) | Public web frontend (browse without login) |
 | [marque/usarrs](packages/usarrs) | Auth, user profiles, invites, admin |
 | [marque/squidink](packages/squidink) | Format-agnostic text pipeline (Markdown, BBCode → HTML) |
 | [marque/parley](packages/parley) | Polymorphic threaded discussion (torrent comments + forum) |
 | [marque/taxonomy](packages/taxonomy) | Declarative content-type engine (YAML-defined levels + facets) |
+| [marque/skipper](packages/skipper) | Admin panel — renders the admin screens packages register |
 
 ## Requirements
 
@@ -76,6 +77,9 @@ composer require marque/parley
 
 # Declarative taxonomy engine (usually pulled in by a marque/taxonomy-* package)
 composer require marque/taxonomy
+
+# Admin panel — lists the admin screens your installed packages register
+composer require marque/skipper
 ```
 
 ## Features
