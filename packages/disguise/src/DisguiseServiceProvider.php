@@ -10,6 +10,8 @@ use Marque\Disguise\Livewire\Torrent\Edit;
 use Marque\Disguise\Livewire\Torrent\Index;
 use Marque\Disguise\Livewire\Torrent\Show;
 use Marque\Disguise\Livewire\Torrent\Upload;
+use Marque\Trove\Registry\NavItem;
+use Marque\Trove\Registry\NavRegistry;
 
 class DisguiseServiceProvider extends ServiceProvider
 {
@@ -27,6 +29,8 @@ class DisguiseServiceProvider extends ServiceProvider
             $this->registerLivewireComponents();
         }
 
+        $this->registerNavItems();
+
         if ($this->app->runningInConsole()) {
             $this->publishes([
                 __DIR__.'/../config/disguise.php' => config_path('disguise.php'),
@@ -36,6 +40,23 @@ class DisguiseServiceProvider extends ServiceProvider
                 __DIR__.'/../resources/views' => resource_path('views/vendor/disguise'),
             ], 'disguise-views');
         }
+    }
+
+    /**
+     * Declare disguise's navigation entry.
+     *
+     * Unlike guise, no visibility rule: disguise is the public frontend and
+     * guest browsing is the whole point, so the entry shows to everyone.
+     */
+    protected function registerNavItems(): void
+    {
+        $this->app->make(NavRegistry::class)->register(new NavItem(
+            identifier: 'disguise-torrents',
+            label: 'Torrents',
+            route: 'torrents.index',
+            icon: 'arrow-down-tray',
+            position: 10,
+        ));
     }
 
     protected function registerLivewireComponents(): void

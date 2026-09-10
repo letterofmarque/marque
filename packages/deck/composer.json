@@ -16,6 +16,7 @@
     },
     "require": {
         "php": "^8.3",
+        "marque/trove": "^4.0",
         "illuminate/support": "^13.0",
         "illuminate/view": "^13.0",
         "livewire/livewire": "^4.0"
@@ -55,5 +56,14 @@
         "allow-plugins": {
             "pestphp/pest-plugin": true
         }
-    }
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../trove",
+            "options": {
+                "symlink": true
+            }
+        }
+    ]
 }

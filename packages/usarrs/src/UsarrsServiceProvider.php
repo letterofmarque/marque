@@ -9,6 +9,9 @@ use Illuminate\Support\ServiceProvider;
 use Laravel\Fortify\Fortify;
 use Laravel\Passkeys\Passkeys;
 use Livewire\Livewire;
+use Marque\Trove\Enums\Role;
+use Marque\Trove\Registry\NavItem;
+use Marque\Trove\Registry\NavRegistry;
 use Marque\Usarrs\Contracts\InviteServiceInterface;
 use Marque\Usarrs\Livewire\Admin\UserIndex;
 use Marque\Usarrs\Livewire\Admin\UserShow;
@@ -75,6 +78,7 @@ class UsarrsServiceProvider extends ServiceProvider
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
 
         $this->registerPolicies();
+        $this->registerNavItems();
 
         if (class_exists(Livewire::class)) {
             if ($manageAuth) {
@@ -105,6 +109,42 @@ class UsarrsServiceProvider extends ServiceProvider
         $userModel = config('trove.user_model', 'App\\Models\\User');
         if (class_exists($userModel)) {
             Gate::policy($userModel, UserPolicy::class);
+        }
+    }
+
+    /**
+     * Declare usarrs' navigation entries.
+     *
+     * The shell used to add Profile itself after detecting usarrs, and to render
+     * an `admin.index` link for any admin — a route nothing has ever registered.
+     * Both now come from here: usarrs owns the routes, so usarrs owns the
+     * entries, and the admin entry points at `admin.users.index`, which actually
+     * exists.
+     */
+    protected function registerNavItems(): void
+    {
+        $registry = $this->app->make(NavRegistry::class);
+
+        $registry->register(new NavItem(
+            identifier: 'usarrs-profile',
+            label: 'Profile',
+            route: 'profile.show',
+            icon: 'user',
+            position: 50,
+            visible: fn (?object $user): bool => $user !== null,
+        ));
+
+        // Respects the same admin.enabled flag the rest of the admin surface
+        // uses — a disabled admin should not advertise itself in the nav.
+        if (config('usarrs.admin.enabled', true)) {
+            $registry->register(NavItem::forRole(
+                identifier: 'usarrs-admin',
+                label: 'Admin',
+                route: 'admin.users.index',
+                minimumRole: Role::Admin,
+                icon: 'cog-6-tooth',
+                position: 90,
+            ));
         }
     }
 

@@ -6,6 +6,7 @@ namespace Marque\Deck\Tests;
 
 use Livewire\LivewireServiceProvider;
 use Marque\Deck\DeckServiceProvider;
+use Marque\Trove\TroveServiceProvider;
 use Orchestra\Testbench\TestCase as BaseTestCase;
 
 abstract class TestCase extends BaseTestCase
@@ -14,6 +15,7 @@ abstract class TestCase extends BaseTestCase
     {
         return [
             LivewireServiceProvider::class,
+            TroveServiceProvider::class,
             DeckServiceProvider::class,
         ];
     }

@@ -10,6 +10,8 @@ use Marque\Guise\Livewire\Torrent\Edit;
 use Marque\Guise\Livewire\Torrent\Index;
 use Marque\Guise\Livewire\Torrent\Show;
 use Marque\Guise\Livewire\Torrent\Upload;
+use Marque\Trove\Registry\NavItem;
+use Marque\Trove\Registry\NavRegistry;
 
 class GuiseServiceProvider extends ServiceProvider
 {
@@ -24,6 +26,7 @@ class GuiseServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'guise');
 
         $this->registerLivewireComponents();
+        $this->registerNavItems();
 
         if ($this->app->runningInConsole()) {
             $this->publishes([
@@ -34,6 +37,26 @@ class GuiseServiceProvider extends ServiceProvider
                 __DIR__.'/../resources/views' => resource_path('views/vendor/guise'),
             ], 'guise-views');
         }
+    }
+
+    /**
+     * Declare guise's navigation entry.
+     *
+     * The shell used to detect guise and add this itself. Registering it here
+     * means guise owns its own entry, and deck never needs to know guise exists.
+     */
+    protected function registerNavItems(): void
+    {
+        $this->app->make(NavRegistry::class)->register(new NavItem(
+            identifier: 'guise-torrents',
+            label: 'Torrents',
+            route: 'torrents.index',
+            icon: 'arrow-down-tray',
+            position: 10,
+            // The private frontend's listing sits behind auth, so a guest has
+            // nowhere to go if this renders.
+            visible: fn (?object $user): bool => $user !== null,
+        ));
     }
 
     protected function registerLivewireComponents(): void

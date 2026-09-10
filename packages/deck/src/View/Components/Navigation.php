@@ -6,97 +6,60 @@ namespace Marque\Deck\View\Components;
 
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
+use Marque\Trove\Registry\NavRegistry;
 
 /**
- * Dynamic navigation component.
+ * Renders the navigation entries packages have registered.
  *
- * Detects which Marque packages are installed and builds
- * the appropriate navigation items.
+ * This component used to detect its own consumers — a hardcoded `if` per
+ * package, each naming a specific frontend package's service provider as a
+ * string literal. That inverted the dependency (the shell knowing its tenants),
+ * made third-party nav entries impossible, and meant adding an entry required
+ * editing and releasing a *different* package than the one gaining it.
+ *
+ * It now reads `NavRegistry` and renders whatever is there. Packages declare
+ * their own entries from their own service providers, so this file names no
+ * Marque package at all — see `docs/integration.md` Pattern 4, which flagged
+ * exactly this shape.
  */
 class Navigation extends Component
 {
     public string $appName;
 
-    /** @var array<int, array{label: string, route: string, icon: string}> */
+    /**
+     * Flattened to primitives deliberately.
+     *
+     * Livewire serialises public properties into component state, and a NavItem
+     * carries a Closure — so handing the objects straight through fails with
+     * "Property type not supported in Livewire". Only what the template renders
+     * crosses that boundary; the registry keeps the objects.
+     *
+     * @var list<array{identifier: string, label: string, route: string, icon: string|null}>
+     */
     public array $items = [];
 
     public function mount(): void
     {
         $this->appName = config('deck.app_name', 'Marque');
-        $this->items = $this->detectNavItems();
+
+        // Visibility is per-request and per-user: an entry can be gated on a
+        // role, on a query, or on nothing at all. The registry owns that rule;
+        // this component only asks.
+        $visible = app(NavRegistry::class)->visibleTo(auth()->user());
+
+        $this->items = array_values(array_map(
+            fn ($item): array => [
+                'identifier' => $item->identifier,
+                'label' => $item->label,
+                'route' => $item->route,
+                'icon' => $item->icon,
+            ],
+            $visible,
+        ));
     }
 
     public function render(): View
     {
         return view('deck::components.navigation');
-    }
-
-    /**
-     * Detect installed packages and build nav items.
-     *
-     * @return array<int, array{label: string, route: string, icon: string}>
-     */
-    private function detectNavItems(): array
-    {
-        $items = [];
-
-        // Guise (private frontend) - torrents with auth
-        if ($this->hasRoute('torrents.index') && $this->hasProvider('Marque\\Guise\\GuiseServiceProvider')) {
-            $items[] = [
-                'label' => 'Torrents',
-                'route' => 'torrents.index',
-                'icon' => 'arrow-down-tray',
-            ];
-        }
-
-        // Disguise (public frontend) - torrents without auth
-        if ($this->hasRoute('torrents.index') && $this->hasProvider('Marque\\Disguise\\DisguiseServiceProvider')) {
-            $items[] = [
-                'label' => 'Torrents',
-                'route' => 'torrents.index',
-                'icon' => 'arrow-down-tray',
-            ];
-        }
-
-        // Usarrs (auth/admin) - profile and admin
-        if ($this->hasProvider('Marque\\Usarrs\\UsarrsServiceProvider')) {
-            if ($this->hasRoute('profile.show')) {
-                $items[] = [
-                    'label' => 'Profile',
-                    'route' => 'profile.show',
-                    'icon' => 'user',
-                ];
-            }
-
-            if ($this->hasRoute('admin.index') && auth()->check()) {
-                $user = auth()->user();
-                if (method_exists($user, 'isAdmin') && $user->isAdmin()) {
-                    $items[] = [
-                        'label' => 'Admin',
-                        'route' => 'admin.index',
-                        'icon' => 'cog-6-tooth',
-                    ];
-                }
-            }
-        }
-
-        return $items;
-    }
-
-    private function hasRoute(string $name): bool
-    {
-        return app('router')->has($name);
-    }
-
-    /**
-     * Whether the given package is actually wired into this app, not just
-     * autoloadable — see docs/integration.md, Pattern 1. class_exists() would
-     * say yes for a require-dev-only install where the provider never
-     * booted; this decides whether to RENDER another package's nav items, so
-     * it needs the stronger check.
-     */
-    private function hasProvider(string $class): bool
-    {
-        return app()->providerIsLoaded($class);
     }
 }
