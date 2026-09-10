@@ -168,3 +168,57 @@ describe('the gate and the listing agree', function () {
         $this->actingAs($mod)->get('/admin/reports')->assertOk();
     });
 });
+
+describe('screens that own their own route', function () {
+    // A package like usarrs binds `admin/users` itself and names it
+    // `admin.users.index`. skipper must not shadow that with a second URL
+    // derived from the identifier — one screen, one canonical path.
+    it('honours a declared path rather than deriving one from the identifier', function () {
+        app(AdminScreenRegistry::class)->register(new AdminScreen(
+            identifier: 'vendor-users',
+            label: 'Users',
+            component: 'skipper-test-screen',
+            path: 'admin/users',
+            minimumRole: Role::Moderator,
+        ));
+
+        $screen = app(AdminScreenRegistry::class)->find('vendor-users');
+
+        expect($screen->path)->toBe('admin/users')
+            ->and($screen->pathSegment())->toBe('users');
+    });
+
+    it('resolves a screen by its declared path segment, not its identifier', function () {
+        app(AdminScreenRegistry::class)->register(new AdminScreen(
+            identifier: 'vendor-users',
+            label: 'Users',
+            component: 'skipper-test-screen',
+            path: 'admin/users',
+            minimumRole: Role::Moderator,
+        ));
+
+        $this->actingAs(TestUser::factory()->create(['role' => Role::Moderator->value]))
+            ->get('/admin/users')
+            ->assertOk();
+    });
+});
+
+describe('screens whose package already bound the route', function () {
+    // usarrs binds `admin/users` as `admin.users.index` in its own routes file
+    // and registers a screen pointing at the same path. skipper must leave that
+    // route alone: generating its own at the same path silently replaced the
+    // package's named route, breaking published API with no error anywhere.
+    it('does not generate an alias over a path another package already bound', function () {
+        // The TestCase binds admin/users as admin.users (see defineWebRoutes).
+        app(AdminScreenRegistry::class)->register(new AdminScreen(
+            identifier: 'vendor-users',
+            label: 'Users',
+            component: 'skipper-test-screen',
+            path: 'admin/users',
+            minimumRole: Role::Moderator,
+        ));
+
+        // The pre-existing name survives.
+        expect(app('router')->has('admin.users'))->toBeTrue();
+    });
+});

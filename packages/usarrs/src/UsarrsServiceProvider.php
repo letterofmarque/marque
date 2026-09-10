@@ -10,6 +10,8 @@ use Laravel\Fortify\Fortify;
 use Laravel\Passkeys\Passkeys;
 use Livewire\Livewire;
 use Marque\Trove\Enums\Role;
+use Marque\Trove\Registry\AdminScreen;
+use Marque\Trove\Registry\AdminScreenRegistry;
 use Marque\Trove\Registry\NavItem;
 use Marque\Trove\Registry\NavRegistry;
 use Marque\Usarrs\Contracts\InviteServiceInterface;
@@ -79,6 +81,7 @@ class UsarrsServiceProvider extends ServiceProvider
 
         $this->registerPolicies();
         $this->registerNavItems();
+        $this->registerAdminScreens();
 
         if (class_exists(Livewire::class)) {
             if ($manageAuth) {
@@ -110,6 +113,43 @@ class UsarrsServiceProvider extends ServiceProvider
         if (class_exists($userModel)) {
             Gate::policy($userModel, UserPolicy::class);
         }
+    }
+
+    /**
+     * Declare usarrs' admin screens.
+     *
+     * usarrs keeps owning and binding its own routes — the registry entry makes
+     * the screen *discoverable* from an admin panel, it does not take over the
+     * routing. That separation is what lets usarrs work identically with no
+     * panel installed: an unread registry entry costs nothing.
+     *
+     * Registered against trove, which usarrs already requires. **usarrs must
+     * never depend on marque/skipper** — a screen provider that needed the
+     * panel installed would defeat the whole arrangement.
+     */
+    protected function registerAdminScreens(): void
+    {
+        // Nothing to advertise when the admin surface is switched off — the
+        // components 404 in that state, so listing them would be a dead link.
+        if (! config('usarrs.admin.enabled', true)) {
+            return;
+        }
+
+        $registry = $this->app->make(AdminScreenRegistry::class);
+
+        // Moderator, not Admin: UserIndex::mount() enforces
+        // `abort_unless(auth()->user()->isModerator(), 403)`, and a stricter
+        // floor here would hide a screen moderators can legitimately use.
+        $registry->register(new AdminScreen(
+            identifier: 'usarrs-users',
+            label: 'Users',
+            component: 'usarrs-admin-user-index',
+            path: 'admin/users',
+            minimumRole: Role::Moderator,
+            icon: 'users',
+            group: 'Users',
+            position: 10,
+        ));
     }
 
     /**

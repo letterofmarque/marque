@@ -69,10 +69,25 @@ class SkipperServiceProvider extends ServiceProvider
             $middleware = config('skipper.middleware', ['web', 'auth', 'verified']);
             $prefix = config('skipper.prefix', 'admin');
 
+            $bound = collect(Route::getRoutes()->getRoutes())
+                ->map(fn ($route): string => $route->uri())
+                ->all();
+
             foreach ($this->app->make(AdminScreenRegistry::class)->all() as $screen) {
+                $uri = trim($prefix.'/'.$screen->pathSegment(), '/');
+
+                // A package that binds its own route keeps it. usarrs serves
+                // `admin/users` as `admin.users.index`, and generating a second
+                // route at the same URI silently REPLACED that name — published
+                // API disappearing with no error anywhere. The package's own
+                // route is the canonical one; the panel just links to it.
+                if (in_array($uri, $bound, true)) {
+                    continue;
+                }
+
                 Route::middleware($middleware)
                     ->prefix($prefix)
-                    ->get($screen->identifier, ScreenController::class)
+                    ->get($screen->pathSegment(), ScreenController::class)
                     ->defaults('screen', $screen->identifier)
                     ->name($screen->routeName());
             }

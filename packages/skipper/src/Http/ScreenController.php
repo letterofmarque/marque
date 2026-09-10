@@ -30,7 +30,7 @@ class ScreenController
 
     public function __invoke(Request $request, string $screen): mixed
     {
-        $entry = $this->registry->find($screen);
+        $entry = $this->resolve($screen);
 
         // An unknown identifier is a 404 — the screen does not exist, which is
         // a different thing from existing and being off-limits.
@@ -47,6 +47,29 @@ class ScreenController
         }
 
         return $this->render($entry);
+    }
+
+    /**
+     * Find the screen by identifier, then by declared path segment.
+     *
+     * The generated alias routes on the path segment, so a package declaring
+     * `path: 'admin/users'` is reached as `users` rather than by its
+     * identifier. Both work: the identifier is the canonical handle, the
+     * segment is what the URL actually carries.
+     */
+    private function resolve(string $screen): ?AdminScreen
+    {
+        if ($entry = $this->registry->find($screen)) {
+            return $entry;
+        }
+
+        foreach ($this->registry->all() as $candidate) {
+            if ($candidate->pathSegment() === $screen) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     /**

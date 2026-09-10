@@ -41,6 +41,26 @@ final class AdminScreen
     }
 
     /**
+     * The screen's path with the panel prefix stripped.
+     *
+     * The panel routes on this rather than on the identifier, so a package that
+     * declares `path: 'admin/users'` is reachable at `/admin/users` and not at
+     * `/admin/<identifier>`. Deriving the URL from the identifier instead would
+     * give a screen two addresses — one the package bound itself and one the
+     * panel invented — and the panel would link to the wrong one.
+     */
+    public function pathSegment(): string
+    {
+        $segments = array_values(array_filter(explode('/', trim($this->path, '/'))));
+
+        // A single-segment path is already the segment; anything deeper has the
+        // panel prefix on the front.
+        return count($segments) > 1
+            ? implode('/', array_slice($segments, 1))
+            : ($segments[0] ?? $this->identifier);
+    }
+
+    /**
      * Whether the given role clears this screen's minimum.
      *
      * Reads trove's existing Role ranking rather than introducing a second

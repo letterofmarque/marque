@@ -9,7 +9,7 @@
 
             <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 @foreach ($screens as $screen)
-                    <a href="{{ route($screen['route']) }}"
+                    <a href="{{ $screen['url'] }}"
                        wire:navigate
                        class="flex items-center gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-3 text-sm font-medium text-zinc-900 transition hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:hover:border-zinc-600 dark:hover:bg-zinc-800">
                         @if ($screen['icon'])

@@ -59,7 +59,7 @@ class Panel extends Component
             $grouped[$screen->group ?? $default][] = [
                 'identifier' => $screen->identifier,
                 'label' => $screen->label,
-                'route' => $screen->routeName(),
+                'url' => $this->urlFor($screen),
                 'icon' => $screen->icon,
             ];
         }
@@ -79,14 +79,42 @@ class Panel extends Component
     }
 
     /**
-     * Whether the screen's route is actually bound.
+     * Whether the screen can be linked at all.
      *
-     * One package failing to register its route should cost that package its
-     * tile, not everyone else their admin access.
+     * One package failing to bind its route should cost that package its tile,
+     * not everyone else their admin access.
      */
     private function isRoutable(AdminScreen $screen): bool
     {
-        return app('router')->has($screen->routeName());
+        return $this->urlFor($screen) !== null;
+    }
+
+    /**
+     * Where this screen actually lives.
+     *
+     * Prefers the panel's generated alias, then the screen's declared path.
+     * The second case is the one that matters: a package binding its own route
+     * (usarrs serves `admin/users` as `admin.users.index`) gets no generated
+     * alias, because generating one at the same URI would replace the
+     * package's name. The declared path still reaches it.
+     */
+    private function urlFor(AdminScreen $screen): ?string
+    {
+        $router = app('router');
+
+        if ($router->has($screen->routeName())) {
+            return route($screen->routeName());
+        }
+
+        $uri = '/'.trim($screen->path, '/');
+
+        foreach ($router->getRoutes()->getRoutes() as $route) {
+            if ('/'.trim($route->uri(), '/') === $uri) {
+                return url($uri);
+            }
+        }
+
+        return null;
     }
 
     /**
