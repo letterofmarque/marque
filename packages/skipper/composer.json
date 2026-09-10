@@ -1,6 +1,6 @@
 {
-    "name": "marque/deck",
-    "description": "App layout shell for Marque platform - navigation, footer, theming",
+    "name": "marque/skipper",
+    "description": "Admin panel for Marque - renders the admin screens packages register",
     "type": "library",
     "license": "MIT",
     "authors": [
@@ -14,9 +14,26 @@
         "issues": "https://github.com/letterofmarque/marque/issues",
         "source": "https://github.com/letterofmarque/marque"
     },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../trove",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../deck",
+            "options": {
+                "symlink": true
+            }
+        }
+    ],
     "require": {
         "php": "^8.3",
         "marque/trove": "^4.0",
+        "marque/deck": "^2.0",
         "illuminate/support": "^13.0",
         "illuminate/view": "^13.0",
         "livewire/livewire": "^4.0"
@@ -29,21 +46,21 @@
     },
     "autoload": {
         "psr-4": {
-            "Marque\\Deck\\": "src/"
+            "Marque\\Skipper\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Marque\\Deck\\Tests\\": "tests/"
+            "Marque\\Skipper\\Tests\\": "tests/"
         }
     },
     "extra": {
         "branch-alias": {
-            "dev-main": "2.0.x-dev"
+            "dev-main": "1.0.x-dev"
         },
         "laravel": {
             "providers": [
-                "Marque\\Deck\\DeckServiceProvider"
+                "Marque\\Skipper\\SkipperServiceProvider"
             ]
         }
     },
@@ -56,14 +73,5 @@
         "allow-plugins": {
             "pestphp/pest-plugin": true
         }
-    },
-    "repositories": [
-        {
-            "type": "path",
-            "url": "../trove",
-            "options": {
-                "symlink": true
-            }
-        }
-    ]
+    }
 }

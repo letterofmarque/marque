@@ -33,8 +33,8 @@ jobs:
             repo_name: 'threepio'
           - local_path: 'packages/hound'
             repo_name: 'hound'
-          - local_path: 'packages/ise'
-            repo_name: 'ise'
+          - local_path: 'packages/deck'
+            repo_name: 'deck'
           - local_path: 'packages/disguise'
             repo_name: 'disguise'
           - local_path: 'packages/usarrs'
@@ -45,6 +45,8 @@ jobs:
             repo_name: 'parley'
           - local_path: 'packages/taxonomy'
             repo_name: 'taxonomy'
+          - local_path: 'packages/skipper'
+            repo_name: 'skipper'
 
     steps:
       - uses: actions/checkout@v4
