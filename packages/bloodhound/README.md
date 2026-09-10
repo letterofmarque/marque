@@ -2,6 +2,22 @@
 
 BitTorrent tracker for the [Marque](https://github.com/letterofmarque/marque) platform. Handles announce/scrape with Redis-backed peer storage, client validation, and anti-cheat detection.
 
+## Starting from scratch?
+
+Bloodhound is the tracker half only — no frontend, no auth, no upload UI. For a
+complete private tracker, install the set:
+
+```bash
+composer require marque/trove marque/bloodhound marque/guise marque/usarrs marque/cennad
+```
+
+That resolves `marque/threepio` and `marque/ise` for you. Verified working as a set,
+2026-09-10.
+
+Prefer a public, no-login tracker? Use [marque/hound](https://packagist.org/packages/marque/hound)
+and [marque/disguise](https://packagist.org/packages/marque/disguise) instead of
+bloodhound and guise.
+
 ## Installation
 
 Requires [marque/trove](https://packagist.org/packages/marque/trove).

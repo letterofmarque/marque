@@ -13,6 +13,18 @@ of the auth surface. Fortify's own routes are never reachable
 (`Fortify::ignoreRoutes()` is called unconditionally, regardless of any other
 config); it's used purely as a library.
 
+## Starting from scratch?
+
+Usarrs is the auth and user-management half — it has no catalogue and no tracker of
+its own. For a complete private tracker, install the set:
+
+```bash
+composer require marque/trove marque/bloodhound marque/guise marque/usarrs marque/cennad
+```
+
+That resolves `marque/threepio` and `marque/ise` for you. Verified working as a set,
+2026-09-10.
+
 ## Installation
 
 ```bash

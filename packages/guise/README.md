@@ -2,6 +2,21 @@
 
 Livewire web frontend for the [Marque](https://github.com/letterofmarque/marque) tracker platform. Provides torrent browsing, uploading, and management UI built with Livewire and Tailwind CSS.
 
+## Starting from scratch?
+
+Guise is the authenticated frontend only — it renders torrents but does not track
+them or handle login. For a complete private tracker, install the set:
+
+```bash
+composer require marque/trove marque/bloodhound marque/guise marque/usarrs marque/cennad
+```
+
+That resolves `marque/threepio` and `marque/ise` for you. Verified working as a set,
+2026-09-10.
+
+Browsing without accounts is [marque/disguise](https://packagist.org/packages/marque/disguise)
+instead.
+
 ## Installation
 
 Requires [marque/trove](https://packagist.org/packages/marque/trove) and [marque/ise](https://packagist.org/packages/marque/ise), which supplies the Blade UI components.

@@ -27,9 +27,33 @@ Built by [Letter Of Marque Software](https://lom.software).
 - Laravel 13+
 - Redis (for tracker peer storage)
 
+## Start here
+
+Marque's packages install independently, which is flexible once you know what you
+want and unhelpful on day one. These are the combinations that actually make a
+working site — pick the one closest to what you're building:
+
+```bash
+# Private tracker — login required, ratio tracked, full web UI + API
+composer require marque/trove marque/bloodhound marque/guise marque/usarrs marque/cennad
+
+# Public tracker — open announce, browse without an account
+composer require marque/trove marque/hound marque/disguise
+
+# Torrent catalogue, no tracker
+composer require marque/trove marque/guise marque/usarrs
+```
+
+Each pulls in whatever it needs (`marque/threepio` for the BitTorrent protocol,
+`marque/ise` for the shared UI shell) — you don't name those yourself. All three
+verified installing cleanly as sets on 2026-09-10.
+
+Then add whatever else you want from the list below: rich text, discussion, a
+declarative taxonomy.
+
 ## Installation
 
-Install the packages you need:
+Adding packages individually, or already know what you need:
 
 ```bash
 # Core (required)

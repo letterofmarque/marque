@@ -2,6 +2,25 @@
 
 Core models, services, and contracts for the [Marque](https://github.com/letterofmarque/marque) tracker platform.
 
+## Starting from scratch?
+
+Trove is the catalogue core — models, roles, policies. On its own it tracks nothing
+and serves no pages. Pick the shape you're building:
+
+```bash
+# Private tracker — login required, ratio tracked
+composer require marque/trove marque/bloodhound marque/guise marque/usarrs marque/cennad
+
+# Public tracker — open announce, browse without an account
+composer require marque/trove marque/hound marque/disguise
+
+# Torrent catalogue, no tracker
+composer require marque/trove marque/guise marque/usarrs
+```
+
+Each resolves its own supporting packages (`threepio` for the BitTorrent protocol,
+`ise` for the UI shell). All three verified working as sets, 2026-09-10.
+
 ## Installation
 
 ```bash
