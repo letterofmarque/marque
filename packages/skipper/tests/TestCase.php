@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Marque\Skipper\Tests;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Livewire\LivewireServiceProvider;
 use Marque\Deck\DeckServiceProvider;
 use Marque\Skipper\SkipperServiceProvider;
@@ -114,6 +115,13 @@ abstract class TestCase extends BaseTestCase
      */
     protected function defineWebRoutes($router): void
     {
+        // A real Livewire component for screens under test to resolve to.
+        // Registered here rather than in defineEnvironmentSetUp, which runs
+        // before Livewire's own provider boots. Routing looks the registered
+        // component up, so a name resolving to nothing would test the gate and
+        // not the routing.
+        Livewire::component('skipper-test-screen', TestScreen::class);
+
         foreach (['users', 'a', 'b', 'z', 'loose', 'real', 'admin-only', 'mod-ok'] as $id) {
             $router->get("admin/{$id}", fn () => $id)->name("admin.{$id}");
         }
