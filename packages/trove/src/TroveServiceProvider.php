@@ -9,6 +9,8 @@ use Illuminate\Support\ServiceProvider;
 use Marque\Trove\Contracts\TorrentServiceInterface;
 use Marque\Trove\Models\Torrent;
 use Marque\Trove\Policies\TorrentPolicy;
+use Marque\Trove\Registry\AdminScreenRegistry;
+use Marque\Trove\Registry\NavRegistry;
 use Marque\Trove\Services\TorrentService;
 
 class TroveServiceProvider extends ServiceProvider
@@ -18,6 +20,12 @@ class TroveServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/trove.php', 'trove');
 
         $this->app->bind(TorrentServiceInterface::class, TorrentService::class);
+
+        // Singletons because they are shared collection points: every package
+        // registers into the same instance, and the panel reads that instance
+        // back. A fresh instance per resolution would lose every registration.
+        $this->app->singleton(AdminScreenRegistry::class);
+        $this->app->singleton(NavRegistry::class);
     }
 
     public function boot(): void
