@@ -20,6 +20,13 @@
 # it through nested command substitution, which is what produced a screen of
 # fake PARSE_FAILs the first time this was done by hand.
 #
+# It calls ./vendor/bin/pest directly, NOT `composer test`. The composer script
+# is a bare alias for `pest`, and wrapping it cost hours: composer imposes its
+# own 300s process timeout (killing usarrs/taxonomy/bloodhound mid-run), prints
+# usage text on failure that reads as a corrupt result rather than a timeout,
+# and appends its own line after pest's JSON so `tail -1` reads the wrong one.
+# Three separate wrong bug reports came out of that wrapper. Call pest.
+#
 # A green SQLite run proves very little (docs/how.md): SQLite does not enforce
 # foreign keys by default, ignores ->after() column positioning, and tolerates
 # an abandoned transaction. The real engines are the point.
@@ -30,10 +37,22 @@ cd "$(dirname "$0")/.."
 ROOT=$(pwd)
 RESULTS="${TMPDIR:-/tmp}/marque-engines-$$"
 mkdir -p "$RESULTS"
-trap 'rm -rf "$RESULTS"' EXIT
+cleanup() {
+    if [[ $OVERALL -ne 0 ]]; then
+        printf '\nFailure output kept in %s\n' "$RESULTS" >&2
+    else
+        rm -rf "$RESULTS"
+    fi
+}
+trap cleanup EXIT
 
+OVERALL=0
 ALL_ENGINES=(sqlite mysql mariadb pgsql)
 PACKAGES=""
+
+# Real engines do real DDL per test. usarrs is ~415s on MySQL, taxonomy ~640s,
+# bloodhound ~670s; 900s leaves headroom without hanging forever on a deadlock.
+PKG_TIMEOUT="${PKG_TIMEOUT:-900}"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -70,16 +89,26 @@ engine_env() {
 # packages so each one starts from nothing — this cost an hour of chasing a
 # phantom foreign-key error that was really residue from an interrupted run.
 reset_db() {
+    local err
     case "$1" in
         sqlite) return 0 ;;
-        mysql)   mysql -h127.0.0.1 -umarque -pmarque \
-                   -e 'DROP DATABASE IF EXISTS marque_test; CREATE DATABASE marque_test;' 2>/dev/null ;;
-        mariadb) mysql -h127.0.0.1 -P3307 -umarque -pmarque \
-                   -e 'DROP DATABASE IF EXISTS marque_test; CREATE DATABASE marque_test;' 2>/dev/null ;;
-        pgsql)   PGPASSWORD=marque psql -h 127.0.0.1 -U marque -d postgres -q \
+        mysql)   err=$(mysql -h127.0.0.1 -umarque -pmarque \
+                   -e 'DROP DATABASE IF EXISTS marque_test; CREATE DATABASE marque_test;' 2>&1) ;;
+        mariadb) err=$(mysql -h127.0.0.1 -P3307 -umarque -pmarque \
+                   -e 'DROP DATABASE IF EXISTS marque_test; CREATE DATABASE marque_test;' 2>&1) ;;
+        pgsql)   err=$(PGPASSWORD=marque psql -h 127.0.0.1 -U marque -d postgres -q \
                    -c 'DROP DATABASE IF EXISTS marque_test' \
-                   -c 'CREATE DATABASE marque_test' 2>/dev/null ;;
+                   -c 'CREATE DATABASE marque_test' 2>&1) ;;
     esac
+
+    # A silently-failed reset leaves the NEXT package inheriting a dirty
+    # database, which then fails with "table already exists" and reads exactly
+    # like a code bug. Never swallow this.
+    if [[ -n "${err//*Warning*/}" ]] && grep -qiE 'error|denied|refused' <<<"$err"; then
+        printf '  \033[31m✗\033[0m reset failed for %s: %s\n' "$1" "$(head -1 <<<"$err")"
+        return 1
+    fi
+    return 0
 }
 
 # Fail fast and clearly if an engine is not actually reachable, rather than
@@ -121,14 +150,31 @@ for engine in "${ENGINES[@]}"; do
 
         # Each result goes to its own file. Capturing through nested command
         # substitution is what produced fake failures when this was done by hand.
-        ( cd "$ROOT/packages/$pkg" && env $(engine_env "$engine") composer test 2>&1 | tail -1 ) > "$out" 2>&1
+        #
+        # The explicit timeout matters: bloodhound takes ~586s on MySQL and trove
+        # ~100s, against seconds on SQLite. An inherited short timeout kills the
+        # run mid-migration, which BOTH reports a fake failure AND leaves the
+        # database dirty for the next package — the two together produced three
+        # wrong diagnoses before this was tracked down.
+        ( cd "$ROOT/packages/$pkg" && timeout "$PKG_TIMEOUT" env $(engine_env "$engine") ./vendor/bin/pest 2>&1 ) > "$out" 2>&1
+        rc=$?
+
+        if [[ $rc -eq 124 ]]; then
+            printf '  \033[31m✗\033[0m %-12s TIMEOUT after %ss — raise PKG_TIMEOUT\n' "$pkg" "$PKG_TIMEOUT"
+            failed+=("$pkg"); OVERALL=1; continue
+        fi
 
         elapsed=$(( $(date +%s) - start ))
 
         # A package whose TestCase has no matcher for this engine falls back to
         # SQLite and reports a cheerful green for an engine it never touched.
-        # A real-engine run that finishes suspiciously fast is the tell.
-        if [[ "$engine" != sqlite && $elapsed -lt 2 ]]; then
+        # A real-engine run that finishes suspiciously fast is the tell — but
+        # only for packages that HAVE schema. deck, squidink and threepio ship
+        # no migrations and legitimately never touch a database, so warning on
+        # them is noise that trains you to ignore the warning.
+        if [[ "$engine" != sqlite && $elapsed -lt 2 \
+              && -d "$ROOT/packages/$pkg/database/migrations" \
+              && -n "$(ls -A "$ROOT/packages/$pkg/database/migrations" 2>/dev/null)" ]]; then
             printf '  \033[33m!\033[0m %-12s suspiciously fast (%ds) — did it fall back to SQLite?\n' "$pkg" "$elapsed"
         fi
 
@@ -136,8 +182,8 @@ for engine in "${ENGINES[@]}"; do
             python3 - "$out" <<'PY'
 import json, sys
 try:
-    with open(sys.argv[1]) as fh:
-        d = json.loads(fh.read().strip().splitlines()[-1])
+    lines = [l.strip() for l in open(sys.argv[1]) if l.strip().startswith('{')]
+    d = json.loads(lines[-1])
     print(d.get('result', 'unknown'), d.get('tests', 0))
 except Exception:
     print('UNPARSEABLE 0')
