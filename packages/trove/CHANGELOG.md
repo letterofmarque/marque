@@ -7,6 +7,36 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [RELEASES.md](../../RELEASES.md) for the story up to this point.
 
+## [4.2.0] — 2026-09-11
+
+> Adds the surface registries — packages can now contribute navigation entries and admin screens to a shell that knows nothing about them.
+
+### Added
+
+- **`Marque\Trove\Registry\NavRegistry`** and **`AdminScreenRegistry`**, plus the
+  `NavItem` and `AdminScreen` entries they hold. A package registers from its own
+  service provider and depends on trove alone — never on whatever renders the
+  result — so it behaves identically whether or not a shell or panel is
+  installed.
+
+  This is what makes third-party navigation and admin screens possible. Before
+  it, the shell held a hardcoded list of the packages it knew about.
+
+  `AdminScreenRegistry` is enumerable **without** a user, because a panel builds
+  its route table from it at boot. `NavRegistry` is evaluated per request against
+  the current user, with an arbitrary visibility rule — "show Invites only if this
+  user has any" is a query, not a rank. Same idea, different lifecycles, which is
+  why they are two classes rather than one abstraction.
+
+  Registering a duplicate identifier throws rather than silently replacing the
+  existing entry.
+
+  **This contract is public API from this release.** See
+  [`docs/integration.md`](../../docs/integration.md) Pattern 5.
+
+- trove gains **no new dependencies** for this — no view layer, no Livewire. The
+  registries are plain PHP.
+
 ## [4.1.0] — 2026-09-04
 
 > Lowers the PHP floor to 8.3, matching Laravel 13's own requirement.

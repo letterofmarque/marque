@@ -70,7 +70,7 @@
         "nunomaduro/pao": "^1.1"
     },
     "suggest": {
-        "marque/parley": "Adds a comment thread to the torrent show page — see docs/integration.md"
+        "marque/parley": "Adds a comment thread to the torrent show page \u2014 see docs/integration.md"
     },
     "autoload": {
         "psr-4": {
@@ -84,7 +84,7 @@
     },
     "extra": {
         "branch-alias": {
-            "dev-main": "4.0.x-dev"
+            "dev-main": "5.0.x-dev"
         },
         "laravel": {
             "providers": [

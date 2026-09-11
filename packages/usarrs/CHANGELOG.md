@@ -7,6 +7,36 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [RELEASES.md](../../RELEASES.md) for the story up to this point.
 
+## [7.0.0] — 2026-09-11
+
+> Requires `marque/deck` in place of `marque/ise`, and registers its admin screen and nav entries against trove's registries.
+
+### Changed
+
+- **BREAKING: requires `marque/deck` `^2.0` instead of `marque/ise` `^1.0`.** The
+  shell package was renamed; see the
+  [upgrade guide](../../docs/upgrade-guide-ise-to-deck.md). Major because it
+  changes the install set.
+
+- **`route('admin.users.index')` and `route('admin.users.show')` are unchanged** —
+  same names, same paths, same components. usarrs keeps binding its own routes; the
+  registry entry only makes the screen discoverable from an admin panel.
+
+### Added
+
+- **Registers its user admin screen** with trove's `AdminScreenRegistry`, so
+  installing [`marque/skipper`](https://github.com/letterofmarque/skipper) lists it
+  in the panel automatically. The declared floor is `Role::Moderator`, matching what
+  `UserIndex::mount()` already enforces. Skipped entirely when
+  `usarrs.admin.enabled` is false.
+
+- **Registers Profile and Admin nav entries** with `NavRegistry`. The Admin entry
+  points at `admin.users.index` — a route usarrs owns — replacing the shell's old
+  link to an `admin.index` that nothing had ever registered.
+
+- usarrs does **not** require or suggest skipper. With no panel installed the
+  registrations are simply never read.
+
 ## [6.2.0] — 2026-09-04
 
 > Lowers the PHP floor to 8.3, matching Laravel 13's own requirement.

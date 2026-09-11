@@ -1,6 +1,6 @@
 {
     "name": "marque/parley",
-    "description": "Polymorphic threaded discussion for Marque — torrent comments and forum-lite from one data model",
+    "description": "Polymorphic threaded discussion for Marque \u2014 torrent comments and forum-lite from one data model",
     "type": "library",
     "license": "MIT",
     "keywords": [
@@ -81,7 +81,7 @@
     },
     "extra": {
         "branch-alias": {
-            "dev-main": "2.0.x-dev"
+            "dev-main": "3.0.x-dev"
         },
         "laravel": {
             "providers": [

@@ -29,6 +29,7 @@ fetching the whole repo tree and grepping for `upgrad|migrat|changelog`.
 | 10 | [Release: Marque 5.1](releases/5.1.md) | PHP floor lowered to 8.3 (nothing to do; unblocks PHP 8.3 apps) |
 | 11 | [Release: Marque 5.2](releases/5.2.md) | `marque/taxonomy` added — declare your catalogue's structure in YAML (nothing to do; optional new package) |
 | 12 | [Upgrade guide: ise → deck](upgrade-guide-ise-to-deck.md) | `marque/ise` renamed to `marque/deck`; namespace, view namespace, config and published-config changes |
+| 13 | [Release: Marque 6.0](releases/6.0.md) | The admin panel arrives; the shell rename ripples through every frontend package |
 
 If you're picking up an old install: start at whichever row matches the version
 you're currently on, and read down to the bottom. If you don't know your version,

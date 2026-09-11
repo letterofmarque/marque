@@ -5,6 +5,21 @@ All notable changes to `marque/parley` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
+## [3.0.0] — 2026-09-11
+
+> Requires `marque/deck` in place of `marque/ise`.
+
+### Changed
+
+- **BREAKING: requires `marque/deck` `^2.0` instead of `marque/ise` `^1.0`.** The
+  shell package was renamed; see the
+  [upgrade guide](../../docs/upgrade-guide-ise-to-deck.md). Major because it
+  changes the install set — no parley class, model, route or component changed.
+
+- View references and the `parley.layout` config default updated from `ise::` to
+  `deck::`. **A published `parley.php` keeps the old value** and must be updated by
+  hand — the upgrade guide covers it.
+
 ## [2.3.0] — 2026-09-04
 
 > Replaces `$guarded = []` with explicit `$fillable` on all three models, closing an unintended mass-assignment surface.

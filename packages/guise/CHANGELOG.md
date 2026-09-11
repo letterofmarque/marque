@@ -7,6 +7,25 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [RELEASES.md](../../RELEASES.md) for the story up to this point.
 
+## [5.0.0] — 2026-09-11
+
+> Requires `marque/deck` in place of `marque/ise`, and registers its own navigation entry instead of being detected by the shell.
+
+### Changed
+
+- **BREAKING: requires `marque/deck` `^2.0` instead of `marque/ise` `^1.0`.** The
+  shell package was renamed; see the
+  [upgrade guide](../../docs/upgrade-guide-ise-to-deck.md). This is a major
+  because it changes the install set, not because guise's own API moved — no
+  guise class, route or component changed.
+
+- **guise registers its own nav entry.** The shell used to detect guise and add a
+  Torrents link itself. guise now declares it against trove's `NavRegistry`, gated
+  on an authenticated user — its listing sits behind auth, so a guest has nowhere
+  to go.
+
+- View references updated from `ise::` to `deck::`.
+
 ## [4.2.0] — 2026-09-04
 
 > Lowers the PHP floor to 8.3, matching Laravel 13's own requirement.

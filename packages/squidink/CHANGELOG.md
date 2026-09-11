@@ -5,6 +5,20 @@ All notable changes to `marque/squidink` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
+## [1.1.1] — 2026-09-11
+
+> Comment-only: two references to the renamed shell package.
+
+### Changed
+
+- Two inline comments in the editor views referred to `marque/ise`, now
+  `marque/deck`. No code, markup or behaviour changed.
+
+  squidink does not depend on the shell in either direction — its editor
+  deliberately owns its markup rather than referencing shell components, because
+  Blade resolves component tags at compile time and a `class_exists()` guard
+  cannot save a view that names an absent package's tag.
+
 ## [1.1.0] — 2026-09-04
 
 > Lowers the PHP floor to 8.3, matching Laravel 13's own requirement.

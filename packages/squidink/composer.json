@@ -1,6 +1,6 @@
 {
     "name": "marque/squidink",
-    "description": "Format-agnostic text pipeline for Marque — parse any supported syntax to a document AST, render it safely to anything",
+    "description": "Format-agnostic text pipeline for Marque \u2014 parse any supported syntax to a document AST, render it safely to anything",
     "type": "library",
     "license": "MIT",
     "keywords": [
@@ -44,7 +44,7 @@
     },
     "extra": {
         "branch-alias": {
-            "dev-main": "1.0.x-dev"
+            "dev-main": "1.1.x-dev"
         },
         "laravel": {
             "providers": [
