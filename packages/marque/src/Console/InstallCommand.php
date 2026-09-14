@@ -16,14 +16,15 @@ use Marque\Marque\Install\EnvironmentReport;
 use Marque\Marque\Install\EnvWriter;
 use Marque\Marque\Install\PackageSelection;
 use Marque\Marque\Install\StylesheetWiring;
+use Marque\Marque\Install\UserModelPatch;
 use RuntimeException;
 
 /**
  * The front door.
  *
  * Stages land one Checkpoint at a time (Build #105). Live now: the environment
- * gate, the interview, composer require, and the Tailwind source wiring. Still
- * to come: the User model edit, the home page, migrations and a
+ * gate, the interview, composer require, the Tailwind source wiring and the
+ * User model edit. Still to come: the home page, migrations and a
  * self-verification pass. Until those arrive the command says plainly that it
  * has not finished rather than reporting a success it has not performed —
  * which is the precise failure this Build exists to correct.
@@ -87,13 +88,14 @@ class InstallCommand extends Command
         }
 
         $this->wireStylesheet($selection);
+        $this->patchUserModel($selection);
 
         $this->newLine();
         $this->components->warn('The rest of marque:install is not finished yet.');
-        $this->line('  Your packages are installed and your stylesheet knows where their');
-        $this->line('  templates are. The User model, the home page and migrations land');
-        $this->line('  one stage at a time and are not done, so this command will not');
-        $this->line('  claim your tracker is ready.');
+        $this->line('  Your packages are installed, your stylesheet knows where their');
+        $this->line('  templates are, and your User model has what the tracker needs.');
+        $this->line('  The home page and migrations land one stage at a time and are');
+        $this->line('  not done, so this command will not claim your tracker is ready.');
 
         return self::FAILURE;
     }
@@ -256,6 +258,65 @@ class InstallCommand extends Command
 
         $this->components->task('resources/css/app.css updated (backup at app.css.marque-backup)');
         $this->line('  Run your asset build (npm run build, or npm run dev) to see it.');
+    }
+
+    /**
+     * The headline fatal from job #10699: a stock User model has none of the
+     * Marque traits, so /torrents — the product's main page — dies with
+     * `Call to undefined method App\Models\User::isUploader()`.
+     *
+     * This edits a file the app owns and did not ask us to touch, so the
+     * operator sees the diff and says yes before anything is written, and the
+     * original is kept beside it.
+     */
+    private function patchUserModel(PackageSelection $selection): void
+    {
+        $path = $this->laravel->basePath('app/Models/User.php');
+
+        if (! is_file($path)) {
+            $this->newLine();
+            $this->components->warn('No app/Models/User.php — skipping.'
+                ."\n".'  Add Marque\Trove\Concerns\HasRoles and implement'
+                ."\n".'  Marque\Trove\Contracts\UserInterface on your own user model.');
+
+            return;
+        }
+
+        $patch = new UserModelPatch($path);
+        $pending = $patch->pending($selection->isPrivate());
+
+        $this->newLine();
+
+        if ($pending['traits'] === [] && $pending['interfaces'] === []) {
+            $this->components->task('User model already has what it needs');
+
+            return;
+        }
+
+        $this->components->info('Your User model needs the tracker traits');
+        $this->line('  Without these, /torrents fails with');
+        $this->line('  <fg=red>Call to undefined method App\Models\User::isUploader()</>.');
+        $this->newLine();
+        $this->line($patch->diff($selection->isPrivate()));
+        $this->newLine();
+
+        if (! confirm(label: 'Apply this to app/Models/User.php?', default: true)) {
+            $this->components->warn('Skipped. /torrents will fail until your User model '
+                .'uses HasRoles and implements UserInterface.');
+
+            return;
+        }
+
+        try {
+            $patch->apply($selection->isPrivate());
+            $this->components->task('app/Models/User.php updated (backup at User.php.marque-backup)');
+        } catch (RuntimeException $e) {
+            // apply() refuses to write anything that would not parse, so the
+            // model is intact — but the operator must be told plainly, since
+            // the fatal they came here to fix is still present.
+            $this->components->error($e->getMessage());
+            $this->components->warn('Your User model was left untouched. Add the traits by hand.');
+        }
     }
 
     /**

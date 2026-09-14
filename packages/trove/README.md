@@ -48,14 +48,32 @@ Add the Trove traits and interface to your User model:
 
 ```php
 use Marque\Trove\Concerns\HasRoles;
-use Marque\Trove\Concerns\HasTrackerStats;
 use Marque\Trove\Contracts\UserInterface;
+
+class User extends Authenticatable implements UserInterface
+{
+    use HasRoles;
+}
+```
+
+`marque:install` does this for you — it shows the diff, backs the file up and
+applies it on confirmation. The manual version is here for anyone wiring the
+packages up by hand.
+
+**On a private tracker, add `HasTrackerStats` as well.** It lives in
+`marque/bloodhound`, not trove:
+
+```php
+use Marque\Bloodhound\Concerns\HasTrackerStats;
 
 class User extends Authenticatable implements UserInterface
 {
     use HasRoles, HasTrackerStats;
 }
 ```
+
+A public tracker does not install bloodhound, so adding that trait there fatals
+on a missing class.
 
 `HasRoles` gives you role checks:
 
