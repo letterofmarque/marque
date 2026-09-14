@@ -28,8 +28,10 @@ final class EnvWriterTest extends TestCase
 
     protected function tearDown(): void
     {
-        if (is_file($this->path)) {
-            unlink($this->path);
+        foreach ([$this->path, $this->path.'.marque-backup'] as $file) {
+            if (is_file($file)) {
+                unlink($file);
+            }
         }
 
         parent::tearDown();
@@ -133,5 +135,34 @@ final class EnvWriterTest extends TestCase
 
         $this->assertStringContainsString('# APP_NAME=Commented', $after);
         $this->assertStringContainsString('APP_NAME=Tracker', $after);
+    }
+
+    public function test_it_backs_up_before_writing(): void
+    {
+        // .env holds the database credentials and APP_KEY. Spec #115's
+        // acceptance names it alongside the User model and routes file as
+        // something to back up before touching; it was the one that got
+        // missed, caught while checking the criteria before closing the Build.
+        $this->write("APP_NAME=Laravel\n");
+        $original = $this->read();
+
+        (new EnvWriter($this->path))->set('APP_NAME', 'Tracker');
+
+        $this->assertFileExists($this->path.'.marque-backup');
+        $this->assertSame($original, file_get_contents($this->path.'.marque-backup'));
+    }
+
+    public function test_it_does_not_replace_an_existing_backup(): void
+    {
+        // Two keys set in one run must not leave the second overwriting the
+        // pristine copy taken before the first.
+        $this->write("APP_NAME=Laravel\nAPP_ENV=local\n");
+        $original = $this->read();
+
+        $writer = new EnvWriter($this->path);
+        $writer->set('APP_NAME', 'Tracker');
+        $writer->set('APP_ENV', 'production');
+
+        $this->assertSame($original, file_get_contents($this->path.'.marque-backup'));
     }
 }

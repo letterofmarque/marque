@@ -40,8 +40,25 @@ final class EnvWriter
             throw new RuntimeException("Failed to update {$key} in {$this->path}");
         }
 
+        $this->backUp();
+
         if (file_put_contents($this->path, $updated) === false) {
             throw new RuntimeException("Failed to write {$this->path}");
+        }
+    }
+
+    /**
+     * .env carries the database credentials and APP_KEY, so a copy is kept
+     * before the first edit — but only the first: a run that sets two keys
+     * must not have the second overwrite the pristine copy taken before the
+     * first.
+     */
+    private function backUp(): void
+    {
+        $backup = $this->path.'.marque-backup';
+
+        if (! is_file($backup)) {
+            copy($this->path, $backup);
         }
     }
 
