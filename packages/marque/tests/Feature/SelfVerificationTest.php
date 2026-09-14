@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Marque\Marque\Tests\Feature;
 
+use Illuminate\Foundation\ViteManifestNotFoundException;
 use Marque\Marque\Install\SelfVerification;
 use Marque\Marque\Tests\TestCase;
 
@@ -120,5 +121,22 @@ final class SelfVerificationTest extends TestCase
         $result = (new SelfVerification)->check('/torrents', fn (): int => 200, mustReachApp: true);
 
         $this->assertTrue($result->passed);
+    }
+
+    public function test_a_missing_vite_manifest_is_explained_not_just_reported(): void
+    {
+        // Found 2026-09-15 by the cold run from `laravel new`: every route
+        // returned 500 with "Vite manifest not found", because the installer
+        // wires the @source lines but the operator has not run an asset build
+        // yet. A bare "responded 500" would send them hunting through logs for
+        // something that is one npm command away.
+        $result = (new SelfVerification)->check('/', function (): int {
+            throw new ViteManifestNotFoundException(
+                'Vite manifest not found at: /app/public/build/manifest.json'
+            );
+        });
+
+        $this->assertFalse($result->passed);
+        $this->assertStringContainsString('npm run build', $result->detail);
     }
 }

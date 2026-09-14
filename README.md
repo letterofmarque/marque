@@ -8,6 +8,7 @@ Built by [Letter Of Marque Software](https://lom.software).
 
 | Package | Description |
 |---------|-------------|
+| [marque/marque](packages/marque) | **Start here** — the installer that wires the rest into your app |
 | [marque/trove](packages/trove) | Core models, services, contracts, and policies |
 | [marque/bloodhound](packages/bloodhound) | Private BitTorrent tracker (announce/scrape) |
 | [marque/cennad](packages/cennad) | REST API controllers and resources |
@@ -30,9 +31,35 @@ Built by [Letter Of Marque Software](https://lom.software).
 
 ## Start here
 
-Marque's packages install independently, which is flexible once you know what you
-want and unhelpful on day one. These are the combinations that actually make a
-working site — pick the one closest to what you're building:
+```bash
+composer require marque/marque
+php artisan marque:install
+```
+
+That is the whole thing. `marque:install` asks what you are building — private
+or public tracker, whether you want the API, forums, a taxonomy, an admin panel
+— installs exactly those packages, and wires them into your app: routes, config,
+migrations, your `User` model, the Tailwind sources your templates need, and a
+front page. Then it checks the result actually responds before telling you it
+worked.
+
+It is safe to re-run. A second pass finds what is already in place and offers
+only the gaps, which is also how you add forums later.
+
+**You will need a mailer configured first.** Registration, password reset and
+invites all need one, and the installer sets up your admin account by emailing
+you a link to choose a password — so without mail you would end up with an
+account you could never sign in as. The installer refuses to start until
+`MAIL_MAILER` is set to something that delivers.
+
+**Build your assets afterwards** — `npm install && npm run build`, or
+`npm run dev` while you work. Laravel does not ship compiled assets, and until
+you build them every page fails on a missing Vite manifest.
+
+### Wiring it up by hand
+
+You do not have to use the installer. The packages install independently, and
+these are the combinations that make a working site:
 
 ```bash
 # Private tracker — login required, ratio tracked, full web UI + API
@@ -49,8 +76,17 @@ Each pulls in whatever it needs (`marque/threepio` for the BitTorrent protocol,
 `marque/deck` for the shared UI shell) — you don't name those yourself. All three
 verified installing cleanly as sets on 2026-09-10.
 
-Then add whatever else you want from the list below: rich text, discussion, a
-declarative taxonomy.
+Going this way you also need to add the Marque traits to your `User` model, add
+`@source` lines for the packages' views to `resources/css/app.css`, and give `/`
+something to show. See [`packages/trove/README.md`](packages/trove/README.md) for
+the `User` model, and note that the installer exists because missing one of those
+steps produces an app that looks installed and is not.
+
+**Do not install both `marque/bloodhound` and `marque/hound`.** hound registers
+an open `announce` route with no key and no authentication, so a private tracker
+that merely has it in `vendor/` carries a keyless announce endpoint beside its
+authenticated one — and anyone who finds it can transfer without ever touching
+ratio accounting.
 
 ## Installation
 

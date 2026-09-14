@@ -50,7 +50,7 @@ final class SelfVerification
             // The operator needs the actual error. "Verification failed" tells
             // them nothing; "Call to undefined method User::isUploader()" tells
             // them exactly which stage to re-run.
-            $result = new CheckResult($name, false, $this->firstLine($e->getMessage()));
+            $result = new CheckResult($name, false, $this->explain($e));
         }
 
         $this->results[] = $result;
@@ -86,6 +86,24 @@ final class SelfVerification
     public function results(): array
     {
         return $this->results;
+    }
+
+    /**
+     * Some failures have an obvious remedy the operator should be handed
+     * rather than left to infer from a stack trace.
+     */
+    private function explain(Throwable $e): string
+    {
+        $message = $this->firstLine($e->getMessage());
+
+        // The cold-run failure: the installer wires Tailwind's sources, but
+        // the assets have never been compiled, so every page 500s on a missing
+        // manifest. One npm command away, and worth saying so.
+        if (str_contains($message, 'Vite manifest not found')) {
+            return $message."\n    Run `npm install && npm run build` (or `npm run dev`) to compile your assets.";
+        }
+
+        return $message;
     }
 
     private function firstLine(string $message): string

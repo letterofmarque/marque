@@ -622,6 +622,15 @@ class InstallCommand extends Command
         $this->newLine();
         $this->line('  Worth knowing:');
 
+        // The cold run from `laravel new` ended with every route 500ing on a
+        // missing Vite manifest: the @source lines were written but the assets
+        // had never been compiled. Said up front rather than left to be
+        // discovered.
+        if (! is_file($this->laravel->publicPath('build/manifest.json'))) {
+            $this->line('  • Your assets are not built yet — run `npm install && npm run build`');
+            $this->line('    (or `npm run dev`), or every page will fail on a missing manifest.');
+        }
+
         if ($this->adminEmail !== null) {
             $this->line("  • Check {$this->adminEmail} for the link that sets your password.");
         } else {
