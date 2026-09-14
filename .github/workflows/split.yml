@@ -47,6 +47,11 @@ jobs:
             repo_name: 'taxonomy'
           - local_path: 'packages/skipper'
             repo_name: 'skipper'
+          # Splits to letterofmarque/installer, not .../marque — that name is
+          # the monorepo itself, and the split action would overwrite it with
+          # package-only history. The Packagist name stays marque/marque.
+          - local_path: 'packages/marque'
+            repo_name: 'installer'
 
     steps:
       - uses: actions/checkout@v7
@@ -82,9 +87,21 @@ jobs:
           TAG="${{ github.event.inputs.tag || github.ref_name }}"
           PACKAGE="${TAG%%/*}"
           VERSION="${TAG#*/}"
+
+          # The split repo is normally named after the package directory, but
+          # packages/marque cannot be: letterofmarque/marque IS this monorepo,
+          # and splitting onto it would replace it with package-only history.
+          # It publishes to Packagist as marque/marque regardless of the repo
+          # name, so only the GitHub target is remapped.
+          REPO="${PACKAGE}"
+          if [ "${PACKAGE}" = "marque" ]; then
+            REPO="installer"
+          fi
+
           echo "package=${PACKAGE}" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Splitting ${PACKAGE} at ${VERSION}"
+          echo "repo=${REPO}" >> "$GITHUB_OUTPUT"
+          echo "Splitting ${PACKAGE} at ${VERSION} -> letterofmarque/${REPO}"
 
       - name: Split ${{ steps.tag.outputs.package }} (${{ steps.tag.outputs.version }})
         uses: symplify/monorepo-split-github-action@v2.3.0
@@ -93,7 +110,7 @@ jobs:
         with:
           package_directory: 'packages/${{ steps.tag.outputs.package }}'
           repository_organization: 'letterofmarque'
-          repository_name: ${{ steps.tag.outputs.package }}
+          repository_name: ${{ steps.tag.outputs.repo }}
           user_name: 'LOM Software'
           user_email: 'dan@lom.software'
           tag: ${{ steps.tag.outputs.version }}

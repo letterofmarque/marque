@@ -77,6 +77,7 @@ jobs:
           - parley
           - taxonomy
           - skipper
+          - marque
 
     steps:
       - uses: actions/checkout@v7

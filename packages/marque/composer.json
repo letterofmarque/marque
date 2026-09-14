@@ -1,0 +1,98 @@
+{
+    "name": "marque/marque",
+    "description": "The Marque installer — one require, then `php artisan marque:install` wires a working tracker",
+    "type": "library",
+    "license": "MIT",
+    "keywords": [
+        "bittorrent",
+        "tracker",
+        "installer",
+        "laravel"
+    ],
+    "authors": [
+        {
+            "name": "Letter Of Marque Software",
+            "email": "dan@lom.software",
+            "homepage": "https://lom.software"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/letterofmarque/marque/issues",
+        "source": "https://github.com/letterofmarque/marque"
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../trove",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../threepio",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../deck",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../usarrs",
+            "options": {
+                "symlink": true
+            }
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "marque/trove": "^4.0",
+        "marque/threepio": "^3.0",
+        "marque/deck": "^2.0",
+        "marque/usarrs": "^7.0",
+        "illuminate/console": "^13.0",
+        "illuminate/support": "^13.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^11.0",
+        "pestphp/pest": "^4.7",
+        "mockery/mockery": "^1.6",
+        "nunomaduro/pao": "^1.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Marque\\Marque\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Marque\\Marque\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "1.0.x-dev"
+        },
+        "laravel": {
+            "providers": [
+                "Marque\\Marque\\MarqueServiceProvider"
+            ]
+        }
+    },
+    "scripts": {
+        "test": "pest"
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    }
+}
