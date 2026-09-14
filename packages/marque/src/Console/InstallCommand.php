@@ -15,20 +15,30 @@ use Marque\Marque\Install\EnvironmentCheck;
 use Marque\Marque\Install\EnvironmentReport;
 use Marque\Marque\Install\EnvWriter;
 use Marque\Marque\Install\PackageSelection;
+use Marque\Marque\Install\StylesheetWiring;
 use RuntimeException;
 
 /**
  * The front door.
  *
- * Stages land one Checkpoint at a time (Build #105). Live now: the interview,
- * the environment gate, and composer require. Still to come: the Tailwind
- * source wiring, the User model edit, the home page, migrations and a
+ * Stages land one Checkpoint at a time (Build #105). Live now: the environment
+ * gate, the interview, composer require, and the Tailwind source wiring. Still
+ * to come: the User model edit, the home page, migrations and a
  * self-verification pass. Until those arrive the command says plainly that it
  * has not finished rather than reporting a success it has not performed —
  * which is the precise failure this Build exists to correct.
  */
 class InstallCommand extends Command
 {
+    /**
+     * Packages that arrive with marque/marque itself. They ship most of the
+     * app's chrome, so their templates need scanning regardless of what the
+     * operator chose.
+     *
+     * @var list<string>
+     */
+    private const CORE_PACKAGES = ['marque/deck', 'marque/usarrs'];
+
     protected $signature = 'marque:install';
 
     protected $description = 'Install and wire up Marque — interviews you, then configures the app';
@@ -76,12 +86,14 @@ class InstallCommand extends Command
             return self::FAILURE;
         }
 
+        $this->wireStylesheet($selection);
+
         $this->newLine();
         $this->components->warn('The rest of marque:install is not finished yet.');
-        $this->line('  Your packages are installed. Wiring them into the app — the home');
-        $this->line('  page, the User model, the stylesheet and migrations — lands one');
-        $this->line('  stage at a time and is not done, so this command will not claim');
-        $this->line('  your tracker is ready.');
+        $this->line('  Your packages are installed and your stylesheet knows where their');
+        $this->line('  templates are. The User model, the home page and migrations land');
+        $this->line('  one stage at a time and are not done, so this command will not');
+        $this->line('  claim your tracker is ready.');
 
         return self::FAILURE;
     }
@@ -184,6 +196,66 @@ class InstallCommand extends Command
         }
 
         return true;
+    }
+
+    /**
+     * Tailwind emits only the classes it can find. Without these lines the
+     * packages' templates are never scanned, so none of their classes exist in
+     * the built stylesheet and the app renders with browser defaults — which
+     * is the entire "dark mode is broken" report, and not a component bug.
+     */
+    private function wireStylesheet(PackageSelection $selection): void
+    {
+        $path = $this->laravel->resourcePath('css/app.css');
+
+        if (! is_file($path)) {
+            $this->newLine();
+            $this->components->warn('No resources/css/app.css — skipping stylesheet wiring.'
+                ."\n".'  Point Tailwind at vendor/marque/*/resources/views yourself, or the'
+                ."\n".'  packages\' templates will render unstyled.');
+
+            return;
+        }
+
+        // Every package that ships templates, not merely the ones chosen:
+        // deck and usarrs arrive with marque/marque itself and carry most of
+        // the app's chrome.
+        $packages = [...self::CORE_PACKAGES, ...$selection->packages()];
+
+        $wiring = new StylesheetWiring($path);
+        $pending = $wiring->pending($packages);
+
+        $this->newLine();
+
+        if ($pending === []) {
+            $this->components->task('Stylesheet already knows where the templates are');
+
+            return;
+        }
+
+        $this->components->info('Your stylesheet needs to know where the packages\' templates are');
+        $this->line('  Tailwind only generates classes it can find. Without these, the');
+        $this->line('  packages render unstyled. To be added to resources/css/app.css:');
+        $this->newLine();
+
+        foreach ($pending as $line) {
+            $this->line('    <fg=green>+</> '.$line);
+        }
+
+        $this->newLine();
+
+        if (! confirm(label: 'Add them?', default: true)) {
+            $this->components->warn('Skipped. The app will render unstyled until those lines exist.');
+
+            return;
+        }
+
+        copy($path, $path.'.marque-backup');
+
+        $wiring->wire($packages);
+
+        $this->components->task('resources/css/app.css updated (backup at app.css.marque-backup)');
+        $this->line('  Run your asset build (npm run build, or npm run dev) to see it.');
     }
 
     /**
