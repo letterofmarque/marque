@@ -5,17 +5,22 @@ declare(strict_types=1);
 namespace Marque\Marque\Console;
 
 use Illuminate\Console\Command;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Password;
 
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\select;
 use function Laravel\Prompts\text;
 
+use Marque\Marque\Install\AdminSeeder;
 use Marque\Marque\Install\ComposerRunner;
 use Marque\Marque\Install\EnvironmentCheck;
 use Marque\Marque\Install\EnvironmentReport;
 use Marque\Marque\Install\EnvWriter;
 use Marque\Marque\Install\HomePage;
 use Marque\Marque\Install\PackageSelection;
+use Marque\Marque\Install\SelfVerification;
 use Marque\Marque\Install\StylesheetWiring;
 use Marque\Marque\Install\UserModelPatch;
 use RuntimeException;
@@ -25,10 +30,14 @@ use RuntimeException;
  *
  * Stages land one Checkpoint at a time (Build #105). Live now: the environment
  * gate, the interview, composer require, the Tailwind source wiring, the User
- * model edit and the home page. Still to come: migrations and a
- * self-verification pass. Until those arrive the command says plainly that it
- * has not finished rather than reporting a success it has not performed —
- * which is the precise failure this Build exists to correct.
+ * model edit, the home page, config publishing, migrations, the admin account
+ * and a self-verification pass.
+ *
+ * That last stage is the point. Spec #115 exists because "files written" and
+ * "working" diverged — the suite registered thirty-odd routes, every file was
+ * in place, and the app still showed Laravel's welcome page with a fatal on
+ * its main listing. So this command exercises what it built and only reports
+ * success when the app actually responds.
  */
 class InstallCommand extends Command
 {
@@ -40,6 +49,14 @@ class InstallCommand extends Command
      * @var list<string>
      */
     private const CORE_PACKAGES = ['marque/deck', 'marque/usarrs'];
+
+    /**
+     * Collected in the interview, acted on after migrations. See
+     * askAboutAdmin() for why the two are separated.
+     */
+    private ?string $adminName = null;
+
+    private ?string $adminEmail = null;
 
     protected $signature = 'marque:install';
 
@@ -91,15 +108,10 @@ class InstallCommand extends Command
         $this->wireStylesheet($selection);
         $this->patchUserModel($selection);
         $this->chooseHomePage();
+        $this->publishAndMigrate($selection);
+        $this->seedAdmin();
 
-        $this->newLine();
-        $this->components->warn('The rest of marque:install is not finished yet.');
-        $this->line('  Your packages are installed, your stylesheet knows where their');
-        $this->line('  templates are, your User model has what the tracker needs and');
-        $this->line('  / is yours. Migrations and the final check land next, so this');
-        $this->line('  command will not yet claim your tracker is ready.');
-
-        return self::FAILURE;
+        return $this->selfVerify($selection);
     }
 
     /**
@@ -146,8 +158,51 @@ class InstallCommand extends Command
         }
 
         $this->setSiteName();
+        $this->askAboutAdmin();
 
         return $selection;
+    }
+
+    /**
+     * Asked here, acted on at the end.
+     *
+     * The admin cannot be created until migrations have run, which cannot
+     * happen until the packages are installed — but the interview is the only
+     * place the operator is asked anything, and coming back to find the
+     * install stopped on a prompt is the "looks hung" failure the streamed
+     * composer output exists to avoid. So the questions live together and the
+     * work happens later.
+     *
+     * No password is asked for. The account is seeded with random bytes and a
+     * reset link is emailed, which sets the password through the real flow,
+     * proves the address is real and proves the mailer works.
+     */
+    private function askAboutAdmin(): void
+    {
+        if (! confirm(label: 'Create an admin account?', default: true)) {
+            return;
+        }
+
+        $this->adminName = text(
+            label: 'What is the admin called?',
+            placeholder: 'Your name',
+            required: true,
+        );
+
+        $this->adminEmail = text(
+            label: 'What email address?',
+            placeholder: 'you@example.com',
+            required: true,
+            hint: 'We will email a link to set the password — which also verifies the address.',
+        );
+
+        $error = (new AdminSeeder)->validate($this->adminName, $this->adminEmail);
+
+        if ($error !== null) {
+            $this->components->warn($error.' Skipping the admin account.');
+            $this->adminName = null;
+            $this->adminEmail = null;
+        }
     }
 
     /**
@@ -374,6 +429,213 @@ class InstallCommand extends Command
             $this->components->error($e->getMessage());
             $this->components->warn('routes/web.php was left untouched.');
         }
+    }
+
+    private function publishAndMigrate(PackageSelection $selection): void
+    {
+        $this->newLine();
+        $this->components->info('Publishing config and running migrations');
+
+        foreach ([...self::CORE_PACKAGES, ...$selection->packages()] as $package) {
+            $tag = str_replace('marque/', '', $package).'-config';
+
+            // Not --force: a published config the operator has edited is
+            // theirs, and overwriting it would discard their settings.
+            $this->callSilently('vendor:publish', ['--tag' => $tag]);
+        }
+
+        $this->call('migrate', ['--force' => true]);
+    }
+
+    /**
+     * Creates the first admin, then emails a password reset link.
+     *
+     * Nobody chooses a password: the row is seeded with random bytes and the
+     * reset flow sets the real one. That single email verifies the address,
+     * exercises the mailer, and avoids an interim credential existing at all.
+     */
+    private function seedAdmin(): void
+    {
+        if ($this->adminEmail === null || $this->adminName === null) {
+            return;
+        }
+
+        $this->newLine();
+
+        $users = $this->laravel['config']->get('auth.providers.users.model');
+
+        if (! is_string($users) || ! class_exists($users)) {
+            $this->components->warn('Could not find the user model — skipping the admin account.');
+
+            return;
+        }
+
+        $seeder = new AdminSeeder;
+
+        if ($seeder->adminExists(fn (): int => $users::query()->where('role', 'admin')->count())) {
+            $this->components->task('An admin already exists — leaving it alone');
+
+            return;
+        }
+
+        if ($users::query()->where('email', $this->adminEmail)->exists()) {
+            $this->components->warn("A user with {$this->adminEmail} already exists — skipping.");
+
+            return;
+        }
+
+        $admin = $users::query()->create($seeder->attributesFor($this->adminName, $this->adminEmail));
+
+        // Assigned rather than mass-assigned: stock Laravel's User declares
+        // #[Fillable] without `role`, so passing it to create() drops it
+        // silently and yields an "admin" that is not one.
+        $admin->role = $seeder->role();
+        $admin->save();
+
+        if (! $admin->isAdmin()) {
+            $this->components->error('The admin account was created but could not be given the admin role.');
+            $this->line('  Set it by hand: UPDATE users SET role = \'admin\' WHERE email = \''.$this->adminEmail.'\';');
+
+            return;
+        }
+
+        $this->components->task("Admin account created for {$this->adminEmail}");
+
+        $status = Password::sendResetLink(['email' => $this->adminEmail]);
+
+        if ($status === Password::RESET_LINK_SENT) {
+            $this->line('  Sent a link to set your password. It also verifies the address.');
+
+            return;
+        }
+
+        // The account exists but is unreachable, which the operator must know
+        // about rather than discover at the login screen.
+        $this->components->error('The admin account was created, but the password reset email '
+            ."could not be sent ({$status}).");
+        $this->line('  Check your mail settings, then use Forgot Password on the login page.');
+    }
+
+    /**
+     * The last thing the installer does, and the reason Spec #115 exists.
+     *
+     * "Files written" and "working" diverged badly enough to motivate this
+     * whole Build: the suite registered thirty-odd routes, every file was in
+     * place, and the app still showed Laravel's welcome page with a fatal on
+     * its main listing. So the installer exercises what it built instead of
+     * inferring success from having finished.
+     */
+    private function selfVerify(PackageSelection $selection): int
+    {
+        $this->newLine();
+        $this->components->info('Checking that it actually works');
+
+        $verification = new SelfVerification;
+
+        $verification->check('/', fn (): int => $this->statusOf('/'));
+
+        if ($selection->isPrivate()) {
+            $verification->check('/login', fn (): int => $this->statusOf('/login'));
+        }
+
+        // Authenticated, and a redirect counts as a failure here.
+        //
+        // Probing /torrents as a guest proves nothing on a private tracker:
+        // auth middleware 302s to login before the controller runs, so a
+        // broken User model (the exact fatal this installer exists to fix)
+        // sails through looking healthy. Found 2026-09-14 by reverting the
+        // User model and watching verification pass anyway.
+        $admin = $this->firstAdmin();
+
+        $verification->check(
+            '/torrents',
+            fn (): int => $this->statusOf('/torrents', $admin),
+            mustReachApp: $admin !== null,
+        );
+
+        foreach ($verification->results() as $result) {
+            $this->components->twoColumnDetail(
+                '  '.$result->name,
+                $result->passed ? '<fg=green>ok</>' : '<fg=red>'.$result->detail.'</>',
+            );
+        }
+
+        $this->newLine();
+
+        if ($verification->failed()) {
+            $this->components->error('Marque is installed, but not everything responds.');
+
+            foreach ($verification->failures() as $failure) {
+                $this->line("  <fg=red>{$failure->name}</> — {$failure->detail}");
+            }
+
+            $this->line('  Fix the above and run marque:install again; it is safe to re-run.');
+
+            return self::FAILURE;
+        }
+
+        $this->components->info('Marque is installed and responding.');
+        $this->reportOutstanding();
+
+        return self::SUCCESS;
+    }
+
+    private function statusOf(string $uri, mixed $as = null): int
+    {
+        if ($as !== null) {
+            Auth::login($as);
+        }
+
+        $request = Request::create($uri, 'GET');
+
+        try {
+            return $this->laravel->handle($request)->getStatusCode();
+        } finally {
+            if ($as !== null) {
+                Auth::logout();
+            }
+        }
+    }
+
+    /**
+     * Someone to make the authenticated checks meaningful. Null on a public
+     * tracker or an install that declined the admin account, in which case the
+     * guest probe is the best available and is not treated as proof.
+     */
+    private function firstAdmin(): mixed
+    {
+        $users = $this->laravel['config']->get('auth.providers.users.model');
+
+        if (! is_string($users) || ! class_exists($users)) {
+            return null;
+        }
+
+        return $users::query()->where('role', 'admin')->first();
+    }
+
+    /**
+     * What the installer deliberately did not do. Saying so plainly is the
+     * difference between a finished install and one that merely stopped.
+     */
+    private function reportOutstanding(): void
+    {
+        $this->newLine();
+        $this->line('  Worth knowing:');
+
+        if ($this->adminEmail !== null) {
+            $this->line("  • Check {$this->adminEmail} for the link that sets your password.");
+        } else {
+            $this->line('  • No admin account was created. Re-run marque:install to add one.');
+        }
+
+        // usarrs gates its admin routes on the `verified` middleware, but
+        // Laravel's stock User model leaves MustVerifyEmail commented out, so
+        // that gate currently passes everybody. Enabling the interface later
+        // locks out every existing user at once, since nothing backfills
+        // email_verified_at.
+        $this->line('  • Email verification is not enforced: App\Models\User does not implement');
+        $this->line('    MustVerifyEmail, so the `verified` middleware on /admin passes everyone.');
+        $this->line('    Enabling it later locks out existing users until they verify.');
     }
 
     /**

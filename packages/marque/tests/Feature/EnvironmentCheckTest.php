@@ -78,18 +78,25 @@ final class EnvironmentCheckTest extends TestCase
         $report = $this->check()->run(needsRedis: false);
 
         $this->assertFalse($report->checked('redis'));
-        $this->assertFalse($report->isFatal());
+        // Not isFatal(): the test environment's mailer is `array`, which is
+        // fatal in its own right. What matters here is that redis contributed
+        // nothing to the report.
+        $this->assertSame([], $report->messagesFor(['redis']));
     }
 
-    public function test_unconfigured_mail_warns_but_never_blocks(): void
+    public function test_unconfigured_mail_is_fatal(): void
     {
+        // Mail is not deferrable. Without it there is no registration, no
+        // password reset and no invites — and the admin account is seeded by
+        // emailing a reset link, so an install with no mailer produces an
+        // admin nobody can ever sign in as. Setting up Postmark or similar is
+        // a two-minute job; shipping a tracker nobody can log into is not.
         config()->set('mail.default', 'log');
 
         $report = $this->check()->run(needsRedis: false);
 
         $this->assertFalse($report->passed('mail'));
-        $this->assertTrue($report->hasWarnings());
-        $this->assertFalse($report->isFatal(), 'mail is deferrable and must not stop the install');
+        $this->assertTrue($report->isFatal(), 'no mailer means no way into the tracker');
     }
 
     public function test_a_configured_mailer_does_not_warn(): void
@@ -108,12 +115,12 @@ final class EnvironmentCheckTest extends TestCase
 
         $report = $this->check()->run(needsRedis: false);
 
-        // An operator who defers mail needs to know which features are dead
-        // until they come back to it, not merely that a check went yellow.
-        $warning = implode(' ', $report->warnings());
+        // The refusal has to say what is actually broken, not merely that a
+        // check went red.
+        $failure = implode(' ', $report->failures());
 
-        $this->assertStringContainsString('registration', strtolower($warning));
-        $this->assertStringContainsString('password reset', strtolower($warning));
+        $this->assertStringContainsString('registration', strtolower($failure));
+        $this->assertStringContainsString('password reset', strtolower($failure));
     }
 
     public function test_a_fatal_report_names_what_to_fix(): void
@@ -147,7 +154,7 @@ final class EnvironmentCheckTest extends TestCase
 
         $mail = $report->messagesFor(['mail']);
         $this->assertCount(1, $mail);
-        $this->assertFalse($mail[0]['fatal']);
+        $this->assertTrue($mail[0]['fatal']);
         $this->assertStringContainsString('registration', strtolower($mail[0]['text']));
 
         $this->assertSame([], $report->messagesFor(['redis']));

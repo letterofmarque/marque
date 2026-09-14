@@ -113,13 +113,18 @@ final class EnvironmentCheck
     }
 
     /**
-     * Warn only.
+     * Fatal.
      *
-     * Deferring mail on first setup is normal and what it costs is bounded and
-     * obvious, so it does not justify refusing to install. The warning names
-     * the features that will not work rather than merely reporting a yellow
-     * check, because an operator who defers this needs to know what they have
-     * deferred.
+     * This was a warning until 2026-09-14, on the reasoning that deferring
+     * mail is normal on first setup. That was too polite about something
+     * genuinely broken: without a mailer there is no registration, no password
+     * reset and no invites — and the admin account is created by emailing a
+     * reset link, so an install with no mail produces an admin nobody can ever
+     * sign in as.
+     *
+     * Configuring a transactional provider takes a couple of minutes. Shipping
+     * a tracker nobody can log into does not become acceptable for want of
+     * those minutes.
      */
     private function checkMail(EnvironmentReport $report): void
     {
@@ -127,12 +132,14 @@ final class EnvironmentCheck
 
         // `log` and `array` are Laravel's non-delivering defaults: mail is
         // written to the log or discarded. Nothing is sent, which is fine for
-        // local work and wrong for a live tracker.
+        // local work and wrong for a tracker anyone else will use.
         if (in_array($mailer, ['log', 'array', ''], true)) {
-            $report->warn('mail', sprintf(
-                'Mail is set to [%s], so no mail will actually be delivered.'
-                ."\n".'  Registration and password reset will not work until you configure a'
-                ."\n".'  real mailer. Everything else installs and runs normally.',
+            $report->fail('mail', sprintf(
+                'Mail is set to [%s], so nothing would actually be delivered.'
+                ."\n".'  Registration, password reset and invites all need a real mailer, and'
+                ."\n".'  the admin account is set up by emailing you a password reset link —'
+                ."\n".'  so without mail you would have an account you could never sign in as.'
+                ."\n".'  Set MAIL_MAILER and its credentials in .env, then run marque:install again.',
                 $mailer === '' ? 'unset' : $mailer,
             ));
 
@@ -140,8 +147,9 @@ final class EnvironmentCheck
         }
 
         if ($mailer === 'smtp' && blank(config('mail.mailers.smtp.host'))) {
-            $report->warn('mail', 'Mail is set to [smtp] but no host is configured.'
-                ."\n".'  Registration and password reset will not work until MAIL_HOST is set.');
+            $report->fail('mail', 'Mail is set to [smtp] but no host is configured.'
+                ."\n".'  Registration, password reset and invites need a working mailer.'
+                ."\n".'  Set MAIL_HOST in .env, then run marque:install again.');
 
             return;
         }
