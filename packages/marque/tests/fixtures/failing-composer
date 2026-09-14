@@ -1,0 +1,6 @@
+#!/bin/sh
+# Stands in for composer in ComposerRunnerTest: emits a realistic
+# resolution failure on stderr and exits non-zero.
+echo "Loading composer repositories with package information"
+echo "Your requirements could not be resolved to an installable set of packages." >&2
+exit 2

@@ -135,4 +135,41 @@ final class EnvironmentCheckTest extends TestCase
         $this->assertNotSame('', trim($failures), 'a refusal must explain itself');
         $this->assertStringContainsString('database', strtolower($failures));
     }
+
+    public function test_messages_are_attributable_to_their_check(): void
+    {
+        // The gate runs in two passes either side of the interview, so the
+        // second pass must be able to render only its own lines rather than
+        // reprinting what the operator already read.
+        config()->set('mail.default', 'log');
+
+        $report = $this->check()->run(needsRedis: false);
+
+        $mail = $report->messagesFor(['mail']);
+        $this->assertCount(1, $mail);
+        $this->assertFalse($mail[0]['fatal']);
+        $this->assertStringContainsString('registration', strtolower($mail[0]['text']));
+
+        $this->assertSame([], $report->messagesFor(['redis']));
+    }
+
+    public function test_a_fatal_message_is_marked_fatal(): void
+    {
+        config()->set('database.default', 'broken');
+        config()->set('database.connections.broken', [
+            'driver' => 'mysql',
+            'host' => '127.0.0.1',
+            'port' => 59998,
+            'database' => 'nope',
+            'username' => 'nope',
+            'password' => 'nope',
+        ]);
+
+        $report = $this->check()->run(needsRedis: false);
+
+        $messages = $report->messagesFor(['database']);
+
+        $this->assertCount(1, $messages);
+        $this->assertTrue($messages[0]['fatal']);
+    }
 }

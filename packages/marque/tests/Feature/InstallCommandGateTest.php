@@ -40,15 +40,44 @@ final class InstallCommandGateTest extends TestCase
             ->assertFailed();
     }
 
-    public function test_it_stops_before_the_interview(): void
+    public function test_it_stops_before_asking_the_operator_anything(): void
     {
-        // The operator must not be asked questions whose answers are about to
-        // be thrown away. If the command reached the interview it would block
-        // waiting for input and this test would hang rather than fail.
+        // The database is required regardless of every answer, so discovering
+        // it is unreachable AFTER a page of questions wastes the operator's
+        // time. It is therefore checked in a first pass, before any prompt.
+        //
+        // Redis is deliberately NOT in that pass: whether it is needed depends
+        // on whether the deployment announces, which only the interview can
+        // say. Splitting the gate is what lets both hold at once.
+        //
+        // If the command reached a prompt here the test would hang on input
+        // rather than fail, so reaching the assertion at all is the proof.
         $this->breakTheDatabase();
 
         $this->artisan('marque:install')
-            ->doesntExpectOutputToContain('tracker')
+            ->doesntExpectOutputToContain('What kind of tracker')
             ->assertFailed();
+    }
+
+    public function test_it_does_not_claim_nothing_changed_after_writing_env(): void
+    {
+        // setSiteName() writes .env inside the interview, which sits between
+        // the gate's two passes. If a later check fails, the refusal must not
+        // claim nothing was changed when .env already was.
+        $this->assertStringNotContainsString(
+            'Nothing has been changed',
+            $this->redisRefusalWording(),
+            'the Redis refusal must not claim nothing changed — the interview may have written APP_NAME',
+        );
+    }
+
+    private function redisRefusalWording(): string
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../src/Console/InstallCommand.php');
+
+        // The wording used on the post-interview refusal path.
+        preg_match('/runConditional.*?return self::FAILURE;/s', $source, $m);
+
+        return $m[0] ?? '';
     }
 }

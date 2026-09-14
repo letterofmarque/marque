@@ -17,11 +17,8 @@ final class EnvironmentReport
     /** @var array<string, bool> */
     private array $results = [];
 
-    /** @var list<string> */
-    private array $failures = [];
-
-    /** @var list<string> */
-    private array $warnings = [];
+    /** @var list<array{check: string, text: string, fatal: bool}> */
+    private array $messages = [];
 
     public function pass(string $check): void
     {
@@ -36,7 +33,7 @@ final class EnvironmentReport
     public function fail(string $check, string $message): void
     {
         $this->results[$check] = false;
-        $this->failures[] = $message;
+        $this->messages[] = ['check' => $check, 'text' => $message, 'fatal' => true];
     }
 
     /**
@@ -46,7 +43,7 @@ final class EnvironmentReport
     public function warn(string $check, string $message): void
     {
         $this->results[$check] = false;
-        $this->warnings[] = $message;
+        $this->messages[] = ['check' => $check, 'text' => $message, 'fatal' => false];
     }
 
     /**
@@ -66,23 +63,50 @@ final class EnvironmentReport
 
     public function isFatal(): bool
     {
-        return $this->failures !== [];
+        return $this->failures() !== [];
     }
 
     public function hasWarnings(): bool
     {
-        return $this->warnings !== [];
+        return $this->warnings() !== [];
     }
 
     /** @return list<string> */
     public function failures(): array
     {
-        return $this->failures;
+        return $this->textOf(true);
     }
 
     /** @return list<string> */
     public function warnings(): array
     {
-        return $this->warnings;
+        return $this->textOf(false);
+    }
+
+    /**
+     * Messages belonging to the named checks.
+     *
+     * The gate runs in two passes either side of the interview — the database
+     * before, Redis after — so the second pass needs to render only its own
+     * lines rather than reprinting what the operator has already read.
+     *
+     * @param  list<string>  $checks
+     * @return list<array{check: string, text: string, fatal: bool}>
+     */
+    public function messagesFor(array $checks): array
+    {
+        return array_values(array_filter(
+            $this->messages,
+            fn (array $m): bool => in_array($m['check'], $checks, true),
+        ));
+    }
+
+    /** @return list<string> */
+    private function textOf(bool $fatal): array
+    {
+        return array_values(array_map(
+            fn (array $m): string => $m['text'],
+            array_filter($this->messages, fn (array $m): bool => $m['fatal'] === $fatal),
+        ));
     }
 }

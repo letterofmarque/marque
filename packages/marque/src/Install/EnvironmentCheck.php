@@ -23,15 +23,43 @@ final class EnvironmentCheck
 
     public function run(bool $needsRedis): EnvironmentReport
     {
-        $report = new EnvironmentReport;
-
-        $this->checkDatabase($report);
+        $report = $this->runUnconditional();
 
         if ($needsRedis) {
             $this->checkRedis($report);
         }
 
+        return $report;
+    }
+
+    /**
+     * The checks that hold regardless of what the operator chooses, run BEFORE
+     * the interview so nobody answers a page of questions only to be told
+     * their database is unreachable.
+     *
+     * Redis is deliberately not here: whether it is required depends on
+     * whether the deployment announces, which is an interview answer. So the
+     * gate is split rather than the ordering compromised.
+     */
+    public function runUnconditional(): EnvironmentReport
+    {
+        $report = new EnvironmentReport;
+
+        $this->checkDatabase($report);
         $this->checkMail($report);
+
+        return $report;
+    }
+
+    /**
+     * The part that needs an answer first. Called after the interview with the
+     * selection's own requirement.
+     */
+    public function runConditional(EnvironmentReport $report, bool $needsRedis): EnvironmentReport
+    {
+        if ($needsRedis) {
+            $this->checkRedis($report);
+        }
 
         return $report;
     }
