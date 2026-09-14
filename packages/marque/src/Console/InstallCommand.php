@@ -14,6 +14,7 @@ use Marque\Marque\Install\ComposerRunner;
 use Marque\Marque\Install\EnvironmentCheck;
 use Marque\Marque\Install\EnvironmentReport;
 use Marque\Marque\Install\EnvWriter;
+use Marque\Marque\Install\HomePage;
 use Marque\Marque\Install\PackageSelection;
 use Marque\Marque\Install\StylesheetWiring;
 use Marque\Marque\Install\UserModelPatch;
@@ -23,8 +24,8 @@ use RuntimeException;
  * The front door.
  *
  * Stages land one Checkpoint at a time (Build #105). Live now: the environment
- * gate, the interview, composer require, the Tailwind source wiring and the
- * User model edit. Still to come: the home page, migrations and a
+ * gate, the interview, composer require, the Tailwind source wiring, the User
+ * model edit and the home page. Still to come: migrations and a
  * self-verification pass. Until those arrive the command says plainly that it
  * has not finished rather than reporting a success it has not performed —
  * which is the precise failure this Build exists to correct.
@@ -89,13 +90,14 @@ class InstallCommand extends Command
 
         $this->wireStylesheet($selection);
         $this->patchUserModel($selection);
+        $this->chooseHomePage();
 
         $this->newLine();
         $this->components->warn('The rest of marque:install is not finished yet.');
         $this->line('  Your packages are installed, your stylesheet knows where their');
-        $this->line('  templates are, and your User model has what the tracker needs.');
-        $this->line('  The home page and migrations land one stage at a time and are');
-        $this->line('  not done, so this command will not claim your tracker is ready.');
+        $this->line('  templates are, your User model has what the tracker needs and');
+        $this->line('  / is yours. Migrations and the final check land next, so this');
+        $this->line('  command will not yet claim your tracker is ready.');
 
         return self::FAILURE;
     }
@@ -316,6 +318,61 @@ class InstallCommand extends Command
             // the fatal they came here to fix is still present.
             $this->components->error($e->getMessage());
             $this->components->warn('Your User model was left untouched. Add the traits by hand.');
+        }
+    }
+
+    /**
+     * The suite registers thirty-odd working routes and `/` is still Laravel's
+     * welcome page. Everything works and nothing announces itself — which is
+     * the finding that made Spec #115 worth writing.
+     */
+    private function chooseHomePage(): void
+    {
+        $routes = $this->laravel->basePath('routes/web.php');
+
+        if (! is_file($routes)) {
+            $this->newLine();
+            $this->components->warn('No routes/web.php — skipping the home page.');
+
+            return;
+        }
+
+        $home = new HomePage($routes, $this->laravel->resourcePath('views'));
+
+        $this->newLine();
+
+        if (! $home->pending(HomePage::SPLASH)) {
+            $this->components->task('Home page already set');
+
+            return;
+        }
+
+        $this->components->info('Your app still opens on Laravel\'s welcome page');
+
+        $choice = select(
+            label: 'What should / show?',
+            options: HomePage::options(),
+            default: HomePage::SPLASH,
+        );
+
+        if ($choice === HomePage::LEAVE_ALONE) {
+            $this->components->warn('Left alone. / still shows whatever it showed before.');
+
+            return;
+        }
+
+        try {
+            $home->apply($choice);
+
+            $this->components->task('routes/web.php updated (backup at web.php.marque-backup)');
+
+            if ($choice === HomePage::SPLASH) {
+                $this->line('  Published resources/views/home.blade.php — it is yours to edit,');
+                $this->line('  and marque:install will never overwrite it.');
+            }
+        } catch (RuntimeException $e) {
+            $this->components->error($e->getMessage());
+            $this->components->warn('routes/web.php was left untouched.');
         }
     }
 
