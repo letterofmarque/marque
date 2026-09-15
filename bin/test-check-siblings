@@ -1,0 +1,168 @@
+#!/usr/bin/env bash
+#
+# Tests for bin/check-siblings.
+#
+# check-siblings is the guard against the failure that opened this whole piece
+# of work: guise pinned `marque/parley: ^2.0` while parley went to 3.0.0, and
+# four consecutive pushes to main went red because nothing checked whether the
+# siblings could still resolve. A guard nobody has exercised is not a guard, so
+# the headline test replays that exact break in both directions.
+#
+# Run: bin/test-check-siblings
+
+set -uo pipefail
+
+cd "$(dirname "$0")/.."
+ROOT=$(pwd)
+
+PASS=0
+FAIL=0
+
+pass() { printf '  \033[32m✓\033[0m %s\n' "$1"; PASS=$((PASS + 1)); }
+fail() {
+    printf '  \033[31m✗\033[0m %s\n' "$1"
+    [[ $# -gt 1 ]] && printf '      %s\n' "$2"
+    FAIL=$((FAIL + 1))
+}
+
+# ── fixtures ─────────────────────────────────────────────────────────────
+#
+# The replay mutates a real tracked file, so it is restored unconditionally on
+# exit — including on an interrupt. Leaving guise pinned to ^2.0 would break
+# the monorepo for the next person, which is precisely the bug under test.
+GUISE_JSON="$ROOT/packages/guise/composer.json"
+GUISE_BACKUP="$(mktemp)"
+cp "$GUISE_JSON" "$GUISE_BACKUP"
+
+restore() {
+    cp "$GUISE_BACKUP" "$GUISE_JSON"
+    rm -f "$GUISE_BACKUP"
+}
+trap restore EXIT INT TERM
+
+break_guise() {
+    # Back to the state that produced the 2026-09-11 failure.
+    python3 - "$GUISE_JSON" <<'PY'
+import json, sys
+path = sys.argv[1]
+raw = open(path).read()
+open(path, 'w').write(raw.replace('"marque/parley": "^2.0|^3.0"', '"marque/parley": "^2.0"'))
+PY
+}
+
+# ── the replay ───────────────────────────────────────────────────────────
+
+printf '\n\033[1mThe 2026-09-11 replay\033[0m\n'
+
+break_guise
+if grep -q '"marque/parley": "\^2.0"' "$GUISE_JSON"; then
+    pass 'fixture: guise pinned back to parley ^2.0'
+else
+    fail 'fixture: could not reproduce the broken constraint'
+fi
+
+OUTPUT=$(bin/check-siblings parley 2>&1)
+STATUS=$?
+
+if [[ $STATUS -ne 0 ]]; then
+    pass "a stale constraint exits non-zero (got $STATUS)"
+else
+    fail 'a stale constraint exited zero — the guard does not guard'
+fi
+
+if grep -q 'guise' <<<"$OUTPUT"; then
+    pass 'the report names the offending sibling'
+else
+    fail 'the report does not name guise' "$OUTPUT"
+fi
+
+if grep -qi 'parley' <<<"$OUTPUT"; then
+    pass 'the report names the constraint that cannot resolve'
+else
+    fail 'the report does not mention parley' "$OUTPUT"
+fi
+
+restore
+cp "$GUISE_JSON" "$GUISE_BACKUP"   # keep the trap honest after an early restore
+
+OUTPUT=$(bin/check-siblings parley 2>&1)
+STATUS=$?
+
+if [[ $STATUS -eq 0 ]]; then
+    pass 'the repaired constraint exits zero'
+else
+    fail "the repaired constraint still fails (got $STATUS)" "$OUTPUT"
+fi
+
+# ── the graph ────────────────────────────────────────────────────────────
+
+printf '\n\033[1mThe dependency graph\033[0m\n'
+
+OUTPUT=$(bin/check-siblings parley 2>&1)
+
+if ! grep -qE '^\s*parley\b' <<<"$OUTPUT"; then
+    pass 'a package is not treated as its own sibling'
+else
+    fail 'parley checked against itself' "$OUTPUT"
+fi
+
+OUTPUT=$(bin/check-siblings trove 2>&1)
+STATUS=$?
+
+if [[ $STATUS -eq 0 ]]; then
+    pass 'trove — eleven dependents — resolves clean'
+else
+    fail 'trove has a stale dependent' "$OUTPUT"
+fi
+
+# squidink is required by parley only; a narrow graph must still work.
+OUTPUT=$(bin/check-siblings squidink 2>&1)
+if grep -q 'parley' <<<"$OUTPUT"; then
+    pass 'a single-dependent package finds its one sibling'
+else
+    fail 'squidink did not find parley' "$OUTPUT"
+fi
+
+# ── edge cases ───────────────────────────────────────────────────────────
+
+printf '\n\033[1mEdge cases\033[0m\n'
+
+OUTPUT=$(bin/check-siblings threepio 2>&1)
+if grep -qiE 'no sibling|nothing to check|[0-9]+ sibling' <<<"$OUTPUT"; then
+    pass 'a package with dependents reports how many it checked'
+else
+    fail 'no indication of how many siblings were checked' "$OUTPUT"
+fi
+
+OUTPUT=$(bin/check-siblings nonexistent-package 2>&1)
+STATUS=$?
+if [[ $STATUS -ne 0 ]]; then
+    pass 'an unknown package is refused rather than silently passing'
+else
+    fail 'an unknown package exited zero — a typo would read as success'
+fi
+
+OUTPUT=$(bin/check-siblings 2>&1)
+STATUS=$?
+if [[ $STATUS -ne 0 ]]; then
+    pass 'no argument is refused'
+else
+    fail 'no argument exited zero'
+fi
+
+# ── result ───────────────────────────────────────────────────────────────
+
+printf '\n'
+if [[ $FAIL -eq 0 ]]; then
+    printf '\033[32m%d passed.\033[0m\n' "$PASS"
+else
+    printf '\033[31m%d passed, %d failed.\033[0m\n' "$PASS" "$FAIL"
+fi
+
+# The tree must be exactly as we found it — the replay edits a tracked file.
+if [[ -n "$(git status --porcelain packages/guise/composer.json)" ]]; then
+    printf '\033[31mguise/composer.json is dirty — the restore failed.\033[0m\n'
+    exit 1
+fi
+
+exit $(( FAIL > 0 ? 1 : 0 ))

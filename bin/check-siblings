@@ -1,0 +1,196 @@
+#!/usr/bin/env bash
+#
+# Can every sibling still resolve against this package?
+#
+#   bin/check-siblings parley           # after changing parley
+#   bin/check-siblings trove            # eleven dependents
+#   bin/check-siblings --all            # every package, before a big release
+#
+# Why this exists
+# ---------------
+# On 2026-09-11 the ise→deck rename took marque/parley to 3.0.0 while
+# packages/guise still required `marque/parley: ^2.0` in require-dev. Four
+# consecutive pushes to main went red and nobody noticed for a day, because the
+# suite was green everywhere it was being run.
+#
+# It was green because a local run reuses an already-resolved vendor/ and never
+# re-evaluates a constraint. CI does a fresh per-package `composer install`, and
+# there the path repos (../parley) are CANONICAL — they outrank Packagist — so a
+# constraint that no longer matches the sibling on disk does not quietly fall
+# back to a published release. Composer aborts before a single test runs.
+#
+# So this asks the one question a local test run cannot: given the packages as
+# they stand on disk right now, does every sibling that names this one still
+# resolve? It is scoped deliberately — `composer update <pkg> --dry-run` rather
+# than a full update — which takes about fifteen seconds per sibling and touches
+# nothing.
+#
+# The dependency graph is read from the composer.json files. Never hardcode it;
+# the whole failure mode here is a list that drifts from reality.
+
+set -uo pipefail
+
+cd "$(dirname "$0")/.."
+
+PACKAGES_DIR="packages"
+
+red()   { printf '\033[31m%s\033[0m\n' "$*"; }
+green() { printf '\033[32m%s\033[0m\n' "$*"; }
+blue()  { printf '\033[34m%s\033[0m\n' "$*"; }
+dim()   { printf '\033[2m%s\033[0m\n' "$*"; }
+
+usage() {
+    sed -n '3,8p' "$0" | sed 's/^# \?//'
+    exit "${1:-0}"
+}
+
+package_exists() {
+    [[ -d "$PACKAGES_DIR/$1" ]]
+}
+
+all_packages() {
+    find "$PACKAGES_DIR" -maxdepth 1 -mindepth 1 -type d -printf '%f\n' | sort
+}
+
+# Every package whose composer.json names marque/<target> as a dependency.
+#
+# Matched against the require blocks rather than the whole file, so a package is
+# never its own sibling (its `name` field names itself) and a `suggest` entry
+# does not count — composer does not resolve suggestions.
+siblings_of() {
+    local target="$1" pkg file
+
+    while read -r pkg; do
+        [[ "$pkg" == "$target" ]] && continue
+
+        file="$PACKAGES_DIR/$pkg/composer.json"
+        [[ -f "$file" ]] || continue
+
+        if jq -e --arg dep "marque/$target" \
+            '((.require // {}) + (."require-dev" // {})) | has($dep)' \
+            "$file" >/dev/null 2>&1; then
+            echo "$pkg"
+        fi
+    done < <(all_packages)
+}
+
+# The constraint a sibling declares, for the report. Knowing it is `^2.0` when
+# the package is at 3.0.0 is the whole diagnosis.
+constraint_in() {
+    local pkg="$1" target="$2"
+
+    jq -r --arg dep "marque/$target" \
+        '((.require // {}) + (."require-dev" // {}))[$dep] // "?"' \
+        "$PACKAGES_DIR/$pkg/composer.json"
+}
+
+check_one() {
+    local sibling="$1" target="$2" out status constraint
+
+    constraint="$(constraint_in "$sibling" "$target")"
+
+    # --dry-run resolves and reports without writing vendor/ or the lock file.
+    # Scoped to the one package so a sibling with a slow full graph does not
+    # cost a minute for a question about one constraint.
+    out=$(cd "$PACKAGES_DIR/$sibling" && composer update "marque/$target" \
+        --dry-run --no-interaction --no-audit 2>&1)
+    status=$?
+
+    if [[ $status -eq 0 ]]; then
+        printf '  \033[32m✓\033[0m %-12s %s\n' "$sibling" "$constraint"
+        return 0
+    fi
+
+    printf '  \033[31m✗\033[0m %-12s %s\n' "$sibling" "$constraint"
+
+    # Composer's own resolution error names the exact constraint that could not
+    # be satisfied, which is the single most useful line on the screen. Printed
+    # verbatim rather than summarised — the 2026-09-11 break was diagnosed from
+    # precisely this text.
+    grep -E 'could not be resolved|requires .*marque|higher repository priority' <<<"$out" \
+        | head -4 \
+        | sed 's/^/      /'
+
+    return 1
+}
+
+check_target() {
+    local target="$1" sibling failed=0 count=0
+
+    if ! package_exists "$target"; then
+        red "error: no such package: $target"
+        dim "       expected a directory at $PACKAGES_DIR/$target"
+        return 2
+    fi
+
+    local -a sibs=()
+    while read -r sibling; do
+        [[ -n "$sibling" ]] && sibs+=("$sibling")
+    done < <(siblings_of "$target")
+
+    if [[ ${#sibs[@]} -eq 0 ]]; then
+        blue "==> marque/$target"
+        dim "    no siblings depend on it — nothing to check"
+        return 0
+    fi
+
+    blue "==> marque/$target — ${#sibs[@]} sibling(s) depend on it"
+
+    for sibling in "${sibs[@]}"; do
+        count=$((count + 1))
+        check_one "$sibling" "$target" || failed=1
+    done
+
+    return $failed
+}
+
+main() {
+    local -a targets=()
+    local arg
+
+    (( $# > 0 )) || usage 1
+
+    for arg in "$@"; do
+        case "$arg" in
+            -h|--help) usage 0 ;;
+            --all)
+                while read -r p; do targets+=("$p"); done < <(all_packages)
+                ;;
+            -*) red "unknown flag: $arg"; exit 2 ;;
+            *) targets+=("$arg") ;;
+        esac
+    done
+
+    local overall=0 target result
+    local -a broken=()
+
+    for target in "${targets[@]}"; do
+        check_target "$target"
+        result=$?
+
+        if [[ $result -eq 2 ]]; then
+            exit 2
+        fi
+
+        if [[ $result -ne 0 ]]; then
+            overall=1
+            broken+=("$target")
+        fi
+    done
+
+    printf '\n'
+
+    if [[ $overall -eq 0 ]]; then
+        green "Every sibling resolves."
+        return 0
+    fi
+
+    red "Siblings cannot resolve against: ${broken[*]}"
+    dim "Widen the constraint in the sibling(s) marked ✗ above, or release a"
+    dim "version they accept. A union (^2.0|^3.0) keeps consumers already on the"
+    dim "older major from being forced up."
+
+    return 1
+}
+
+main "$@"
