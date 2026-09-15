@@ -3,10 +3,11 @@
          xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
          bootstrap="vendor/autoload.php"
          colors="true">
+    <!-- Feature only: this package has no unit tests, and declaring a suite
+         whose directory does not exist makes pest exit 2 before running
+         anything. That passed locally (the empty dir existed on disk) and
+         failed on all four engines in CI, where git had never carried it. -->
     <testsuites>
-        <testsuite name="Unit">
-            <directory>tests/Unit</directory>
-        </testsuite>
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
         </testsuite>
