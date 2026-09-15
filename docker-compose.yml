@@ -59,6 +59,13 @@ services:
       # disk I/O that dominates a real-engine sweep — bloodhound does real DDL
       # per test and takes ~670s on MySQL.
       - /var/lib/mysql
+    volumes:
+      # Grants `marque` rights over marque_test_%, so the parallel runner can
+      # give each worker its own database. Without it CREATE DATABASE fails
+      # with ERROR 1044 — see the script for why Postgres needs no equivalent.
+      # Init scripts run only when the data directory is empty, and tmpfs means
+      # that is every start.
+      - ./docker/mysql-init:/docker-entrypoint-initdb.d:ro
     command:
       # Matching CI's defaults rather than tuning for speed: a local pass has
       # to mean the same thing as a CI pass.
@@ -85,6 +92,10 @@ services:
       start_period: 20s
     tmpfs:
       - /var/lib/mysql
+    volumes:
+      # Same grant, same reason as mysql above — MariaDB inherits the official
+      # image's "MYSQL_USER owns MYSQL_DATABASE only" behaviour unchanged.
+      - ./docker/mysql-init:/docker-entrypoint-initdb.d:ro
 
   postgres:
     image: postgres:17

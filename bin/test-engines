@@ -1,24 +1,43 @@
 #!/usr/bin/env bash
 #
-# Run the full suite against one or more database engines, serially.
+# Run the full suite against one or more database engines.
 #
 #   bin/test-engines                    # all four
 #   bin/test-engines mysql              # just one
 #   bin/test-engines sqlite pgsql       # a subset
 #   bin/test-engines --packages trove,skipper mysql
+#   bin/test-engines --workers 1        # force serial (debugging)
 #
-# Why this exists
-# ---------------
-# Running two engines at once makes the whole thing slower AND unreliable:
-# trove took 251s against MySQL while MariaDB was competing, and 97s once it
-# had the machine to itself. Job #10548 recorded the sharper version of the
-# same mistake — two packages against one database produced 172 phantom
-# failures. So this script is serial by construction. There is no --parallel
-# flag and there should not be one.
+# Engines run one at a time; packages run in parallel WITHIN an engine.
 #
-# It also writes each package's result to its own file rather than capturing
-# it through nested command substitution, which is what produced a screen of
-# fake PARSE_FAILs the first time this was done by hand.
+# Why that split
+# --------------
+# Two engines at once makes the whole thing slower and less reliable: trove
+# took 251s against MySQL while MariaDB was competing, and 97s once it had the
+# machine to itself. They share one disk, one CPU budget, one page cache. So
+# engines stay serial.
+#
+# Packages within an engine are different, and the distinction is the whole
+# point of this script. Job #10548 recorded two packages against ONE database
+# producing 172 phantom failures — the failure was the shared database, not
+# the concurrency. Give each worker its own database and the races disappear;
+# that is exactly what CI does when it runs 52 jobs at once.
+#
+# So: each worker owns marque_test_<n> for the life of the run and nothing
+# else ever touches it. Workers pull packages off a shared queue, so one slow
+# package (bloodhound is ~670s on MySQL) does not idle the rest of the pool.
+#
+# The per-worker databases need a grant the official MySQL/MariaDB images do
+# not give: MYSQL_USER gets rights to MYSQL_DATABASE and nothing more, so
+# CREATE DATABASE marque_test_1 fails with ERROR 1044. docker/mysql-init/
+# grants the marque_test_% pattern at container init. If you see 1044 here,
+# the containers predate that script — `docker compose up -d --force-recreate
+# mysql mariadb`.
+#
+# It writes each package's result to its own file rather than capturing it
+# through nested command substitution, which is what produced a screen of fake
+# PARSE_FAILs the first time this was done by hand. Under a worker pool that
+# is no longer just tidiness — concurrent writers to one stream interleave.
 #
 # It calls ./vendor/bin/pest directly, NOT `composer test`. The composer script
 # is a bare alias for `pest`, and wrapping it cost hours: composer imposes its
@@ -37,7 +56,17 @@ cd "$(dirname "$0")/.."
 ROOT=$(pwd)
 RESULTS="${TMPDIR:-/tmp}/marque-engines-$$"
 mkdir -p "$RESULTS"
+
+OVERALL=0
+
 cleanup() {
+    # Workers are backgrounded; a Ctrl-C that kills only the parent leaves pest
+    # processes holding their databases open, and the next run then fails to
+    # drop them and reports it as a reset failure.
+    local pids
+    pids=$(jobs -pr)
+    [[ -n "$pids" ]] && kill $pids 2>/dev/null
+
     if [[ $OVERALL -ne 0 ]]; then
         printf '\nFailure output kept in %s\n' "$RESULTS" >&2
     else
@@ -46,24 +75,38 @@ cleanup() {
 }
 trap cleanup EXIT
 
-OVERALL=0
 ALL_ENGINES=(sqlite mysql mariadb pgsql)
 PACKAGES=""
+ENGINES=()
 
 # Real engines do real DDL per test. usarrs is ~415s on MySQL, taxonomy ~640s,
 # bloodhound ~670s; 900s leaves headroom without hanging forever on a deadlock.
 PKG_TIMEOUT="${PKG_TIMEOUT:-900}"
 
+# Measured on tyrionjr (16 cores, 28GB) on 2026-09-15 — see docs/how.md for the
+# table. 4 is where the curve flattens: the sweep is dominated by bloodhound,
+# taxonomy and usarrs, and once those three run concurrently more workers have
+# nothing left to pick up. Higher counts also start contending for the single
+# database server each engine has.
+WORKERS="${WORKERS:-4}"
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --packages) PACKAGES="$2"; shift 2 ;;
         --packages=*) PACKAGES="${1#*=}"; shift ;;
-        -h|--help) sed -n '2,28p' "$0" | sed 's/^# \?//'; exit 0 ;;
+        --workers) WORKERS="$2"; shift 2 ;;
+        --workers=*) WORKERS="${1#*=}"; shift ;;
+        -h|--help) sed -n '2,10p' "$0" | sed 's/^# \?//'; exit 0 ;;
         *) ENGINES+=("$1"); shift ;;
     esac
 done
 
 ENGINES=("${ENGINES[@]:-${ALL_ENGINES[@]}}")
+
+if [[ ! "$WORKERS" =~ ^[0-9]+$ ]] || [[ "$WORKERS" -lt 1 ]]; then
+    echo "--workers must be a positive integer, got: $WORKERS" >&2
+    exit 2
+fi
 
 if [[ -n "$PACKAGES" ]]; then
     IFS=',' read -ra PKG_LIST <<< "$PACKAGES"
@@ -107,16 +150,21 @@ driver_for() {
     esac
 }
 
-engine_env() {
-    local port="${ENGINE_PORT[$1]:-}"
+# The database a given worker owns on a given engine. SQLite workers get
+# :memory: from the package TestCase and never collide, so they need no name.
+worker_db() {
+    echo "marque_test_$2"
+}
 
-    case "$1" in
+engine_env() {
+    local engine="$1" db="$2"
+    local port="${ENGINE_PORT[$engine]:-}"
+
+    case "$engine" in
         sqlite)  echo "DB_CONNECTION=sqlite" ;;
-        mysql|mariadb)
-            echo "DB_CONNECTION=$(driver_for "$1") DB_PORT=$port DB_DATABASE=marque_test" ;;
-        pgsql|pgsql16)
-            echo "DB_CONNECTION=$(driver_for "$1") DB_PORT=$port DB_DATABASE=marque_test" ;;
-        *) echo "unknown engine: $1" >&2; return 1 ;;
+        mysql|mariadb|pgsql|pgsql16)
+            echo "DB_CONNECTION=$(driver_for "$engine") DB_PORT=$port DB_DATABASE=$db" ;;
+        *) echo "unknown engine: $engine" >&2; return 1 ;;
     esac
 }
 
@@ -124,26 +172,47 @@ engine_env() {
 # failures on the next run that look exactly like code bugs. Reset between
 # packages so each one starts from nothing — this cost an hour of chasing a
 # phantom foreign-key error that was really residue from an interrupted run.
+#
+# Under the worker pool this is also what keeps workers independent: a worker
+# only ever resets the one database it owns, so a reset can never pull the
+# floor out from under a package running elsewhere in the pool.
 reset_db() {
-    local err
-    case "$1" in
+    local engine="$1" db="$2" err
+
+    case "$engine" in
         sqlite) return 0 ;;
         mysql|mariadb)
-                 err=$(mysql -h127.0.0.1 -P"${ENGINE_PORT[$1]}" -umarque -pmarque \
-                   -e 'DROP DATABASE IF EXISTS marque_test; CREATE DATABASE marque_test;' 2>&1) ;;
+                 err=$(mysql -h127.0.0.1 -P"${ENGINE_PORT[$engine]}" -umarque -pmarque \
+                   -e "DROP DATABASE IF EXISTS \`$db\`; CREATE DATABASE \`$db\`;" 2>&1) ;;
         pgsql|pgsql16)
-                 err=$(PGPASSWORD=marque psql -h 127.0.0.1 -p "${ENGINE_PORT[$1]}" -U marque -d postgres -q \
-                   -c 'DROP DATABASE IF EXISTS marque_test' \
-                   -c 'CREATE DATABASE marque_test' 2>&1) ;;
+                 err=$(PGPASSWORD=marque psql -h 127.0.0.1 -p "${ENGINE_PORT[$engine]}" -U marque -d postgres -q \
+                   -c "DROP DATABASE IF EXISTS \"$db\"" \
+                   -c "CREATE DATABASE \"$db\"" 2>&1) ;;
     esac
 
     # A silently-failed reset leaves the NEXT package inheriting a dirty
     # database, which then fails with "table already exists" and reads exactly
     # like a code bug. Never swallow this.
     if [[ -n "${err//*Warning*/}" ]] && grep -qiE 'error|denied|refused' <<<"$err"; then
-        printf '  \033[31m✗\033[0m reset failed for %s: %s\n' "$1" "$(head -1 <<<"$err")"
+        printf '  \033[31m✗\033[0m reset failed for %s (%s): %s\n' "$engine" "$db" "$(head -1 <<<"$err")"
         return 1
     fi
+    return 0
+}
+
+# Drop a worker's database once the engine is done with it, so a run does not
+# leave 4 databases per engine lying around for the next person to wonder about.
+drop_db() {
+    local engine="$1" db="$2"
+    case "$engine" in
+        sqlite) return 0 ;;
+        mysql|mariadb)
+            mysql -h127.0.0.1 -P"${ENGINE_PORT[$engine]}" -umarque -pmarque \
+                -e "DROP DATABASE IF EXISTS \`$db\`;" >/dev/null 2>&1 ;;
+        pgsql|pgsql16)
+            PGPASSWORD=marque psql -h 127.0.0.1 -p "${ENGINE_PORT[$engine]}" -U marque -d postgres -q \
+                -c "DROP DATABASE IF EXISTS \"$db\"" >/dev/null 2>&1 ;;
+    esac
     return 0
 }
 
@@ -155,12 +224,117 @@ check_engine() {
         mysql|mariadb)
             mysql -h127.0.0.1 -P"${ENGINE_PORT[$1]}" -umarque -pmarque -e 'SELECT 1' >/dev/null 2>&1 ;;
         pgsql|pgsql16)
-            PGPASSWORD=marque psql -h 127.0.0.1 -p "${ENGINE_PORT[$1]}" -U marque -d marque_test \
+            PGPASSWORD=marque psql -h 127.0.0.1 -p "${ENGINE_PORT[$1]}" -U marque -d postgres \
                 -c 'SELECT 1' >/dev/null 2>&1 ;;
     esac
 }
 
-OVERALL=0
+# The per-worker grant is the one prerequisite that fails in a way nobody can
+# read: ERROR 1044 surfaces as "the package failed", not "the container is
+# older than docker/mysql-init". Check it once per engine, up front, and say
+# exactly what to do about it.
+check_worker_grant() {
+    local engine="$1" probe="marque_test_probe" err
+    case "$engine" in
+        sqlite|pgsql|pgsql16) return 0 ;;
+    esac
+
+    err=$(mysql -h127.0.0.1 -P"${ENGINE_PORT[$engine]}" -umarque -pmarque \
+        -e "CREATE DATABASE IF NOT EXISTS \`$probe\`; DROP DATABASE \`$probe\`;" 2>&1)
+
+    if grep -qiE 'error|denied' <<<"$err"; then
+        printf '\n\033[31m%s cannot create per-worker databases.\033[0m\n' "$engine"
+        echo "  $(head -1 <<<"$err")"
+        echo "  The container predates docker/mysql-init/. Recreate it:"
+        echo "    docker compose up -d --force-recreate ${ENGINE_SERVICE[$engine]}"
+        return 1
+    fi
+    return 0
+}
+
+# One worker: pull package names off the shared queue until it is empty.
+#
+# The queue is a directory of files rather than a pipe, because a pipe read by
+# several readers splits lines unpredictably at buffer boundaries. `mv` on the
+# same filesystem is atomic, so exactly one worker can ever claim a package —
+# a failed mv means somebody else got there first.
+run_worker() {
+    local engine="$1" slot="$2" db claimed pkg
+    db=$(worker_db "$engine" "$slot")
+
+    while true; do
+        claimed=""
+        for candidate in "$QUEUE"/*.job; do
+            [[ -e "$candidate" ]] || break
+            if mv "$candidate" "$CLAIMED/$slot.job" 2>/dev/null; then
+                claimed="$CLAIMED/$slot.job"
+                break
+            fi
+        done
+        [[ -n "$claimed" ]] || break
+
+        pkg=$(cat "$claimed")
+        rm -f "$claimed"
+
+        run_package "$engine" "$db" "$pkg"
+    done
+
+    drop_db "$engine" "$db"
+}
+
+# Run one package and write a single result line to its own file. Nothing here
+# prints to the terminal: interleaved output from four workers is unreadable,
+# and worse, it is misleading — a ✓ appearing under a package name it does not
+# belong to. The parent renders everything in queue order once the pool drains.
+run_package() {
+    local engine="$1" db="$2" pkg="$3"
+    local out start elapsed rc result tests
+
+    if [[ ! -d "$ROOT/packages/$pkg" ]]; then
+        printf 'no-such-package\t0\t0' > "$RESULTS/$engine-$pkg.result"
+        return
+    fi
+
+    if ! reset_db "$engine" "$db"; then
+        printf 'reset-failed\t0\t0' > "$RESULTS/$engine-$pkg.result"
+        return
+    fi
+
+    out="$RESULTS/$engine-$pkg.json"
+    start=$(date +%s)
+
+    # Each result goes to its own file. Capturing through nested command
+    # substitution is what produced fake failures when this was done by hand.
+    #
+    # The explicit timeout matters: bloodhound takes ~586s on MySQL and trove
+    # ~100s, against seconds on SQLite. An inherited short timeout kills the
+    # run mid-migration, which BOTH reports a fake failure AND leaves the
+    # database dirty for the next package — the two together produced three
+    # wrong diagnoses before this was tracked down.
+    ( cd "$ROOT/packages/$pkg" && timeout "$PKG_TIMEOUT" env $(engine_env "$engine" "$db") ./vendor/bin/pest 2>&1 ) > "$out" 2>&1
+    rc=$?
+
+    elapsed=$(( $(date +%s) - start ))
+
+    if [[ $rc -eq 124 ]]; then
+        printf 'TIMEOUT\t0\t%s' "$elapsed" > "$RESULTS/$engine-$pkg.result"
+        return
+    fi
+
+    read -r result tests <<< "$(
+        python3 - "$out" <<'PY'
+import json, sys
+try:
+    lines = [l.strip() for l in open(sys.argv[1]) if l.strip().startswith('{')]
+    d = json.loads(lines[-1])
+    print(d.get('result', 'unknown'), d.get('tests', 0))
+except Exception:
+    print('UNPARSEABLE 0')
+PY
+    )"
+
+    printf '%s\t%s\t%s' "$result" "$tests" "$elapsed" > "$RESULTS/$engine-$pkg.result"
+}
 
 for engine in "${ENGINES[@]}"; do
     if ! check_engine "$engine"; then
@@ -170,73 +344,86 @@ for engine in "${ENGINES[@]}"; do
         continue
     fi
 
-    printf '\n\033[1m=== %s ===\033[0m\n' "$engine"
+    if ! check_worker_grant "$engine"; then
+        OVERALL=1
+        continue
+    fi
+
+    # SQLite runs in-memory inside each pest process, so there is no shared
+    # database to isolate and no reason to cap concurrency at the pool size
+    # chosen for database servers. It is also fast enough that it hardly
+    # matters. Keep the same pool for one code path.
+    pool=$WORKERS
+    [[ ${#PKG_LIST[@]} -lt $pool ]] && pool=${#PKG_LIST[@]}
+
+    printf '\n\033[1m=== %s ===\033[0m (%d workers)\n' "$engine" "$pool"
     engine_start=$(date +%s)
+
+    QUEUE="$RESULTS/queue-$engine"
+    CLAIMED="$RESULTS/claimed-$engine"
+    mkdir -p "$QUEUE" "$CLAIMED"
+
+    # Zero-padded so the glob hands them out in the order given. Bigger
+    # packages first would drain the pool more evenly, but that ordering is a
+    # guess about runtimes that differ per engine — and the measured sweep is
+    # already bounded by the longest single package, not by the ordering.
+    i=0
+    for pkg in "${PKG_LIST[@]}"; do
+        printf '%s' "$pkg" > "$QUEUE/$(printf '%03d' $i).job"
+        i=$(( i + 1 ))
+    done
+
+    for (( slot=1; slot<=pool; slot++ )); do
+        run_worker "$engine" "$slot" &
+    done
+    wait
+
     total=0
     failed=()
 
     for pkg in "${PKG_LIST[@]}"; do
-        if [[ ! -d "$ROOT/packages/$pkg" ]]; then
-            printf '  \033[31m✗\033[0m %-12s no such package\n' "$pkg"
+        rfile="$RESULTS/$engine-$pkg.result"
+        if [[ ! -f "$rfile" ]]; then
+            printf '  \033[31m✗\033[0m %-12s no result — worker died\n' "$pkg"
             failed+=("$pkg"); OVERALL=1; continue
         fi
 
-        reset_db "$engine"
-
-        out="$RESULTS/$engine-$pkg.json"
-        start=$(date +%s)
-
-        # Each result goes to its own file. Capturing through nested command
-        # substitution is what produced fake failures when this was done by hand.
-        #
-        # The explicit timeout matters: bloodhound takes ~586s on MySQL and trove
-        # ~100s, against seconds on SQLite. An inherited short timeout kills the
-        # run mid-migration, which BOTH reports a fake failure AND leaves the
-        # database dirty for the next package — the two together produced three
-        # wrong diagnoses before this was tracked down.
-        ( cd "$ROOT/packages/$pkg" && timeout "$PKG_TIMEOUT" env $(engine_env "$engine") ./vendor/bin/pest 2>&1 ) > "$out" 2>&1
-        rc=$?
-
-        if [[ $rc -eq 124 ]]; then
-            printf '  \033[31m✗\033[0m %-12s TIMEOUT after %ss — raise PKG_TIMEOUT\n' "$pkg" "$PKG_TIMEOUT"
-            failed+=("$pkg"); OVERALL=1; continue
-        fi
-
-        elapsed=$(( $(date +%s) - start ))
-
-        # A package whose TestCase has no matcher for this engine falls back to
-        # SQLite and reports a cheerful green for an engine it never touched.
-        # A real-engine run that finishes suspiciously fast is the tell — but
-        # only for packages that HAVE schema. deck, squidink and threepio ship
-        # no migrations and legitimately never touch a database, so warning on
-        # them is noise that trains you to ignore the warning.
-        if [[ "$engine" != sqlite && $elapsed -lt 2 \
-              && -d "$ROOT/packages/$pkg/database/migrations" \
-              && -n "$(ls -A "$ROOT/packages/$pkg/database/migrations" 2>/dev/null)" ]]; then
-            printf '  \033[33m!\033[0m %-12s suspiciously fast (%ds) — did it fall back to SQLite?\n' "$pkg" "$elapsed"
-        fi
-
-        read -r result tests <<< "$(
-            python3 - "$out" <<'PY'
-import json, sys
-try:
-    lines = [l.strip() for l in open(sys.argv[1]) if l.strip().startswith('{')]
-    d = json.loads(lines[-1])
-    print(d.get('result', 'unknown'), d.get('tests', 0))
-except Exception:
-    print('UNPARSEABLE 0')
-PY
-        )"
-
+        IFS=$'\t' read -r result tests elapsed < "$rfile"
         total=$(( total + tests ))
 
-        if [[ "$result" == passed ]]; then
-            printf '  \033[32m✓\033[0m %-12s %4s tests  %3ds\n' "$pkg" "$tests" "$elapsed"
-        else
-            printf '  \033[31m✗\033[0m %-12s %-11s %3ds\n' "$pkg" "$result" "$elapsed"
-            failed+=("$pkg")
-            OVERALL=1
-        fi
+        case "$result" in
+            passed)
+                # A package whose TestCase has no matcher for this engine falls
+                # back to SQLite and reports a cheerful green for an engine it
+                # never touched. A real-engine run that finishes suspiciously
+                # fast is the tell — but only for packages that HAVE schema.
+                # deck, squidink and threepio ship no migrations and
+                # legitimately never touch a database, so warning on them is
+                # noise that trains you to ignore the warning.
+                if [[ "$engine" != sqlite && $elapsed -lt 2 \
+                      && -d "$ROOT/packages/$pkg/database/migrations" \
+                      && -n "$(ls -A "$ROOT/packages/$pkg/database/migrations" 2>/dev/null)" ]]; then
+                    printf '  \033[33m!\033[0m %-12s suspiciously fast (%ds) — did it fall back to SQLite?\n' "$pkg" "$elapsed"
+                fi
+                printf '  \033[32m✓\033[0m %-12s %4s tests  %3ds\n' "$pkg" "$tests" "$elapsed"
+                ;;
+            TIMEOUT)
+                printf '  \033[31m✗\033[0m %-12s TIMEOUT after %ss — raise PKG_TIMEOUT\n' "$pkg" "$PKG_TIMEOUT"
+                failed+=("$pkg"); OVERALL=1
+                ;;
+            no-such-package)
+                printf '  \033[31m✗\033[0m %-12s no such package\n' "$pkg"
+                failed+=("$pkg"); OVERALL=1
+                ;;
+            reset-failed)
+                printf '  \033[31m✗\033[0m %-12s database reset failed\n' "$pkg"
+                failed+=("$pkg"); OVERALL=1
+                ;;
+            *)
+                printf '  \033[31m✗\033[0m %-12s %-11s %3ds\n' "$pkg" "$result" "$elapsed"
+                failed+=("$pkg"); OVERALL=1
+                ;;
+        esac
     done
 
     engine_elapsed=$(( $(date +%s) - engine_start ))

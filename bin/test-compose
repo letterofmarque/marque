@@ -84,6 +84,40 @@ else
     fail 'no postgres:16 — the version range is untested'
 fi
 
+# ── the per-worker grant is wired in ─────────────────────────────────────
+
+printf '\n\033[1mParallel workers can create their own databases\033[0m\n'
+
+# bin/test-engines gives each worker its own marque_test_<n>, which is what
+# makes parallelism safe (job #10548: two packages on one database, 172
+# phantom failures). The official MySQL/MariaDB images grant MYSQL_USER rights
+# to MYSQL_DATABASE only, so that needs docker/mysql-init to be mounted.
+#
+# Asserted here because losing the mount fails in an unreadable way: the run
+# reports package failures, not "the grant is missing". Postgres needs no
+# equivalent — its marque role can already create databases.
+GRANT_SQL=docker/mysql-init/01-worker-databases.sql
+
+if [[ -f "$GRANT_SQL" ]] && grep -q 'marque\\_test\\_%' "$GRANT_SQL"; then
+    pass 'the worker-database grant script exists'
+else
+    fail "no grant on marque_test_% in docker/mysql-init/ — workers will hit ERROR 1044"
+fi
+
+for svc in mysql mariadb; do
+    if docker compose -f "$COMPOSE" config --format json 2>/dev/null \
+        | python3 -c "
+import json, sys
+cfg = json.load(sys.stdin)
+vols = cfg['services'][sys.argv[1]].get('volumes', [])
+sys.exit(0 if any('docker-entrypoint-initdb.d' in (v.get('target') or '') for v in vols) else 1)
+" "$svc" 2>/dev/null; then
+        pass "$svc: mounts the init script"
+    else
+        fail "$svc: no /docker-entrypoint-initdb.d mount — per-worker databases will fail"
+    fi
+done
+
 # ── ports agree with the runner ──────────────────────────────────────────
 
 printf '\n\033[1mPorts agree with bin/test-engines\033[0m\n'
