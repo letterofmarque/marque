@@ -1,0 +1,365 @@
+#!/usr/bin/env bash
+#
+# Tests for bin/release-plan.
+#
+# release-plan is the gate that decides how much testing a release gets, so a
+# wrong answer here is either a release that skipped the engines that would
+# have caught it, or a trivial patch dragging the whole matrix behind it.
+# Both failures are silent — the release still succeeds — which is why the
+# tiers are asserted rather than eyeballed.
+#
+# The verification set comes from CP #608 and Spec #113:
+#
+#   patch  ->  the package alone, SQLite only
+#   minor  ->  the package + everything that depends on it, all engines
+#   major  ->  every package, all engines, plus the constraint sweep
+#
+# Run: bin/test-release-plan
+
+set -uo pipefail
+
+cd "$(dirname "$0")/.."
+ROOT=$(pwd)
+PLAN="$ROOT/bin/release-plan"
+
+PASS=0
+FAIL=0
+
+# Guard against the whole suite "passing" because the script under test is
+# missing. Several assertions here are satisfied by a non-existent file — a
+# refusal test cannot tell "refused the input" from "could not be executed",
+# and `eval ""` succeeds. Without this check the suite reports a cheerful
+# partial green for a script that was never written.
+if [[ ! -x "$PLAN" ]]; then
+    printf '\n\033[31mbin/release-plan does not exist or is not executable.\033[0m\n'
+    printf 'Every assertion below would be testing its absence.\n'
+    exit 1
+fi
+
+pass() { printf '  \033[32m✓\033[0m %s\n' "$1"; PASS=$((PASS + 1)); }
+fail() {
+    printf '  \033[31m✗\033[0m %s\n' "$1"
+    [[ $# -gt 1 ]] && printf '      %s\n' "$2"
+    FAIL=$((FAIL + 1))
+}
+
+# Read one field out of the plan's machine-readable output. The human table is
+# for people; every assertion here reads --format=sh so that a cosmetic change
+# to the table cannot break the tests, and a change to the CONTRACT does.
+plan_field() {
+    local field="$1"; shift
+    "$PLAN" --format=sh "$@" 2>/dev/null | grep "^${field}=" | head -1 | cut -d= -f2- | tr -d "'"
+}
+
+# ── the three tiers ──────────────────────────────────────────────────────
+
+printf '\n\033[1mSemver delta picks the test set\033[0m\n'
+
+# guise has no dependents at all, which makes it the clean case for reading a
+# tier without the dependency graph muddying it.
+bump=$(plan_field bump guise 5.0.1)
+if [[ "$bump" == patch ]]; then
+    pass 'guise 5.0.1 is a patch'
+else
+    fail 'guise 5.0.1 should be a patch' "got: $bump"
+fi
+
+engines=$(plan_field engines guise 5.0.1)
+if [[ "$engines" == sqlite ]]; then
+    pass 'a patch runs SQLite only'
+else
+    fail 'a patch should run SQLite only' "got: $engines"
+fi
+
+packages=$(plan_field packages guise 5.0.1)
+if [[ "$packages" == guise ]]; then
+    pass 'a patch runs only the released package'
+else
+    fail 'a patch should run only the released package' "got: $packages"
+fi
+
+bump=$(plan_field bump guise 5.1.0)
+if [[ "$bump" == minor ]]; then
+    pass 'guise 5.1.0 is a minor'
+else
+    fail 'guise 5.1.0 should be a minor' "got: $bump"
+fi
+
+engines=$(plan_field engines guise 5.1.0)
+if [[ "$engines" == *sqlite* && "$engines" == *mysql* && "$engines" == *mariadb* && "$engines" == *pgsql* ]]; then
+    pass 'a minor runs all engines'
+else
+    fail 'a minor should run all engines' "got: $engines"
+fi
+
+# Spec #113 calls this out explicitly: the graph makes the tiers land
+# unevenly, and that is correct rather than a bug to smooth over. guise is the
+# floor of that unevenness.
+packages=$(plan_field packages guise 5.1.0)
+if [[ "$packages" == guise ]]; then
+    pass 'a minor on a package with no dependents stays a one-package run'
+else
+    fail 'guise 5.1.0 should test guise alone — it has no dependents' "got: $packages"
+fi
+
+# ── the dependency graph, derived not hardcoded ──────────────────────────
+
+printf '\n\033[1mDependents come from composer.json\033[0m\n'
+
+# ...and trove is the ceiling: eleven direct dependents, so a trove minor is
+# very nearly a full matrix. This is the number Spec #113 quotes.
+packages=$(plan_field packages trove 4.3.0)
+count=$(tr ',' '\n' <<<"$packages" | grep -c .)
+if [[ "$count" -eq 12 ]]; then
+    pass "a trove minor pulls in its 11 dependents (12 packages total)"
+else
+    fail 'trove 4.3.0 should test trove + 11 dependents' "got $count: $packages"
+fi
+
+if [[ "$packages" == *bloodhound* && "$packages" == *usarrs* && "$packages" == *taxonomy* ]]; then
+    pass 'the trove dependent set includes bloodhound, usarrs and taxonomy'
+else
+    fail 'trove dependents look wrong' "got: $packages"
+fi
+
+if [[ "$packages" != *squidink* ]]; then
+    pass 'squidink is excluded — it does not depend on trove'
+else
+    fail 'squidink should not be in the trove dependent set' "got: $packages"
+fi
+
+# The transitive case, and the reason this is not a one-hop lookup. Four
+# packages reach threepio only through trove: deck, parley, skipper, taxonomy.
+# A direct-only read would test 8 packages and silently skip those four.
+#
+# This matters because the bug that opened this whole piece of work was
+# exactly a second-order break: guise went red from a change to parley, a
+# package whose files guise does not contain. Blast radius does not stop at
+# one hop.
+packages=$(plan_field packages threepio 3.3.0)
+count=$(tr ',' '\n' <<<"$packages" | grep -c .)
+if [[ "$count" -eq 13 ]]; then
+    pass "a threepio minor reaches all 12 transitive dependents, not just the 8 direct ones"
+else
+    fail 'threepio 3.3.0 should reach its transitive dependents' "got $count: $packages"
+fi
+
+for p in deck parley skipper taxonomy; do
+    if [[ "$packages" == *"$p"* ]]; then
+        pass "  transitive: $p reached through trove"
+    else
+        fail "  transitive: $p missing — dependents are being read one hop deep" "got: $packages"
+    fi
+done
+
+# ── major ────────────────────────────────────────────────────────────────
+
+printf '\n\033[1mA major is the full matrix plus the sweep\033[0m\n'
+
+bump=$(plan_field bump parley 4.0.0)
+sweep=$(plan_field sweep parley 4.0.0)
+packages=$(plan_field packages parley 4.0.0)
+count=$(tr ',' '\n' <<<"$packages" | grep -c .)
+total=$(find packages -mindepth 1 -maxdepth 1 -type d | wc -l)
+
+if [[ "$bump" == major ]]; then
+    pass 'parley 4.0.0 is a major'
+else
+    fail 'parley 4.0.0 should be a major' "got: $bump"
+fi
+
+if [[ "$count" -eq "$total" ]]; then
+    pass "a major tests every package ($total)"
+else
+    fail "a major should test all $total packages" "got $count: $packages"
+fi
+
+# The sweep is what catches a stale sibling constraint, which is the exact
+# class of bug that left main red for four commits. A major without it would
+# be the same gap wearing a different hat.
+if [[ "$sweep" == yes ]]; then
+    pass 'a major requests the constraint sweep'
+else
+    fail 'a major should request the constraint sweep' "got: $sweep"
+fi
+
+sweep=$(plan_field sweep guise 5.0.1)
+if [[ "$sweep" == no ]]; then
+    pass 'a patch does not request the sweep'
+else
+    fail 'a patch should not request the sweep' "got: $sweep"
+fi
+
+# ── refusals ─────────────────────────────────────────────────────────────
+
+printf '\n\033[1mInvalid bumps are refused, not guessed\033[0m\n'
+
+# A version that is not a clean single-step bump is a typo often enough that
+# guessing is the wrong behaviour — and the cost of guessing is a mis-tiered
+# release. Every one of these must exit non-zero.
+#
+# A refusal must be a DELIBERATE one: non-zero exit plus something on stderr
+# explaining it. Exit-non-zero alone is too weak an assertion — an unhandled
+# crash satisfies it too, and "it blew up" is not the same behaviour as "it
+# told you the version was wrong".
+refuses() {
+    local desc="$1"; shift
+    local err rc
+    err=$("$PLAN" "$@" 2>&1 >/dev/null)
+    rc=$?
+
+    if [[ $rc -eq 0 ]]; then
+        fail "$desc" "exited 0 — it should have refused"
+    elif [[ -z "$err" ]]; then
+        fail "$desc" "refused silently — no message on stderr"
+    else
+        pass "$desc"
+    fi
+}
+
+refuses 'a version going backwards (guise 4.0.0 from 5.0.0)' guise 4.0.0
+refuses 'the same version again (guise 5.0.0)' guise 5.0.0
+refuses 'a skipped major (guise 7.0.0 from 5.0.0)' guise 7.0.0
+refuses 'a skipped minor (guise 5.3.0 from 5.0.0)' guise 5.3.0
+refuses 'a malformed version (guise 5.1)' guise 5.1
+refuses 'a non-numeric version (guise banana)' guise banana
+refuses 'an unknown package' nosuchpkg 1.0.0
+refuses 'no arguments at all'
+
+# A major resets the lower components; 5.0.1 -> 6.0.0 is legal but
+# 5.0.1 -> 6.0.1 is not, and that is an easy one to get wrong by hand.
+refuses 'a major that does not reset minor/patch (squidink 2.1.1)' squidink 2.1.1
+
+# ── purity ───────────────────────────────────────────────────────────────
+
+printf '\n\033[1mThe planner is side-effect free\033[0m\n'
+
+# It informs a release; it must never BE one. A planner that can mutate the
+# tree is a planner nobody can safely run to answer "what would this cost?".
+before=$(git status --porcelain | sort)
+"$PLAN" trove 4.3.0 >/dev/null 2>&1
+"$PLAN" parley 4.0.0 >/dev/null 2>&1
+after=$(git status --porcelain | sort)
+
+if [[ "$before" == "$after" ]]; then
+    pass 'running the planner leaves the working tree untouched'
+else
+    fail 'the planner modified the working tree' "$(diff <(echo "$before") <(echo "$after") | head -5)"
+fi
+
+# Reading git is fine and necessary — current_version needs `git tag -l` to
+# know what it is bumping from. What must not appear is a WRITE: creating a
+# tag, pushing, committing, resolving dependencies, starting containers.
+#
+# The pattern is deliberately specific about that difference. An earlier
+# version matched `git tag` outright and flagged the read, which would have
+# pushed the fix towards loosening the test rather than tightening the pattern.
+MUTATORS='^[^#]*(git tag [^-]|git (push|commit|checkout|reset)|composer (update|require|install)|docker (compose |run )|npm |> *[a-z])'
+if ! grep -qE "$MUTATORS" "$PLAN"; then
+    pass 'the planner contains no mutating commands'
+else
+    fail 'the planner contains commands that mutate state' \
+        "$(grep -nE "$MUTATORS" "$PLAN" | head -3)"
+fi
+
+# ── multi-package plans ──────────────────────────────────────────────────
+
+printf '\n\033[1mSeveral packages in one release\033[0m\n'
+
+# Releases are per-package (VERSIONING.md: no suite transaction), but they
+# often go out together. The plan for a set is the union, and the tier is the
+# highest one present — a patch riding along with a major does not dilute it.
+engines=$(plan_field engines guise 5.0.1 parley 4.0.0)
+packages=$(plan_field packages guise 5.0.1 parley 4.0.0)
+count=$(tr ',' '\n' <<<"$packages" | grep -c .)
+
+if [[ "$count" -eq "$total" ]]; then
+    pass 'a patch released alongside a major still gets the full matrix'
+else
+    fail 'the union should take the widest tier' "got $count: $packages"
+fi
+
+if [[ "$engines" == *mysql* ]]; then
+    pass 'the union takes the widest engine set'
+else
+    fail 'the union should take the widest engine set' "got: $engines"
+fi
+
+# ── first release ────────────────────────────────────────────────────────
+
+printf '\n\033[1mA package with no released version yet\033[0m\n'
+
+# marque/marque is Spec #115's meta-package and has never been tagged. A
+# planner that assumes a previous version crashes on exactly the release it is
+# most needed for.
+if [[ -z "$(git tag -l 'marque/*')" ]]; then
+    bump=$(plan_field bump marque 1.0.0)
+    if [[ "$bump" == initial ]]; then
+        pass 'an untagged package reads as an initial release'
+    else
+        fail 'marque 1.0.0 should read as initial' "got: $bump"
+    fi
+
+    packages=$(plan_field packages marque 1.0.0)
+    count=$(tr ',' '\n' <<<"$packages" | grep -c .)
+    if [[ "$count" -eq "$total" ]]; then
+        pass 'an initial release is gated like a major'
+    else
+        fail 'an initial release should be gated like a major' "got $count: $packages"
+    fi
+else
+    pass '(skipped: marque now has tags — revisit this fixture)'
+fi
+
+# ── output shape ─────────────────────────────────────────────────────────
+
+printf '\n\033[1mBoth output formats work\033[0m\n'
+
+# Strip ANSI before matching. The human output bolds the bump, so a raw grep
+# for 'minor' misses it — the word is there, wrapped in escapes.
+human=$("$PLAN" trove 4.3.0 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g')
+
+if grep -qi 'trove' <<<"$human" && grep -qi 'minor' <<<"$human"; then
+    pass 'the default output names the package and the bump'
+else
+    fail 'the default output should be a readable summary' "got: $(head -3 <<<"$human")"
+fi
+
+# The count is the number a person actually wants: 12 packages × 4 engines.
+# It is also the one most likely to drift silently if the tiers change.
+if grep -q '48 package-runs' <<<"$human"; then
+    pass 'the default output totals the package-runs'
+else
+    fail 'the default output should total the package-runs' "got: $(grep -i 'runs' <<<"$human")"
+fi
+
+# The uneven landing is correct but looks arbitrary without the reason beside
+# it, so the reason is part of the contract.
+if grep -q 'trove has 11 dependents' <<<"$human"; then
+    pass 'the default output explains why the set is that size'
+else
+    fail 'the default output should explain the dependent count'
+fi
+
+if "$PLAN" --format=sh trove 4.3.0 2>/dev/null | grep -qE '^packages='; then
+    pass '--format=sh emits shell-evalable assignments'
+else
+    fail '--format=sh should emit shell assignments'
+fi
+
+if eval "$("$PLAN" --format=sh trove 4.3.0 2>/dev/null)" 2>/dev/null; then
+    pass '--format=sh output is actually evalable'
+else
+    fail '--format=sh output failed to eval'
+fi
+
+# ── summary ──────────────────────────────────────────────────────────────
+
+echo
+if [[ $FAIL -eq 0 ]]; then
+    printf '\033[32m%d passed.\033[0m\n' "$PASS"
+    exit 0
+else
+    printf '\033[31m%d passed, %d failed.\033[0m\n' "$PASS" "$FAIL"
+    exit 1
+fi

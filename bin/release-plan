@@ -1,0 +1,304 @@
+#!/usr/bin/env bash
+#
+# Work out how much testing a release needs, and print it. Runs nothing.
+#
+#   bin/release-plan guise 5.0.1                # one package
+#   bin/release-plan guise 5.0.1 parley 3.0.0   # several, as a union
+#   bin/release-plan --format=sh trove 4.3.0    # for a script to eval
+#
+# The tiers come from VERSIONING.md by way of Spec #113, and the point is that
+# the DECLARED BUMP decides the blast radius:
+#
+#   patch    the package alone, SQLite only
+#   minor    the package + everything that depends on it, all engines
+#   major    every package, all engines, plus the sibling constraint sweep
+#   initial  a package with no tags yet — gated like a major
+#
+# Why the bump and not the diff
+# -----------------------------
+# Deriving the test set from changed files was considered and rejected: the
+# 2026-09-11 break involved no change to any guise file at all. parley's files
+# changed, guise was the casualty, and a diff-driven gate would have tested
+# parley, found it green, and shipped the break. The declared bump is what
+# communicates blast radius — VERSIONING.md already counts "changing the
+# required set of marque/* packages" as major, which is exactly the case that
+# bit.
+#
+# Dependents are TRANSITIVE
+# -------------------------
+# Not one hop. Four packages (deck, parley, skipper, taxonomy) reach threepio
+# only through trove, so a direct-only read of a threepio minor would test 8
+# packages and silently skip those four. The same second-order shape as the
+# original bug, which is reason enough not to repeat it.
+#
+# This script is deliberately side-effect free — no tags, no composer, no
+# containers. It answers "what would this release cost?", which is a question
+# worth being able to ask without consequences. bin/test-release-plan asserts
+# that, because a planner that can mutate is a planner nobody runs casually.
+
+set -uo pipefail
+
+cd "$(dirname "$0")/.."
+ROOT=$(pwd)
+
+FORMAT=human
+ARGS=()
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --format) FORMAT="$2"; shift 2 ;;
+        --format=*) FORMAT="${1#*=}"; shift ;;
+        -h|--help) sed -n '2,12p' "$0" | sed 's/^# \?//'; exit 0 ;;
+        -*) echo "unknown option: $1" >&2; exit 2 ;;
+        *) ARGS+=("$1"); shift ;;
+    esac
+done
+
+if [[ ${#ARGS[@]} -eq 0 ]]; then
+    echo "usage: bin/release-plan [--format=sh] <package> <version> [<package> <version>...]" >&2
+    exit 2
+fi
+
+if [[ $(( ${#ARGS[@]} % 2 )) -ne 0 ]]; then
+    echo "each package needs a version: got an odd number of arguments" >&2
+    exit 2
+fi
+
+case "$FORMAT" in
+    human|sh) ;;
+    *) echo "unknown format: $FORMAT (want human or sh)" >&2; exit 2 ;;
+esac
+
+# ── the graph ────────────────────────────────────────────────────────────
+#
+# Read from the composer.json files, never hardcoded. A hardcoded graph is
+# wrong the first time somebody adds a package and right-looking forever
+# after — and the whole tier system rests on it being accurate.
+#
+# require-dev counts. In the monorepo the path repos are canonical, so a
+# require-dev constraint is exactly as capable of breaking `composer update`
+# as a require one — which is precisely how guise broke: parley was in its
+# require-dev.
+read -r -d '' GRAPH_PY <<'PY'
+import json, glob, os, collections, sys
+
+deps = {}
+for f in sorted(glob.glob('packages/*/composer.json')):
+    pkg = os.path.basename(os.path.dirname(f))
+    try:
+        d = json.load(open(f))
+    except Exception as e:
+        print(f"unreadable: {f}: {e}", file=sys.stderr)
+        sys.exit(1)
+    s = set()
+    for section in ('require', 'require-dev'):
+        for k in (d.get(section) or {}):
+            if k.startswith('marque/'):
+                name = k.split('/', 1)[1]
+                if name != pkg:
+                    s.add(name)
+    deps[pkg] = s
+
+dependents = collections.defaultdict(set)
+for pkg, req in deps.items():
+    for dep in req:
+        if dep in deps:
+            dependents[dep].add(pkg)
+
+def transitive(p):
+    seen, stack = set(), [p]
+    while stack:
+        for d in dependents.get(stack.pop(), ()):
+            if d not in seen:
+                seen.add(d)
+                stack.append(d)
+    return seen
+
+for p in sorted(deps):
+    print(f"{p}\t{','.join(sorted(transitive(p)))}")
+PY
+
+ALL_PACKAGES=()
+declare -A DEPENDENTS=()
+
+while IFS=$'\t' read -r pkg deps; do
+    ALL_PACKAGES+=("$pkg")
+    DEPENDENTS[$pkg]="$deps"
+done < <(python3 -c "$GRAPH_PY")
+
+if [[ ${#ALL_PACKAGES[@]} -eq 0 ]]; then
+    echo "could not read the package graph from packages/*/composer.json" >&2
+    exit 1
+fi
+
+ALL_ENGINES="sqlite,mysql,mariadb,pgsql"
+
+# ── current versions ─────────────────────────────────────────────────────
+#
+# From git tags (<pkg>/v<semver>), which is what bin/release tags and what
+# Packagist publishes from. Sorted with -V so v10 beats v9.
+current_version() {
+    git tag -l "$1/v*" | sed "s|^$1/v||" | sort -V | tail -1
+}
+
+# ── the bump ─────────────────────────────────────────────────────────────
+#
+# Refuse anything that is not a clean single step. A skipped version is a typo
+# often enough that guessing is worse than stopping, and the cost of guessing
+# is a mis-tiered release that nobody notices until something ships broken.
+classify_bump() {
+    local pkg="$1" new="$2" cur="$3"
+
+    if [[ ! "$new" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo "$pkg: '$new' is not a semver version (want MAJOR.MINOR.PATCH)" >&2
+        return 1
+    fi
+
+    if [[ -z "$cur" ]]; then
+        echo initial
+        return 0
+    fi
+
+    local cM cm cp nM nm np
+    IFS=. read -r cM cm cp <<<"$cur"
+    IFS=. read -r nM nm np <<<"$new"
+
+    if (( nM == cM && nm == cm && np == cp + 1 )); then
+        echo patch
+    elif (( nM == cM && nm == cm + 1 && np == 0 )); then
+        echo minor
+    elif (( nM == cM + 1 && nm == 0 && np == 0 )); then
+        echo major
+    else
+        echo "$pkg: $cur -> $new is not a single semver step" >&2
+        echo "  next would be $cM.$cm.$(( cp + 1 )) (patch), $cM.$(( cm + 1 )).0 (minor) or $(( cM + 1 )).0.0 (major)" >&2
+        return 1
+    fi
+}
+
+# ── resolve each release ─────────────────────────────────────────────────
+
+declare -A PLAN_BUMP=()
+declare -A PLAN_FROM=()
+RELEASING=()
+TEST_SET=()
+WIDEST=patch
+SWEEP=no
+ENGINES=sqlite
+
+tier_rank() {
+    case "$1" in
+        patch) echo 1 ;;
+        minor) echo 2 ;;
+        major|initial) echo 3 ;;
+    esac
+}
+
+for (( i=0; i<${#ARGS[@]}; i+=2 )); do
+    pkg="${ARGS[$i]}"
+    ver="${ARGS[$((i+1))]}"
+
+    if [[ ! -d "$ROOT/packages/$pkg" ]]; then
+        echo "no such package: $pkg" >&2
+        exit 1
+    fi
+
+    if [[ -n "${PLAN_BUMP[$pkg]:-}" ]]; then
+        echo "$pkg given twice" >&2
+        exit 1
+    fi
+
+    cur=$(current_version "$pkg")
+    bump=$(classify_bump "$pkg" "$ver" "$cur") || exit 1
+
+    PLAN_BUMP[$pkg]="$bump"
+    PLAN_FROM[$pkg]="${cur:-<none>}"
+    RELEASING+=("$pkg $ver")
+
+    # The union takes the widest tier present: a patch riding along with a
+    # major gets the major's gate, not its own. Releases go out together often
+    # enough that the alternative — gating each one separately and hoping the
+    # combination is fine — is how you ship an untested interaction.
+    if [[ $(tier_rank "$bump") -gt $(tier_rank "$WIDEST") ]]; then
+        WIDEST="$bump"
+    fi
+
+    case "$bump" in
+        patch)
+            TEST_SET+=("$pkg")
+            ;;
+        minor)
+            TEST_SET+=("$pkg")
+            IFS=',' read -ra deps <<< "${DEPENDENTS[$pkg]}"
+            for d in "${deps[@]}"; do
+                [[ -n "$d" ]] && TEST_SET+=("$d")
+            done
+            ENGINES="$ALL_ENGINES"
+            ;;
+        major|initial)
+            TEST_SET+=("${ALL_PACKAGES[@]}")
+            ENGINES="$ALL_ENGINES"
+            SWEEP=yes
+            ;;
+    esac
+done
+
+# Dedupe, keeping the canonical package order rather than the order packages
+# happened to be named on the command line — a plan should read the same way
+# whichever way you asked for it.
+PACKAGES=""
+for p in "${ALL_PACKAGES[@]}"; do
+    for t in "${TEST_SET[@]}"; do
+        if [[ "$p" == "$t" ]]; then
+            PACKAGES="${PACKAGES:+$PACKAGES,}$p"
+            break
+        fi
+    done
+done
+
+# ── output ───────────────────────────────────────────────────────────────
+
+if [[ "$FORMAT" == sh ]]; then
+    printf "bump='%s'\n" "$WIDEST"
+    printf "packages='%s'\n" "$PACKAGES"
+    printf "engines='%s'\n" "$ENGINES"
+    printf "sweep='%s'\n" "$SWEEP"
+    exit 0
+fi
+
+pkg_count=$(tr ',' '\n' <<<"$PACKAGES" | grep -c .)
+engine_count=$(tr ',' '\n' <<<"$ENGINES" | grep -c .)
+
+printf '\n\033[1mReleasing\033[0m\n'
+for r in "${RELEASING[@]}"; do
+    read -r p v <<<"$r"
+    printf '  %-12s %s → %s  (\033[1m%s\033[0m)\n' "$p" "${PLAN_FROM[$p]}" "$v" "${PLAN_BUMP[$p]}"
+done
+
+printf '\n\033[1mTest set\033[0m  (%s)\n' "$WIDEST"
+printf '  packages  %s (%d)\n' "$PACKAGES" "$pkg_count"
+printf '  engines   %s (%d)\n' "$ENGINES" "$engine_count"
+printf '  sweep     %s\n' "$SWEEP"
+
+printf '\n  %d package-runs total\n' "$(( pkg_count * engine_count ))"
+
+# Say WHY the set is the size it is. The uneven landing is correct — trove has
+# eleven dependents and guise has none — but it looks arbitrary unless the
+# reason is on screen next to the number.
+if [[ "$WIDEST" == minor ]]; then
+    for (( i=0; i<${#ARGS[@]}; i+=2 )); do
+        p="${ARGS[$i]}"
+        [[ "${PLAN_BUMP[$p]}" == minor ]] || continue
+        d="${DEPENDENTS[$p]}"
+        n=$(tr ',' '\n' <<<"$d" | grep -c .)
+        if [[ "$n" -eq 0 ]]; then
+            printf '  %s has no dependents, so the minor stays narrow.\n' "$p"
+        else
+            printf '  %s has %d dependents: %s\n' "$p" "$n" "$d"
+        fi
+    done
+elif [[ "$WIDEST" == major || "$WIDEST" == initial ]]; then
+    printf '  A %s gates on everything, plus the sibling constraint sweep.\n' "$WIDEST"
+fi
+
+echo
