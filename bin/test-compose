@@ -1,0 +1,166 @@
+#!/usr/bin/env bash
+#
+# Tests for docker-compose.yml and the port agreement with bin/test-engines.
+#
+# The compose stack deliberately does NOT use the default ports: MySQL and
+# PostgreSQL run as system services on this machine and keep 3306/5432. That
+# means there are now two places that have to agree about where each engine
+# lives, and a disagreement is silent — the runner simply talks to the wrong
+# server, or to a system MySQL of whatever version apt last installed, and the
+# whole point of matching CI's image versions evaporates.
+#
+# So the agreement is asserted rather than assumed.
+#
+# Run: bin/test-compose
+
+set -uo pipefail
+
+cd "$(dirname "$0")/.."
+
+PASS=0
+FAIL=0
+
+pass() { printf '  \033[32m✓\033[0m %s\n' "$1"; PASS=$((PASS + 1)); }
+fail() {
+    printf '  \033[31m✗\033[0m %s\n' "$1"
+    [[ $# -gt 1 ]] && printf '      %s\n' "$2"
+    FAIL=$((FAIL + 1))
+}
+
+COMPOSE=docker-compose.yml
+
+# ── the file ─────────────────────────────────────────────────────────────
+
+printf '\n\033[1mThe compose file\033[0m\n'
+
+if [[ -f "$COMPOSE" ]]; then
+    pass 'docker-compose.yml exists'
+else
+    fail 'docker-compose.yml is missing'
+    printf '\n\033[31m%d passed, %d failed.\033[0m\n' "$PASS" "$FAIL"
+    exit 1
+fi
+
+if docker compose -f "$COMPOSE" config >/dev/null 2>&1; then
+    pass 'it is valid compose syntax'
+else
+    fail 'compose rejects the file' "$(docker compose -f "$COMPOSE" config 2>&1 | head -3)"
+fi
+
+# ── image versions match CI ──────────────────────────────────────────────
+#
+# The reason the stack exists. If local runs mysql:9 while CI runs mysql:8.0,
+# a green local sweep says nothing about the matrix that gates merges.
+
+printf '\n\033[1mImage versions match CI\033[0m\n'
+
+ci_image() {
+    grep -oE "image: $1:[0-9.]+" .github/workflows/test-run.yml | head -1 | awk '{print $2}'
+}
+
+compose_image() {
+    grep -oE "image: $1:[0-9.]+" "$COMPOSE" | head -1 | awk '{print $2}'
+}
+
+for engine in mysql mariadb postgres; do
+    ci="$(ci_image "$engine")"
+    local_image="$(compose_image "$engine")"
+
+    if [[ -z "$ci" ]]; then
+        fail "$engine: could not read CI's image"
+    elif [[ "$ci" == "$local_image" ]]; then
+        pass "$engine: $local_image matches CI"
+    else
+        fail "$engine: compose has '$local_image', CI has '$ci'"
+    fi
+done
+
+# The second Postgres major exists so "PostgreSQL is supported" is testable
+# rather than asserted — the same unverified-claim trap MariaDB fell into
+# (job #10616), where it was documented as supported and had never been run.
+if grep -qE 'image: postgres:16' "$COMPOSE"; then
+    pass 'a second Postgres major is declared'
+else
+    fail 'no postgres:16 — the version range is untested'
+fi
+
+# ── ports agree with the runner ──────────────────────────────────────────
+
+printf '\n\033[1mPorts agree with bin/test-engines\033[0m\n'
+
+# What compose publishes on the host side, per service.
+published_port() {
+    docker compose -f "$COMPOSE" config --format json 2>/dev/null \
+        | python3 -c "
+import json, sys
+svc = sys.argv[1]
+cfg = json.load(sys.stdin)
+ports = cfg['services'][svc].get('ports', [])
+print(ports[0]['published'] if ports else '')
+" "$1" 2>/dev/null
+}
+
+# What the runner will actually connect to.
+runner_port() {
+    bash -c "source <(sed -n '/^declare -A ENGINE_PORT/,/^)/p' bin/test-engines); echo \${ENGINE_PORT[$1]:-}" 2>/dev/null
+}
+
+for engine in mysql mariadb pgsql pgsql16; do
+    service="$engine"
+    [[ "$engine" == pgsql ]] && service=postgres
+    [[ "$engine" == pgsql16 ]] && service=postgres16
+
+    want="$(published_port "$service")"
+    got="$(runner_port "$engine")"
+
+    if [[ -z "$want" ]]; then
+        fail "$engine: compose publishes no port for service '$service'"
+    elif [[ "$want" == "$got" ]]; then
+        pass "$engine: both say $want"
+    else
+        fail "$engine: compose publishes $want, runner uses '${got:-unset}'"
+    fi
+done
+
+# ── no collision with the system services ────────────────────────────────
+
+printf '\n\033[1mNo collision with the system services\033[0m\n'
+
+# MySQL and PostgreSQL run from apt on this machine and keep the defaults.
+# Binding those would fail to start, or worse, succeed after someone stops the
+# service and then silently test against the wrong server later.
+for port in 3306 5432; do
+    if docker compose -f "$COMPOSE" config 2>/dev/null | grep -qE "published: \"?$port\"?"; then
+        fail "compose claims $port, which a system service already holds"
+    else
+        pass "compose leaves $port to the system service"
+    fi
+done
+
+# ── health checks ────────────────────────────────────────────────────────
+
+printf '\n\033[1mHealth checks\033[0m\n'
+
+for service in mysql mariadb postgres postgres16; do
+    if docker compose -f "$COMPOSE" config --format json 2>/dev/null \
+        | python3 -c "
+import json, sys
+cfg = json.load(sys.stdin)
+sys.exit(0 if cfg['services'].get(sys.argv[1], {}).get('healthcheck') else 1)
+" "$service" 2>/dev/null; then
+        pass "$service declares a health check"
+    else
+        fail "$service has no health check — a run could start against a database still booting"
+    fi
+done
+
+# ── result ───────────────────────────────────────────────────────────────
+
+printf '\n'
+if [[ $FAIL -eq 0 ]]; then
+    printf '\033[32m%d passed.\033[0m\n' "$PASS"
+else
+    printf '\033[31m%d passed, %d failed.\033[0m\n' "$PASS" "$FAIL"
+fi
+
+exit $(( FAIL > 0 ? 1 : 0 ))

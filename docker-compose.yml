@@ -1,0 +1,125 @@
+# The database engines the suite is tested against.
+#
+# Marque claims to run on SQLite, MySQL, MariaDB and PostgreSQL, and a claim
+# nobody exercises is how MariaDB spent the project's whole life documented as
+# supported and never once run (job #10616). These are the servers that make
+# that claim checkable locally, and they pin the SAME image versions CI uses —
+# a green local sweep against mysql:9 would say nothing about a matrix gating
+# merges on mysql:8.0.
+#
+#   docker compose up -d        bring them up
+#   docker compose ps           check health
+#   bin/test-engines            run the suite against them
+#
+# ─── ports ───────────────────────────────────────────────────────────────
+#
+# Deliberately NOT the defaults. MySQL and PostgreSQL run as system services on
+# the dev machine and keep 3306 and 5432; binding those here would fail to
+# start, or — worse — succeed once somebody stopped the service and then
+# silently test against whichever MySQL apt last installed.
+#
+# So everything here is offset into the 1xxxx range and bin/test-engines reads
+# the same table. bin/test-compose asserts the two agree, because a
+# disagreement is invisible: the runner just talks to the wrong server.
+#
+#   13306  mysql       (system MySQL keeps 3306)
+#   13307  mariadb
+#   15432  postgres 17
+#   15433  postgres 16
+#
+# ─── credentials ─────────────────────────────────────────────────────────
+#
+# marque/marque/marque_test throughout, matching CI and the defaults in every
+# package's tests/TestCase.php. These are throwaway test databases on a
+# loopback-bound port; there is nothing here worth protecting.
+
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: marque
+      MYSQL_DATABASE: marque_test
+      MYSQL_USER: marque
+      MYSQL_PASSWORD: marque
+    ports:
+      # Loopback only. Nothing off this machine has any business reaching a
+      # test database with a password of "marque".
+      - "127.0.0.1:13306:3306"
+    healthcheck:
+      # Nothing may start against a database still booting. MySQL in
+      # particular accepts TCP connections well before it will answer a query,
+      # which produces a connection error that reads like a broken test.
+      test: ["CMD", "mysqladmin", "ping", "--silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    tmpfs:
+      # The data is thrown away between runs anyway, and tmpfs removes the
+      # disk I/O that dominates a real-engine sweep — bloodhound does real DDL
+      # per test and takes ~670s on MySQL.
+      - /var/lib/mysql
+    command:
+      # Matching CI's defaults rather than tuning for speed: a local pass has
+      # to mean the same thing as a CI pass.
+      - --default-authentication-plugin=caching_sha2_password
+
+  mariadb:
+    # A distinct target, not a MySQL alias. Laravel ships its own
+    # MariaDbConnection, connector and grammar, and the two diverge on JSON
+    # storage (native binary in MySQL 8, a LONGTEXT alias with a CHECK
+    # constraint here), index length limits and RETURNING support.
+    image: mariadb:11
+    environment:
+      MARIADB_ROOT_PASSWORD: marque
+      MARIADB_DATABASE: marque_test
+      MARIADB_USER: marque
+      MARIADB_PASSWORD: marque
+    ports:
+      - "127.0.0.1:13307:3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    tmpfs:
+      - /var/lib/mysql
+
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: marque_test
+      POSTGRES_USER: marque
+      POSTGRES_PASSWORD: marque
+    ports:
+      - "127.0.0.1:15432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marque -d marque_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    tmpfs:
+      - /var/lib/postgresql/data
+
+  postgres16:
+    # The second major exists so "PostgreSQL is supported" is a testable claim
+    # rather than an assertion about whichever version happens to be installed.
+    # docs/product.md names PostgreSQL with no floor, and CI pins 17 only — so
+    # without this, nothing anywhere exercises an older major.
+    image: postgres:16
+    environment:
+      POSTGRES_DB: marque_test
+      POSTGRES_USER: marque
+      POSTGRES_PASSWORD: marque
+    ports:
+      - "127.0.0.1:15433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marque -d marque_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    tmpfs:
+      - /var/lib/postgresql/data

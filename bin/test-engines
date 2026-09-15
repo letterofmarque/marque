@@ -72,14 +72,50 @@ else
     for d in packages/*/; do PKG_LIST+=("$(basename "$d")"); done
 fi
 
-# Per-engine connection settings. MariaDB is on 3307 because it cannot be
-# installed alongside MySQL from apt — it runs in Docker (see docs/how.md).
+# Where each engine lives, in ONE place.
+#
+# These are docker-compose.yml's published ports, and they are deliberately not
+# the defaults: MySQL and PostgreSQL run as system services on the dev machine
+# and keep 3306 and 5432. A container binding those would fail to start, or
+# succeed after someone stopped the service and then silently test against
+# whichever MySQL apt last installed.
+#
+# bin/test-compose asserts this table matches what compose publishes. It has to
+# be asserted rather than trusted, because a disagreement is invisible — the
+# runner simply connects to the wrong server and reports whatever it finds.
+declare -A ENGINE_PORT=(
+    [mysql]=13306
+    [mariadb]=13307
+    [pgsql]=15432
+    [pgsql16]=15433
+)
+
+# The compose service behind each engine, for `docker compose up` and for
+# reading health.
+declare -A ENGINE_SERVICE=(
+    [mysql]=mysql
+    [mariadb]=mariadb
+    [pgsql]=postgres
+    [pgsql16]=postgres16
+)
+
+# pgsql16 uses Laravel's pgsql driver; only the server version differs.
+driver_for() {
+    case "$1" in
+        pgsql16) echo pgsql ;;
+        *) echo "$1" ;;
+    esac
+}
+
 engine_env() {
+    local port="${ENGINE_PORT[$1]:-}"
+
     case "$1" in
         sqlite)  echo "DB_CONNECTION=sqlite" ;;
-        mysql)   echo "DB_CONNECTION=mysql DB_DATABASE=marque_test" ;;
-        mariadb) echo "DB_CONNECTION=mariadb DB_PORT=3307 DB_DATABASE=marque_test" ;;
-        pgsql)   echo "DB_CONNECTION=pgsql DB_DATABASE=marque_test" ;;
+        mysql|mariadb)
+            echo "DB_CONNECTION=$(driver_for "$1") DB_PORT=$port DB_DATABASE=marque_test" ;;
+        pgsql|pgsql16)
+            echo "DB_CONNECTION=$(driver_for "$1") DB_PORT=$port DB_DATABASE=marque_test" ;;
         *) echo "unknown engine: $1" >&2; return 1 ;;
     esac
 }
@@ -92,11 +128,11 @@ reset_db() {
     local err
     case "$1" in
         sqlite) return 0 ;;
-        mysql)   err=$(mysql -h127.0.0.1 -umarque -pmarque \
+        mysql|mariadb)
+                 err=$(mysql -h127.0.0.1 -P"${ENGINE_PORT[$1]}" -umarque -pmarque \
                    -e 'DROP DATABASE IF EXISTS marque_test; CREATE DATABASE marque_test;' 2>&1) ;;
-        mariadb) err=$(mysql -h127.0.0.1 -P3307 -umarque -pmarque \
-                   -e 'DROP DATABASE IF EXISTS marque_test; CREATE DATABASE marque_test;' 2>&1) ;;
-        pgsql)   err=$(PGPASSWORD=marque psql -h 127.0.0.1 -U marque -d postgres -q \
+        pgsql|pgsql16)
+                 err=$(PGPASSWORD=marque psql -h 127.0.0.1 -p "${ENGINE_PORT[$1]}" -U marque -d postgres -q \
                    -c 'DROP DATABASE IF EXISTS marque_test' \
                    -c 'CREATE DATABASE marque_test' 2>&1) ;;
     esac
@@ -116,9 +152,11 @@ reset_db() {
 check_engine() {
     case "$1" in
         sqlite) return 0 ;;
-        mysql)   mysql -h127.0.0.1 -umarque -pmarque -e 'SELECT 1' >/dev/null 2>&1 ;;
-        mariadb) mysql -h127.0.0.1 -P3307 -umarque -pmarque -e 'SELECT 1' >/dev/null 2>&1 ;;
-        pgsql)   PGPASSWORD=marque psql -h 127.0.0.1 -U marque -d marque_test -c 'SELECT 1' >/dev/null 2>&1 ;;
+        mysql|mariadb)
+            mysql -h127.0.0.1 -P"${ENGINE_PORT[$1]}" -umarque -pmarque -e 'SELECT 1' >/dev/null 2>&1 ;;
+        pgsql|pgsql16)
+            PGPASSWORD=marque psql -h 127.0.0.1 -p "${ENGINE_PORT[$1]}" -U marque -d marque_test \
+                -c 'SELECT 1' >/dev/null 2>&1 ;;
     esac
 }
 
@@ -127,7 +165,7 @@ OVERALL=0
 for engine in "${ENGINES[@]}"; do
     if ! check_engine "$engine"; then
         printf '\n\033[31m%s is not reachable — skipping.\033[0m\n' "$engine"
-        [[ "$engine" == mariadb ]] && echo "  (docker start marque-mariadb)"
+        echo "  (docker compose up -d ${ENGINE_SERVICE[$engine]:-})"
         OVERALL=1
         continue
     fi
