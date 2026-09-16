@@ -7,6 +7,44 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [RELEASES.md](../../RELEASES.md) for the story up to this point.
 
+## [Unreleased]
+
+> Gates the genuinely guest-only auth routes behind `guest` middleware, so a logged-in user no longer sees the login form.
+
+### Changed
+
+- **BREAKING: `login`, `register`, `two-factor-challenge` and both `forgot-password`
+  routes now carry `guest` middleware** and redirect an authenticated user instead
+  of rendering. They previously ran under plain `['web']` despite the group being
+  commented "Guest routes", so a logged-in user could open the login form
+  (job #10698, reported by twentyt).
+
+  Major under [VERSIONING.md](../../VERSIONING.md) because it changes default
+  behaviour on shipped routes: requests that returned 200 now return a redirect.
+  Nothing is renamed or removed — every route name, path and component is
+  unchanged.
+
+  **If you worked around this**, you can now drop the workaround. twentyt
+  re-registered `/login` in its own `routes/web.php` with `->middleware('guest')`
+  ahead of the package's routes; that override is now redundant and should be
+  removed rather than left shadowing the package route.
+
+  If you need the old behaviour, set `usarrs.guest_middleware` to `['web']`.
+
+### Added
+
+- **`usarrs.guest_middleware` config key**, default `['web', 'guest']`, mirroring
+  the existing `auth_middleware`. Overridable by publishing the config.
+
+  The auth routes now use three middleware stacks rather than two, because they
+  divide into three audiences. `reset-password`, the magic-link routes and the
+  socialite callbacks stay on `middleware` (`['web']`) and are **not** guest-gated
+  on purpose: an authenticated user can legitimately follow a reset link from
+  email, click a magic link issued on another device, or complete an OAuth
+  callback to link an additional provider. Gating the whole group would break all
+  three, which is why this needed a route split rather than a one-line config
+  change.
+
 ## [7.0.0] — 2026-09-11
 
 > Requires `marque/deck` in place of `marque/ise`, and registers its admin screen and nav entries against trove's registries.

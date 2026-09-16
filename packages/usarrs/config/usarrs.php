@@ -124,8 +124,18 @@ return [
 
     'prefix' => env('USARRS_PREFIX', ''),
 
-    // Middleware for guest routes (login, register, password reset)
+    // Base middleware for the auth route group (password reset, magic link,
+    // socialite callbacks). Deliberately NOT guest-gated: an authenticated
+    // user can legitimately follow a reset link from email, click a magic
+    // link issued on another device, or link an extra OAuth provider.
     'middleware' => ['web'],
+
+    // Middleware for routes only a logged-OUT user should reach: login,
+    // register, the 2FA challenge, and forgot-password (job #10698). These
+    // used to sit on 'middleware' above, so a logged-in user could open the
+    // login form — confusing rather than dangerous, but every consuming app
+    // worked around it separately.
+    'guest_middleware' => ['web', 'guest'],
 
     // Middleware for authenticated routes (profile, invite management)
     'auth_middleware' => ['web', 'auth'],

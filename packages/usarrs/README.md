@@ -58,6 +58,28 @@ have their own equivalent keys (`GUISE_LAYOUT`, `DISGUISE_LAYOUT`) that default 
 same way but are set independently. If you're using more than one Marque frontend
 package pointed at the same custom layout, set each package's key to match.
 
+### Route middleware
+
+Three stacks, because the auth routes divide into three genuinely different
+audiences:
+
+| Config key | Default | Applies to |
+|---|---|---|
+| `guest_middleware` | `['web', 'guest']` | login, register, 2FA challenge, forgot-password |
+| `middleware` | `['web']` | reset-password, magic-link, socialite callbacks |
+| `auth_middleware` | `['web', 'auth']` | logout, profile, email verification, password confirm |
+
+The middle row is the one worth understanding. Those routes are **not**
+guest-gated on purpose: an authenticated user can legitimately follow a
+password-reset link that arrived by email, click a magic link issued on
+another device, or complete an OAuth callback to link an additional provider.
+Gating them would break all three, which is why `guest` is applied to the
+genuinely guest-only routes rather than to the whole group.
+
+Override any of them by publishing the config. If you point `guest_middleware`
+at a custom stack, keep a `guest`-equivalent in it or logged-in users will see
+the login form again.
+
 ## Auth Driver
 
 `config('usarrs.auth_driver')` controls the top-level login/registration flow. Set
