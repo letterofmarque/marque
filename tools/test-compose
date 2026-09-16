@@ -54,8 +54,17 @@ fi
 
 printf '\n\033[1mImage versions match CI\033[0m\n'
 
+# CI declares its images inside a conditional expression, so that only the
+# database a job actually tests against gets a container:
+#
+#   image: ${{ matrix.database == 'mysql' && 'mysql:8.0' || '' }}
+#
+# The version is the quoted <engine>:<version> inside it. Matching that rather
+# than a bare `image: mysql:8.0` line, because the bare form stopped existing
+# when the services became conditional (job #10715) and this check silently
+# reported "could not read CI's image" for all three engines.
 ci_image() {
-    grep -oE "image: $1:[0-9.]+" .github/workflows/test-run.yml | head -1 | awk '{print $2}'
+    grep -oE "'$1:[0-9.]+'" .github/workflows/test-run.yml | head -1 | tr -d "'"
 }
 
 compose_image() {
