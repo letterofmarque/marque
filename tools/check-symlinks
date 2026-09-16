@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+#
+# Are the files that should be symlinks still symlinks?
+#
+#   tools/check-symlinks          report, exit non-zero if any are broken
+#   tools/check-symlinks --fix    repair them, keeping the detached content
+#   tools/check-symlinks --quiet  print only on failure (for hooks)
+#
+# Why this exists
+# ---------------
+# Marque's operating docs and skills live in the private `project` repo and are
+# symlinked into this one. `sed -i` on a symlink does not edit through it: it
+# writes a temp file and renames over the link, leaving a detached REGULAR FILE
+# and never touching the target.
+#
+# That failure is silent and, worse, inverted — the edit appears to succeed
+# while the real document keeps its old content. You then read the stale file,
+# act on it, and make more edits to a copy nothing else can see. It cost Kosh
+# a long time for exactly this reason, and it bit this repo within minutes of
+# the symlinks existing (docs/how.md, 2026-09-16, 20 edits stranded).
+#
+# A rule in CLAUDE.md is the weakest possible control here, because the whole
+# problem is that nothing looks wrong. So it is checked mechanically instead.
+#
+# --fix keeps the DETACHED content, not the target's. That is deliberate: a
+# detached file is nearly always the result of an edit somebody meant to make,
+# so its content is the newer of the two. It copies that onto the real file,
+# removes the copy, and recreates the link.
+
+set -uo pipefail
+
+cd "$(dirname "$0")/.."
+ROOT=$(pwd)
+
+FIX=false
+QUIET=false
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --fix) FIX=true; shift ;;
+        --quiet|-q) QUIET=true; shift ;;
+        -h|--help) sed -n '2,8p' "$0" | sed 's/^# \?//'; exit 0 ;;
+        *) echo "unknown option: $1" >&2; exit 2 ;;
+    esac
+done
+
+red()   { printf '\033[31m%s\033[0m\n' "$*"; }
+green() { printf '\033[32m%s\033[0m\n' "$*"; }
+warn()  { printf '\033[33m%s\033[0m\n' "$*"; }
+
+# link -> target, relative to the repo root. The target path is what the link
+# should point AT (relative to the link's own directory), which is why these
+# are not all the same shape.
+declare -A LINKS=(
+    [CLAUDE.md]="project/CLAUDE.md"
+    [docs/role.md]="../project/docs/role.md"
+    [docs/why.md]="../project/docs/why.md"
+    [docs/how.md]="../project/docs/how.md"
+    [docs/product.md]="../project/docs/product.md"
+    [docs/directives.md]="../project/docs/directives.md"
+    [.claude/skills/release]="../../project/skills/release"
+)
+
+BROKEN=()
+MISSING=()
+FIXED=()
+
+for link in "${!LINKS[@]}"; do
+    want="${LINKS[$link]}"
+
+    # The private repo may not be cloned — that is a different problem and not
+    # this script's to report on every run.
+    resolved="$(cd "$(dirname "$ROOT/$link")" && readlink -f "$want" 2>/dev/null)"
+    if [[ ! -e "$resolved" ]]; then
+        MISSING+=("$link")
+        continue
+    fi
+
+    if [[ -L "$ROOT/$link" ]]; then
+        continue
+    fi
+
+    if [[ ! -e "$ROOT/$link" ]]; then
+        # No link and no file — recreate it, nothing to lose.
+        if $FIX; then
+            ln -s "$want" "$ROOT/$link"
+            FIXED+=("$link (recreated, was absent)")
+        else
+            BROKEN+=("$link — absent")
+        fi
+        continue
+    fi
+
+    # A regular file where a link should be: something clobbered it.
+    if $FIX; then
+        # The detached copy is almost certainly the newer content — it exists
+        # because an edit landed there instead of on the target.
+        cp "$ROOT/$link" "$resolved"
+        rm "$ROOT/$link"
+        ln -s "$want" "$ROOT/$link"
+        FIXED+=("$link (detached content recovered onto $want)")
+    else
+        detail=""
+        if ! diff -q "$ROOT/$link" "$resolved" >/dev/null 2>&1; then
+            detail=" — AND ITS CONTENT DIFFERS from the real file"
+        fi
+        BROKEN+=("$link$detail")
+    fi
+done
+
+if [[ ${#BROKEN[@]} -eq 0 && ${#FIXED[@]} -eq 0 ]]; then
+    $QUIET || green "All ${#LINKS[@]} symlinks intact."
+    [[ ${#MISSING[@]} -gt 0 ]] && ! $QUIET && warn "  (${#MISSING[@]} target(s) absent — is the project repo cloned?)"
+    exit 0
+fi
+
+if [[ ${#FIXED[@]} -gt 0 ]]; then
+    green "Repaired ${#FIXED[@]} symlink(s):"
+    printf '  %s\n' "${FIXED[@]}"
+    exit 0
+fi
+
+red "${#BROKEN[@]} symlink(s) are no longer symlinks:"
+printf '  %s\n' "${BROKEN[@]}"
+echo
+warn "Almost certainly a 'sed -i' (or another write-temp-then-rename edit) on the"
+warn "link. The edit went to a detached copy and the real file was never touched."
+echo
+warn "  tools/check-symlinks --fix     recover the detached content and relink"
+exit 1
