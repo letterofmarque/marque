@@ -15,9 +15,20 @@ yarn-error.log
 .DS_Store
 composer.lock
 
-# Claude operational files + internal docs (local only)
-# Public-facing user docs (e.g. UPGRADE.md, README.md) stay tracked at docs/ root
-# but anything internal — role/why/how/product/directives, plans/, graph/ — stays local.
+# Maintainer-only, in two private repos nested inside this one:
+#
+#   release/   letterofmarque/release   — release tooling; useless without push
+#              rights to the tags, the split workflow and Packagist
+#   project/   letterofmarque/project   — operating docs, plans, Claude skills
+#
+# Both are real git repos, so they are versioned — just not here. The entries
+# below them are symlinks INTO project/, which is why the paths still appear:
+# the link is ignored, the target lives in the private repo.
+#
+# Public-facing docs (upgrade guides, integration, new-package) stay tracked
+# at docs/ root. Anything internal does not.
+release/
+project/
 CLAUDE.md
 .claude/
 docs/role.md
