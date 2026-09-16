@@ -175,30 +175,31 @@ Three doc updates that get forgotten:
 - `docs/how.md` (maintainers only) — monorepo tree entry, and **recount the test table
   by running every suite** rather than incrementing the old number. Parley's checkpoint
   found it stale by 400 tests doing exactly that.
-- **`RELEASES.md` + `docs/releases/<n>.md` + `docs/upgrading.md`** — a new package is
-  exactly the kind of event that page exists for. See below; this is the one that got
-  missed on taxonomy.
+- **`docs/releases/<n>.md` + `docs/upgrading.md`** — a new package is exactly the kind
+  of event those pages exist for. See below; this is the one that got missed on
+  taxonomy.
 
 ### A new package needs a suite release entry
 
-`RELEASES.md` is the "what do I need to know to catch up" page, written for people who
-upgrade the *suite* rather than a package. **A brand-new package always warrants an
-entry** — 4.0 got one for adding squidink and parley.
+`docs/upgrading.md` is the "what do I need to know to catch up" page, written for
+people who upgrade the *suite* rather than a package. **A brand-new package always
+warrants an entry** — 4.0 got one for adding squidink and parley.
 
 Taxonomy shipped without one (2026-09-09) and TYT noticed the gap before we did. The
 cause is worth recording because it will recur: the Build's shipping checkpoint listed
 the package README, root README, `how.md` and `CHANGELOG.md`, and that list got worked
-as a checklist rather than as a prompt to ask *who reads what*. `RELEASES.md` is the
+as a checklist rather than as a prompt to ask *who reads what*. The upgrade page is the
 only one of these written for a consumer deciding whether they want the thing.
 
-Three files, all of them:
+Two files, both of them:
 
 1. `docs/releases/<n>.md` — the release doc itself. Follow
    [4.0](releases/4.0.md), which is the new-package precedent: what problem it solves
    in **tracker terms rather than engine terms**, what the config or usage actually
    looks like, who's affected, what they need to do.
-2. [`RELEASES.md`](../RELEASES.md) — one row at the **top** of the Releases table.
-3. [`docs/upgrading.md`](upgrading.md) — one row at the **bottom** of the ordered list.
+2. [`docs/upgrading.md`](upgrading.md) — **two** rows: one at the top of the Releases
+   table (newest first) and one at the bottom of the ordered path (oldest first). They
+   are the same releases in opposite orders; missing the second is easy to do.
 
 **Pick the suite number by impact, not by momentum.** Suite numbers are not package
 numbers and do not follow them. A purely additive optional package is a MINOR bump
@@ -212,8 +213,10 @@ returning empty is what "purely additive" actually means.
 **Expect the package-version confusion.** Packages version independently, so
 `usarrs/v6.2.0` exists while the suite is on 5.x, and `docs/upgrading.md` carries rows
 titled things like "Upgrade guide: usarrs v6". That is the exact reading that produced
-"didn't we do a 6.0 release?" — resolving it is what `RELEASES.md` is *for*, so the
-release doc should be unambiguous about which kind of number it is quoting.
+"didn't we do a 6.0 release?" (job #10677). The ordered-path table now carries a
+**Suite** column for precisely this, so a guide row states which suite release it
+belongs to — fill it in, and keep the release doc unambiguous about which kind of
+number it is quoting.
 
 ## Where the real detail lives
 

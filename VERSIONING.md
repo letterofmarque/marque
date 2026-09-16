@@ -194,7 +194,7 @@ dated feed of every release across every package, newest first. It is generated 
 Releasing without a summary line is refused rather than left blank.
 
 Majors that are big enough to need explaining — a renamed package, a floor raise, a
-column rename — also get a plain-language write-up in [RELEASES.md](RELEASES.md), which
+column rename — also get a plain-language write-up in [docs/upgrading.md](docs/upgrading.md), which
 groups whatever package versions moved together for one real reason and says who's
 affected and what to do, without assuming you know the codebase. Not every major package
 bump gets its own suite release entry — only ones where the "why" and "what do I do"

@@ -1,6 +1,6 @@
 # Upgrading to Marque v2.0
 
-> **Note:** this predates [RELEASES.md](../RELEASES.md), the suite-wide
+> **Note:** this predates [docs/upgrading.md](upgrading.md), the suite-wide
 > release index — there's no "Marque 2.0" entry there since that page starts
 > at 3.0. This guide is still current for the v1→v2 jump.
 

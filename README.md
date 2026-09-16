@@ -200,7 +200,7 @@ See [VERSIONING.md](VERSIONING.md) for the full policy — what counts as patch,
 major, how the grey areas are decided, pre-releases, and the support window.
 
 Package versions move independently, but if you want the plain-language story of what's
-changed across the suite and what to do about it, see [RELEASES.md](RELEASES.md).
+changed across the suite and what to do about it, see [docs/upgrading.md](docs/upgrading.md).
 
 ## Releasing
 
