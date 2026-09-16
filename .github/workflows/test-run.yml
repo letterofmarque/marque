@@ -75,15 +75,28 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
-      # Both engines start on every job in the matrix, including SQLite-only
-      # ones. GitHub Actions has no conditional `services:` — the alternative
-      # is duplicating this whole workflow per engine, which is worse than a
-      # container that goes unused. Each job gets its own runner and so its own
-      # database server: running two packages against one database concurrently
-      # produced 172 phantom failures locally (job #10548), and per-job
-      # isolation is what makes the matrix safe to parallelise.
+      # ─── one database server per job, and only the one it needs ───────────
+      #
+      # `services:` cannot be declared conditionally, but a service whose
+      # `image` evaluates to an empty string is never created. So each engine's
+      # image is gated on matrix.database, and a job starts exactly one
+      # database container — or none at all, for SQLite.
+      #
+      # This replaces an earlier decision to start all three everywhere. That
+      # reasoning was about waste ("a container that goes unused" beats
+      # duplicating the workflow per engine) and it weighed the wrong cost.
+      # The real cost is blast radius: on 2026-09-15 the nightly's
+      # `cennad (pgsql, ...)` job went red because the MariaDB container failed
+      # to boot on the runner over an io_uring EPERM — a PostgreSQL job killed
+      # by an engine it never touches (job #10715). A test should only be able
+      # to fail for reasons connected to what it is testing.
+      #
+      # Each job still gets its own runner and so its own database server:
+      # running two packages against one database concurrently produced 172
+      # phantom failures locally (job #10548), and per-job isolation is what
+      # makes the matrix safe to parallelise.
       mysql:
-        image: mysql:8.0
+        image: ${{ matrix.database == 'mysql' && 'mysql:8.0' || '' }}
         env:
           MYSQL_ROOT_PASSWORD: marque
           MYSQL_DATABASE: marque_test
@@ -100,12 +113,14 @@ jobs:
       # MariaDB is a distinct target, not a MySQL alias — Laravel ships its own
       # MariaDbConnection, connector and grammar. It diverges on JSON storage
       # (native binary type in MySQL 8, a LONGTEXT alias with a CHECK
-      # constraint here), index length limits, and RETURNING support. Mapped to
-      # 3307 because MySQL already holds 3306 on the host side; inside Actions
-      # each service has its own namespace, but keeping the port consistent
-      # with local dev means one less thing that only breaks in one place.
+      # constraint here), index length limits, and RETURNING support.
+      #
+      # Still mapped to 3307 even though MySQL can no longer be running
+      # alongside it: the port matches local dev (docker-compose.yml publishes
+      # 13307, and tools/test-compose asserts the runner agrees), which is one
+      # less thing that can only break in one place.
       mariadb:
-        image: mariadb:11
+        image: ${{ matrix.database == 'mariadb' && 'mariadb:11' || '' }}
         env:
           MARIADB_ROOT_PASSWORD: marque
           MARIADB_DATABASE: marque_test
@@ -120,7 +135,7 @@ jobs:
           --health-retries 10
 
       postgres:
-        image: postgres:17
+        image: ${{ matrix.database == 'pgsql' && 'postgres:17' || '' }}
         env:
           POSTGRES_DB: marque_test
           POSTGRES_USER: marque
