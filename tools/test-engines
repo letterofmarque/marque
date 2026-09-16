@@ -2,11 +2,11 @@
 #
 # Run the full suite against one or more database engines.
 #
-#   bin/test-engines                    # all four
-#   bin/test-engines mysql              # just one
-#   bin/test-engines sqlite pgsql       # a subset
-#   bin/test-engines --packages trove,skipper mysql
-#   bin/test-engines --workers 1        # force serial (debugging)
+#   tools/test-engines                    # all four
+#   tools/test-engines mysql              # just one
+#   tools/test-engines sqlite pgsql       # a subset
+#   tools/test-engines --packages trove,skipper mysql
+#   tools/test-engines --workers 1        # force serial (debugging)
 #
 # Engines run one at a time; packages run in parallel WITHIN an engine.
 #
@@ -123,7 +123,7 @@ fi
 # succeed after someone stopped the service and then silently test against
 # whichever MySQL apt last installed.
 #
-# bin/test-compose asserts this table matches what compose publishes. It has to
+# tools/test-compose asserts this table matches what compose publishes. It has to
 # be asserted rather than trusted, because a disagreement is invisible — the
 # runner simply connects to the wrong server and reports whatever it finds.
 declare -A ENGINE_PORT=(

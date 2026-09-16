@@ -189,7 +189,7 @@ refuses_with 'a missing changelog entry is refused' 'changelog|entry' guise 5.0.
 
 setup_sandbox
 # An entry with no '> summary' line under it. The root changelog is generated
-# from that line, so without it bin/build-changelog produces a hole — and by
+# from that line, so without it tools/build-changelog produces a hole — and by
 # then the tags are already pushed. Refused here, before anything is tagged.
 python3 - "$SANDBOX/repo/packages/guise/CHANGELOG.md" <<'PY'
 import sys
@@ -339,11 +339,11 @@ printf '\n\033[1mCheap checks run before expensive ones\033[0m\n'
 # The whole point of preflight is that everything checkable is checked before
 # any test or container work starts. A preflight that runs tests is not a
 # preflight.
-if ! grep -qE '^[^#]*(bin/test-engines|vendor/bin/pest|docker compose (up|run)|composer (update|install))' "$PREFLIGHT"; then
+if ! grep -qE '^[^#]*(tools/test-engines|vendor/bin/pest|docker compose (up|run)|composer (update|install))' "$PREFLIGHT"; then
     pass 'preflight runs no tests and starts no containers'
 else
     fail 'preflight should not run tests or containers' \
-        "$(grep -nE '^[^#]*(bin/test-engines|vendor/bin/pest|docker compose (up|run))' "$PREFLIGHT" | head -3)"
+        "$(grep -nE '^[^#]*(tools/test-engines|vendor/bin/pest|docker compose (up|run))' "$PREFLIGHT" | head -3)"
 fi
 
 # It must also not tag or push — it is a check, not a release step.

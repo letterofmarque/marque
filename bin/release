@@ -153,7 +153,7 @@ check_changelog() {
         found && (/^## \[/ || /^### /) { exit }
         END { exit ok ? 0 : 1 }
     ' "$file" \
-        || die "$pkg/CHANGELOG.md has no '> summary' line under [$version] — add a one-sentence summary for the root changelog (see bin/build-changelog)"
+        || die "$pkg/CHANGELOG.md has no '> summary' line under [$version] — add a one-sentence summary for the root changelog (see tools/build-changelog)"
 }
 
 # extra.branch-alias.dev-main is composer metadata (what dev-main resolves to
@@ -411,9 +411,9 @@ main() {
     # than it trailing a release by one commit.
     blue "==> Rebuilding root changelog"
     if $DRY_RUN; then
-        echo "    [dry-run] would run: bin/build-changelog"
+        echo "    [dry-run] would run: tools/build-changelog"
     else
-        bin/build-changelog | sed 's/^/    /'
+        tools/build-changelog | sed 's/^/    /'
         if ! git diff --quiet -- CHANGELOG.md; then
             git add CHANGELOG.md
             git commit --quiet -m "docs: Rebuild root changelog for release"

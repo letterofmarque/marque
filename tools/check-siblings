@@ -2,9 +2,9 @@
 #
 # Can every sibling still resolve against this package?
 #
-#   bin/check-siblings parley           # after changing parley
-#   bin/check-siblings trove            # eleven dependents
-#   bin/check-siblings --all            # every package, before a big release
+#   tools/check-siblings parley           # after changing parley
+#   tools/check-siblings trove            # eleven dependents
+#   tools/check-siblings --all            # every package, before a big release
 #
 # Why this exists
 # ---------------

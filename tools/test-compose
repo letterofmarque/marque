@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Tests for docker-compose.yml and the port agreement with bin/test-engines.
+# Tests for docker-compose.yml and the port agreement with tools/test-engines.
 #
 # The compose stack deliberately does NOT use the default ports: MySQL and
 # PostgreSQL run as system services on this machine and keep 3306/5432. That
@@ -11,7 +11,7 @@
 #
 # So the agreement is asserted rather than assumed.
 #
-# Run: bin/test-compose
+# Run: tools/test-compose
 
 set -uo pipefail
 
@@ -88,7 +88,7 @@ fi
 
 printf '\n\033[1mParallel workers can create their own databases\033[0m\n'
 
-# bin/test-engines gives each worker its own marque_test_<n>, which is what
+# tools/test-engines gives each worker its own marque_test_<n>, which is what
 # makes parallelism safe (job #10548: two packages on one database, 172
 # phantom failures). The official MySQL/MariaDB images grant MYSQL_USER rights
 # to MYSQL_DATABASE only, so that needs docker/mysql-init to be mounted.
@@ -120,7 +120,7 @@ done
 
 # ── ports agree with the runner ──────────────────────────────────────────
 
-printf '\n\033[1mPorts agree with bin/test-engines\033[0m\n'
+printf '\n\033[1mPorts agree with tools/test-engines\033[0m\n'
 
 # What compose publishes on the host side, per service.
 published_port() {
@@ -136,7 +136,7 @@ print(ports[0]['published'] if ports else '')
 
 # What the runner will actually connect to.
 runner_port() {
-    bash -c "source <(sed -n '/^declare -A ENGINE_PORT/,/^)/p' bin/test-engines); echo \${ENGINE_PORT[$1]:-}" 2>/dev/null
+    bash -c "source <(sed -n '/^declare -A ENGINE_PORT/,/^)/p' tools/test-engines); echo \${ENGINE_PORT[$1]:-}" 2>/dev/null
 }
 
 for engine in mysql mariadb pgsql pgsql16; do

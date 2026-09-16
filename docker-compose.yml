@@ -9,7 +9,7 @@
 #
 #   docker compose up -d        bring them up
 #   docker compose ps           check health
-#   bin/test-engines            run the suite against them
+#   tools/test-engines            run the suite against them
 #
 # ─── ports ───────────────────────────────────────────────────────────────
 #
@@ -18,8 +18,8 @@
 # start, or — worse — succeed once somebody stopped the service and then
 # silently test against whichever MySQL apt last installed.
 #
-# So everything here is offset into the 1xxxx range and bin/test-engines reads
-# the same table. bin/test-compose asserts the two agree, because a
+# So everything here is offset into the 1xxxx range and tools/test-engines reads
+# the same table. tools/test-compose asserts the two agree, because a
 # disagreement is invisible: the runner just talks to the wrong server.
 #
 #   13306  mysql       (system MySQL keeps 3306)

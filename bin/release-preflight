@@ -156,7 +156,7 @@ check_changelog() {
         found && (/^## \[/ || /^### /) { exit }
         END { exit ok ? 0 : 1 }
     ' "$file" \
-        || die "$pkg/CHANGELOG.md has no '> summary' line under [$version] — add a one-sentence summary for the root changelog (see bin/build-changelog)"
+        || die "$pkg/CHANGELOG.md has no '> summary' line under [$version] — add a one-sentence summary for the root changelog (see tools/build-changelog)"
 }
 
 # Returns 0 if it changed anything (caller commits), 1 if already correct.

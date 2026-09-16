@@ -51,7 +51,7 @@ jobs:
         run: composer lint:test
 
       - name: Check the root changelog is current
-        run: bin/build-changelog --check
+        run: tools/build-changelog --check
 
   # PHPStan cannot join the lint job: it needs each package's own vendor/ to
   # resolve models and facades, so it installs per package the way the test

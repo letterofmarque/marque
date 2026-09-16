@@ -1,6 +1,6 @@
 -- Let the `marque` user create and drop its own per-worker test databases.
 --
--- bin/test-engines runs packages in parallel, and parallelism is only safe
+-- tools/test-engines runs packages in parallel, and parallelism is only safe
 -- when each worker owns a database nobody else touches (job #10548: two
 -- packages sharing one database produced 172 phantom failures). So the runner
 -- needs marque_test_1, marque_test_2, ... on demand.

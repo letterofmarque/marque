@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Tests for bin/check-siblings.
+# Tests for tools/check-siblings.
 #
 # check-siblings is the guard against the failure that opened this whole piece
 # of work: guise pinned `marque/parley: ^2.0` while parley went to 3.0.0, and
@@ -8,7 +8,7 @@
 # siblings could still resolve. A guard nobody has exercised is not a guard, so
 # the headline test replays that exact break in both directions.
 #
-# Run: bin/test-check-siblings
+# Run: tools/test-check-siblings
 
 set -uo pipefail
 
@@ -61,7 +61,7 @@ else
     fail 'fixture: could not reproduce the broken constraint'
 fi
 
-OUTPUT=$(bin/check-siblings parley 2>&1)
+OUTPUT=$(tools/check-siblings parley 2>&1)
 STATUS=$?
 
 if [[ $STATUS -ne 0 ]]; then
@@ -85,7 +85,7 @@ fi
 restore
 cp "$GUISE_JSON" "$GUISE_BACKUP"   # keep the trap honest after an early restore
 
-OUTPUT=$(bin/check-siblings parley 2>&1)
+OUTPUT=$(tools/check-siblings parley 2>&1)
 STATUS=$?
 
 if [[ $STATUS -eq 0 ]]; then
@@ -98,7 +98,7 @@ fi
 
 printf '\n\033[1mThe dependency graph\033[0m\n'
 
-OUTPUT=$(bin/check-siblings parley 2>&1)
+OUTPUT=$(tools/check-siblings parley 2>&1)
 
 if ! grep -qE '^\s*parley\b' <<<"$OUTPUT"; then
     pass 'a package is not treated as its own sibling'
@@ -106,7 +106,7 @@ else
     fail 'parley checked against itself' "$OUTPUT"
 fi
 
-OUTPUT=$(bin/check-siblings trove 2>&1)
+OUTPUT=$(tools/check-siblings trove 2>&1)
 STATUS=$?
 
 if [[ $STATUS -eq 0 ]]; then
@@ -116,7 +116,7 @@ else
 fi
 
 # squidink is required by parley only; a narrow graph must still work.
-OUTPUT=$(bin/check-siblings squidink 2>&1)
+OUTPUT=$(tools/check-siblings squidink 2>&1)
 if grep -q 'parley' <<<"$OUTPUT"; then
     pass 'a single-dependent package finds its one sibling'
 else
@@ -127,14 +127,14 @@ fi
 
 printf '\n\033[1mEdge cases\033[0m\n'
 
-OUTPUT=$(bin/check-siblings threepio 2>&1)
+OUTPUT=$(tools/check-siblings threepio 2>&1)
 if grep -qiE 'no sibling|nothing to check|[0-9]+ sibling' <<<"$OUTPUT"; then
     pass 'a package with dependents reports how many it checked'
 else
     fail 'no indication of how many siblings were checked' "$OUTPUT"
 fi
 
-OUTPUT=$(bin/check-siblings nonexistent-package 2>&1)
+OUTPUT=$(tools/check-siblings nonexistent-package 2>&1)
 STATUS=$?
 if [[ $STATUS -ne 0 ]]; then
     pass 'an unknown package is refused rather than silently passing'
@@ -142,7 +142,7 @@ else
     fail 'an unknown package exited zero — a typo would read as success'
 fi
 
-OUTPUT=$(bin/check-siblings 2>&1)
+OUTPUT=$(tools/check-siblings 2>&1)
 STATUS=$?
 if [[ $STATUS -ne 0 ]]; then
     pass 'no argument is refused'
