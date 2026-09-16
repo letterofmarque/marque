@@ -204,17 +204,13 @@ changed across the suite and what to do about it, see [RELEASES.md](RELEASES.md)
 
 ## Releasing
 
-Packages are versioned independently. Use the release script:
+Packages are versioned independently, and releases are cut by the maintainers with
+tooling that lives outside this repository (it needs push access to the tags, the split
+workflow and Packagist).
 
-```bash
-bin/release cennad 3.0.1                  # one package
-bin/release guise 3.1.0 usarrs 3.1.0      # several at once
-bin/release --all 3.1.0                   # every package
-bin/release --dry-run guise 3.1.0         # show the plan, change nothing
-```
-
-It runs the test suites first, sorts the release into dependency order, tags, pushes in
-safe batches, waits for each split workflow, and verifies the versions reached Packagist.
+What it does, for the record: runs the test suites first, sorts the release into
+dependency order derived from the `composer.json` files, tags, pushes in batches of
+three, waits for each split workflow, and verifies the versions reached Packagist.
 
 To release by hand, tag as `<package>/v<version>` and push. The split workflow parses the
 tag, splits only that package, and pushes the version tag to its sub-repo; Packagist

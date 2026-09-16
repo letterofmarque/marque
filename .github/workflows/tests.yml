@@ -29,7 +29,7 @@ on:
 
 jobs:
   # Style and the generated changelog are repo-wide facts, not per-package
-  # ones, so they run once rather than 11 times. bin/release gates on both
+  # ones, so they run once rather than 11 times. the release tooling gates on both
   # already; this is the same check moved earlier, where it is cheap to fix.
   lint:
     name: Lint and changelog

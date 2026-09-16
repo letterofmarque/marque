@@ -12,7 +12,7 @@
 # changed across Marque lately." This does.
 #
 # It is GENERATED, never hand-edited — the per-package changelogs are the source
-# of truth, so this file cannot drift from them. bin/release regenerates it as
+# of truth, so this file cannot drift from them. the release tooling regenerates it as
 # part of every release, so it updates on the same trigger as a version bump
 # rather than relying on anyone remembering.
 #
@@ -25,7 +25,7 @@
 #
 # One sentence, present tense, plain language — it is read by people scanning
 # for whether a release affects them. Following the same rule as
-# sync_branch_alias in bin/release: mechanical values get filled in
+# sync_branch_alias in the release tooling: mechanical values get filled in
 # automatically, human-written prose gets refused rather than fabricated. A
 # release with no summary line is an error, not a blank row.
 #

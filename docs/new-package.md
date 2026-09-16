@@ -130,7 +130,7 @@ Four places, and missing any of them fails quietly rather than loudly:
 | `.github/workflows/split.yml` | The `split_branch` matrix. **Only that one** — `split_tag` parses the package name out of the tag (`<package>/v<version>`) and takes no matrix entry |
 | `.github/workflows/test-run.yml` | The package list |
 | `.github/workflows/tests.yml` | The PHPStan matrix |
-| `bin/release` | Nothing — it derives order from `composer.json` |
+| the release tooling | Nothing — it derives order from `composer.json` |
 
 ## Conventions already settled
 
@@ -164,9 +164,9 @@ a `body_format`-style column beside it. Adding one after data exists means a mig
 
 ## Shipping
 
-Ordinary release process from here: `bin/release <package> 1.0.0` handles dependency
-ordering, the three-tags-per-push limit (GitHub silently drops workflow triggers above
-that), and Packagist verification. `CHANGELOG.md` needs a `> summary` line under the
+Ordinary release process from here — a maintainer cuts it. The tooling handles
+dependency ordering, the three-tags-per-push limit (GitHub silently drops workflow
+triggers above that), and Packagist verification. `CHANGELOG.md` needs a `> summary` line under the
 version heading or the release is refused.
 
 Three doc updates that get forgotten:
