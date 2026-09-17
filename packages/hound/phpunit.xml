@@ -12,6 +12,10 @@
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
         </testsuite>
+        <!-- Configurable announce paths (job #10649); see tests/Pest.php. -->
+        <testsuite name="Routing">
+            <directory>tests/RoutingPath</directory>
+        </testsuite>
     </testsuites>
     <source>
         <include>

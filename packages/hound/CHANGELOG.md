@@ -7,6 +7,20 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+> Announce and scrape paths are configurable, for migrating public trackers.
+
+### Added
+
+- **`hound.routes` config** — `announce_path` and `scrape_path`, defaulting to the
+  previous hardcoded `announce` and `scrape`. A public tracker migrating onto Marque
+  cannot change the URL its circulating .torrent files announce to, and those files
+  cannot be reissued.
+
+  Paths only: hound is keyless by design, so none of bloodhound's key options apply
+  here. Route names stay `tracker.announce` and `tracker.scrape` regardless.
+
 ## [3.2.0] — 2026-09-04
 
 > Lowers the PHP floor to 8.3, matching Laravel 13's own requirement.

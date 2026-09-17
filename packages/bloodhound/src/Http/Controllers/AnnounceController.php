@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
 use Marque\Bloodhound\Services\AnnounceService;
+use Marque\Bloodhound\Support\AnnounceRouting;
 use Marque\Threepio\Support\TrackerResponse;
 use Marque\Trove\Contracts\UserInterface;
 use Marque\Trove\Models\Torrent;
@@ -21,12 +22,22 @@ class AnnounceController extends Controller
     /**
      * Handle announce request.
      *
-     * URL: /announce/{announce_key}
+     * URL shape is configurable (`bloodhound.routes`): the key is either a path
+     * segment — /announce/<key> — or a query parameter, ?passkey=<key>. In path
+     * mode the router has already vetted the key against the configured pattern
+     * and a malformed one never arrives here. In query mode nothing has, so the
+     * check below is the only one, which is why it is not redundant.
+     *
+     * The parameter is optional because in query mode the route declares none.
      */
-    public function __invoke(Request $request, string $announceKey): Response
+    public function __invoke(Request $request, ?string $announceKey = null): Response
     {
-        // Validate announce key format (alphanumeric, 32 chars)
-        if (! preg_match('/^[0-9a-zA-Z]{32}$/', $announceKey)) {
+        $announceKey = AnnounceRouting::keyFromRequest($request, $announceKey);
+
+        // Absent entirely (query mode, parameter missing) or malformed. Both are
+        // a bencoded failure with HTTP 200, the shape every other tracker error
+        // uses — clients surface the reason rather than reporting a dead tracker.
+        if ($announceKey === null || ! AnnounceRouting::matches($announceKey)) {
             return TrackerResponse::error('Invalid announce key');
         }
 

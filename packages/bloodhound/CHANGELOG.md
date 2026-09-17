@@ -7,6 +7,41 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+> The announce URL's shape is configurable, so a tracker migrating onto Marque can keep
+> serving the URL its existing .torrent files announce to.
+
+### Added
+
+- **`bloodhound.routes` config.** `announce_path`, `scrape_path`, `key_source`
+  (`path` or `query`), `key_parameter` and `key_pattern`. Every default matches the
+  previous hardcoded behaviour, so an existing install sees no change.
+
+  This exists because a migrating tracker cannot change its announce URL: every .torrent
+  already in circulation points at the old one and those files are on strangers' disks.
+  The common case is a TBDev or Gazelle-derived tracker with `announce.php?passkey=`.
+
+  It is deliberately *configurable routing*, not a legacy compatibility mode — there are
+  no per-tracker special cases and there should never be any.
+
+- `Marque\Bloodhound\Support\AnnounceRouting`, the single source of truth for the URL
+  shape. The key format used to be asserted in **four** places — both route constraints
+  and a `preg_match` in each controller, each spelling out `[0-9a-zA-Z]{32}`
+  independently. Harmless while hardcoded and identical; guaranteed to drift once
+  configurable. The router and the controllers now read the same value.
+
+### Changed
+
+- `AnnounceController::__invoke()` and `ScrapeController::__invoke()` take the announce
+  key as an optional parameter and resolve it through `AnnounceRouting`, because in
+  query mode the route declares no path parameter.
+
+  **Behaviour with default config is unchanged**, including a malformed key in the path
+  still being a 404 from the router. In *query* mode a malformed or missing key is a
+  bencoded `failure reason` with HTTP 200 — the shape every other tracker error uses,
+  since a 4xx reads to a client as an unreachable tracker rather than a message.
+
 ## [5.1.0] — 2026-09-04
 
 > Lowers the PHP floor to 8.3, matching Laravel 13's own requirement.

@@ -12,6 +12,18 @@
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
         </testsuite>
+        <!--
+            Configurable announce routing (job #10649). One directory per URL
+            shape, because routes register during the provider's boot() and the
+            config therefore has to be set in defineEnvironment — which means a
+            TestCase per configuration, and Pest binds one test case per
+            directory. Leaving these out of the suite would skip them silently.
+        -->
+        <testsuite name="Routing">
+            <directory>tests/RoutingPath</directory>
+            <directory>tests/RoutingQuery</directory>
+            <directory>tests/RoutingPattern</directory>
+        </testsuite>
     </testsuites>
     <source>
         <include>

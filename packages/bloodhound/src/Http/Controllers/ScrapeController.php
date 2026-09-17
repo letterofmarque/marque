@@ -7,6 +7,7 @@ namespace Marque\Bloodhound\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
+use Marque\Bloodhound\Support\AnnounceRouting;
 use Marque\Threepio\Services\PeerService;
 use Marque\Threepio\Support\TrackerResponse;
 use Marque\Trove\Models\Torrent;
@@ -20,13 +21,18 @@ class ScrapeController extends Controller
     /**
      * Handle scrape request.
      *
-     * Returns stats for one or more torrents.
-     * URL: /scrape or /scrape/{announce_key}
+     * Returns stats for one or more torrents. URL shape follows the same config
+     * as announce (`bloodhound.routes`) — changing announce and not scrape is a
+     * half-migration.
+     *
+     * The key is optional here, unlike announce: a public scrape is legitimate.
+     * So an absent key is fine and only a PRESENT-but-malformed one is refused.
      */
     public function __invoke(Request $request, ?string $announceKey = null): Response
     {
-        // Announce key is optional for scrape but can be used for private trackers
-        if ($announceKey !== null && ! preg_match('/^[0-9a-zA-Z]{32}$/', $announceKey)) {
+        $announceKey = AnnounceRouting::keyFromRequest($request, $announceKey);
+
+        if ($announceKey !== null && ! AnnounceRouting::matches($announceKey)) {
             return TrackerResponse::error('Invalid announce key');
         }
 

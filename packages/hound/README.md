@@ -61,6 +61,18 @@ keeps live peers in Redis.
 **No announce key in the URL.** That is the whole difference from bloodhound, whose
 routes are `/announce/{announce_key}`. Anyone holding the .torrent can announce.
 
+The paths are configurable, for migrations — a public tracker moving onto Marque cannot
+change the URL its circulating .torrent files announce to:
+
+```env
+HOUND_ANNOUNCE_PATH=announce.php
+HOUND_SCRAPE_PATH=scrape.php
+```
+
+Route names stay `tracker.announce` and `tracker.scrape` whatever you set. There are no
+key options here — hound is keyless by design; if you need announce keys you want
+[bloodhound](../bloodhound/README.md#announce-url-shape), which has the full set.
+
 Both routes run outside the `web` middleware group — no session, no CSRF, no cookies —
 and behind threepio's `BlockBrowsers` middleware, which rejects anything that looks like
 a web browser rather than a BitTorrent client.

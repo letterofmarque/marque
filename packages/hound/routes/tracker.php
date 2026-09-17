@@ -14,14 +14,21 @@ use Marque\Threepio\Http\Middleware\BlockBrowsers;
 |
 | Open announce and scrape endpoints. No announce key, no auth.
 |
+| The paths are configurable (`hound.routes`) so a public tracker migrating onto
+| Marque can keep serving the announce URL its circulating .torrent files point
+| at. Route names are fixed regardless: 'tracker.announce', 'tracker.scrape'.
+|
 */
+
+$announcePath = trim((string) config('hound.routes.announce_path', 'announce'), '/') ?: 'announce';
+$scrapePath = trim((string) config('hound.routes.scrape_path', 'scrape'), '/') ?: 'scrape';
 
 Route::middleware([BlockBrowsers::class])
     ->withoutMiddleware(['web', 'auth', 'csrf'])
-    ->group(function () {
-        Route::get('announce', AnnounceController::class)
+    ->group(function () use ($announcePath, $scrapePath) {
+        Route::get($announcePath, AnnounceController::class)
             ->name('tracker.announce');
 
-        Route::get('scrape', ScrapeController::class)
+        Route::get($scrapePath, ScrapeController::class)
             ->name('tracker.scrape');
     });

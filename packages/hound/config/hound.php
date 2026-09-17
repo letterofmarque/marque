@@ -21,6 +21,27 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Announce Routing
+    |--------------------------------------------------------------------------
+    |
+    | The paths your announce and scrape endpoints live at. These exist for the
+    | same reason bloodhound's do: a tracker migrating onto Marque cannot change
+    | the URL its existing .torrent files announce to, because those files are
+    | already on strangers' disks and cannot be reissued.
+    |
+    | No key options here — hound is a public tracker and its endpoints take no
+    | announce key at all. If you need keys you want bloodhound.
+    |
+    | Route names stay 'tracker.announce' and 'tracker.scrape' whatever you set.
+    |
+    */
+    'routes' => [
+        'announce_path' => env('HOUND_ANNOUNCE_PATH', 'announce'),
+        'scrape_path' => env('HOUND_SCRAPE_PATH', 'scrape'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | IP Limiting
     |--------------------------------------------------------------------------
     |
