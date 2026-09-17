@@ -55,7 +55,7 @@
         "orchestra/testbench": "^11.0",
         "pestphp/pest": "^4.7",
         "mockery/mockery": "^1.6",
-        "nunomaduro/pao": "^1.1"
+        "laravel/pao": "^1.1"
     },
     "suggest": {
         "laravel/socialite": "Required for OAuth/socialite auth driver (^5.0)"
