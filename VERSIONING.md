@@ -163,6 +163,14 @@ Opt in with `"marque/guise": "^3.1@beta"`. Betas may change before the stable ta
 are still tagged releases, so your lock file records exactly what you took — which is why
 we prefer them to telling people to track a branch.
 
+`alpha` and `rc` are available on the same terms; `beta` is what we normally reach for.
+
+**A pre-release is tested as the release it is rehearsing.** `3.1.0-beta1` gets a minor's
+gate because `3.1.0` would — the whole point of a beta is soak time before the stable tag,
+so putting it through a lighter matrix would be testing the wrong artifact. The suffix
+changes who opts in, not how much the change can break. Promoting `3.1.0-beta2` to
+`3.1.0` is likewise gated against the last *stable* (3.0.x), not against the beta.
+
 ## Support
 
 The current major receives patches and features. When a new major ships, the previous
