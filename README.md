@@ -27,7 +27,16 @@ Built by [Letter Of Marque Software](https://lom.software).
 
 - PHP 8.3+
 - Laravel 13+
-- Redis (for tracker peer storage)
+- A database — PostgreSQL, MySQL, MariaDB or SQLite
+- **A Redis server, plus `ext-redis` or `predis/predis`** — required by any deployment
+  serving announces, i.e. anything with `bloodhound` or `hound` installed
+
+Redis is not optional and not a cache you can swap out. Peer storage uses Redis sets,
+hashes and atomic counters directly; pointing `CACHE_STORE` elsewhere does not degrade
+the tracker, it fatals on the first announce. A catalogue-only or API-only install with
+no tracker package genuinely does not need it. See
+[`packages/threepio/README.md`](packages/threepio/README.md#redis-is-required-and-it-is-a-real-redis)
+for the detail, including what happens if Redis restarts empty.
 
 ## Start here
 

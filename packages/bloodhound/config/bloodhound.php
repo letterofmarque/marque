@@ -11,6 +11,16 @@ return [
     | Settings specific to the private tracker. Shared protocol settings
     | (announce intervals, peer storage, ports) live in threepio config.
     |
+    | REQUIRES REDIS. Peer storage is a real Redis server, not Laravel's cache
+    | pointed at one — PeerService uses sets, hashes and atomic counters, none
+    | of which the cache abstraction offers. Without a working connection the
+    | announce path fatals on the first request. You need ext-redis or
+    | predis/predis installed; see packages/threepio/README.md.
+    |
+    | Note the failure mode if Redis restarts empty: it holds the baseline
+    | announce deltas are diffed against, so the next announce credits zero
+    | silently. The announce ledger below is what recovers from that.
+    |
     */
 
     /*

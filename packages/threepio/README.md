@@ -27,8 +27,52 @@ Publish the config:
 php artisan vendor:publish --tag=threepio-config
 ```
 
-Threepio has no dependency on `marque/trove` and no migrations. Redis is required — the
-peer store has no database fallback.
+Threepio has no dependency on `marque/trove` and no migrations.
+
+### Redis is required, and it is a real Redis
+
+**Every deployment that serves announces needs a running Redis server.** Not "for
+performance" — the peer store has no database fallback, and the announce path fatals
+without a working connection.
+
+It is genuinely Redis, not Laravel's cache pointed at Redis. `PeerService` uses Redis data
+structures directly — sets for swarm and per-IP membership, a hash per peer, `incrby` for
+atomic seeder/leecher counters, `expire` for peer TTL. None of that is expressible through
+Laravel's cache abstraction, which offers get/put/forget on opaque values. Pointing
+`CACHE_STORE` at file or database does not degrade the tracker gracefully; it fatals on the
+first announce.
+
+`illuminate/redis` is a hard requirement of this package, but it is only the Laravel layer
+— it still needs a client to reach a server. Install **either**:
+
+```bash
+# the C extension (faster, and what REDIS_CLIENT defaults to)
+pecl install redis
+
+# or the pure-PHP client
+composer require predis/predis
+```
+
+Both satisfy Laravel's `REDIS_CLIENT`. They are listed as `suggest` rather than `require`
+precisely because either one is valid and forcing the extension would exclude working
+predis installs.
+
+**An install that never serves an announce genuinely does not need Redis** — a
+catalogue-only or API-only deployment with no tracker package. If you have `bloodhound` or
+`hound` installed, you need it.
+
+#### What happens if Redis loses state
+
+Worth knowing before you decide where to run it. Redis holds the baseline that announce
+deltas are diffed against. If it restarts and comes back empty, the next announce has
+nothing to compare against and credits **zero** — silently — for everything that peer
+transferred across the gap.
+
+On a public tracker that costs nothing, because nobody is credited anyway. On a private
+tracker it is ratio data quietly going wrong, which is what gets people banned.
+`bloodhound` closes this with the [baseline resolver](#the-baseline-resolver) wired to its
+announce ledger, so the durable record supplies the baseline Redis lost. That mechanism is
+the reason the ledger exists.
 
 ## What's in it
 
