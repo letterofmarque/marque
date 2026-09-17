@@ -1,20 +1,123 @@
 # Contributing to Marque
 
-Thanks for your interest in contributing to Marque. This guide covers the development setup, testing, and pull request process.
+Thanks for your interest in contributing to Marque. This guide covers how to report
+something, how to get a patch in, and the development setup behind both.
+
+## How to contribute
+
+**Open an issue on the monorepo.** That is the front door for everything — bug reports,
+feature requests, questions about whether Marque can already do the thing you want:
+
+**https://github.com/letterofmarque/marque/issues**
+
+Pull requests on this repo are limited to collaborators, and the individual package repos
+have issues and pull requests turned off entirely. That is not "we don't want your help" —
+[there is a route in for a patch you already have](#i-already-have-a-patch), and it still
+works. It is that starting from a description of the *problem* works better here than
+starting from a diff, for three reasons:
+
+1. **Most of what arrives will not be code.** Tracker admins are skilled at running
+   trackers — sysadmin, config, tuning, moderation. "How do I make it do X" and "can it do
+   Y" are the common cases, and you cannot open a pull request for a question.
+2. **Reviewing a patch here is expensive.** A green SQLite run
+   [proves less than it looks like](#running-against-a-real-database), real-engine runs
+   take minutes, and two packages cannot share a test database. Evaluating an external
+   patch costs a four-engine review whatever its quality.
+3. **A patch arrives with the solution already chosen.** Which packages you have
+   installed, what your announce traffic looks like, which client, what scale — that
+   context is the part only you have, and a diff compresses it away.
+
+### What makes a good issue
+
+No mandatory template. A long required form suppresses reports, and a thin report about a
+real problem beats a polished one about an imagined one. Include what you can:
+
+- Which package(s), and which others are installed alongside
+- Marque version, plus PHP and Laravel versions
+- Database engine — the suite supports four and they genuinely diverge
+- Expected vs actual behaviour
+- For tracker behaviour: the client, and roughly what the announce traffic looks like
+- A minimal reproducer if you have one — helpful, not required
+
+### Three outcomes, all of them useful
+
+An issue is worth filing even when the answer is "no code change":
+
+1. **Already possible** — you get an answer, and it just found a documentation gap.
+2. **Possible once we expose a seam** — it shapes where the next extension point goes.
+3. **Belongs in your own package** — you get pointed at the extension point that lets you
+   build it without waiting for us.
+
+### Issues prepared with an AI agent
+
+Welcome, and they can be excellent. Point your agent at this guide.
+
+**But verify the thing you are reporting actually happened.** Agent-generated analysis is
+valuable when it describes something observed and misleading when it describes something
+plausible. A confident, detailed, entirely fictional bug report costs more to disprove
+than a one-line real one costs to fix. Mass-generated speculative issues are not welcome.
+
+## I already have a patch
+
+Good — send it. Pull requests being collaborators-only removes some GitHub automation, not
+the ability to contribute code.
+
+A pull request is a GitHub feature wrapped around a plain git operation. Git itself has no
+concept of one; the underlying command is `git pull <url> <branch>`, which is what the
+feature was named after. Fork, branch, push to your own remote, and post the ref in an
+issue:
+
+```
+git remote add contributor https://github.com/you/marque.git
+git fetch contributor
+git checkout contributor/your-branch
+```
+
+Linux, Git and PostgreSQL have all worked this way for decades.
+
+Contribute regularly and land good patches and you get made a collaborator, at which point
+you can open pull requests directly. Collaborator status is not push access to `main` —
+that is branch protection, a separate control.
+
+### The bar a branch needs to clear
+
+Whether it arrives as a posted ref or a collaborator's pull request:
+
+- One feature or fix per branch, focused
+- Tests for new functionality
+- The test suite passes for every package you touched
+- Follows existing patterns — Laravel conventions, the service/contract pattern
+- Config options have sensible defaults and are documented
+- `composer lint` run before you send it — releases are refused on a style violation
+- A clear description of what changed and why, with usage examples for a new feature
+
+A change spanning multiple packages is fine as one branch.
 
 ## Monorepo Structure
 
-Marque is a monorepo. All packages live in `packages/` and are split to individual read-only repos on push to `main`:
+Marque is a monorepo. All fourteen packages live in `packages/` and are split to
+individual read-only repos on push to `main`:
 
 ```
 packages/
 ├── trove/        → letterofmarque/trove
+├── threepio/     → letterofmarque/threepio
 ├── bloodhound/   → letterofmarque/bloodhound
+├── hound/        → letterofmarque/hound
+├── usarrs/       → letterofmarque/usarrs
+├── deck/         → letterofmarque/deck
+├── guise/        → letterofmarque/guise
+├── disguise/     → letterofmarque/disguise
+├── skipper/      → letterofmarque/skipper
 ├── cennad/       → letterofmarque/cennad
-└── guise/        → letterofmarque/guise
+├── squidink/     → letterofmarque/squidink
+├── parley/       → letterofmarque/parley
+├── taxonomy/     → letterofmarque/taxonomy
+└── marque/       → letterofmarque/installer
 ```
 
-**All pull requests should target this monorepo**, not the individual package repos.
+Those are generated mirrors — issues and pull requests are turned off on all of them.
+**Everything targets this monorepo.**
 
 ## Development Setup
 
@@ -28,7 +131,7 @@ packages/
 **PHP 8.3 is the floor deliberately**, matching Laravel 13's own. One consequence worth
 knowing before you touch `composer.json`: the test suite is pinned to **Pest 4**, because
 Pest 5 requires PHP 8.4 and adopting it would raise the floor for every consumer — a MAJOR
-across all eleven packages. See [VERSIONING.md](VERSIONING.md#dependencies-and-floors) for
+across all fourteen packages. See [VERSIONING.md](VERSIONING.md#dependencies-and-floors) for
 the full reasoning and the transitive traps that go with it.
 
 ### Clone and Install
@@ -128,28 +231,6 @@ for pkg in packages/*/; do
 done
 ```
 
-## Pull Request Process
-
-1. **Fork the repo** and create a branch from `main`
-2. **Make your changes** in the relevant package(s)
-3. **Add tests** for new functionality
-4. **Run the test suite** for any packages you've changed
-5. **Open a PR** against `main` in the monorepo
-
-### PR Guidelines
-
-- Keep PRs focused - one feature or fix per PR
-- If your change spans multiple packages, that's fine - submit it as one PR
-- Include a clear description of what changed and why
-- If it's a new feature, include usage examples in the description
-
-### What Makes a Good PR
-
-- Tests pass
-- New functionality has test coverage
-- Follows existing code patterns (Laravel conventions, service/contract pattern)
-- Config options have sensible defaults and are documented
-
 ## Static Analysis
 
 PHPStan (with Larastan) runs at level 1 across every package:
@@ -205,15 +286,6 @@ composer lint:test    # check only
 
 Run `composer lint` before opening a pull request — releases are refused on a style
 violation.
-
-## Reporting Issues
-
-Use the [GitHub issue tracker](https://github.com/letterofmarque/marque/issues). Include:
-
-- Which package is affected
-- Steps to reproduce
-- Expected vs actual behaviour
-- PHP/Laravel version
 
 ## License
 
