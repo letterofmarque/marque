@@ -90,6 +90,18 @@ backfill or making an existing column stricter is **major**.
 wrong, fixing it is **patch**. If the documented behaviour changes, it is **major**,
 regardless of how small the fix looks.
 
+**The surface registries.** `Marque\Trove\Registry\` — `AdminScreen`, `AdminScreenRegistry`,
+`NavItem`, `NavRegistry`, their constructor parameters and public methods — is **public API
+from trove 4.x**, because third-party packages register admin screens and navigation entries
+against it. Adding an optional constructor parameter or a new method is **minor**; changing
+or removing one is **major on trove**, the mandatory package and so the most expensive place
+to break. That is the correct incentive rather than an unfortunate side effect.
+
+What is deliberately *not* covered: skipper's rendering of those screens — its views,
+grouping and layout — is skipper's own surface and versions with skipper. The contract and
+the renderer live in different packages precisely so committing to one does not commit us to
+the other.
+
 ## Dependencies and floors
 
 Every Marque package declares the same four constraints. They are set deliberately, and
