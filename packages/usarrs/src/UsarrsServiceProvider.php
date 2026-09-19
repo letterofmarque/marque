@@ -21,6 +21,7 @@ use Marque\Usarrs\Livewire\Auth\Login;
 use Marque\Usarrs\Livewire\Auth\PasswordConfirm;
 use Marque\Usarrs\Livewire\Auth\Register;
 use Marque\Usarrs\Livewire\Auth\TwoFactorChallenge;
+use Marque\Usarrs\Livewire\Dashboard\Index as DashboardIndex;
 use Marque\Usarrs\Livewire\Invite\InviteCreate;
 use Marque\Usarrs\Livewire\Invite\InviteIndex;
 use Marque\Usarrs\Livewire\Profile\AnnounceKeyManagement;
@@ -207,6 +208,7 @@ class UsarrsServiceProvider extends ServiceProvider
     // Profile, invites, admin — unaffected by manage_auth in either state.
     protected function registerNonAuthLivewireComponents(): void
     {
+        Livewire::component('usarrs-dashboard-index', DashboardIndex::class);
         Livewire::component('usarrs-profile-show', Show::class);
         Livewire::component('usarrs-profile-edit', Edit::class);
         Livewire::component('usarrs-announce-key-management', AnnounceKeyManagement::class);
