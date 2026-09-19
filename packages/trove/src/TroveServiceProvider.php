@@ -10,6 +10,7 @@ use Marque\Trove\Contracts\TorrentServiceInterface;
 use Marque\Trove\Models\Torrent;
 use Marque\Trove\Policies\TorrentPolicy;
 use Marque\Trove\Registry\AdminScreenRegistry;
+use Marque\Trove\Registry\DashboardPanelRegistry;
 use Marque\Trove\Registry\NavRegistry;
 use Marque\Trove\Services\TorrentService;
 
@@ -26,6 +27,7 @@ class TroveServiceProvider extends ServiceProvider
         // back. A fresh instance per resolution would lose every registration.
         $this->app->singleton(AdminScreenRegistry::class);
         $this->app->singleton(NavRegistry::class);
+        $this->app->singleton(DashboardPanelRegistry::class);
     }
 
     public function boot(): void
