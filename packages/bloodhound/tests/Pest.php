@@ -6,6 +6,9 @@ use Illuminate\Testing\TestResponse;
 use Marque\Bloodhound\Tests\CustomPathTestCase;
 use Marque\Bloodhound\Tests\CustomPatternTestCase;
 use Marque\Bloodhound\Tests\QueryKeyTestCase;
+use Marque\Bloodhound\Tests\RatioModeFullTestCase;
+use Marque\Bloodhound\Tests\RatioModeOffTestCase;
+use Marque\Bloodhound\Tests\RatioModeSeedtimeTestCase;
 use Marque\Bloodhound\Tests\TestCase;
 use Marque\Bloodhound\Tests\TestUser;
 use Marque\Threepio\Http\Middleware\BlockBrowsers;
@@ -25,6 +28,13 @@ pest()->extend(TestCase::class)->in('Feature', 'Unit');
 pest()->extend(CustomPathTestCase::class)->in('RoutingPath');
 pest()->extend(QueryKeyTestCase::class)->in('RoutingQuery');
 pest()->extend(CustomPatternTestCase::class)->in('RoutingPattern');
+
+// Spec #118 CP3: panels register in the provider's boot(), so ratio_mode must
+// be set before the app boots — a directory per mode, same reason the routing
+// TestCases above exist.
+pest()->extend(RatioModeFullTestCase::class)->in('PanelsFull');
+pest()->extend(RatioModeOffTestCase::class)->in('PanelsOff');
+pest()->extend(RatioModeSeedtimeTestCase::class)->in('PanelsSeedtime');
 
 /**
  * Make a tracker request the way a BitTorrent client would.
