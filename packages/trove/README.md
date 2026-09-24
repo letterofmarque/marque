@@ -84,15 +84,35 @@ $user->isUploader();
 $user->hasRoleAtLeast(Role::Moderator);
 ```
 
-`HasTrackerStats` gives you tracker integration:
+`HasTrackerStats` issues each new user an announce key and gives the model a few
+formatting helpers (`getRatioForHumans()`, `getUploadedForHumans()`, …).
+
+**To read tracker figures or a user's announce key from your own code, ask the tracker**
+rather than the User model. trove declares the contract; bloodhound implements it; nothing
+binds it on an install without a tracker:
 
 ```php
-$user->announce_key;                // Auto-generated 32-char key
-$user->getRatio();                 // Upload/download ratio
-$user->getRatioForHumans();        // "1.25" or "Inf"
-$user->getUploadedForHumans();     // "4.2 GB"
-$user->meetsRatioRequirement(0.5); // Boolean
+use Marque\Trove\Contracts\TrackerStatsInterface;
+
+$tracker = app()->bound(TrackerStatsInterface::class)
+    ? app(TrackerStatsInterface::class)
+    : null;                                   // no tracker installed
+
+$stats = $tracker?->statsFor($user);         // TrackerStats: uploaded, downloaded, seedtime, ratio
+$key = $tracker?->announceKeyFor($user);     // the key for the user's announce URL
+$tracker?->regenerateAnnounceKey($user);     // issue a new one; the old stops working
+
+$stats->ratio;                // float, unrounded — or null, meaning INFINITE (nothing downloaded)
+$stats->hasInfiniteRatio();   // say it without relying on the null
 ```
+
+`statsForTorrent($user, $torrent)` returns a `TorrentStats` for one torrent, including when
+the user first and last completed it. Every figure is a raw integer (bytes, seconds) —
+formatting is yours.
+
+⚠️ **`$user->announce_key` is not the user's key** as of bloodhound 6. Keys live in
+bloodhound's own `announce_keys` table; the old `users.announce_key` column is left in place
+but never read or written. Use `announceKeyFor()`.
 
 ## Working with Torrents
 

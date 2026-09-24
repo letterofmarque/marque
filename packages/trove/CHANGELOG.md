@@ -7,6 +7,26 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+> Declares the tracker stats contract, so packages ask the installed tracker for a user's figures and announce key instead of probing the User model.
+
+### Added
+
+- **`Marque\Trove\Contracts\TrackerStatsInterface`** — `statsFor()`, `statsForTorrent()`,
+  `announceKeyFor()`, `regenerateAnnounceKey()`. trove declares it and implements nothing;
+  a tracker (bloodhound) binds it. On an install with no tracker nothing is bound, so
+  `app()->bound(TrackerStatsInterface::class)` is the capability check. Use it in place of
+  `method_exists($user, 'getRatio')`, which only ever answered "is a trait applied".
+- **`Marque\Trove\Support\TrackerStats`** and **`TorrentStats`**, the readonly values it
+  returns. Raw integers (bytes, seconds) and a `ratio` computed from them, unrounded.
+  **A null `ratio` means infinite** — nothing downloaded — and `hasInfiniteRatio()` says so
+  explicitly. `TorrentStats` also carries `firstCompletedAt`, `lastCompletedAt` and
+  `timesCompleted`.
+- **`Marque\Trove\Registry\DashboardPanel`** and **`DashboardPanelRegistry`** — the user
+  dashboard's equivalent of the nav and admin-screen registries: a package contributes a
+  panel to a dashboard it does not own.
+
 ## [4.2.0] — 2026-09-11
 
 > Adds the surface registries — packages can now contribute navigation entries and admin screens to a shell that knows nothing about them.

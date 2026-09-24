@@ -9,7 +9,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [Unreleased]
 
-> Gates the genuinely guest-only auth routes behind `guest` middleware, so a logged-in user no longer sees the login form.
+> Reads tracker figures and announce keys through trove's tracker stats contract instead of probing the User model, and gates the guest-only auth routes behind `guest` middleware.
 
 ### Changed
 
@@ -44,6 +44,28 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   callback to link an additional provider. Gating the whole group would break all
   three, which is why this needed a route split rather than a one-line config
   change.
+
+
+### Breaking
+
+Upgrade guide: [bloodhound v6 / usarrs v8](../../docs/upgrade-guide-bloodhound-v6-usarrs-v8.md).
+
+- **Requires `marque/trove` `^4.3`**, for `TrackerStatsInterface`.
+- **Tracker stats come from the tracker, not the User model.** The profile stats page,
+  the profile's "Tracker Stats" link, the admin user page and announce-key regeneration
+  all ask `TrackerStatsInterface`. With no tracker installed the stats and key sections
+  are **absent** — previously they rendered whenever the User model happened to have a
+  `getRatio()` method or an `announce_key` attribute, including values nothing maintained.
+  Regenerating a key with no tracker is a 404.
+- **The views receive different data.** `profile/stats` gets `$stats` (a `TrackerStats` or
+  null) and `$announceKey` instead of `$hasTrackerStats` and `$user`; `admin/show` gets
+  `$stats` instead of `$hasTrackerStats`. **If you published `usarrs-views`, update your
+  copies** — the guide shows the change.
+
+### Fixed
+
+- **An infinite ratio rendered as an empty box.** `getRatio()` returns null when nothing
+  has been downloaded, and the view printed it raw. It now shows ∞.
 
 ## [7.0.0] — 2026-09-11
 

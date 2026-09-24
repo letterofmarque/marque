@@ -9,8 +9,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [Unreleased]
 
-> The announce URL's shape is configurable, so a tracker migrating onto Marque can keep
-> serving the URL its existing .torrent files announce to.
+> Announce keys move into a table bloodhound owns and other packages read tracker figures through a declared contract; the announce URL's shape also becomes configurable for migrating trackers.
 
 ### Added
 
@@ -41,6 +40,60 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   still being a 404 from the router. In *query* mode a malformed or missing key is a
   bencoded `failure reason` with HTTP 200 — the shape every other tracker error uses,
   since a 4xx reads to a client as an unreachable tracker rather than a message.
+
+
+### Breaking
+
+Upgrade guide: [bloodhound v6 / usarrs v8](../../docs/upgrade-guide-bloodhound-v6-usarrs-v8.md).
+
+- **Announce keys live in `announce_keys`, not `users.announce_key`.** A migration creates
+  the table and copies every existing key across (INSERT … SELECT, one statement). The old
+  column is **left in place and never read or written again** — no drop, no rename; drop it
+  yourself if you want it gone. Code that reads **`$user->announce_key` gets a stale or null
+  value** and must switch to `app(TrackerStatsInterface::class)->announceKeyFor($user)`.
+- **`HasTrackerStats` no longer has `generateAnnounceKey()` or `regenerateAnnounceKey()`.**
+  Issue keys through `TrackerStatsInterface::regenerateAnnounceKey()`. The trait still
+  issues a key to each new user, now into `announce_keys`.
+- **`HasTrackerStats` no longer adds `announce_key`, `uploaded`, `downloaded` or `seedtime`
+  to your User model's `$fillable`.** See Security. If your own code mass-assigned any of
+  them, it now silently drops them — bloodhound never did.
+- **Requires `marque/trove` `^4.3`**, for the contract.
+- **Conflicts with `marque/usarrs` below 8.0.** usarrs 7 reads `users.announce_key` and calls the
+  trait's removed key methods, so beside bloodhound 6 it would show a stale key and 404 on
+  regenerate. Composer now refuses the pair instead of letting it half-work.
+
+### Added
+
+- **`TrackerStatsService`**, bound to trove's `TrackerStatsInterface`. Registered
+  unconditionally: the figures exist in every `ratio_mode`, and the binding *is* the "a
+  tracker is installed" signal. Reads go to storage by the user's key, never to attributes
+  on the instance passed in, so a model loaded at the start of a request cannot report
+  figures the ledger has moved past.
+- **`Marque\Bloodhound\Models\AnnounceKey`** — nothing mass-assignable.
+- **`MassAssignmentTest`**, as CONTRIBUTING.md asks of every package with models.
+
+### Fixed
+
+- **Announce keys longer than 32 characters can now be stored.** `key_pattern` is
+  configurable and documented as widenable, but `users.announce_key` is `varchar(32)`, so
+  on MySQL, MariaDB and PostgreSQL a longer key could not be saved at all. SQLite ignores
+  varchar length, which is how it went unseen. `announce_keys.key` is 255 wide.
+- **`HasTrackerStats` broke mass assignment on a `$guarded = []` User model.** Once
+  `$fillable` is non-empty Laravel accepts only what it lists, so the trait's
+  `mergeFillable` silently dropped `name`, `email` and every other column from `create()`.
+
+### Security
+
+- **A tracker credential and a user's ratio were mass-assignable on your User model.**
+  `HasTrackerStats` added them to `$fillable`, so an ordinary
+  `User::create($request->all())` let a user choose their own announce key and upload
+  figure. Nothing in Marque exploited it, but the guarantee was yours, not ours. bloodhound
+  writes these through the query builder and its own service, neither of which needs them
+  fillable.
+
+### Deprecated
+
+- **`users.announce_key`.** Never read or written by bloodhound from this version.
 
 ## [5.1.0] — 2026-09-04
 
