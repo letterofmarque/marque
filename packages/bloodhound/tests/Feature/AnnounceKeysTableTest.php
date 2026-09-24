@@ -150,10 +150,7 @@ describe('the announce path', function () {
 
 describe('HasTrackerStats', function () {
     it('issues a key into announce_keys when a user is created', function () {
-        // forceCreate, not create: until CP #659 the trait's mergeFillable
-        // makes $fillable non-empty, which silently drops every attribute not
-        // on it — name and email included — from a $guarded = [] model.
-        $user = TrackerUser::query()->forceCreate(['name' => 'Trait User', 'email' => 'trait@example.com', 'password' => 'password']);
+        $user = TrackerUser::create(['name' => 'Trait User', 'email' => 'trait@example.com', 'password' => 'password']);
 
         $key = app(TrackerStatsInterface::class)->announceKeyFor($user);
 

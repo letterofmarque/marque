@@ -20,8 +20,13 @@ trait HasTrackerStats
      */
     public function initializeHasTrackerStats(): void
     {
-        $this->mergeFillable(['announce_key', 'uploaded', 'downloaded', 'seedtime']);
-
+        // Deliberately no mergeFillable. It used to add announce_key,
+        // uploaded, downloaded and seedtime to the consumer's $fillable,
+        // making a credential and the ratio settable from request data — and,
+        // on a model relying on $guarded = [], silently restricting
+        // mass assignment to those four columns alone (Spec #119). bloodhound
+        // writes these through the query builder and TrackerStatsService,
+        // neither of which consults $fillable.
         $this->mergeCasts([
             'uploaded' => 'integer',
             'downloaded' => 'integer',
