@@ -36,6 +36,7 @@ Newest first. Each links to the full write-up.
 
 | Release | Date | Summary | Who's affected |
 |---|---|---|---|
+| [7.0](releases/7.0.md) | 2026-09-25 | Tracker data gets an owner: packages ask a declared contract instead of probing your User model; announce keys move to a bloodhound-owned table; tracker columns no longer mass-assignable | anyone running bloodhound; anyone reading `$user->announce_key` |
 | [6.0](releases/6.0.md) | 2026-09-11 | Marque gets an admin panel (`marque/skipper`); `marque/ise` renamed to `marque/deck`; packages now declare their own nav entries and admin screens | anyone using guise, disguise, usarrs or parley |
 | [5.2](releases/5.2.md) | 2026-09-09 | `marque/taxonomy` added — declare your catalogue's structure in YAML instead of hardcoding it | nobody negatively; optional new package |
 | [5.1](releases/5.1.md) | 2026-09-04 | PHP floor lowered to 8.3, matching Laravel 13's own requirement | nobody negatively; unblocks Laravel 13 apps on PHP 8.3 |
@@ -79,6 +80,8 @@ release each guide belongs to.
 | 11 | Release | [Marque 5.2](releases/5.2.md) | 5.2 | `marque/taxonomy` added — declare your catalogue's structure in YAML (nothing to do; optional new package) |
 | 12 | Guide | [ise → deck](upgrade-guide-ise-to-deck.md) | 6.0 | `marque/ise` renamed to `marque/deck`; namespace, view namespace, config and published-config changes |
 | 13 | Release | [Marque 6.0](releases/6.0.md) | 6.0 | The admin panel arrives; the shell rename ripples through every frontend package |
+| 14 | Release | [Marque 7.0](releases/7.0.md) | 7.0 | The tracker stats contract; announce keys move to `announce_keys`; mass-assignment hole closed |
+| 15 | Guide | [bloodhound v6 / usarrs v8](upgrade-guide-bloodhound-v6-usarrs-v8.md) | 7.0 | Technical checklist: stop reading `$user->announce_key`, removed trait methods, published usarrs views |
 
 ## Currently at 2.x or earlier?
 
