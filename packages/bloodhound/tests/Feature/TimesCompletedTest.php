@@ -28,8 +28,8 @@ beforeEach(function () {
         'name' => 'Test User',
         'email' => 'completed@example.com',
         'password' => 'password',
-        'announce_key' => 'aaaabbbbccccddddeeeeffffgggghhhh',
     ]);
+    issueAnnounceKey($this->user, 'aaaabbbbccccddddeeeeffffgggghhhh');
 
     $this->torrent = Torrent::create([
         'name' => 'Test Torrent',
@@ -52,7 +52,7 @@ function completedUrl(TestUser $user, Torrent $torrent, string $peerId = '-qB421
         'event' => 'completed',
     ]);
 
-    return "/announce/{$user->announce_key}?{$query}";
+    return '/announce/'.keyOf($user)."?{$query}";
 }
 
 function hitAnnounce(TestCase $test, string $url): TestResponse

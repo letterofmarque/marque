@@ -33,8 +33,8 @@ beforeEach(function () {
         'name' => 'Owner',
         'email' => 'owner@example.com',
         'password' => 'password',
-        'announce_key' => str_repeat('z', 32),
     ]);
+    issueAnnounceKey($this->torrentOwner, str_repeat('z', 32));
 
     $this->torrent = Torrent::create([
         'name' => 'Test Torrent',
@@ -53,8 +53,8 @@ function legacyUser(string $email, int $uploaded, int $downloaded): TestUser
         'name' => 'Legacy',
         'email' => $email,
         'password' => 'password',
-        'announce_key' => substr(md5($email), 0, 32),
     ]);
+    issueAnnounceKey($user, substr(md5($email), 0, 32));
 
     $user->forceFill(['uploaded' => $uploaded, 'downloaded' => $downloaded])->save();
 

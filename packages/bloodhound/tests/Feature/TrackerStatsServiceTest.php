@@ -7,6 +7,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Redis;
+use Marque\Bloodhound\Models\AnnounceKey;
 use Marque\Bloodhound\Models\TorrentUser;
 use Marque\Bloodhound\Services\TrackerStatsService;
 use Marque\Bloodhound\Support\AnnounceRouting;
@@ -119,7 +120,7 @@ describe('announce keys', function () {
     });
 
     it('returns null for a user with no announce key', function () {
-        TestUser::whereKey($this->user->id)->update(['announce_key' => null]);
+        AnnounceKey::where('user_id', $this->user->id)->delete();
 
         expect($this->stats->announceKeyFor($this->user))->toBeNull();
     });
@@ -128,8 +129,26 @@ describe('announce keys', function () {
         $new = $this->stats->regenerateAnnounceKey($this->user);
 
         expect($new)->not->toBe('aaaabbbbccccddddeeeeffffgggghhhh')
-            ->and(TestUser::find($this->user->id)->announce_key)->toBe($new)
+            ->and(AnnounceKey::where('user_id', $this->user->id)->value('key'))->toBe($new)
             ->and($this->stats->announceKeyFor($this->user))->toBe($new);
+    });
+
+    // A user with no key yet gets one: regenerate is also how a key is issued.
+    it('issues a key to a user who has none', function () {
+        AnnounceKey::where('user_id', $this->user->id)->delete();
+
+        $new = $this->stats->regenerateAnnounceKey($this->user);
+
+        expect($this->stats->announceKeyFor($this->user))->toBe($new);
+    });
+
+    // The deprecated column is written by nothing, including this.
+    it('leaves users.announce_key alone', function () {
+        TestUser::whereKey($this->user->id)->update(['announce_key' => 'deadcolumndeadcolumndeadcolumn00']);
+
+        $this->stats->regenerateAnnounceKey($this->user);
+
+        expect(TestUser::find($this->user->id)->announce_key)->toBe('deadcolumndeadcolumndeadcolumn00');
     });
 
     // A minted key the router then refuses would lock the user out of their

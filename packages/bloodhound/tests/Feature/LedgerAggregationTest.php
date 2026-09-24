@@ -33,8 +33,8 @@ beforeEach(function () {
         'name' => 'Test User',
         'email' => 'agg@example.com',
         'password' => 'password',
-        'announce_key' => 'aaaabbbbccccddddeeeeffffgggghhhh',
     ]);
+    issueAnnounceKey($this->user, 'aaaabbbbccccddddeeeeffffgggghhhh');
 
     $this->torrent = Torrent::create([
         'name' => 'Test Torrent',
@@ -63,7 +63,7 @@ function announceForAggregation($test, int $uploaded = 0): void
 
     $test->withoutMiddleware(BlockBrowsers::class)
         ->withHeaders(['User-Agent' => 'qBittorrent/4.5.0'])
-        ->get("/announce/{$test->user->announce_key}?{$query}")
+        ->get('/announce/'.keyOf($test->user)."?{$query}")
         ->assertOk();
 }
 

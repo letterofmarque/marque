@@ -37,8 +37,8 @@ beforeEach(function () {
         'name' => 'Test User',
         'email' => 'dedupe@example.com',
         'password' => 'password',
-        'announce_key' => 'aaaabbbbccccddddeeeeffffgggghhhh',
     ]);
+    issueAnnounceKey($this->user, 'aaaabbbbccccddddeeeeffffgggghhhh');
 
     $this->torrent = Torrent::create([
         'name' => 'Test Torrent',
@@ -63,7 +63,7 @@ function completeAs(TestCase $test, string $peerId = '-qB4210-aaaaaaaaaaaa'): Te
 
     return $test->withoutMiddleware(BlockBrowsers::class)
         ->withHeaders(['User-Agent' => 'qBittorrent/4.5.0'])
-        ->get("/announce/{$test->user->announce_key}?{$query}");
+        ->get('/announce/'.keyOf($test->user)."?{$query}");
 }
 
 describe('one download session counts once', function () {
@@ -163,8 +163,8 @@ describe('different users are counted independently', function () {
     test('two users completing gives two', function () {
         $other = TestUser::create([
             'name' => 'Other', 'email' => 'other@example.com', 'password' => 'p',
-            'announce_key' => str_repeat('c', 32),
         ]);
+        issueAnnounceKey($other, str_repeat('c', 32));
 
         completeAs($this)->assertOk();
 
@@ -178,7 +178,7 @@ describe('different users are counted independently', function () {
 
         $this->withoutMiddleware(BlockBrowsers::class)
             ->withHeaders(['User-Agent' => 'qBittorrent/4.5.0'])
-            ->get("/announce/{$other->announce_key}?{$query}")
+            ->get('/announce/'.keyOf($other)."?{$query}")
             ->assertOk();
 
         expect($this->torrent->fresh()->times_completed)->toBe(2)

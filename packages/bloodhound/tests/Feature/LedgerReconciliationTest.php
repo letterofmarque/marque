@@ -30,8 +30,8 @@ beforeEach(function () {
         'name' => 'Test User',
         'email' => 'recon@example.com',
         'password' => 'password',
-        'announce_key' => 'aaaabbbbccccddddeeeeffffgggghhhh',
     ]);
+    issueAnnounceKey($this->user, 'aaaabbbbccccddddeeeeffffgggghhhh');
 
     $this->torrent = Torrent::create([
         'name' => 'Test Torrent',
@@ -191,8 +191,8 @@ describe('rebuild', function () {
     test('can be scoped to one user', function () {
         $other = TestUser::create([
             'name' => 'Other', 'email' => 'o@example.com', 'password' => 'p',
-            'announce_key' => str_repeat('c', 32),
         ]);
+        issueAnnounceKey($other, str_repeat('c', 32));
 
         auditRow($this->user->id, $this->torrent->id, 0, 1_000);
         auditRow($other->id, $this->torrent->id, 0, 2_000, peerId: '-qB4210-bbbbbbbbbbbb');

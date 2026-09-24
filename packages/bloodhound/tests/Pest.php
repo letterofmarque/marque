@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Testing\TestResponse;
+use Marque\Bloodhound\Models\AnnounceKey;
 use Marque\Bloodhound\Tests\CustomPathTestCase;
 use Marque\Bloodhound\Tests\CustomPatternTestCase;
 use Marque\Bloodhound\Tests\QueryKeyTestCase;
@@ -87,10 +88,32 @@ function decodeTracker(TestResponse $response): array
 
 function makeTrackerUser(string $announceKey, string $email): TestUser
 {
-    return TestUser::create([
+    $user = TestUser::create([
         'name' => 'Test User',
         'email' => $email,
         'password' => 'password',
-        'announce_key' => $announceKey,
     ]);
+
+    issueAnnounceKey($user, $announceKey);
+
+    return $user;
+}
+
+/**
+ * Give a user a specific announce key, in the table bloodhound owns.
+ *
+ * Tests want known keys; production mints them through TrackerStatsService.
+ * users.announce_key is deprecated and never read, so setting it does nothing.
+ */
+function issueAnnounceKey(TestUser $user, string $key): void
+{
+    AnnounceKey::query()->forceCreate(['user_id' => $user->getKey(), 'key' => $key]);
+}
+
+/**
+ * The user's current announce key, asked the way a consumer asks.
+ */
+function keyOf(TestUser $user): string
+{
+    return (string) app(TrackerStatsInterface::class)->announceKeyFor($user);
 }

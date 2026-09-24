@@ -33,8 +33,8 @@ beforeEach(function () {
         'name' => 'Test User',
         'email' => 'baseline@example.com',
         'password' => 'password',
-        'announce_key' => 'aaaabbbbccccddddeeeeffffgggghhhh',
     ]);
+    issueAnnounceKey($this->user, 'aaaabbbbccccddddeeeeffffgggghhhh');
 
     $this->torrent = Torrent::create([
         'name' => 'Test Torrent',
@@ -56,7 +56,7 @@ function recoveryUrl(TestUser $user, Torrent $torrent, array $params = []): stri
         'compact' => 1,
     ], $params));
 
-    return "/announce/{$user->announce_key}?{$query}";
+    return '/announce/'.keyOf($user)."?{$query}";
 }
 
 function recoveryAnnounce(TestCase $test, string $url): TestResponse

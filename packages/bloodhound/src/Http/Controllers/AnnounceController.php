@@ -7,6 +7,7 @@ namespace Marque\Bloodhound\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
+use Marque\Bloodhound\Models\AnnounceKey;
 use Marque\Bloodhound\Services\AnnounceService;
 use Marque\Bloodhound\Support\AnnounceRouting;
 use Marque\Threepio\Support\TrackerResponse;
@@ -117,12 +118,19 @@ class AnnounceController extends Controller
 
     /**
      * Find user by announce key.
+     *
+     * One statement: the key lookup is a subquery, so moving keys into
+     * announce_keys added no query to the hot path. users.announce_key is
+     * deprecated and deliberately not consulted (Spec #119).
      */
     private function findUserByAnnounceKey(string $announceKey): ?UserInterface
     {
         $userModel = config('trove.user_model', 'App\\Models\\User');
+        $model = new $userModel;
 
-        return $userModel::where('announce_key', $announceKey)->first();
+        return $userModel::query()
+            ->whereIn($model->getKeyName(), AnnounceKey::query()->select('user_id')->where('key', $announceKey))
+            ->first();
     }
 
     /**

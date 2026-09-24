@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Marque\Bloodhound\Concerns;
 
-use Illuminate\Support\Str;
+use Marque\Trove\Contracts\TrackerStatsInterface;
+use Marque\Trove\Contracts\UserInterface;
 
 /**
  * Provides tracker stats functionality for User models.
  *
- * Handles upload/download tracking, ratio calculation, and announce key management.
+ * Handles upload/download tracking and ratio calculation. Announce keys live in
+ * announce_keys and are issued by TrackerStatsService.
  */
 trait HasTrackerStats
 {
@@ -28,34 +30,23 @@ trait HasTrackerStats
     }
 
     /**
-     * Boot the trait.
+     * Issue a key when a user is created.
+     *
+     * Written to announce_keys through the tracker's own service, never to
+     * users.announce_key, which is deprecated. Read a key back with
+     * TrackerStatsInterface::announceKeyFor(), not $user->announce_key.
+     *
+     * The key methods this trait used to carry (generateAnnounceKey(),
+     * regenerateAnnounceKey()) are gone: a key is the tracker's to issue, not
+     * something the consumer's model does to itself (Spec #119).
      */
     public static function bootHasTrackerStats(): void
     {
-        static::creating(function ($model) {
-            if (empty($model->announce_key)) {
-                $model->announce_key = $model->generateAnnounceKey();
+        static::created(function ($model) {
+            if ($model instanceof UserInterface) {
+                app(TrackerStatsInterface::class)->regenerateAnnounceKey($model);
             }
         });
-    }
-
-    /**
-     * Generate a new announce key.
-     */
-    public function generateAnnounceKey(): string
-    {
-        return Str::random(32);
-    }
-
-    /**
-     * Regenerate the user's announce key.
-     */
-    public function regenerateAnnounceKey(): string
-    {
-        $this->announce_key = $this->generateAnnounceKey();
-        $this->save();
-
-        return $this->announce_key;
     }
 
     /**

@@ -36,8 +36,8 @@ beforeEach(function () {
         'name' => 'Test User',
         'email' => 'announcelog@example.com',
         'password' => 'password',
-        'announce_key' => 'aaaabbbbccccddddeeeeffffgggghhhh',
     ]);
+    issueAnnounceKey($this->user, 'aaaabbbbccccddddeeeeffffgggghhhh');
 
     $this->torrent = Torrent::create([
         'name' => 'Test Torrent',
@@ -61,7 +61,7 @@ function announceUrl(TestUser $user, Torrent $torrent, array $params = []): stri
 
     $query = http_build_query(array_merge($default, $params));
 
-    return "/announce/{$user->announce_key}?{$query}";
+    return '/announce/'.keyOf($user)."?{$query}";
 }
 
 // Spec #99 (CP1) inverted the default to enabled — the ledger is the source of

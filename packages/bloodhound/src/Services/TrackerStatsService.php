@@ -7,6 +7,7 @@ namespace Marque\Bloodhound\Services;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use Marque\Bloodhound\Models\AnnounceKey;
 use Marque\Bloodhound\Models\TorrentUser;
 use Marque\Trove\Contracts\TrackerStatsInterface;
 use Marque\Trove\Contracts\UserInterface;
@@ -69,25 +70,27 @@ class TrackerStatsService implements TrackerStatsInterface
 
     public function announceKeyFor(UserInterface $user): ?string
     {
-        $key = $this->userQuery($user)->value('announce_key');
+        $key = AnnounceKey::query()->where('user_id', $user->getAuthIdentifier())->value('key');
 
         return is_string($key) && $key !== '' ? $key : null;
     }
 
     /**
-     * Written with forceFill so it does not depend on announce_key being
-     * mass-assignable on the consumer's model — which it should not be.
+     * Also how a user with no key is issued one.
+     *
+     * Writes announce_keys only. users.announce_key is deprecated and nothing
+     * writes it — including here — so a consumer still reading that column
+     * sees a stale key rather than a current one. That is the intended break
+     * (Spec #119); read announceKeyFor() instead.
      */
     public function regenerateAnnounceKey(UserInterface $user): string
     {
         $key = $this->mintAnnounceKey();
 
-        $this->userQuery($user)->firstOrFail()->forceFill(['announce_key' => $key])->save();
+        $record = AnnounceKey::query()->where('user_id', $user->getAuthIdentifier())->first()
+            ?? (new AnnounceKey)->forceFill(['user_id' => $user->getAuthIdentifier()]);
 
-        if ($user instanceof Model) {
-            $user->setAttribute('announce_key', $key);
-            $user->syncOriginalAttribute('announce_key');
-        }
+        $record->forceFill(['key' => $key])->save();
 
         return $key;
     }

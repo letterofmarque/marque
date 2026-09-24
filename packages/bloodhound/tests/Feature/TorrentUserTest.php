@@ -14,6 +14,7 @@ declare(strict_types=1);
 // completing" would have measured from the wrong date.
 
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Marque\Bloodhound\Events\TorrentCompleted;
 use Marque\Bloodhound\Models\TorrentUser;
@@ -25,8 +26,8 @@ beforeEach(function () {
         'name' => 'Test User',
         'email' => 'tu@example.com',
         'password' => 'password',
-        'announce_key' => 'aaaabbbbccccddddeeeeffffgggghhhh',
     ]);
+    issueAnnounceKey($this->user, 'aaaabbbbccccddddeeeeffffgggghhhh');
 
     $this->torrent = Torrent::create([
         'name' => 'Test Torrent',
@@ -51,10 +52,13 @@ describe('schema', function () {
     test('a user has at most one row per torrent', function () {
         TorrentUser::create(['user_id' => $this->user->id, 'torrent_id' => $this->torrent->id]);
 
-        expect(fn () => TorrentUser::create([
+        // In a savepoint: PostgreSQL aborts the whole transaction on a
+        // constraint violation, and without one the next query in teardown
+        // fails instead — reported against whichever test runs it.
+        expect(fn () => DB::transaction(fn () => TorrentUser::create([
             'user_id' => $this->user->id,
             'torrent_id' => $this->torrent->id,
-        ]))->toThrow(Exception::class);
+        ])))->toThrow(Exception::class);
     });
 
     test('byte counters and completions default to zero', function () {
@@ -136,8 +140,8 @@ describe('recording a completion', function () {
     test('different users on one torrent get their own rows', function () {
         $other = TestUser::create([
             'name' => 'Other', 'email' => 'other@example.com', 'password' => 'p',
-            'announce_key' => str_repeat('b', 32),
         ]);
+        issueAnnounceKey($other, str_repeat('b', 32));
 
         TorrentUser::recordCompletion($this->user->id, $this->torrent->id);
         TorrentUser::recordCompletion($other->id, $this->torrent->id);

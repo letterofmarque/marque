@@ -23,11 +23,11 @@ describe('Tracker Routes', function () {
                 'name' => 'Test User',
                 'email' => 'test@example.com',
                 'password' => 'password',
-                'announce_key' => 'aaaabbbbccccddddeeeeffffgggghhhh', // 32 char alphanumeric
             ]);
+            issueAnnounceKey($user, 'aaaabbbbccccddddeeeeffffgggghhhh');
 
             // Request without required params should get bencoded error
-            $response = trackerGet($this, '/announce/'.$user->announce_key);
+            $response = trackerGet($this, '/announce/'.keyOf($user));
 
             // Should be 200 with bencoded response (not 404)
             expect($response->getStatusCode())->toBe(200);
@@ -70,10 +70,10 @@ describe('Tracker Routes', function () {
                 'name' => 'Test User',
                 'email' => 'scrape@example.com',
                 'password' => 'password',
-                'announce_key' => 'zzzzyyyyxxxxwwwwvvvvuuuuttttssss',
             ]);
+            issueAnnounceKey($user, 'zzzzyyyyxxxxwwwwvvvvuuuuttttssss');
 
-            $response = trackerGet($this, '/scrape/'.$user->announce_key);
+            $response = trackerGet($this, '/scrape/'.keyOf($user));
 
             expect($response->getStatusCode())->toBe(200);
         });

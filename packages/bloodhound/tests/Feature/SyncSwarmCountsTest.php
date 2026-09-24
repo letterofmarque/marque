@@ -24,8 +24,8 @@ beforeEach(function () {
         'name' => 'Test User',
         'email' => 'swarm@example.com',
         'password' => 'password',
-        'announce_key' => 'aaaabbbbccccddddeeeeffffgggghhhh',
     ]);
+    issueAnnounceKey($this->user, 'aaaabbbbccccddddeeeeffffgggghhhh');
 });
 
 // Bloodhound's TestUser has no factory, so torrents are built explicitly here

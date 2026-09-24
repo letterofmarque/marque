@@ -28,8 +28,8 @@ beforeEach(function () {
         'name' => 'Test User',
         'email' => 'ledger@example.com',
         'password' => 'password',
-        'announce_key' => 'aaaabbbbccccddddeeeeffffgggghhhh',
     ]);
+    issueAnnounceKey($this->user, 'aaaabbbbccccddddeeeeffffgggghhhh');
 
     $this->torrent = Torrent::create([
         'name' => 'Test Torrent',
@@ -51,7 +51,7 @@ function ledgerUrl(TestUser $user, Torrent $torrent, array $params = []): string
         'compact' => 1,
     ], $params));
 
-    return "/announce/{$user->announce_key}?{$query}";
+    return '/announce/'.keyOf($user)."?{$query}";
 }
 
 function ledgerAnnounce(TestCase $test, string $url): TestResponse
