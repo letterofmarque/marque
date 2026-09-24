@@ -40,11 +40,6 @@ class TestUser extends Authenticatable implements MustVerifyEmail, PasskeyUser, 
         'status' => 'active',
     ];
 
-    public function generateAnnounceKey(): string
-    {
-        return bin2hex(random_bytes(16));
-    }
-
     /**
      * laravel/passkeys hardcodes 'user_id' on Passkey::user() but derives the
      * hasMany foreign key from the consumer's class name on

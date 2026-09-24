@@ -6,6 +6,7 @@ namespace Marque\Usarrs\Livewire\Admin;
 
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Marque\Trove\Contracts\UserInterface;
 use Marque\Trove\Enums\Role;
 use Marque\Usarrs\Enums\UserStatus;
 use Marque\Usarrs\Livewire\Component;
@@ -61,11 +62,10 @@ class UserShow extends Component
     public function render(): View
     {
         $targetUser = $this->resolveUser();
-        $hasTrackerStats = method_exists($targetUser, 'getRatio');
 
         return $this->usarrsView('usarrs::admin.show', [
             'targetUser' => $targetUser,
-            'hasTrackerStats' => $hasTrackerStats,
+            'stats' => $targetUser instanceof UserInterface ? $this->tracker()?->statsFor($targetUser) : null,
             'roles' => Role::cases(),
             'statuses' => UserStatus::cases(),
         ])->title($targetUser->name);

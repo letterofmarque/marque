@@ -7,19 +7,19 @@
 
     <x-deck::heading size="xl">{{ __('Tracker Stats') }}</x-deck::heading>
 
-    @if ($hasTrackerStats)
+    @if ($stats)
         <div class="grid gap-4 sm:grid-cols-3">
             <div class="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-900">
                 <x-deck::text class="text-sm text-zinc-500">{{ __('Uploaded') }}</x-deck::text>
-                <x-deck::heading size="lg" class="mt-1">{{ Number::fileSize($user->uploaded ?? 0) }}</x-deck::heading>
+                <x-deck::heading size="lg" class="mt-1">{{ Number::fileSize($stats->uploaded) }}</x-deck::heading>
             </div>
             <div class="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-900">
                 <x-deck::text class="text-sm text-zinc-500">{{ __('Downloaded') }}</x-deck::text>
-                <x-deck::heading size="lg" class="mt-1">{{ Number::fileSize($user->downloaded ?? 0) }}</x-deck::heading>
+                <x-deck::heading size="lg" class="mt-1">{{ Number::fileSize($stats->downloaded) }}</x-deck::heading>
             </div>
             <div class="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-900">
                 <x-deck::text class="text-sm text-zinc-500">{{ __('Ratio') }}</x-deck::text>
-                <x-deck::heading size="lg" class="mt-1">{{ $user->getRatio() }}</x-deck::heading>
+                <x-deck::heading size="lg" class="mt-1">{{ $stats->hasInfiniteRatio() ? '∞' : number_format($stats->ratio, 2) }}</x-deck::heading>
             </div>
         </div>
     @endif
@@ -28,7 +28,7 @@
         <div class="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-900">
             <x-deck::heading size="sm" class="mb-4">{{ __('Announce Key') }}</x-deck::heading>
             <div class="flex items-center gap-4">
-                <code class="rounded bg-zinc-100 px-3 py-2 font-mono text-sm dark:bg-zinc-800">{{ $user->announce_key }}</code>
+                <code class="rounded bg-zinc-100 px-3 py-2 font-mono text-sm dark:bg-zinc-800">{{ $announceKey }}</code>
                 @if ($allowRegen)
                     <x-deck::button
                         variant="ghost"

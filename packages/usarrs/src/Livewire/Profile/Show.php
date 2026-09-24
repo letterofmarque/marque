@@ -11,12 +11,9 @@ class Show extends Component
 {
     public function render(): View
     {
-        $user = auth()->user();
-        $hasTrackerStats = method_exists($user, 'getRatio');
-
         return $this->usarrsView('usarrs::profile.show', [
-            'user' => $user,
-            'hasTrackerStats' => $hasTrackerStats,
+            'user' => auth()->user(),
+            'hasTrackerStats' => $this->tracker() !== null,
         ])->title(__('Profile'));
     }
 }

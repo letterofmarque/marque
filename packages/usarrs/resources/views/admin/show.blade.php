@@ -28,19 +28,19 @@
                 </div>
             </div>
 
-            @if ($hasTrackerStats)
+            @if ($stats)
                 <div class="mt-4 grid gap-4 sm:grid-cols-3">
                     <div class="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
                         <x-deck::text class="text-sm text-zinc-500">{{ __('Uploaded') }}</x-deck::text>
-                        <x-deck::heading size="lg" class="mt-1">{{ Number::fileSize($targetUser->uploaded ?? 0) }}</x-deck::heading>
+                        <x-deck::heading size="lg" class="mt-1">{{ Number::fileSize($stats->uploaded) }}</x-deck::heading>
                     </div>
                     <div class="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
                         <x-deck::text class="text-sm text-zinc-500">{{ __('Downloaded') }}</x-deck::text>
-                        <x-deck::heading size="lg" class="mt-1">{{ Number::fileSize($targetUser->downloaded ?? 0) }}</x-deck::heading>
+                        <x-deck::heading size="lg" class="mt-1">{{ Number::fileSize($stats->downloaded) }}</x-deck::heading>
                     </div>
                     <div class="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
                         <x-deck::text class="text-sm text-zinc-500">{{ __('Ratio') }}</x-deck::text>
-                        <x-deck::heading size="lg" class="mt-1">{{ $targetUser->getRatio() }}</x-deck::heading>
+                        <x-deck::heading size="lg" class="mt-1">{{ $stats->hasInfiniteRatio() ? '∞' : number_format($stats->ratio, 2) }}</x-deck::heading>
                     </div>
                 </div>
             @endif
