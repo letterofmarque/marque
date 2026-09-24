@@ -7,7 +7,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [Unreleased]
+## [4.3.0] — 2026-09-25
 
 > Declares the tracker stats contract, so packages ask the installed tracker for a user's figures and announce key instead of probing the User model.
 

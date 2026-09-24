@@ -7,7 +7,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [Unreleased]
+## [6.0.0] — 2026-09-25
 
 > Announce keys move into a table bloodhound owns and other packages read tracker figures through a declared contract; the announce URL's shape also becomes configurable for migrating trackers.
 

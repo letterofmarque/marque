@@ -7,7 +7,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [Unreleased]
+## [8.0.0] — 2026-09-25
 
 > Reads tracker figures and announce keys through trove's tracker stats contract instead of probing the User model, and gates the guest-only auth routes behind `guest` middleware.
 
