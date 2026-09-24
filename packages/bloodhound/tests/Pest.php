@@ -13,6 +13,7 @@ use Marque\Bloodhound\Tests\TestCase;
 use Marque\Bloodhound\Tests\TestUser;
 use Marque\Threepio\Http\Middleware\BlockBrowsers;
 use Marque\Threepio\Support\Bencode;
+use Marque\Trove\Contracts\TrackerStatsInterface;
 
 pest()->extend(TestCase::class)->in('Feature', 'Unit');
 
@@ -32,9 +33,33 @@ pest()->extend(CustomPatternTestCase::class)->in('RoutingPattern');
 // Spec #118 CP3: panels register in the provider's boot(), so ratio_mode must
 // be set before the app boots — a directory per mode, same reason the routing
 // TestCases above exist.
-pest()->extend(RatioModeFullTestCase::class)->in('PanelsFull');
-pest()->extend(RatioModeOffTestCase::class)->in('PanelsOff');
-pest()->extend(RatioModeSeedtimeTestCase::class)->in('PanelsSeedtime');
+pest()->extend(RatioModeFullTestCase::class)->in('PanelsFull', 'StatsFull');
+pest()->extend(RatioModeOffTestCase::class)->in('PanelsOff', 'StatsOff');
+pest()->extend(RatioModeSeedtimeTestCase::class)->in('PanelsSeedtime', 'StatsSeedtime');
+
+/**
+ * Spec #119: the tracker stats contract reports what is stored, in every
+ * ratio_mode, because nothing reads ratio_mode (job #10732) and the ledger
+ * accumulates identically in all three. Run from a directory per mode so the
+ * mode is in place before boot — a binding made conditional on ratio_mode at
+ * registration is exactly the mistake this is here to catch, and a
+ * config()->set() inside the test would be too late to see it.
+ */
+function assertStatsReportedRegardlessOfRatioMode(): void
+{
+    $user = makeTrackerUser('mmmmnnnnooooppppqqqqrrrrsssstttt', 'mode@example.com');
+    $user->forceFill(['uploaded' => 4_000, 'downloaded' => 1_000, 'seedtime' => 600])->save();
+
+    expect(app()->bound(TrackerStatsInterface::class))->toBeTrue();
+
+    $stats = app(TrackerStatsInterface::class)->statsFor($user);
+
+    expect($stats)->not->toBeNull()
+        ->and($stats->uploaded)->toBe(4_000)
+        ->and($stats->downloaded)->toBe(1_000)
+        ->and($stats->seedtime)->toBe(600)
+        ->and($stats->ratio)->toBe(4.0);
+}
 
 /**
  * Make a tracker request the way a BitTorrent client would.

@@ -21,7 +21,9 @@ use Marque\Bloodhound\Services\AnnounceLogService;
 use Marque\Bloodhound\Services\AnnounceService;
 use Marque\Bloodhound\Services\AntiCheatService;
 use Marque\Bloodhound\Services\ClientValidationService;
+use Marque\Bloodhound\Services\TrackerStatsService;
 use Marque\Threepio\Services\PeerService;
+use Marque\Trove\Contracts\TrackerStatsInterface;
 
 class BloodhoundServiceProvider extends ServiceProvider
 {
@@ -38,6 +40,12 @@ class BloodhoundServiceProvider extends ServiceProvider
         // pattern) so a consumer can swap the query implementation — e.g. to
         // read the log from a warehouse rather than the table itself.
         $this->app->bind(AnnounceLogServiceInterface::class, AnnounceLogService::class);
+
+        // trove declares the contract; bloodhound fulfils it (Spec #119). This
+        // binding IS the capability: without bloodhound nothing binds, and
+        // consumers asking app()->bound() get a clean "no tracker here".
+        // Unconditional on purpose — the figures exist in every ratio_mode.
+        $this->app->singleton(TrackerStatsInterface::class, TrackerStatsService::class);
 
         // Teach threepio's peer store to recover a lost baseline from the
         // ledger (Spec #99 CP3).
