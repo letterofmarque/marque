@@ -14,8 +14,8 @@ use Marque\Trove\Enums\Role;
  * The third instance of the shape Spec #108 established for nav entries and
  * admin screens: a package contributes a surface to a shell it does not own.
  * `docs/integration.md` Pattern 4 sets the promotion trigger at the second
- * instance, so this is not a speculative abstraction — it has two tenants
- * (bloodhound, usarrs) before a line of the dashboard exists.
+ * instance, so this is not a speculative abstraction — its first panels were
+ * named before a line of the dashboard existed.
  *
  * Why this is not just a NavItem with a different label: a nav entry points at
  * a route, where a panel *is* rendered content. It names a Livewire component
@@ -26,8 +26,8 @@ use Marque\Trove\Enums\Role;
  * deliberately not one mechanism (Spec #118):
  *
  * 1. the owning package is absent — it never registers, nothing to decide
- * 2. the capability is off — it never registers either, e.g. bloodhound is
- *    installed but `ratio_mode` is `off`, so there is no ratio to show
+ * 2. the capability is absent — it never registers either, e.g. no tracker
+ *    has bound TrackerStatsInterface, so there are no tracker figures to show
  * 3. this particular user has nothing to show — the visibility closure declines
  *
  * The first two are registration-time facts and belong in the registering

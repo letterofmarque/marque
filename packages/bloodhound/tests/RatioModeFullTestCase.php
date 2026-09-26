@@ -7,10 +7,10 @@ namespace Marque\Bloodhound\Tests;
 /**
  * bloodhound booted with ratio_mode = 'full'.
  *
- * Panels register in the provider's boot(), so the mode has to be set before
- * the application boots — config()->set() inside a test is too late and the
- * assertion would pass or fail for the wrong reason. Same constraint the
- * routing TestCases exist for.
+ * The tracker stats binding is made while the application boots, so the mode
+ * has to be set before then — config()->set() inside a test is too late, and a
+ * binding made conditional on ratio_mode would go unseen (Spec #119). Same
+ * constraint the routing TestCases exist for.
  */
 class RatioModeFullTestCase extends TestCase
 {

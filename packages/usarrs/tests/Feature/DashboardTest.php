@@ -5,11 +5,13 @@ declare(strict_types=1);
 // Spec #118: the dashboard assembles panels other packages register. usarrs
 // owns the page; it does not own most of what appears on it.
 //
-// At this Checkpoint usarrs registers NO panels of its own, which is what makes
-// the zero-panels case below honest rather than contrived.
+// This file runs with no tracker bound, so usarrs registers none of its tracker
+// panels — which is what makes the zero-panels case below honest rather than
+// contrived. The tracker-bound half is Feature/TrackerBound.
 
 use Livewire\Component as LivewireComponent;
 use Livewire\Livewire;
+use Marque\Trove\Contracts\TrackerStatsInterface;
 use Marque\Trove\Registry\DashboardPanel;
 use Marque\Trove\Registry\DashboardPanelRegistry;
 use Marque\Usarrs\Tests\TestUser;
@@ -28,6 +30,17 @@ beforeEach(function () {
             return '<div>panel body</div>';
         }
     });
+});
+
+// CP3: usarrs registers the tracker panels only when a tracker is bound. This
+// TestCase binds none, so neither may appear — the bound half is in
+// Feature/TrackerBound, which needs the binding in place before boot.
+test('no tracker panels register when no tracker is bound', function () {
+    $registry = app(DashboardPanelRegistry::class);
+
+    expect(app()->bound(TrackerStatsInterface::class))->toBeFalse()
+        ->and($registry->find('usarrs-tracker-stats'))->toBeNull()
+        ->and($registry->find('usarrs-announce-key'))->toBeNull();
 });
 
 test('dashboard requires authentication', function () {

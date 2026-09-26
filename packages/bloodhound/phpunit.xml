@@ -24,11 +24,11 @@
             <directory>tests/RoutingQuery</directory>
             <directory>tests/RoutingPattern</directory>
         </testsuite>
-        <!-- Spec #118 CP3: one directory per ratio_mode; see tests/Pest.php. -->
-        <testsuite name="Panels">
-            <directory>tests/PanelsFull</directory>
-            <directory>tests/PanelsOff</directory>
-            <directory>tests/PanelsSeedtime</directory>
+        <!-- Spec #119: one directory per ratio_mode; see tests/Pest.php. -->
+        <testsuite name="Stats">
+            <directory>tests/StatsFull</directory>
+            <directory>tests/StatsOff</directory>
+            <directory>tests/StatsSeedtime</directory>
         </testsuite>
     </testsuites>
     <source>

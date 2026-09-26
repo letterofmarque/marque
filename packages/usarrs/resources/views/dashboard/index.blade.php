@@ -25,9 +25,9 @@
 
                     {{--
                         The panel renders itself. usarrs knows the component's
-                        name and nothing else about it — which is what lets
-                        bloodhound own its ratio figures and a third-party
-                        package contribute without usarrs being changed.
+                        name and nothing else about it — which is what lets a
+                        third-party package contribute without usarrs being
+                        changed.
                     --}}
                     @livewire($panel->component, key($panel->identifier))
                 </div>

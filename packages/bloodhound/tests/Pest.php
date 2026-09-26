@@ -31,12 +31,12 @@ pest()->extend(CustomPathTestCase::class)->in('RoutingPath');
 pest()->extend(QueryKeyTestCase::class)->in('RoutingQuery');
 pest()->extend(CustomPatternTestCase::class)->in('RoutingPattern');
 
-// Spec #118 CP3: panels register in the provider's boot(), so ratio_mode must
-// be set before the app boots — a directory per mode, same reason the routing
-// TestCases above exist.
-pest()->extend(RatioModeFullTestCase::class)->in('PanelsFull', 'StatsFull');
-pest()->extend(RatioModeOffTestCase::class)->in('PanelsOff', 'StatsOff');
-pest()->extend(RatioModeSeedtimeTestCase::class)->in('PanelsSeedtime', 'StatsSeedtime');
+// Spec #119: the stats binding must hold in every ratio_mode, and a binding is
+// decided before boot — so ratio_mode is set before the app boots, a directory
+// per mode, same reason the routing TestCases above exist.
+pest()->extend(RatioModeFullTestCase::class)->in('StatsFull');
+pest()->extend(RatioModeOffTestCase::class)->in('StatsOff');
+pest()->extend(RatioModeSeedtimeTestCase::class)->in('StatsSeedtime');
 
 /**
  * Spec #119: the tracker stats contract reports what is stored, in every

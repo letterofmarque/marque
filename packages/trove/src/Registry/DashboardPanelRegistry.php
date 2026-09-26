@@ -9,8 +9,8 @@ use InvalidArgumentException;
 /**
  * Where packages declare the panels that make up the user dashboard.
  *
- * The dashboard assembles information five different packages own — ratio and
- * announce key from bloodhound, invites and security posture from usarrs — and
+ * The dashboard assembles information different packages own — a tracker's
+ * figures and announce key, invites and security posture from usarrs — and
  * without this the page that renders it would have to reach into each of them.
  * That is backwards for the same reason the old hardcoded navigation was: the
  * shell would depend on its own tenants, and no third-party package could ever

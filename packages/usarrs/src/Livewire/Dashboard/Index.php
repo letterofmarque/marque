@@ -11,8 +11,9 @@ use Marque\Usarrs\Livewire\Component;
 /**
  * The user dashboard — one screen answering "how am I doing".
  *
- * usarrs owns the page and almost none of its content. Ratio and announce key
- * belong to bloodhound; other packages may contribute anything. This component
+ * usarrs owns the page and little of its content. Ratio and announce key belong
+ * to the tracker, and reach usarrs only through TrackerStatsInterface; other
+ * packages may contribute anything. This component
  * asks trove's registry what to render and renders it, and deliberately names
  * no other package (Spec #118).
  */
