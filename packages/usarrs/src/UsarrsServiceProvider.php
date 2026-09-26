@@ -27,6 +27,8 @@ use Marque\Usarrs\Livewire\Auth\Register;
 use Marque\Usarrs\Livewire\Auth\TwoFactorChallenge;
 use Marque\Usarrs\Livewire\Dashboard\AnnounceKeyPanel;
 use Marque\Usarrs\Livewire\Dashboard\Index as DashboardIndex;
+use Marque\Usarrs\Livewire\Dashboard\InvitesPanel;
+use Marque\Usarrs\Livewire\Dashboard\SecurityPanel;
 use Marque\Usarrs\Livewire\Dashboard\TrackerStatsPanel;
 use Marque\Usarrs\Livewire\Invite\InviteCreate;
 use Marque\Usarrs\Livewire\Invite\InviteIndex;
@@ -177,11 +179,13 @@ class UsarrsServiceProvider extends ServiceProvider
      */
     protected function registerDashboardPanels(): void
     {
+        $registry = $this->app->make(DashboardPanelRegistry::class);
+
+        $this->registerOwnDashboardPanels($registry);
+
         if (! $this->app->bound(TrackerStatsInterface::class)) {
             return;
         }
-
-        $registry = $this->app->make(DashboardPanelRegistry::class);
 
         $registry->register(new DashboardPanel(
             identifier: 'usarrs-tracker-stats',
@@ -200,6 +204,42 @@ class UsarrsServiceProvider extends ServiceProvider
             visible: fn (?object $user): bool => $user instanceof UserInterface
                 && config('usarrs.profile.show_announce_key', true)
                 && app(TrackerStatsInterface::class)->announceKeyFor($user) !== null,
+        ));
+    }
+
+    /**
+     * The panels for data usarrs owns outright: account security and invites.
+     *
+     * Two-factor, passkeys and invites are each switched on by config, and
+     * usarrs already reads those flags per request — TwoFactorSetup,
+     * PasskeyManagement and InviteIndex all check in mount(). The panels read
+     * them the same way, from their visibility closures, rather than freezing
+     * a second answer at boot.
+     *
+     * manage_auth is decided at boot like the rest of the auth surface. The
+     * security panel reports Fortify's two-factor columns and usarrs' passkeys,
+     * which a fully custom auth implementation has replaced — so under
+     * manage_auth=false it would be describing the wrong system. Invites are
+     * not auth and register either way.
+     */
+    protected function registerOwnDashboardPanels(DashboardPanelRegistry $registry): void
+    {
+        if (config('usarrs.manage_auth', true)) {
+            $registry->register(new DashboardPanel(
+                identifier: 'usarrs-security',
+                label: 'Account Security',
+                component: 'usarrs-dashboard-security',
+                position: 30,
+                visible: fn (?object $user): bool => SecurityPanel::appliesTo($user),
+            ));
+        }
+
+        $registry->register(new DashboardPanel(
+            identifier: 'usarrs-invites',
+            label: 'Invites',
+            component: 'usarrs-dashboard-invites',
+            position: 40,
+            visible: fn (?object $user): bool => InvitesPanel::appliesTo($user),
         ));
     }
 
@@ -261,6 +301,8 @@ class UsarrsServiceProvider extends ServiceProvider
         Livewire::component('usarrs-dashboard-index', DashboardIndex::class);
         Livewire::component('usarrs-dashboard-tracker-stats', TrackerStatsPanel::class);
         Livewire::component('usarrs-dashboard-announce-key', AnnounceKeyPanel::class);
+        Livewire::component('usarrs-dashboard-security', SecurityPanel::class);
+        Livewire::component('usarrs-dashboard-invites', InvitesPanel::class);
         Livewire::component('usarrs-profile-show', Show::class);
         Livewire::component('usarrs-profile-edit', Edit::class);
         Livewire::component('usarrs-announce-key-management', AnnounceKeyManagement::class);

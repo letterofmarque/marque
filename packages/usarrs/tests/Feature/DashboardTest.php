@@ -5,9 +5,11 @@ declare(strict_types=1);
 // Spec #118: the dashboard assembles panels other packages register. usarrs
 // owns the page; it does not own most of what appears on it.
 //
-// This file runs with no tracker bound, so usarrs registers none of its tracker
-// panels — which is what makes the zero-panels case below honest rather than
-// contrived. The tracker-bound half is Feature/TrackerBound.
+// This file runs with no tracker bound and usarrs' own features at their
+// shipped defaults (two-factor, passkeys and invites all off), so no panel
+// applies to the user — which is what makes the zero-panels case below honest
+// rather than contrived. The tracker-bound half is Feature/TrackerBound;
+// usarrs' own panels are DashboardUsarrsPanelsTest.
 
 use Livewire\Component as LivewireComponent;
 use Livewire\Livewire;
@@ -57,8 +59,12 @@ test('authenticated user can view the dashboard', function () {
 // existed, which makes the route table install-dependent — route('dashboard.index')
 // safe on one install and fatal on another, so every consumer linking to it
 // would need a Route::has() guard.
-test('the route is registered even with no panels at all', function () {
-    expect(app(DashboardPanelRegistry::class)->all())->toBeEmpty();
+//
+// usarrs always registers its own panels (CP4), so "no panels" means none that
+// apply to this user — the shipped default, with two-factor, passkeys and
+// invites all off and no tracker bound.
+test('the route is registered even with no panel visible to the user', function () {
+    expect(app(DashboardPanelRegistry::class)->visibleTo($this->user))->toBeEmpty();
 
     expect(fn () => route('dashboard.index'))->not->toThrow(Exception::class);
 

@@ -14,6 +14,7 @@ declare(strict_types=1);
 // in the test body is too late.
 
 use Livewire\Livewire;
+use Marque\Trove\Registry\DashboardPanelRegistry;
 use Marque\Usarrs\Tests\TestUser;
 
 beforeEach(function () {
@@ -113,4 +114,21 @@ test('invites still register when manage_auth is false', function () {
 
 test('admin panel still registers when manage_auth is false', function () {
     $this->actingAs($this->admin)->get(route('admin.users.index'))->assertOk();
+});
+
+// Build #108 CP4. The security panel reads Fortify's two-factor columns and
+// usarrs' passkeys — the auth surface a power-user replaces when going fully
+// custom. Reporting those columns under a custom 2FA would be reporting the
+// wrong system, so the panel goes with the rest of the auth UI. Invites are
+// not auth, and stay.
+test('the dashboard still works when manage_auth is false', function () {
+    $this->actingAs($this->user)->get(route('dashboard.index'))->assertOk();
+});
+
+test('the security panel does not register when manage_auth is false', function () {
+    expect(app(DashboardPanelRegistry::class)->find('usarrs-security'))->toBeNull();
+});
+
+test('the invites panel still registers when manage_auth is false', function () {
+    expect(app(DashboardPanelRegistry::class)->find('usarrs-invites'))->not->toBeNull();
 });
