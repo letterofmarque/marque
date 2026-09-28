@@ -10,6 +10,15 @@
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
         </testsuite>
+        <!--
+            A third-party provider booted alongside trove (Spec #118 criterion 5).
+            Its own directory because Pest binds one TestCase per directory, and
+            it has to be listed here: a directory missing from this file is
+            skipped silently by a full run.
+        -->
+        <testsuite name="ThirdParty">
+            <directory>tests/ThirdParty</directory>
+        </testsuite>
     </testsuites>
     <source>
         <include>

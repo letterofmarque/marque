@@ -91,14 +91,16 @@ wrong, fixing it is **patch**. If the documented behaviour changes, it is **majo
 regardless of how small the fix looks.
 
 **The surface registries.** `Marque\Trove\Registry\` — `AdminScreen`, `AdminScreenRegistry`,
-`NavItem`, `NavRegistry`, their constructor parameters and public methods — is **public API
-from trove 4.x**, because third-party packages register admin screens and navigation entries
-against it. Adding an optional constructor parameter or a new method is **minor**; changing
+`NavItem`, `NavRegistry`, `DashboardPanel`, `DashboardPanelRegistry`, their constructor
+parameters and public methods — is **public API from trove 4.x** (the dashboard pair from
+4.3), because third-party packages register admin screens, navigation entries and dashboard
+panels against it. Adding an optional constructor parameter or a new method is **minor**; changing
 or removing one is **major on trove**, the mandatory package and so the most expensive place
 to break. That is the correct incentive rather than an unfortunate side effect.
 
 What is deliberately *not* covered: skipper's rendering of those screens — its views,
-grouping and layout — is skipper's own surface and versions with skipper. The contract and
+grouping and layout — is skipper's own surface and versions with skipper. Likewise the
+dashboard page that renders panels, and usarrs' own panels on it, version with usarrs. The contract and
 the renderer live in different packages precisely so committing to one does not commit us to
 the other.
 
