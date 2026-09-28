@@ -7,6 +7,33 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+> The dashboard gets its panels — tracker stats, announce key, account security and invites — plus a nav entry, and other packages can contribute panels of their own.
+
+### Added
+
+- **Dashboard panels.** `/dashboard` (`dashboard.index`) shipped in 8.0.0 as an empty page
+  that renders whatever trove's `DashboardPanelRegistry` holds, and went unannounced. It now
+  has four panels from usarrs, each shown only when it has something true to say:
+  - **Tracker Stats** and **Announce Key** — registered only when a tracker has bound
+    trove's `TrackerStatsInterface`, and read through it. Regenerate goes through the
+    contract with the same confirm dialog as `/profile/stats`.
+  - **Account Security** — two-factor (on once *confirmed*, not merely enabled) and passkey
+    count, when either feature is enabled. Not registered under `manage_auth=false`, since
+    it reports Fortify's columns and a custom auth has replaced them.
+  - **Invites** — allowance, pending count, and a send link, when invites are enabled and
+    the user has any to send or outstanding.
+- **A Dashboard navigation entry** (`usarrs-dashboard`, position 5) for signed-in users.
+  Apps rendering deck's navigation gain the link with no change on their side.
+
+### Changed
+
+- `/profile/stats` renders its figures and announce key from two shared partials,
+  `usarrs::partials.tracker-figures` and `usarrs::partials.announce-key`, which the dashboard
+  panels use too. Output is unchanged. A previously published `profile/stats.blade.php` keeps
+  working as-is.
+
 ## [8.0.0] — 2026-09-25
 
 > Reads tracker figures and announce keys through trove's tracker stats contract instead of probing the User model, and gates the guest-only auth routes behind `guest` middleware.

@@ -137,6 +137,63 @@ $service->update($torrent, ['name' => 'New Name']);
 $service->delete($torrent);
 ```
 
+## Dashboard panels
+
+The user dashboard (`/dashboard`, rendered by `marque/usarrs`) shows whatever panels
+packages have registered. It names no package and holds no list of its own, so a package
+Marque has never heard of gets a panel exactly as a first-party one does — same card, same
+heading, ordered among the others by the position it chose.
+
+A panel is a Livewire component you own plus a declaration in trove's registry. Register
+from your own service provider's `boot()`, with a dependency on `marque/trove` alone:
+
+```php
+use Livewire\Livewire;
+use Marque\Trove\Registry\DashboardPanel;
+use Marque\Trove\Registry\DashboardPanelRegistry;
+
+public function boot(): void
+{
+    Livewire::component('acme-stats-panel', AcmeStatsPanel::class);
+
+    $this->app->make(DashboardPanelRegistry::class)->register(new DashboardPanel(
+        identifier: 'acme-stats',
+        label: 'Acme Stats',
+        component: 'acme-stats-panel',
+        position: 35,
+        // Per request, against the signed-in user. Omit it to show the panel to
+        // everyone who reaches the dashboard.
+        visible: fn (?object $user): bool => $user !== null && $user->widgets()->exists(),
+    ));
+}
+```
+
+`DashboardPanel::forRole('acme-mod', 'Moderation', 'acme-mod-panel', Role::Moderator)` is the
+shorthand for a role gate, with the same semantics as `NavItem::forRole()` — a guest never
+clears it.
+
+**Nothing depends on the dashboard in order to contribute to it.** Registering a panel needs
+trove and nothing else; if usarrs is not installed the declaration simply goes unread. Your
+package boots and behaves identically either way.
+
+Three separate things decide whether a panel appears, and they belong in different places:
+
+| | Where | Example |
+|---|---|---|
+| Your package is not installed | nothing registers | — |
+| The capability is absent | don't register, in `boot()` | usarrs registers its tracker panels only when a tracker has bound `TrackerStatsInterface` |
+| This user has nothing to show | the `visible` closure | the invites panel hides for a user with none to send and none outstanding |
+
+usarrs's own panels sit at positions 10 (tracker stats), 20 (announce key), 30 (account
+security) and 40 (invites), so pick a position between them to interleave. Panels are
+ordered by `position`, then label. Registering a duplicate `identifier` throws rather than
+silently replacing the existing panel.
+
+**This is public API.** `DashboardPanel` and `DashboardPanelRegistry` — their constructor
+parameters and public methods — follow trove's semver from 4.3, alongside the nav and
+admin-screen registries (see [VERSIONING.md](../../VERSIONING.md)). The dashboard page that
+renders them, and usarrs's own panels on it, version with usarrs.
+
 ## Configuration
 
 Published to `config/trove.php`:

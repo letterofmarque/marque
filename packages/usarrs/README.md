@@ -203,6 +203,35 @@ Independent of `auth_driver` — combine `invite_only` with `invites.enabled` fo
 fully closed, invite-gated tracker, or leave invites off and use `invite_only` alone
 to close registration without an invite system.
 
+## Dashboard
+
+`/dashboard` (`dashboard.index`) is one screen answering "how am I doing" for a signed-in
+user. **The route is registered on every install**, whatever else is present, so
+`route('dashboard.index')` is always safe to link to — no `Route::has()` guard needed. A
+Dashboard entry is added to the navigation for signed-in users, and `marque:install`
+offers it as the home page (the default for a private tracker).
+
+The page renders panels from trove's `DashboardPanelRegistry`. usarrs registers these, each
+appearing only when it has something true to say:
+
+| Panel | Appears when |
+|---|---|
+| Tracker Stats — uploaded, downloaded, ratio | a tracker has bound `TrackerStatsInterface`, and it keeps figures for this user |
+| Announce Key — with regenerate | a tracker is bound, the user has a key, and `profile.show_announce_key` is on |
+| Account Security — two-factor, passkeys | `two_factor.enabled` or `passkeys.enabled`, and the User model supports it; not registered when `manage_auth` is `false` |
+| Invites — allowance, pending, send | `invites.enabled`, and the user can send one or has one outstanding |
+
+Other packages add their own panels without usarrs knowing about them — see
+[trove's README](../trove/README.md#dashboard-panels). With nothing to show, the page says
+"Nothing to show yet" rather than rendering an empty grid; that is what a stock install
+with no tracker and 2FA, passkeys and invites all off will see.
+
+**`/profile/stats` still exists.** The dashboard shows the same figures and announce key,
+and its stats panel links through to it for the full page. Removing it would remove a
+named route — a major version for usarrs and a broken deep link for anyone who bookmarked
+it — so in this version the two coexist. Whether it goes is a decision for later, once the
+dashboard has proven itself.
+
 ## Requirements
 
 - PHP 8.3+

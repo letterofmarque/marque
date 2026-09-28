@@ -28,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bypassed. So the wrong tracker package is never installed rather than being
   disabled by config, and a future edit adding one here fails `ManifestTest`.
 
+- **"The dashboard" as a home page option, and the default for a private tracker.**
+  `/` redirects to usarrs's `dashboard.index`, which exists on every install the
+  installer produces. A public tracker still defaults to the splash page: its visitors are
+  mostly guests, and the dashboard sits behind a login. Self-verification now also loads
+  `/dashboard` as the new admin — a redirect counts as a failure — which renders every
+  registered panel for real rather than only proving a route exists.
+
 ### Note
 
 `marque:install` currently refuses to run, and says so. Its stages land one at a
