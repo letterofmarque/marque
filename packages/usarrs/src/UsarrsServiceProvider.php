@@ -256,6 +256,17 @@ class UsarrsServiceProvider extends ServiceProvider
     {
         $registry = $this->app->make(NavRegistry::class);
 
+        // The dashboard route exists on every install (Spec #118), so the link
+        // is always safe to render. First, because it is the page that answers
+        // "how am I doing" — the natural place for a signed-in user to start.
+        $registry->register(new NavItem(
+            identifier: 'usarrs-dashboard',
+            label: 'Dashboard',
+            route: 'dashboard.index',
+            position: 5,
+            visible: fn (?object $user): bool => $user !== null,
+        ));
+
         $registry->register(new NavItem(
             identifier: 'usarrs-profile',
             label: 'Profile',

@@ -14,6 +14,33 @@ describe('usarrs nav registration', function () {
             ->and($items['usarrs-profile']->route)->toBe('profile.show');
     });
 
+    // Spec #118 / Build #108 CP6: the dashboard is reachable from the shell,
+    // not only by typing the URL, and it is the first thing a signed-in user
+    // is offered.
+    it('registers a Dashboard entry pointing at a route it owns', function () {
+        $items = app(NavRegistry::class)->all();
+
+        expect($items)->toHaveKey('usarrs-dashboard')
+            ->and($items['usarrs-dashboard']->label)->toBe('Dashboard')
+            ->and($items['usarrs-dashboard']->route)->toBe('dashboard.index')
+            ->and(route($items['usarrs-dashboard']->route))->toBeString();
+    });
+
+    it('shows Dashboard to an authenticated user and hides it from guests', function () {
+        $user = TestUser::factory()->create();
+        $registry = app(NavRegistry::class);
+
+        expect($registry->visibleTo($user))->toHaveKey('usarrs-dashboard')
+            ->and($registry->visibleTo(null))->not->toHaveKey('usarrs-dashboard');
+    });
+
+    it('orders Dashboard ahead of every other usarrs entry', function () {
+        $keys = array_keys(app(NavRegistry::class)->all());
+
+        expect(array_search('usarrs-dashboard', $keys, true))
+            ->toBeLessThan(array_search('usarrs-profile', $keys, true));
+    });
+
     it('hides Profile from guests', function () {
         expect(app(NavRegistry::class)->visibleTo(null))->not->toHaveKey('usarrs-profile');
     });

@@ -20,6 +20,8 @@ use RuntimeException;
  */
 final class HomePage
 {
+    public const DASHBOARD = 'dashboard';
+
     public const SPLASH = 'splash';
 
     public const TORRENT_INDEX = 'torrents';
@@ -42,10 +44,11 @@ final class HomePage
     /**
      * The choices, with what each one actually does.
      *
-     * `dashboard` was in the original Checkpoint and is deliberately absent:
-     * no route of that name exists anywhere in the suite, so offering it would
-     * generate a route() call that fatals on first page load — the exact class
-     * of bug this Build exists to remove (job #10709 covers building one).
+     * `dashboard` was left out of Build #105 because no route of that name
+     * existed, and offering it would have generated a route() call that fatals
+     * on first page load. usarrs now registers `dashboard.index` on every
+     * install (Spec #118), and usarrs is always installed alongside this
+     * package, so the option is safe everywhere.
      *
      * profile.stats rather than profile.show: show is name/email/role/bio,
      * while stats carries ratio, uploaded, downloaded and the announce key.
@@ -56,11 +59,24 @@ final class HomePage
     public static function options(): array
     {
         return [
+            self::DASHBOARD => 'The dashboard — ratio, announce key, invites and account security at a glance',
             self::SPLASH => 'A splash page — your site name and an Enter link, yours to edit',
             self::TORRENT_INDEX => 'Straight to the torrent listing',
             self::PROFILE_STATS => 'Straight to the signed-in tracker stats — ratio, announce key',
             self::LEAVE_ALONE => 'Leave / alone — this app already has a home page',
         ];
+    }
+
+    /**
+     * What to preselect. A private tracker's users are all signed in, and the
+     * dashboard is the page that answers "how am I doing". A public tracker's
+     * visitors are mostly guests, and the dashboard sits behind auth — sending
+     * them to a login form for a site that never asked them to log in is the
+     * wrong first impression.
+     */
+    public static function defaultFor(PackageSelection $selection): string
+    {
+        return $selection->isPrivate() ? self::DASHBOARD : self::SPLASH;
     }
 
     public function pending(string $choice): bool
@@ -97,6 +113,7 @@ final class HomePage
     {
         $body = match ($choice) {
             self::SPLASH => "    return view('home');",
+            self::DASHBOARD => "    return redirect()->route('dashboard.index');",
             self::TORRENT_INDEX => "    return redirect()->route('torrents.index');",
             self::PROFILE_STATS => "    return redirect()->route('profile.stats');",
             default => throw new RuntimeException("Unknown home page choice: {$choice}"),

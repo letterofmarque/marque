@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Marque\Marque\Tests\Feature;
 
 use Marque\Marque\Install\HomePage;
+use Marque\Marque\Install\PackageSelection;
 use Marque\Marque\Tests\TestCase;
 
 /**
@@ -106,6 +107,37 @@ PHP;
         // user actually opens the site for.
         $this->assertStringContainsString('profile.stats', $this->routes());
         $this->assertStringNotContainsString('profile.show', $this->routes());
+    }
+
+    public function test_the_dashboard_is_offered(): void
+    {
+        // Absent from Build #105 CP6 because no route of that name existed, and
+        // offering it would have generated a fatal on first load. usarrs now
+        // registers dashboard.index on every install (Spec #118).
+        $this->assertArrayHasKey(HomePage::DASHBOARD, HomePage::options());
+    }
+
+    public function test_the_dashboard_option_redirects_to_the_dashboard(): void
+    {
+        $this->home()->apply(HomePage::DASHBOARD);
+
+        $this->assertStringContainsString("redirect()->route('dashboard.index')", $this->routes());
+        $this->assertStringNotContainsString("view('welcome')", $this->routes());
+    }
+
+    public function test_the_dashboard_is_the_default_for_a_private_tracker(): void
+    {
+        // Everyone on a private tracker is signed in, and the dashboard is the
+        // one page that answers "how am I doing".
+        $this->assertSame(HomePage::DASHBOARD, HomePage::defaultFor(PackageSelection::private()));
+    }
+
+    public function test_the_splash_stays_the_default_for_a_public_tracker(): void
+    {
+        // A public tracker's visitors are mostly guests, and the dashboard is
+        // behind auth — a guest landing on / would be bounced to a login form
+        // for a site that never asked them to log in.
+        $this->assertSame(HomePage::SPLASH, HomePage::defaultFor(PackageSelection::public()));
     }
 
     public function test_the_splash_option_publishes_a_view(): void

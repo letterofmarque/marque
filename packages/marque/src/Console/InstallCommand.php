@@ -107,7 +107,7 @@ class InstallCommand extends Command
 
         $this->wireStylesheet($selection);
         $this->patchUserModel($selection);
-        $this->chooseHomePage();
+        $this->chooseHomePage($selection);
         $this->publishAndMigrate($selection);
         $this->seedAdmin();
 
@@ -381,7 +381,7 @@ class InstallCommand extends Command
      * welcome page. Everything works and nothing announces itself — which is
      * the finding that made Spec #115 worth writing.
      */
-    private function chooseHomePage(): void
+    private function chooseHomePage(PackageSelection $selection): void
     {
         $routes = $this->laravel->basePath('routes/web.php');
 
@@ -407,7 +407,7 @@ class InstallCommand extends Command
         $choice = select(
             label: 'What should / show?',
             options: HomePage::options(),
-            default: HomePage::SPLASH,
+            default: HomePage::defaultFor($selection),
         );
 
         if ($choice === HomePage::LEAVE_ALONE) {
@@ -550,6 +550,16 @@ class InstallCommand extends Command
         $verification->check(
             '/torrents',
             fn (): int => $this->statusOf('/torrents', $admin),
+            mustReachApp: $admin !== null,
+        );
+
+        // The dashboard exists on every install and renders whatever panels
+        // the installed packages registered — so reaching it as the admin
+        // exercises the tracker stats binding and every panel's component, not
+        // just a route. Resolved by name because usarrs.prefix can move it.
+        $verification->check(
+            '/dashboard',
+            fn (): int => $this->statusOf(route('dashboard.index', absolute: false), $admin),
             mustReachApp: $admin !== null,
         );
 
