@@ -34,9 +34,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mostly guests, and the dashboard sits behind a login. Self-verification now also loads
   `/dashboard` as the new admin — a redirect counts as a failure — which renders every
   registered panel for real rather than only proving a route exists.
-
-### Note
-
-`marque:install` currently refuses to run, and says so. Its stages land one at a
-time; a command that reported success before it could wire anything up would be
-repeating the exact failure this package was written to correct.
