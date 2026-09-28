@@ -1,0 +1,367 @@
+#!/usr/bin/env bash
+#
+# Tests for tools/check-docs.
+#
+# check-docs exists because the 2026-09-28 docs sweep found ~70 false claims in
+# the public docs, and a third of them were mechanically checkable: config keys
+# documented in the wrong package, defaults that disagree with the config file,
+# keys nothing reads, package names that no longer exist, constraints that
+# drifted, tags that were never cut. A check nobody has seen catch the real
+# thing is not a check — so the headline test replays the docs exactly as they
+# stood at 21bbe5e and demands every one of those findings back.
+#
+# The synthetic cases after it pin each category and the escape hatch on a tiny
+# fake monorepo, so a failure names the rule that broke rather than a line in a
+# 3000-line README.
+#
+# Run: tools/test-check-docs
+
+set -uo pipefail
+
+cd "$(dirname "$0")/.."
+ROOT=$(pwd)
+CHECK="$ROOT/tools/check-docs"
+
+PASS=0
+FAIL=0
+
+pass() { printf '  \033[32m✓\033[0m %s\n' "$1"; PASS=$((PASS + 1)); }
+fail() {
+    printf '  \033[31m✗\033[0m %s\n' "$1"
+    [[ $# -gt 1 ]] && printf '      %s\n' "$2"
+    FAIL=$((FAIL + 1))
+}
+
+SCRATCH="$(mktemp -d)"
+REPLAY="$SCRATCH/replay"
+
+cleanup() {
+    git -C "$ROOT" worktree remove --force "$REPLAY" >/dev/null 2>&1
+    rm -rf "$SCRATCH"
+}
+trap cleanup EXIT INT TERM
+
+# expect <output> <description> <extended-regex>
+expect() {
+    if grep -Eq -- "$3" <<<"$1"; then
+        pass "$2"
+    else
+        fail "$2" "no line matching: $3"
+    fi
+}
+
+# refuse <output> <description> <extended-regex>
+refuse() {
+    if grep -Eq -- "$3" <<<"$1"; then
+        fail "$2" "unexpected line: $(grep -E -- "$3" <<<"$1" | head -1)"
+    else
+        pass "$2"
+    fi
+}
+
+# ── 1. The replay: the docs as they stood before the sweep ───────────────
+#
+# A worktree rather than `git archive`, so `git tag` still answers — the tag
+# check reads the real tag list.
+
+echo "Replay of 21bbe5e (the docs the 2026-09-28 sweep read)"
+
+git -C "$ROOT" worktree add --detach "$REPLAY" 21bbe5e >/dev/null 2>&1 \
+    || { echo "could not create a worktree at 21bbe5e"; exit 1; }
+
+out="$("$CHECK" --root "$REPLAY" 2>&1)"
+status=$?
+
+[[ $status -ne 0 ]] && pass "exits non-zero on the pre-sweep docs" \
+    || fail "exits non-zero on the pre-sweep docs" "exit $status"
+
+# bloodhound documents threepio's keys as its own
+expect "$out" "bloodhound: announce_interval is not in config/bloodhound.php" \
+    'packages/bloodhound/README.md:[0-9]+ .*config-missing.*`announce_interval`.*config/bloodhound\.php'
+expect "$out" "bloodhound: peer_expiry is not in config/bloodhound.php" \
+    'packages/bloodhound/README.md:[0-9]+ .*config-missing.*`peer_expiry`'
+expect "$out" "bloodhound: redis.prefix is not in config/bloodhound.php" \
+    'packages/bloodhound/README.md:[0-9]+ .*config-missing.*`redis\.prefix`'
+expect "$out" "bloodhound: max_peers_per_announce is not in config/bloodhound.php" \
+    'packages/bloodhound/README.md:[0-9]+ .*config-missing.*`max_peers_per_announce`'
+expect "$out" "bloodhound: client_validation.whitelist is really top-level whitelist" \
+    'packages/bloodhound/README.md:[0-9]+ .*config-missing.*`client_validation\.whitelist`'
+expect "$out" "bloodhound: announce_log.enabled documented false, config says true" \
+    'packages/bloodhound/README.md:[0-9]+ .*config-default.*`announce_log\.enabled`.*false.*true'
+
+# hound's own table points at threepio — and must NOT be flagged for it
+refuse "$out" "hound: the 'Set these in config/threepio.php' table is checked against threepio" \
+    'packages/hound/README.md:[0-9]+ .*config-missing.*`announce_interval`'
+expect "$out" "hound: logging.enabled is read by nothing" \
+    'packages/hound/README.md:[0-9]+ .*config-unread.*`logging\.enabled`'
+
+expect "$out" "cennad: rate_limit is read by nothing" \
+    'packages/cennad/README.md:[0-9]+ .*config-unread.*`rate_limit`'
+
+# the config files themselves: keys shipped that nothing reads
+expect "$out" "squidink: the cache block in its config is read by nothing" \
+    'packages/squidink/config/squidink\.php:[0-9]+ .*config-dead.*`cache'
+expect "$out" "bloodhound: ratio_mode in its config is read by nothing (#10732)" \
+    'packages/bloodhound/config/bloodhound\.php:[0-9]+ .*config-dead.*`ratio_mode`'
+
+expect "$out" "trove: ratio_mode is not in config/trove.php" \
+    'packages/trove/README.md:[0-9]+ .*config-missing.*`ratio_mode`.*config/trove\.php'
+expect "$out" "trove: min_ratio is not in config/trove.php" \
+    'packages/trove/README.md:[0-9]+ .*config-missing.*`min_ratio`'
+expect "$out" "trove: min_seedtime is not in config/trove.php" \
+    'packages/trove/README.md:[0-9]+ .*config-missing.*`min_seedtime`'
+
+expect "$out" "guise: layout documented layouts.app, config says deck::layouts.app" \
+    'packages/guise/README.md:[0-9]+ .*config-default.*`layout`.*layouts\.app.*deck::layouts\.app'
+
+# names that are not (or no longer) packages
+expect "$out" "trove: 'ise' named as current" \
+    'packages/trove/README.md:[0-9]+ .*package-name.*ise'
+expect "$out" "root README: marque/taxonomy-* does not exist" \
+    '^README.md:[0-9]+ .*package-name.*taxonomy-'
+expect "$out" "taxonomy: marque/taxonomy-sport does not exist" \
+    'packages/taxonomy/README.md:[0-9]+ .*package-name.*taxonomy-sport'
+expect "$out" "new-package.md: nunomaduro/pao is abandoned" \
+    'docs/new-package.md:[0-9]+ .*package-name.*nunomaduro/pao'
+
+expect "$out" "usarrs: fortify ^1.37 documented, composer.json says ^1.30" \
+    'packages/usarrs/README.md:[0-9]+ .*requirement.*laravel/fortify.*1\.37.*1\.30'
+
+expect "$out" "root README: guise/v3.1.0 was never tagged" \
+    '^README.md:[0-9]+ .*tag.*guise/v3\.1\.0'
+
+# Things that are true and must stay quiet
+refuse "$out" "usarrs: the invites snippet matches config/usarrs.php" \
+    'packages/usarrs/README.md:[0-9]+ .*config-.*`invites\.'
+refuse "$out" "a real tag (usarrs/v6.2.0) is not flagged" \
+    'tag.*usarrs/v6\.2\.0'
+refuse "$out" "letterofmarque/marque is a repo, not a package name" \
+    'package-name.*letterofmarque'
+
+# ── 2. Synthetic: one fake package, one rule at a time ───────────────────
+
+echo
+echo "Synthetic cases"
+
+# make_repo <dir>: a one-package monorepo that passes every check
+make_repo() {
+    local d=$1
+    mkdir -p "$d/packages/acme/config" "$d/packages/acme/src"
+    cat >"$d/packages/acme/config/acme.php" <<'PHP'
+<?php
+
+return [
+    'enabled' => env('ACME_ENABLED', true),
+    'limits' => [
+        'per_day' => env('ACME_PER_DAY', 10),
+    ],
+];
+PHP
+    cat >"$d/packages/acme/src/Acme.php" <<'PHP'
+<?php
+
+class Acme
+{
+    public function on(): bool { return config('acme.enabled'); }
+    public function limits(): array { return config('acme.limits'); }
+}
+PHP
+    cat >"$d/packages/acme/composer.json" <<'JSON'
+{ "name": "marque/acme", "require": { "php": "^8.3", "laravel/fortify": "^1.30" } }
+JSON
+    cat >"$d/packages/acme/README.md" <<'MD'
+# Acme
+
+Install with `composer require marque/acme`.
+
+## Configuration
+
+Published to `config/acme.php`:
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `enabled` | `true` | Master switch |
+| `limits.per_day` | `10` | Daily cap |
+
+Tagged as `acme/v1.0.0`.
+
+## Requirements
+
+- PHP 8.3+
+- `laravel/fortify` ^1.30
+MD
+    git -C "$d" init -q
+    git -C "$d" -c user.email=t@t -c user.name=t add -A
+    git -C "$d" -c user.email=t@t -c user.name=t commit -qm init
+    git -C "$d" tag acme/v1.0.0
+}
+
+run_case() { # <name> -> sets $out/$status for $SCRATCH/<name>
+    out="$("$CHECK" --root "$SCRATCH/$1" 2>&1)"
+    status=$?
+}
+
+make_repo "$SCRATCH/clean"
+run_case clean
+[[ $status -eq 0 ]] && pass "a truthful doc passes" \
+    || fail "a truthful doc passes" "exit $status: $out"
+
+make_repo "$SCRATCH/missing"
+sed -i 's/| `limits.per_day` |/| `limits.per_week` |/' "$SCRATCH/missing/packages/acme/README.md"
+run_case missing
+expect "$out" "config-missing: a key the config file does not have" 'config-missing.*`limits\.per_week`'
+
+make_repo "$SCRATCH/default"
+sed -i 's/| `10` | Daily cap/| `20` | Daily cap/' "$SCRATCH/default/packages/acme/README.md"
+run_case default
+expect "$out" "config-default: a default the config file disagrees with" 'config-default.*`limits\.per_day`.*20.*10'
+
+make_repo "$SCRATCH/unread"
+sed -i "s/config('acme.enabled')/true/" "$SCRATCH/unread/packages/acme/src/Acme.php"
+run_case unread
+expect "$out" "config-unread: a documented key nothing reads" 'README.md:[0-9]+ .*config-unread.*`enabled`'
+expect "$out" "config-dead: the same key, flagged in the config file" 'config/acme\.php:[0-9]+ .*config-dead.*`enabled`'
+
+make_repo "$SCRATCH/prefix"
+run_case prefix
+refuse "$out" "a key under a parent array that is read whole is not flagged" 'config-(unread|dead).*per_day'
+
+make_repo "$SCRATCH/name"
+echo 'Pairs well with `marque/ise`.' >>"$SCRATCH/name/packages/acme/README.md"
+run_case name
+expect "$out" "package-name: a dead package named as current" 'package-name.*marque/ise'
+
+make_repo "$SCRATCH/renamed"
+echo 'Formerly `marque/ise`, renamed to deck.' >>"$SCRATCH/renamed/packages/acme/README.md"
+run_case renamed
+[[ $status -eq 0 ]] && pass "package-name: history ('renamed', 'formerly') is allowed" \
+    || fail "package-name: history ('renamed', 'formerly') is allowed" "$out"
+
+make_repo "$SCRATCH/req"
+sed -i 's/`laravel\/fortify` ^1.30/`laravel\/fortify` ^1.37/' "$SCRATCH/req/packages/acme/README.md"
+run_case req
+expect "$out" "requirement: a constraint composer.json disagrees with" 'requirement.*laravel/fortify.*1\.37.*1\.30'
+
+make_repo "$SCRATCH/tag"
+sed -i 's/acme\/v1.0.0/acme\/v1.1.0/' "$SCRATCH/tag/packages/acme/README.md"
+run_case tag
+expect "$out" "tag: a version that was never tagged" 'tag.*acme/v1\.1\.0'
+
+make_repo "$SCRATCH/hatch"
+echo 'Pairs well with `marque/ise`. <!-- check-docs: ignore — deliberate, testing the hatch -->' \
+    >>"$SCRATCH/hatch/packages/acme/README.md"
+run_case hatch
+[[ $status -eq 0 ]] && pass "escape hatch: a marked claim does not fail the run" \
+    || fail "escape hatch: a marked claim does not fail the run" "$out"
+expect "$out" "escape hatch: the exception is still listed, with its reason" 'ignored.*testing the hatch'
+
+make_repo "$SCRATCH/hatch-bare"
+echo 'Pairs well with `marque/ise`. <!-- check-docs: ignore -->' \
+    >>"$SCRATCH/hatch-bare/packages/acme/README.md"
+run_case hatch-bare
+[[ $status -ne 0 ]] && pass "escape hatch: a marker with no reason is itself a finding" \
+    || fail "escape hatch: a marker with no reason is itself a finding" "$out"
+
+# ── 3. False positives found on the first real run ───────────────────────
+#
+# The first pass over main produced findings that were not true. Each case
+# below is one of them, pinned so it cannot come back: a check that cries wolf
+# teaches people to stop reading it.
+
+echo
+echo "False positives that must stay fixed"
+
+# env(...)'s closing paren popped the array stack, so a nested snippet's second
+# key lost its parent ('invites.required' became 'required').
+make_repo "$SCRATCH/snippet"
+cat >>"$SCRATCH/snippet/packages/acme/README.md" <<'MD'
+
+Limits live in `config/acme.php`:
+
+```php
+'limits' => [
+    'per_day' => env('ACME_PER_DAY', 10),
+    'per_week' => env('ACME_PER_WEEK', 50),
+],
+```
+MD
+# The bug only bites the key AFTER the first env() — so there must be two.
+sed -i "s/'per_day' => env('ACME_PER_DAY', 10),/'per_day' => env('ACME_PER_DAY', 10),\n        'per_week' => env('ACME_PER_WEEK', 50),/" \
+    "$SCRATCH/snippet/packages/acme/config/acme.php"
+run_case snippet
+[[ $status -eq 0 ]] && pass "a nested config snippet using env() keeps its parent key" \
+    || fail "a nested config snippet using env() keeps its parent key" "$out"
+
+# A usage example is not a config claim.
+make_repo "$SCRATCH/code"
+cat >>"$SCRATCH/code/packages/acme/README.md" <<'MD'
+
+```php
+$widget->update(['colour' => 'red']);
+```
+MD
+run_case code
+[[ $status -eq 0 ]] && pass "a code example with an array in it is not read as config" \
+    || fail "a code example with an array in it is not read as config" "$out"
+
+# "Set it to this" is advice, not a claimed default (cennad's read_middleware).
+make_repo "$SCRATCH/advice"
+cat >>"$SCRATCH/advice/packages/acme/README.md" <<'MD'
+
+To switch it off, in `config/acme.php`:
+
+```php
+'enabled' => false,
+```
+MD
+run_case advice
+[[ $status -eq 0 ]] && pass "a bare value in a snippet is advice, not a default claim" \
+    || fail "a bare value in a snippet is advice, not a default claim" "$out"
+
+# A regex default starts with '[' and is not an array (bloodhound's key_pattern).
+make_repo "$SCRATCH/regex"
+sed -i "s/'enabled' => env('ACME_ENABLED', true),/'enabled' => env('ACME_ENABLED', true),\n    'pattern' => '[0-9a-z]{32}',/" \
+    "$SCRATCH/regex/packages/acme/config/acme.php"
+sed -i "s/config('acme.enabled');/config('acme.enabled') \&\& config('acme.pattern');/" \
+    "$SCRATCH/regex/packages/acme/src/Acme.php"
+sed -i 's/^| `limits.per_day` |/| `pattern` | `[0-9a-z]{32}` | Key shape |\n| `limits.per_day` |/' \
+    "$SCRATCH/regex/packages/acme/README.md"
+run_case regex
+[[ $status -eq 0 ]] && pass "a regex default beginning with '[' is compared as a string" \
+    || fail "a regex default beginning with '[' is compared as a string" "$out"
+
+# History told across a line break (deck's "…`marque/ise` is\n> abandoned").
+make_repo "$SCRATCH/paragraph"
+printf '\nThe old name `marque/ise` is\nabandoned on Packagist.\n' >>"$SCRATCH/paragraph/packages/acme/README.md"
+run_case paragraph
+[[ $status -eq 0 ]] && pass "history words anywhere in the paragraph exempt a dead name" \
+    || fail "history words anywhere in the paragraph exempt a dead name" "$out"
+
+# squidink reads its whole config then indexes into it. The indexed keys are
+# read; the rest are still dead.
+make_repo "$SCRATCH/whole"
+cat >"$SCRATCH/whole/packages/acme/src/Acme.php" <<'PHP'
+<?php
+
+class Acme
+{
+    public function boot($app): void
+    {
+        $config = $app['config']->get('acme', []);
+        $on = $config['enabled'] ?? true;
+    }
+}
+PHP
+run_case whole
+refuse "$out" "a whole-config read followed by \$config['enabled'] reads enabled" 'config-dead.*`enabled`'
+expect "$out" "…and a key it never indexes is still dead" 'config-dead.*`limits\.per_day`'
+
+# ── summary ──────────────────────────────────────────────────────────────
+
+echo
+if [[ $FAIL -eq 0 ]]; then
+    printf '\033[32m%d passed\033[0m\n' "$PASS"
+    exit 0
+fi
+printf '\033[31m%d failed\033[0m, %d passed\n' "$FAIL" "$PASS"
+exit 1

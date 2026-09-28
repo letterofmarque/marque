@@ -1,0 +1,755 @@
+#!/usr/bin/env php
+<?php
+
+/*
+ * tools/check-docs — do the public docs say things the code can confirm?
+ *
+ *   tools/check-docs                 # the monorepo this script lives in
+ *   tools/check-docs --root <dir>    # another checkout (the tests use a worktree)
+ *
+ * Why this exists
+ * ---------------
+ * The 2026-09-28 docs sweep read every public doc against the code and found
+ * ~70 false claims. A third of them were mechanical, and they were the
+ * expensive third: config keys documented in the wrong package's config file,
+ * so setting them did nothing; defaults the config file disagreed with; keys
+ * nothing reads at all; packages that had been renamed or never existed;
+ * constraints that drifted; example tags that were never cut. Every one of
+ * those is a lookup, so it is checked here on every push rather than hoped for
+ * at release time. Behaviour and prose are not — that is the release
+ * read-through's job (Spec #131).
+ *
+ * What it checks
+ * --------------
+ *   config-missing   a key in a README config table or config snippet that the
+ *                    config file it describes does not have
+ *   config-default   a documented default the config file disagrees with
+ *   config-unread    a documented key that exists but nothing in any package reads
+ *   config-dead      a key a package ships in its own config that nothing reads —
+ *                    checked in the config file, so it is caught whatever the
+ *                    README says
+ *   package-name     `marque/<name>` that is not a package here, or a known-dead
+ *                    name (ise, id, nunomaduro/pao) used as if current
+ *   requirement      a constraint in a README's Requirements section that its
+ *                    composer.json disagrees with
+ *   tag              `<package>/vX.Y.Z` that was never tagged
+ *
+ * The escape hatch
+ * ----------------
+ * A claim that is deliberately not checkable gets a marker, on its own line or
+ * the line before, with a reason:
+ *
+ *   <!-- check-docs: ignore — reason -->        (Markdown)
+ *   // check-docs: ignore — reason              (config files)
+ *
+ * Ignored findings are still printed, so an exception is visible rather than
+ * silent. A marker with no reason is itself a finding.
+ *
+ * Exit status: 0 clean, 1 findings.
+ */
+
+declare(strict_types=1);
+
+// ── arguments ────────────────────────────────────────────────────────────
+
+$root = dirname(__DIR__);
+for ($i = 1; $i < $argc; $i++) {
+    if ($argv[$i] === '--root' && isset($argv[$i + 1])) {
+        $root = rtrim($argv[++$i], '/');
+    } elseif ($argv[$i] === '--help' || $argv[$i] === '-h') {
+        fwrite(STDOUT, "usage: tools/check-docs [--root <dir>]\n");
+        exit(0);
+    } else {
+        fwrite(STDERR, "unknown argument: {$argv[$i]}\n");
+        exit(2);
+    }
+}
+
+if (! is_dir("$root/packages")) {
+    fwrite(STDERR, "no packages/ under $root\n");
+    exit(2);
+}
+
+// ── Laravel helpers a config file may call at include time ───────────────
+//
+// Config files are evaluated outside Laravel. env() returns its default —
+// deliberately ignoring the real environment, so a variable set on the machine
+// running this cannot change what the docs are compared against.
+
+if (! function_exists('env')) {
+    function env(string $key, mixed $default = null): mixed
+    {
+        return $default instanceof Closure ? $default() : $default;
+    }
+}
+foreach (['base_path', 'config_path', 'storage_path', 'resource_path', 'database_path', 'app_path', 'public_path'] as $helper) {
+    if (! function_exists($helper)) {
+        eval("function $helper(string \$path = ''): string { return '$helper/' . \$path; }");
+    }
+}
+
+// ── the repo ─────────────────────────────────────────────────────────────
+
+$packages = [];
+foreach (glob("$root/packages/*/composer.json") as $manifest) {
+    $packages[basename(dirname($manifest))] = json_decode((string) file_get_contents($manifest), true) ?? [];
+}
+ksort($packages);
+
+$tags = [];
+exec('git -C '.escapeshellarg($root).' tag --list 2>/dev/null', $tagLines);
+foreach ($tagLines as $t) {
+    $tags[trim($t)] = true;
+}
+
+/** @var array<string, array{file: string, values: array, keys: array<string, int>, ignored: array<string, string>}> */
+$configs = [];
+foreach (glob("$root/packages/*/config/*.php") as $file) {
+    $name = basename($file, '.php');
+    $configs[$name] = loadConfig($file, $root);
+}
+
+$reads = collectReads($root, array_keys($configs));
+
+$findings = [];
+$ignored = [];
+
+function finding(string $file, int $line, string $category, string $message): void
+{
+    global $findings;
+    $findings[] = compact('file', 'line', 'category', 'message');
+}
+
+// ── config files: keys shipped that nothing reads ────────────────────────
+
+foreach ($configs as $name => $config) {
+    foreach (leafKeys($config['values']) as $path) {
+        if (isRead($reads, $name, $path)) {
+            continue;
+        }
+        $line = $config['keys'][$path] ?? 1;
+        if (isset($config['ignored'][$path])) {
+            $ignored[] = [$config['file'], $line, $config['ignored'][$path]];
+            continue;
+        }
+        finding($config['file'], $line, 'config-dead', "`$path` is shipped in config/$name.php but nothing reads it");
+    }
+}
+
+// ── the docs ─────────────────────────────────────────────────────────────
+
+foreach (docFiles($root) as $doc) {
+    checkDoc($doc, $root);
+}
+
+// ── report ───────────────────────────────────────────────────────────────
+
+usort($findings, fn ($a, $b) => [$a['file'], $a['line']] <=> [$b['file'], $b['line']]);
+
+foreach ($findings as $f) {
+    fwrite(STDOUT, sprintf("%s:%d  %s  %s\n", $f['file'], $f['line'], $f['category'], $f['message']));
+}
+
+if ($ignored !== []) {
+    usort($ignored, fn ($a, $b) => [$a[0], $a[1]] <=> [$b[0], $b[1]]);
+    fwrite(STDOUT, "\n");
+    foreach ($ignored as [$file, $line, $reason]) {
+        fwrite(STDOUT, sprintf("ignored  %s:%d  %s\n", $file, $line, $reason));
+    }
+}
+
+$count = count($findings);
+fwrite(STDOUT, sprintf(
+    "\n%s%d finding%s%s\n",
+    $count === 0 ? "\033[32m" : "\033[31m",
+    $count,
+    $count === 1 ? '' : 's',
+    $ignored === [] ? "\033[0m" : "\033[0m, ".count($ignored).' ignored',
+));
+
+exit($count === 0 ? 0 : 1);
+
+// ════════════════════════════════════════════════════════════════════════
+
+/**
+ * Evaluate a config file for its values, and tokenise it for where each key
+ * is declared — the values say what the defaults are, the tokens say which
+ * line to point at.
+ */
+function loadConfig(string $file, string $root): array
+{
+    $values = (static function (string $__file) {
+        ob_start();
+        try {
+            $v = require $__file;
+        } catch (Throwable) {
+            $v = [];
+        } finally {
+            ob_end_clean();
+        }
+
+        return is_array($v) ? $v : [];
+    })($file);
+
+    [$keys, $ignored] = keyLines((string) file_get_contents($file));
+
+    return [
+        'file' => relative($file, $root),
+        'values' => $values,
+        'keys' => $keys,
+        'ignored' => $ignored,
+    ];
+}
+
+/**
+ * Dotted key path => line number, for every `'key' => ...` in a PHP array,
+ * plus any path carrying an ignore marker. Nesting is tracked by bracket depth.
+ *
+ * @return array{0: array<string, int>, 1: array<string, string>}
+ */
+function keyLines(string $php): array
+{
+    $tokens = token_get_all(str_starts_with(ltrim($php), '<?php') ? $php : "<?php $php");
+    $stack = [];
+    $pending = null;
+    $parens = 0;      // plain calls like env(...) — not arrays
+    $arrayCall = false;
+    $keys = [];
+    $ignored = [];
+    $lastMarker = null; // [line, reason]
+    $count = count($tokens);
+
+    for ($i = 0; $i < $count; $i++) {
+        $t = $tokens[$i];
+
+        if (is_array($t) && $t[0] === T_COMMENT && preg_match('/check-docs:\s*ignore(.*)$/', $t[1], $m)) {
+            $lastMarker = [$t[2], reason($m[1])];
+
+            continue;
+        }
+
+        if (is_array($t) && $t[0] === T_ARRAY) {
+            $arrayCall = true; // the `(` that follows opens an array
+
+            continue;
+        }
+        if ($t === '[' || ($t === '(' && $arrayCall)) {
+            $stack[] = $pending;
+            $pending = null;
+            $arrayCall = false;
+
+            continue;
+        }
+        if ($t === '(') {
+            $parens++;
+
+            continue;
+        }
+        if ($t === ')' && $parens > 0) {
+            $parens--;
+
+            continue;
+        }
+        if ($t === ']' || $t === ')') {
+            array_pop($stack);
+            $pending = null;
+
+            continue;
+        }
+
+        if (is_array($t) && $t[0] === T_CONSTANT_ENCAPSED_STRING) {
+            $j = $i + 1;
+            while ($j < $count && is_array($tokens[$j]) && $tokens[$j][0] === T_WHITESPACE) {
+                $j++;
+            }
+            if ($j < $count && is_array($tokens[$j]) && $tokens[$j][0] === T_DOUBLE_ARROW) {
+                $key = substr($t[1], 1, -1);
+                $path = implode('.', array_filter([...$stack, $key], fn ($s) => $s !== null && $s !== false));
+                $keys[$path] ??= $t[2];
+                if ($lastMarker !== null && $t[2] - $lastMarker[0] <= 1) {
+                    $ignored[$path] = $lastMarker[1];
+                }
+                $pending = $key;
+            }
+        }
+    }
+
+    return [$keys, $ignored];
+}
+
+/**
+ * The paths a caller can read as a unit: scalars, and lists (a whitelist of
+ * clients is one setting, not forty). Associative arrays are descended.
+ *
+ * @return list<string>
+ */
+function leafKeys(array $values, string $prefix = ''): array
+{
+    $out = [];
+    foreach ($values as $k => $v) {
+        $path = $prefix === '' ? (string) $k : "$prefix.$k";
+        if (is_array($v) && $v !== [] && ! array_is_list($v)) {
+            array_push($out, ...leafKeys($v, $path));
+        } else {
+            $out[] = $path;
+        }
+    }
+
+    return $out;
+}
+
+/**
+ * Every config path any package reads, per config name. A read of a parent
+ * (`config('bloodhound.routes')`) or a dynamic key (`"bloodhound.routes.{$x}"`)
+ * counts as reading everything beneath it — generous on purpose, because a
+ * false "nothing reads this" would teach people to ignore the check.
+ *
+ * @return array<string, array<string, true>>
+ */
+function collectReads(string $root, array $names): array
+{
+    $reads = array_fill_keys($names, []);
+    if ($names === []) {
+        return $reads;
+    }
+    $alt = implode('|', array_map(fn ($n) => preg_quote($n, '/'), $names));
+    $pattern = '/[\'"]('.$alt.')\.([A-Za-z0-9_.]*)/';
+
+    foreach (['src', 'routes', 'resources', 'database'] as $dir) {
+        foreach (glob("$root/packages/*/$dir", GLOB_ONLYDIR) as $base) {
+            $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($base, FilesystemIterator::SKIP_DOTS));
+            foreach ($it as $file) {
+                if (! str_ends_with($file->getFilename(), '.php')) {
+                    continue;
+                }
+                $code = (string) file_get_contents($file->getPathname());
+                preg_match_all($pattern, $code, $m, PREG_SET_ORDER);
+                foreach ($m as [, $name, $path]) {
+                    $reads[$name][rtrim($path, '.')] = true;
+                }
+
+                // squidink reads its whole config — `get('squidink', [])` —
+                // then indexes into it. Follow the `$x['key']` accesses in that
+                // file rather than counting the whole namespace as read, or its
+                // genuinely dead keys (`cache`) would vanish with the live ones.
+                if (preg_match_all('/(?:config\(|->get\()\s*[\'"]('.$alt.')[\'"]\s*[,)]/', $code, $whole)) {
+                    preg_match_all('/\$\w+((?:\[[\'"][A-Za-z0-9_]+[\'"]\])+)/', $code, $acc);
+                    foreach (array_unique($whole[1]) as $name) {
+                        foreach ($acc[1] as $chain) {
+                            preg_match_all('/[\'"]([A-Za-z0-9_]+)[\'"]/', $chain, $parts);
+                            $reads[$name][implode('.', $parts[1])] = true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return $reads;
+}
+
+function isRead(array $reads, string $name, string $path): bool
+{
+    $parts = explode('.', $path);
+    for ($n = count($parts); $n >= 1; $n--) {
+        if (isset($reads[$name][implode('.', array_slice($parts, 0, $n))])) {
+            return true;
+        }
+    }
+
+    // A dynamic read of the whole namespace ("usarrs.{$x}") leaves an empty path.
+    return isset($reads[$name]['']);
+}
+
+/**
+ * The public docs. Changelogs and dated release write-ups are records of what
+ * was true when written, and upgrade guides describe the old names on purpose,
+ * so none of them are held to today's code.
+ *
+ * @return list<string>
+ */
+function docFiles(string $root): array
+{
+    $files = [];
+    foreach (['README.md', 'VERSIONING.md', 'CONTRIBUTING.md'] as $f) {
+        if (is_file("$root/$f")) {
+            $files[] = "$root/$f";
+        }
+    }
+    array_push($files, ...glob("$root/packages/*/README.md"));
+    foreach (glob("$root/docs/*.md") as $f) {
+        if (! is_link($f) && ! str_starts_with(basename($f), 'upgrade-guide-')) {
+            $files[] = $f;
+        }
+    }
+
+    return $files;
+}
+
+function checkDoc(string $path, string $root): void
+{
+    global $packages, $configs, $reads, $tags, $ignored;
+
+    $rel = relative($path, $root);
+    $lines = file($path, FILE_IGNORE_NEW_LINES);
+    $own = preg_match('#^packages/([^/]+)/README\.md$#', $rel, $m) ? $m[1] : null;
+
+    $section = '';          // current heading text
+    $configName = $own;     // which config file tables here describe
+    $table = null;          // ['key' => col, 'default' => col] while inside a config table
+    $inCode = false;
+    $codeLang = '';
+    $snippet = [];
+    $snippetStart = 0;
+    $pendingMarker = null;  // reason from a marker on its own line
+
+    // The paragraph each line sits in, so "…`marque/ise` is\n> abandoned" reads
+    // as history even though the telling word is on the next line.
+    $paragraphOf = [];
+    $para = [];
+    foreach ([...$lines, ''] as $i => $l) {
+        if (trim($l) === '' || preg_match('/^\s*(#|```|\|)/', $l)) {
+            $joined = implode(' ', array_column($para, 1));
+            foreach ($para as [$pi]) {
+                $paragraphOf[$pi] = $joined;
+            }
+            $para = [];
+            if (trim($l) !== '') {
+                $paragraphOf[$i] = $l;
+            }
+        } else {
+            $para[] = [$i, $l];
+        }
+    }
+
+    $emit = function (int $line, string $category, string $message, ?string $marker) use ($rel, &$ignored) {
+        if ($marker !== null) {
+            if ($marker === '') {
+                finding($rel, $line, 'ignore-no-reason', 'check-docs: ignore marker without a reason');
+            } else {
+                $ignored[] = [$rel, $line, $marker];
+
+                return;
+            }
+        }
+        finding($rel, $line, $category, $message);
+    };
+
+    foreach ($lines as $idx => $text) {
+        $n = $idx + 1;
+
+        $marker = null;
+        if (preg_match('/<!--\s*check-docs:\s*ignore(.*?)-->/', $text, $mm)) {
+            $marker = reason($mm[1]);
+            if (trim(preg_replace('/<!--.*?-->/', '', $text)) === '') {
+                $pendingMarker = $marker;
+
+                continue;
+            }
+        } elseif ($pendingMarker !== null && trim($text) !== '') {
+            $marker = $pendingMarker;
+            $pendingMarker = null;
+        }
+
+        // fenced code
+        if (preg_match('/^\s*```(\w*)/', $text, $fm)) {
+            if (! $inCode) {
+                $inCode = true;
+                $codeLang = strtolower($fm[1]);
+                $snippet = [];
+                $snippetStart = $n + 1;
+            } else {
+                $inCode = false;
+                if ($codeLang === 'php' && $configName !== null && isset($configs[$configName])) {
+                    checkSnippet($snippet, $snippetStart, $configName, $emit);
+                }
+            }
+
+            continue;
+        }
+        if ($inCode) {
+            $snippet[] = $text;
+            checkNames($text, $n, $marker, $emit);
+            checkTags($text, $n, $marker, $emit);
+
+            continue;
+        }
+
+        if (preg_match('/^#{1,6}\s+(.*)$/', $text, $hm)) {
+            $section = trim($hm[1]);
+            $configName = $own;
+            $table = null;
+
+            continue;
+        }
+
+        if (preg_match_all('#config/([a-z0-9_-]+)\.php#', $text, $cm) && $table === null) {
+            $configName = end($cm[1]);
+        }
+
+        // config tables
+        if (str_starts_with(ltrim($text), '|')) {
+            $cells = array_map('trim', explode('|', trim(trim($text), '|')));
+            if ($table === null) {
+                $keyCol = $defCol = null;
+                foreach ($cells as $c => $cell) {
+                    if ($keyCol === null && preg_match('/\bkey\b/i', $cell)) {
+                        $keyCol = $c;
+                    }
+                    if ($defCol === null && preg_match('/^default$/i', $cell)) {
+                        $defCol = $c;
+                    }
+                }
+                if ($keyCol !== null && $defCol !== null) {
+                    $table = ['key' => $keyCol, 'default' => $defCol];
+                }
+
+                continue;
+            }
+            if (preg_match('/^:?-+:?$/', $cells[0] ?? '')) {
+                continue;
+            }
+            if ($configName !== null && isset($configs[$configName])
+                && preg_match('/^`([a-z0-9_]+(?:\.[a-z0-9_]+)*)`$/', $cells[$table['key']] ?? '', $km)) {
+                checkKey($km[1], $cells[$table['default']] ?? null, $n, $configName, $marker, $emit);
+            }
+        } else {
+            $table = null;
+        }
+
+        checkNames($text, $n, $marker, $emit, $paragraphOf[$idx] ?? $text);
+        checkTags($text, $n, $marker, $emit);
+
+        if ($own !== null && preg_match('/^requirements$/i', $section)) {
+            checkRequirement($text, $n, $own, $marker, $emit);
+        }
+    }
+}
+
+function checkKey(string $key, ?string $documented, int $line, string $configName, ?string $marker, callable $emit): void
+{
+    global $configs, $reads;
+
+    $values = $configs[$configName]['values'];
+    $file = "config/$configName.php";
+
+    if (! hasPath($values, $key)) {
+        $elsewhere = [];
+        foreach ($configs as $name => $c) {
+            if ($name !== $configName && hasPath($c['values'], $key)) {
+                $elsewhere[] = "config/$name.php";
+            }
+        }
+        $hint = $elsewhere === [] ? '' : ' (it is in '.implode(', ', $elsewhere).')';
+        $emit($line, 'config-missing', "`$key` is not in $file$hint", $marker);
+
+        return;
+    }
+
+    if (! isRead($reads, $configName, $key)) {
+        $emit($line, 'config-unread', "`$key` is in $file but nothing reads it", $marker);
+
+        return;
+    }
+
+    if ($documented === null) {
+        return;
+    }
+    $doc = literal($documented);
+    if ($doc === null) {
+        return;
+    }
+    $actual = normalise(getPath($values, $key));
+    if ($actual !== null && $doc !== $actual) {
+        $emit($line, 'config-default', "`$key` documented as $doc, $file says $actual", $marker);
+    }
+}
+
+/**
+ * A PHP snippet documenting config: every `'key' =>` in it must exist, and a
+ * literal or env() default must match.
+ */
+function checkSnippet(array $snippet, int $start, string $configName, callable $emit): void
+{
+    // Only a pure config fragment — every line a `'key' => value`, a closing
+    // bracket, or a comment. Anything with code in it (`$torrent->update([...])`)
+    // is an example of using the package, not a claim about its config.
+    foreach ($snippet as $l) {
+        $l = trim($l);
+        if ($l !== '' && ! preg_match('/^([\'"][^\'"]+[\'"]\s*=>.*|[\])],?;?|\/\/.*|\/?\*.*)$/', $l)) {
+            return;
+        }
+    }
+    $php = implode("\n", $snippet);
+    if (! str_contains($php, '=>')) {
+        return;
+    }
+    [$keys] = keyLines(str_repeat("\n", $start - 1).$php);
+    foreach ($keys as $path => $line) {
+        $text = $snippet[$line - $start] ?? '';
+        if (preg_match('/=>\s*\[\s*$/', $text)) {
+            continue; // a parent array, checked through its children
+        }
+        // Only an env() fallback claims a default. A bare value in a snippet is
+        // usually "set it to this" (cennad's `'read_middleware' => ['api']`),
+        // which is advice, not a statement about what ships.
+        $default = null;
+        if (preg_match('/=>\s*env\(\s*[\'"][^\'"]+[\'"]\s*,\s*(.+?)\)\s*,?\s*(\/\/.*)?$/', $text, $dm)) {
+            $default = $dm[1];
+        }
+        checkKey($path, $default, $line, $configName, null, $emit);
+    }
+}
+
+function checkNames(string $text, int $line, ?string $marker, callable $emit, ?string $context = null): void
+{
+    global $packages;
+
+    // Drop HTML comments first: every one ends in `-->`, which would otherwise
+    // read as the arrow in "ise -> deck" and exempt the line as history.
+    $text = preg_replace('/<!--.*?-->/', '', $text);
+    $context = preg_replace('/<!--.*?-->/', '', $context ?? $text);
+
+    if (preg_match('/\b(renamed|formerly|abandoned|deprecated|previously|replaced|superseded|was)\b|→|->/i', $context)) {
+        return; // history, told as history
+    }
+
+    $dead = ['ise' => 'renamed to deck', 'id' => 'renamed to ise, then deck'];
+
+    if (preg_match_all('#(?<![\w/.-])marque/([a-z0-9][a-z0-9-]*)#', $text, $m)) {
+        foreach (array_unique($m[1]) as $name) {
+            if (isset($packages[$name])) {
+                continue;
+            }
+            $why = $dead[$name] ?? 'no such package';
+            $emit($line, 'package-name', "`marque/$name` is not a package here ($why)", $marker);
+        }
+    }
+    if (preg_match('/`ise`/', $text)) {
+        $emit($line, 'package-name', '`ise` was renamed to deck', $marker);
+    }
+    if (preg_match('#(?<![\w/.-])nunomaduro/pao\b#', $text)) {
+        $emit($line, 'package-name', '`nunomaduro/pao` is abandoned — use laravel/pao', $marker);
+    }
+}
+
+function checkTags(string $text, int $line, ?string $marker, callable $emit): void
+{
+    global $packages, $tags;
+
+    $alt = implode('|', array_map(fn ($p) => preg_quote($p, '#'), array_keys($packages)));
+    if ($alt === '' || ! preg_match_all('#(?<![\w/-])('.$alt.')/v(\d+\.\d+\.\d+)(?![\w.])#', $text, $m, PREG_SET_ORDER)) {
+        return;
+    }
+    foreach ($m as [$whole]) {
+        if (! isset($tags[$whole])) {
+            $emit($line, 'tag', "`$whole` is not a tag", $marker);
+        }
+    }
+}
+
+function checkRequirement(string $text, int $line, string $own, ?string $marker, callable $emit): void
+{
+    global $packages;
+
+    $manifest = $packages[$own];
+    $declared = ($manifest['require'] ?? []) + ($manifest['require-dev'] ?? []);
+
+    $checks = [];
+    if (preg_match('#`?([a-z0-9-]+/[a-z0-9-]+)`?\s+(\^?[0-9]+(?:\.[0-9]+)*\+?)#', $text, $m)) {
+        $checks[] = [$m[1], $m[2]];
+    }
+    if (preg_match('/\bPHP\s+(\^?[0-9]+\.[0-9]+(?:\.[0-9]+)?\+?)/', $text, $m)) {
+        $checks[] = ['php', $m[1]];
+    }
+
+    foreach ($checks as [$dep, $documented]) {
+        if (! isset($declared[$dep])) {
+            $emit($line, 'requirement', "`$dep` is documented but composer.json does not require it", $marker);
+
+            continue;
+        }
+        $docMin = floorOf($documented);
+        $realMin = floorOf($declared[$dep]);
+        if ($docMin !== null && $realMin !== null && version_compare($docMin, $realMin, '!=')) {
+            $emit($line, 'requirement', "`$dep` documented as $documented, composer.json requires {$declared[$dep]}", $marker);
+        }
+    }
+}
+
+// ── small helpers ────────────────────────────────────────────────────────
+
+function reason(string $raw): string
+{
+    return trim($raw, " \t—–-:");
+}
+
+function relative(string $path, string $root): string
+{
+    return ltrim(substr($path, strlen($root)), '/');
+}
+
+function hasPath(array $values, string $path): bool
+{
+    foreach (explode('.', $path) as $part) {
+        if (! is_array($values) || ! array_key_exists($part, $values)) {
+            return false;
+        }
+        $values = $values[$part];
+    }
+
+    return true;
+}
+
+function getPath(array $values, string $path): mixed
+{
+    foreach (explode('.', $path) as $part) {
+        $values = $values[$part];
+    }
+
+    return $values;
+}
+
+/** The lowest version a constraint admits: ^1.30 → 1.30, 8.3+ → 8.3. */
+function floorOf(string $constraint): ?string
+{
+    return preg_match('/([0-9]+(?:\.[0-9]+)*)/', $constraint, $m) ? $m[1] : null;
+}
+
+/**
+ * A documented default as a comparable string, or null when the cell is prose
+ * ("(see config)", "the app default") and not a value at all.
+ */
+function literal(string $cell): ?string
+{
+    $v = trim($cell);
+    $v = preg_replace('/^`(.*)`$/', '$1', $v);
+    if ($v === '' || $v === '—' || $v === '-') {
+        return null;
+    }
+    if (str_starts_with($v, '[') && preg_match('/[\'"]/', $v)) {
+        preg_match_all('/[\'"]([^\'"]*)[\'"]/', $v, $m);
+
+        return '['.implode(', ', $m[1]).']';
+    }
+    if (preg_match('/\s/', $v) || str_starts_with($v, '*') || str_starts_with($v, '(')) {
+        return null;
+    }
+    $v = preg_replace('/^[\'"](.*)[\'"]$/', '$1', $v);
+
+    return strtolower($v) === $v || ! in_array(strtolower($v), ['true', 'false', 'null'], true) ? $v : strtolower($v);
+}
+
+function normalise(mixed $value): ?string
+{
+    return match (true) {
+        $value === true => 'true',
+        $value === false => 'false',
+        $value === null => 'null',
+        is_int($value), is_float($value) => (string) $value,
+        is_string($value) => $value,
+        is_array($value) && array_is_list($value) && array_filter($value, 'is_scalar') === $value
+            => '['.implode(', ', array_map('strval', $value)).']',
+        default => null,
+    };
+}
