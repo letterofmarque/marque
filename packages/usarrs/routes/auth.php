@@ -9,6 +9,7 @@ use Marque\Usarrs\Http\Controllers\LogoutController;
 use Marque\Usarrs\Http\Controllers\MagicLinkController;
 use Marque\Usarrs\Http\Controllers\PasswordResetController;
 use Marque\Usarrs\Http\Controllers\SocialiteController;
+use Marque\Usarrs\Livewire\Auth\ConfirmOAuthLink;
 use Marque\Usarrs\Livewire\Auth\Login;
 use Marque\Usarrs\Livewire\Auth\PasswordConfirm;
 use Marque\Usarrs\Livewire\Auth\Register;
@@ -65,9 +66,10 @@ Route::middleware(config('usarrs.middleware', ['web']))
             Route::get('auth/{provider}/redirect', [SocialiteController::class, 'redirect'])->name('socialite.redirect');
             Route::get('auth/{provider}/callback', [SocialiteController::class, 'callback'])->name('socialite.callback');
 
-            // The emailed "connect this account?" link. Signed and expiring:
-            // following it is the proof of owning the account (Spec #142).
-            Route::get('auth/{provider}/link/confirm', [SocialiteController::class, 'confirmLink'])
+            // The emailed "connect this account?" link — signed and expiring.
+            // It opens a page naming the provider account; connecting is a
+            // deliberate action there, and works once (Spec #142, CP #762).
+            Route::get('auth/{provider}/link/{token}', ConfirmOAuthLink::class)
                 ->middleware('signed')
                 ->name('socialite.link.confirm');
         }

@@ -23,6 +23,7 @@ use Marque\Usarrs\Contracts\InviteServiceInterface;
 use Marque\Usarrs\Contracts\OAuthProvider;
 use Marque\Usarrs\Livewire\Admin\UserIndex;
 use Marque\Usarrs\Livewire\Admin\UserShow;
+use Marque\Usarrs\Livewire\Auth\ConfirmOAuthLink;
 use Marque\Usarrs\Livewire\Auth\Login;
 use Marque\Usarrs\Livewire\Auth\PasswordConfirm;
 use Marque\Usarrs\Livewire\Auth\Register;
@@ -310,6 +311,7 @@ class UsarrsServiceProvider extends ServiceProvider
         Livewire::component('usarrs-two-factor-setup', TwoFactorSetup::class);
         Livewire::component('usarrs-passkey-management', PasskeyManagement::class);
         Livewire::component('usarrs-password-confirm', PasswordConfirm::class);
+        Livewire::component('usarrs-confirm-oauth-link', ConfirmOAuthLink::class);
     }
 
     // Profile, invites, admin — unaffected by manage_auth in either state.

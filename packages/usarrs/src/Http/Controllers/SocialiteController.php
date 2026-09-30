@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Marque\Usarrs\Http\Controllers;
 
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
@@ -14,6 +16,7 @@ use Marque\Usarrs\Auth\LoginCompletion;
 use Marque\Usarrs\Auth\OAuthIdentity;
 use Marque\Usarrs\Auth\RegistrationRules;
 use Marque\Usarrs\Contracts\OAuthProvider;
+use Marque\Usarrs\Livewire\Auth\ConfirmOAuthLink;
 use Marque\Usarrs\Models\SocialAccount;
 use Marque\Usarrs\Notifications\OAuthLinkConfirmation;
 use Marque\Usarrs\Services\InviteService;
@@ -71,11 +74,7 @@ class SocialiteController
         $holder = $identity->email === null ? null : $this->userModel()::where('email', $identity->email)->first();
 
         if ($holder !== null) {
-            $holder->notify(new OAuthLinkConfirmation($provider, URL::temporarySignedRoute(
-                'socialite.link.confirm',
-                now()->addMinutes(60),
-                ['provider' => $provider, 'user' => $holder->getKey(), 'provider_user_id' => $identity->id],
-            )));
+            $this->sendConfirmation($holder, $identity);
 
             return redirect()->route('login')->with('status', __(
                 'That :provider account isn\'t connected here yet. If an account here uses its email address, we\'ve sent it a link to connect them — check your email.',
@@ -132,42 +131,44 @@ class SocialiteController
     }
 
     /**
-     * The emailed link, followed. The `signed` middleware has already refused
-     * an expired or altered URL; what is left is whether the link can still be
-     * made.
+     * Email the account holder a link to connect this identity — unless the
+     * account already has one for this provider, when connecting would be
+     * refused anyway and the mail would only be noise (or a way to spam them).
+     *
+     * The link carries a one-time token; what it would connect is held here,
+     * server-side, and consumed when the holder confirms on the page it opens
+     * (Livewire\Auth\ConfirmOAuthLink).
      */
-    public function confirmLink(Request $request, string $provider): RedirectResponse
+    private function sendConfirmation(Authenticatable $holder, OAuthIdentity $identity): void
     {
-        $this->validateProvider($provider);
+        $alreadyHasOne = SocialAccount::query()
+            ->where('user_id', $holder->getAuthIdentifier())
+            ->where('provider', $identity->provider)
+            ->exists();
 
-        $user = $this->userModel()::find($request->query('user'));
-        abort_if($user === null, 404);
-
-        $providerUserId = (string) $request->query('provider_user_id');
-        $existing = SocialAccount::resolve($provider, $providerUserId);
-
-        if ($existing !== null && $existing->user_id !== $user->getKey()) {
-            return $this->refuse(__('That :provider account is already connected to a different account.', ['provider' => ucfirst($provider)]));
+        if ($alreadyHasOne) {
+            return;
         }
 
-        if ($existing === null) {
-            $alreadyHasOne = SocialAccount::query()
-                ->where('user_id', $user->getKey())
-                ->where('provider', $provider)
-                ->exists();
+        $label = trim(($identity->name ?? '').($identity->email !== null ? " ({$identity->email})" : ''));
+        $label = $label !== '' ? $label : $identity->id;
 
-            if ($alreadyHasOne) {
-                return $this->refuse(__('This account is already connected to a different :provider account.', ['provider' => ucfirst($provider)]));
-            }
+        $token = Str::random(40);
+        Cache::put(ConfirmOAuthLink::CACHE_PREFIX.$token, [
+            'user' => $holder->getAuthIdentifier(),
+            'provider' => $identity->provider,
+            'provider_user_id' => $identity->id,
+            'label' => $label,
+        ], now()->addMinutes(60));
 
-            SocialAccount::forceCreate([
-                'user_id' => $user->getKey(),
-                'provider' => $provider,
-                'provider_user_id' => $providerUserId,
-            ]);
-        }
-
-        return redirect(app(LoginCompletion::class)->begin($user, remember: true));
+        $holder->notify(new OAuthLinkConfirmation(
+            $identity->provider,
+            URL::temporarySignedRoute('socialite.link.confirm', now()->addMinutes(60), [
+                'provider' => $identity->provider,
+                'token' => $token,
+            ]),
+            $label,
+        ));
     }
 
     /**

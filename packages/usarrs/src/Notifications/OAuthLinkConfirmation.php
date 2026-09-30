@@ -24,6 +24,7 @@ class OAuthLinkConfirmation extends Notification
     public function __construct(
         public readonly string $provider,
         public readonly string $url,
+        public readonly string $identityLabel,
     ) {}
 
     public function via(object $notifiable): array
@@ -37,10 +38,10 @@ class OAuthLinkConfirmation extends Notification
 
         return (new MailMessage)
             ->subject("Connect your {$provider} account")
-            ->line("Someone just tried to sign in with a {$provider} account that uses this email address.")
-            ->line("If that was you, connect it to your account here — after that, signing in with {$provider} goes straight in.")
-            ->action("Connect {$provider}", $this->url)
+            ->line("Someone just tried to sign in with the {$provider} account {$this->identityLabel}, which uses this email address.")
+            ->line("If that was you and that's your {$provider} account, you can connect it on the next page. Nothing is connected until you confirm there.")
+            ->action("Review and connect {$provider}", $this->url)
             ->line('This link expires in 60 minutes.')
-            ->line("If it wasn't you, ignore this email. Nothing changes unless the link is followed.");
+            ->line("If it wasn't you, or you don't recognise that {$provider} account, ignore this email. Nothing changes.");
     }
 }
