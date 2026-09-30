@@ -52,6 +52,14 @@ class SocialiteController
         $this->validateProvider($provider);
 
         $identity = $this->oauth->user($provider);
+
+        // Signed in already: this is connecting a provider to *this* account,
+        // never a login. It used to be treated as one — an identity linked to
+        // someone else switched the user into that account (Spec #142).
+        if (auth()->check()) {
+            return $this->connectToCurrentUser($identity);
+        }
+
         $link = SocialAccount::resolve($identity->provider, $identity->id);
 
         if ($link !== null) {
@@ -160,6 +168,41 @@ class SocialiteController
         }
 
         return redirect(app(LoginCompletion::class)->begin($user, remember: true));
+    }
+
+    /**
+     * Link an identity to the signed-in user. The user is already proven, so
+     * the provider's email plays no part; the session is never changed.
+     */
+    private function connectToCurrentUser(OAuthIdentity $identity): RedirectResponse
+    {
+        $user = auth()->user();
+        $provider = ucfirst($identity->provider);
+        $existing = SocialAccount::resolve($identity->provider, $identity->id);
+
+        if ($existing !== null) {
+            return $existing->user_id === $user->getAuthIdentifier()
+                ? redirect()->route('profile.show')->with('status', __(':provider is already connected to your account.', ['provider' => $provider]))
+                : redirect()->route('profile.show')->withErrors(['email' => __('That :provider account is already connected to a different account.', ['provider' => $provider])]);
+        }
+
+        $alreadyHasOne = SocialAccount::query()
+            ->where('user_id', $user->getAuthIdentifier())
+            ->where('provider', $identity->provider)
+            ->exists();
+
+        if ($alreadyHasOne) {
+            return redirect()->route('profile.show')
+                ->withErrors(['email' => __('Your account is already connected to a different :provider account.', ['provider' => $provider])]);
+        }
+
+        SocialAccount::forceCreate([
+            'user_id' => $user->getAuthIdentifier(),
+            'provider' => $identity->provider,
+            'provider_user_id' => $identity->id,
+        ]);
+
+        return redirect()->route('profile.show')->with('status', __(':provider connected.', ['provider' => $provider]));
     }
 
     private function refuse(string $message): RedirectResponse
