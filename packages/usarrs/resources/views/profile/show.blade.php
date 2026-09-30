@@ -1,6 +1,21 @@
 <div class="flex h-full w-full flex-1 flex-col gap-6">
     <x-deck::heading size="xl">{{ __('Profile') }}</x-deck::heading>
 
+    {{-- Where connecting an OAuth provider lands, with its result (Spec #142). --}}
+    @if (session('status'))
+        <div class="rounded-lg bg-green-50 p-4 dark:bg-green-900/20">
+            <x-deck::text class="text-sm text-green-700 dark:text-green-300">{{ session('status') }}</x-deck::text>
+        </div>
+    @endif
+
+    @if ($errors->any())
+        <div class="rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
+            @foreach ($errors->all() as $error)
+                <x-deck::text class="text-sm text-red-700 dark:text-red-300">{{ $error }}</x-deck::text>
+            @endforeach
+        </div>
+    @endif
+
     <div class="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-900">
         <div class="flex flex-col gap-4">
             <div>

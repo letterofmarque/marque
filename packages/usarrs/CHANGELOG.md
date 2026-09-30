@@ -9,7 +9,31 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [Unreleased]
 
-> The dashboard gets its panels — tracker stats, announce key, account security and invites — plus a nav entry, and other packages can contribute panels of their own.
+> Security: OAuth sign-in no longer signs in whoever has the email the provider reports, and every login path now goes through the two-factor challenge; plus the dashboard gets its panels.
+
+### Security
+
+- **OAuth sign-in matched accounts by email — account takeover.** The socialite
+  callback looked up the account whose email the provider reported and signed it in,
+  creating one if nobody matched. Anyone able to get a configured provider to report
+  an address here — the admin's included — was signed in as that account, with no
+  two-factor challenge, under any registration setting, and unverified. OAuth
+  identities are now stored (`usarrs_social_accounts`) and a sign-in resolves only
+  through that stored connection. An unconnected identity whose email matches an
+  account emails *that account's own address* a signed link to connect them, instead
+  of signing anyone in. (Spec #142, #10818)
+- **Magic-link sign-in skipped two-factor.** A user with 2FA confirmed who followed a
+  magic link was signed straight in. Every interactive login — password, magic link,
+  OAuth, straight after registering — now finishes through one place that applies the
+  challenge.
+- **`socialite` mode wasn't OAuth-only.** Only the form was hidden: password login,
+  password registration, password reset and magic-link tokens all still worked. They
+  are now refused on the server. (#10802)
+- **The OAuth routes existed under every driver**, gated only on
+  `socialite_providers` (default `['github']`). They now exist only under `socialite`.
+- **A signed-in user completing OAuth could be switched into another account**, or
+  have a new one created. It now connects the provider to their own account, and
+  refuses one that's connected elsewhere.
 
 ### Added
 
@@ -27,12 +51,38 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 - **A Dashboard navigation entry** (`usarrs-dashboard`, position 5) for signed-in users.
   Apps rendering deck's navigation gain the link with no change on their side.
 
+- **OAuth accounts follow the registration rules.** One `RegistrationRules` answer is
+  shared by `/register` and the OAuth callback: no account where registration is
+  closed or a required invite is missing. Send an invite through the redirect —
+  `/auth/github/redirect?invite=CODE`. New OAuth accounts are unverified and sent the
+  verification email.
+- The profile page now shows flashed status and error messages (where connecting a
+  provider lands).
+
 ### Changed
 
+- **Magic-link verification only works under the `magic_link` driver.** It accepted
+  any password-reset token under every driver and signed the user in.
+- **Password reset only exists under `password` and `invite_only`** — what
+  `AuthDriver::supportsPasswordReset()` always declared and nothing enforced. Under
+  `magic_link` and `socialite` the reset routes are 404s.
 - `/profile/stats` renders its figures and announce key from two shared partials,
   `usarrs::partials.tracker-figures` and `usarrs::partials.announce-key`, which the dashboard
   panels use too. Output is unchanged. A previously published `profile/stats.blade.php` keeps
   working as-is.
+
+### Upgrading
+
+- **Run `php artisan migrate`** — adds `usarrs_social_accounts`.
+- **socialite sites:** existing OAuth users have no stored connection yet. The first
+  time each signs in with OAuth they're emailed a link to connect it; one click, and
+  every sign-in after goes straight through. Make sure mail works before upgrading.
+  `laravel/socialite` is still required (it was never a hard dependency).
+- **OAuth on a non-socialite site stops working.** If you relied on the OAuth routes
+  being live alongside `password`, they're gone — that combination was never
+  documented and is what let the takeover reach every install.
+- **`password`-driver sites whose users followed magic links**, or **`magic_link` /
+  `socialite` sites using password reset**, will now get 404s on those routes.
 
 ## [8.0.0] — 2026-09-25
 

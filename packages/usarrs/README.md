@@ -7,7 +7,8 @@ for the [Marque](https://github.com/letterofmarque/marque) tracker platform.
 reset, magic links, OAuth (Socialite), logout, session handling, role-based access
 control, invites, and the admin user panel. It requires
 [`laravel/fortify`](https://github.com/laravel/fortify) as a hard dependency and
-uses its action classes for two-factor authentication and WebAuthn passkeys — but
+uses its action classes for two-factor authentication (passkeys come from
+[`laravel/passkeys`](https://github.com/laravel/passkeys)) — but
 `usarrs` is always the only thing that registers `/login`, `/register`, and the rest
 of the auth surface. Fortify's own routes are never reachable
 (`Fortify::ignoreRoutes()` is called unconditionally, regardless of any other
@@ -66,15 +67,16 @@ audiences:
 | Config key | Default | Applies to |
 |---|---|---|
 | `guest_middleware` | `['web', 'guest']` | login, register, 2FA challenge, forgot-password |
-| `middleware` | `['web']` | reset-password, magic-link, socialite callbacks |
+| `middleware` | `['web']` | reset-password, magic-link, OAuth redirect/callback/confirm |
 | `auth_middleware` | `['web', 'auth']` | logout, profile, email verification, password confirm |
 
 The middle row is the one worth understanding. Those routes are **not**
 guest-gated on purpose: an authenticated user can legitimately follow a
 password-reset link that arrived by email, click a magic link issued on
-another device, or complete an OAuth callback to link an additional provider.
-Gating them would break all three, which is why `guest` is applied to the
-genuinely guest-only routes rather than to the whole group.
+another device, or complete an OAuth round trip to connect a provider to their
+account (see [OAuth](#oauth-the-socialite-driver)). Gating them would break all
+three, which is why `guest` is applied to the genuinely guest-only routes rather
+than to the whole group. Each still only exists under the driver it belongs to.
 
 Override any of them by publishing the config. If you point `guest_middleware`
 at a custom stack, keep a `guest`-equivalent in it or logged-in users will see
@@ -89,9 +91,14 @@ a time:
 | Driver | What it enables | What it disables |
 |---|---|---|
 | `password` | Email + password login and registration | — |
-| `magic_link` | Passwordless email-only login. A link is emailed on request; visiting it logs the user in | The password field on login; password-based registration still creates an account, but sign-*in* afterwards is link-only |
-| `socialite` | OAuth provider buttons only (`config('usarrs.socialite_providers')`, default `['github']`) | Email/password login and registration entirely — the only way in is an OAuth provider |
+| `magic_link` | Passwordless email-only login. A link is emailed on request; visiting it logs the user in | Password login and password reset; password-based registration still creates an account, but sign-*in* afterwards is link-only |
+| `socialite` | OAuth sign-in only, via the providers in `config('usarrs.socialite_providers')` (default `['github']`). Requires `composer require laravel/socialite` | Password login, password registration, password reset and magic links — refused on the server, not just hidden. See [OAuth](#oauth-the-socialite-driver) |
 | `invite_only` | Password login | Public registration — `GET /register` 404s. New accounts are created only via a redeemed invite (see Invites below) |
+
+Each driver's routes only exist under that driver: the OAuth routes only under
+`socialite`, magic-link verification only under `magic_link`, and password reset
+only under `password` and `invite_only`. A route that belongs to another driver is
+a 404, not a hidden form.
 
 **Every driver's `GET /login`, `GET /register` etc. are usarrs' own routes.**
 Fortify's independently-registered equivalents are suppressed unconditionally
@@ -104,6 +111,27 @@ Fortify with its own routes active by default — installing one alongside usarr
 just having Fortify present for its 2FA/passkey actions, used to leave that second
 front door open. See the [manage_auth](#manage_auth-escape-hatch) section below for
 the full opt-out story.
+
+## OAuth (the socialite driver)
+
+An OAuth sign-in is matched to an account by the **provider's own user id**, stored
+in `usarrs_social_accounts` when the two are connected — never by email. A provider
+reporting someone's email address does not make you that someone.
+
+| Someone completes OAuth and… | What happens |
+|---|---|
+| the identity is connected to an account | signed in to that account — through the two-factor challenge if they have 2FA on |
+| it isn't connected, but its email matches an account here | nobody is signed in. That account's own address is emailed a link, valid 60 minutes, to connect the two; following it connects them and signs in (2FA applies) |
+| it isn't connected and matches no account | an account is created **only if registration is open** — the same rules as `/register`, including required invites — then it's sent the verification email and signed in |
+| they're already signed in | the identity is connected to *their* account. One that's connected to someone else is refused; they are never switched into another account |
+
+**Invites with OAuth:** there's no registration form under this driver, so send the
+invite through the redirect — `/auth/github/redirect?invite=CODE`.
+
+**Upgrading from before 8.1:** existing OAuth accounts have no stored connection yet.
+The first time each of those users signs in with OAuth, they're emailed the
+connection link above; one click and they're in, and every sign-in after that goes
+straight through.
 
 ## Email Verification & Password Confirmation
 
