@@ -8,6 +8,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Marque\Usarrs\Auth\LoginCompletion;
+use Marque\Usarrs\Enums\AuthDriver;
 
 class MagicLinkController
 {
@@ -19,6 +20,11 @@ class MagicLinkController
 
     public function verify(Request $request): RedirectResponse
     {
+        // Only in magic_link mode. The token is a password-broker token, so
+        // this endpoint used to sign in anyone holding a reset link under every
+        // mode — including socialite, which is meant to be OAuth only (Spec #142).
+        abort_unless(AuthDriver::from(config('usarrs.auth_driver', 'password')) === AuthDriver::MagicLink, 404);
+
         $request->validate([
             'token' => 'required',
             'email' => 'required|email',

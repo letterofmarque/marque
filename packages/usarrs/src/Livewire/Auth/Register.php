@@ -31,14 +31,17 @@ class Register extends Component
 
     public function mount(): void
     {
-        $driver = AuthDriver::from(config('usarrs.auth_driver', 'password'));
-        abort_unless($driver->supportsRegistration(), 404);
+        abort_unless($this->driver()->allowsPasswordRegistration(), 404);
 
         $this->invite = request()->query('invite', '');
     }
 
     public function register(InviteService $inviteService): void
     {
+        // Checked again here, not only in mount(): a page loaded before the
+        // operator changed modes can still be submitted (Spec #142).
+        abort_unless($this->driver()->allowsPasswordRegistration(), 404);
+
         $this->validate();
 
         if (config('usarrs.invites.required', false)) {
@@ -62,6 +65,11 @@ class Register extends Component
         }
 
         $this->redirect(app(LoginCompletion::class)->begin($user, remember: false), navigate: true);
+    }
+
+    private function driver(): AuthDriver
+    {
+        return AuthDriver::from(config('usarrs.auth_driver', 'password'));
     }
 
     public function render(): View

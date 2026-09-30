@@ -34,6 +34,14 @@ class Login extends Component
             return;
         }
 
+        if (! $driver->allowsPasswordLogin()) {
+            // socialite mode: the form is hidden, and the server refuses too —
+            // a hidden form is not a closed door (job #10802).
+            $this->addError('email', __('Password sign-in is not available on this site.'));
+
+            return;
+        }
+
         $this->validate();
 
         if (! Auth::validate(['email' => $this->email, 'password' => $this->password])) {

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
+use Marque\Usarrs\Enums\AuthDriver;
 use Marque\Usarrs\Http\Controllers\EmailVerificationController;
 use Marque\Usarrs\Http\Controllers\LogoutController;
 use Marque\Usarrs\Http\Controllers\MagicLinkController;
@@ -55,10 +56,15 @@ Route::middleware(config('usarrs.middleware', ['web']))
         Route::get('auth/magic-link/sent', [MagicLinkController::class, 'showSentPage'])->name('magic-link.sent');
         Route::get('auth/magic-link/verify', [MagicLinkController::class, 'verify'])->name('magic-link.verify');
 
-        // Socialite — the callbacks double as account linking for a user who
-        // is already signed in.
-        Route::get('auth/{provider}/redirect', [SocialiteController::class, 'redirect'])->name('socialite.redirect');
-        Route::get('auth/{provider}/callback', [SocialiteController::class, 'callback'])->name('socialite.callback');
+        // Socialite — only under socialite mode (Spec #142). These used to be
+        // registered under every mode and gated only on socialite_providers,
+        // which defaults to ['github'], so a password-mode install had a live
+        // OAuth door it never chose. The callbacks double as account linking
+        // for a user who is already signed in.
+        if (AuthDriver::from(config('usarrs.auth_driver', 'password')) === AuthDriver::Socialite) {
+            Route::get('auth/{provider}/redirect', [SocialiteController::class, 'redirect'])->name('socialite.redirect');
+            Route::get('auth/{provider}/callback', [SocialiteController::class, 'callback'])->name('socialite.callback');
+        }
     });
 
 // Logout (requires auth)

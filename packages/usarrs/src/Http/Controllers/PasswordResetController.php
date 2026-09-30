@@ -9,17 +9,22 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\View\View;
+use Marque\Usarrs\Enums\AuthDriver;
 
 class PasswordResetController
 {
     public function showForgotForm(): View
     {
+        $this->ensureResetsAllowed();
+
         return view('usarrs::auth.forgot-password')
             ->layout(config('usarrs.layout', 'deck::layouts.app'));
     }
 
     public function sendResetLink(Request $request): RedirectResponse
     {
+        $this->ensureResetsAllowed();
+
         $request->validate(['email' => 'required|email']);
 
         Password::sendResetLink($request->only('email'));
@@ -29,6 +34,8 @@ class PasswordResetController
 
     public function showResetForm(Request $request, string $token): View
     {
+        $this->ensureResetsAllowed();
+
         return view('usarrs::auth.reset-password', [
             'token' => $token,
             'email' => $request->query('email', ''),
@@ -37,6 +44,8 @@ class PasswordResetController
 
     public function reset(Request $request): RedirectResponse
     {
+        $this->ensureResetsAllowed();
+
         $request->validate([
             'token' => 'required',
             'email' => 'required|email',
@@ -53,5 +62,15 @@ class PasswordResetController
         return $status === Password::PASSWORD_RESET
             ? redirect()->route('login')->with('status', __('Password reset successfully.'))
             : back()->withErrors(['email' => __($status)]);
+    }
+
+    /**
+     * Resets exist only where the mode has passwords to reset — what
+     * AuthDriver::supportsPasswordReset() has always declared and nothing
+     * enforced (Spec #142).
+     */
+    private function ensureResetsAllowed(): void
+    {
+        abort_unless(AuthDriver::from(config('usarrs.auth_driver', 'password'))->supportsPasswordReset(), 404);
     }
 }

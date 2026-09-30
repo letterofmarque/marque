@@ -36,6 +36,9 @@ function magicLinkFor(TestUser $user): string
 }
 
 describe('magic link', function () {
+    // Verification only exists in magic_link mode (Spec #142).
+    beforeEach(fn () => config()->set('usarrs.auth_driver', 'magic_link'));
+
     it('sends a user with 2FA confirmed to the challenge instead of signing them in', function () {
         config()->set('usarrs.two_factor.enabled', true);
         [$user] = twoFactorUser();
