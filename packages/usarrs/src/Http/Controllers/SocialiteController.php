@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace Marque\Usarrs\Http\Controllers;
 
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\URL;
 use Marque\Usarrs\Auth\LoginCompletion;
 use Marque\Usarrs\Contracts\OAuthProvider;
 use Marque\Usarrs\Models\SocialAccount;
+use Marque\Usarrs\Notifications\OAuthLinkConfirmation;
 use Symfony\Component\HttpFoundation\RedirectResponse as SymfonyRedirect;
 
 class SocialiteController
@@ -37,16 +40,78 @@ class SocialiteController
         $identity = $this->oauth->user($provider);
         $link = SocialAccount::resolve($identity->provider, $identity->id);
 
-        if ($link === null) {
-            // Not linked to anyone. Never fall back to matching the email —
-            // that is the takeover. (Spec #142 CP4 turns an email match into a
-            // confirmation sent to the account's own address; CP5 creates an
-            // account where registration rules allow.)
-            return redirect()->route('login')
-                ->withErrors(['email' => __('No account here is linked to that :provider account.', ['provider' => ucfirst($provider)])]);
+        if ($link !== null) {
+            return redirect(app(LoginCompletion::class)->begin($link->user, remember: true));
         }
 
-        return redirect(app(LoginCompletion::class)->begin($link->user, remember: true));
+        // Not linked to anyone. Never sign in on the email — that is the
+        // takeover. If it matches an account, ask that account's own inbox.
+        $holder = $identity->email === null ? null : $this->userModel()::where('email', $identity->email)->first();
+
+        if ($holder !== null) {
+            $holder->notify(new OAuthLinkConfirmation($provider, URL::temporarySignedRoute(
+                'socialite.link.confirm',
+                now()->addMinutes(60),
+                ['provider' => $provider, 'user' => $holder->getKey(), 'provider_user_id' => $identity->id],
+            )));
+
+            return redirect()->route('login')->with('status', __(
+                'That :provider account isn\'t connected here yet. If an account here uses its email address, we\'ve sent it a link to connect them — check your email.',
+                ['provider' => ucfirst($provider)],
+            ));
+        }
+
+        return redirect()->route('login')
+            ->withErrors(['email' => __('No account here is linked to that :provider account.', ['provider' => ucfirst($provider)])]);
+    }
+
+    /**
+     * The emailed link, followed. The `signed` middleware has already refused
+     * an expired or altered URL; what is left is whether the link can still be
+     * made.
+     */
+    public function confirmLink(Request $request, string $provider): RedirectResponse
+    {
+        $this->validateProvider($provider);
+
+        $user = $this->userModel()::find($request->query('user'));
+        abort_if($user === null, 404);
+
+        $providerUserId = (string) $request->query('provider_user_id');
+        $existing = SocialAccount::resolve($provider, $providerUserId);
+
+        if ($existing !== null && $existing->user_id !== $user->getKey()) {
+            return $this->refuse(__('That :provider account is already connected to a different account.', ['provider' => ucfirst($provider)]));
+        }
+
+        if ($existing === null) {
+            $alreadyHasOne = SocialAccount::query()
+                ->where('user_id', $user->getKey())
+                ->where('provider', $provider)
+                ->exists();
+
+            if ($alreadyHasOne) {
+                return $this->refuse(__('This account is already connected to a different :provider account.', ['provider' => ucfirst($provider)]));
+            }
+
+            SocialAccount::forceCreate([
+                'user_id' => $user->getKey(),
+                'provider' => $provider,
+                'provider_user_id' => $providerUserId,
+            ]);
+        }
+
+        return redirect(app(LoginCompletion::class)->begin($user, remember: true));
+    }
+
+    private function refuse(string $message): RedirectResponse
+    {
+        return redirect()->route('login')->withErrors(['email' => $message]);
+    }
+
+    private function userModel(): string
+    {
+        return config('trove.user_model', 'App\\Models\\User');
     }
 
     protected function validateProvider(string $provider): void

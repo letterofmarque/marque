@@ -64,6 +64,12 @@ Route::middleware(config('usarrs.middleware', ['web']))
         if (AuthDriver::from(config('usarrs.auth_driver', 'password')) === AuthDriver::Socialite) {
             Route::get('auth/{provider}/redirect', [SocialiteController::class, 'redirect'])->name('socialite.redirect');
             Route::get('auth/{provider}/callback', [SocialiteController::class, 'callback'])->name('socialite.callback');
+
+            // The emailed "connect this account?" link. Signed and expiring:
+            // following it is the proof of owning the account (Spec #142).
+            Route::get('auth/{provider}/link/confirm', [SocialiteController::class, 'confirmLink'])
+                ->middleware('signed')
+                ->name('socialite.link.confirm');
         }
     });
 
