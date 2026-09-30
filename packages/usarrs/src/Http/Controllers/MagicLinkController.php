@@ -6,8 +6,8 @@ namespace Marque\Usarrs\Http\Controllers;
 
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
+use Marque\Usarrs\Auth\LoginCompletion;
 
 class MagicLinkController
 {
@@ -34,9 +34,8 @@ class MagicLinkController
 
         app('auth.password.broker')->deleteToken($user);
 
-        Auth::login($user, remember: true);
-        session()->regenerate();
-
-        return redirect('/');
+        // Through the seam, so a user with 2FA confirmed is challenged. This
+        // path used to sign them straight in (Spec #142).
+        return redirect(app(LoginCompletion::class)->begin($user, remember: true));
     }
 }

@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Marque\Usarrs\Livewire\Auth;
 
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Validate;
+use Marque\Usarrs\Auth\LoginCompletion;
 use Marque\Usarrs\Enums\AuthDriver;
 use Marque\Usarrs\Livewire\Component;
 use Marque\Usarrs\Services\InviteService;
@@ -61,10 +61,7 @@ class Register extends Component
             $inviteService->redeem($invite, $user);
         }
 
-        Auth::login($user);
-        session()->regenerate();
-
-        $this->redirect(url('/'), navigate: true);
+        $this->redirect(app(LoginCompletion::class)->begin($user, remember: false), navigate: true);
     }
 
     public function render(): View

@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Marque\Usarrs\Livewire\Auth;
 
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Fortify;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Validate;
+use Marque\Usarrs\Auth\LoginCompletion;
 use Marque\Usarrs\Livewire\Component;
 use PragmaRX\Google2FA\Google2FA;
 
@@ -78,10 +78,7 @@ class TwoFactorChallenge extends Component
 
     private function completeLogin(mixed $user): void
     {
-        Auth::login($user, session('login.remember', false));
-
-        session()->forget(['login.id', 'login.remember']);
-        session()->regenerate();
+        app(LoginCompletion::class)->finish($user, (bool) session('login.remember', false));
 
         $this->redirect(url('/'), navigate: true);
     }
