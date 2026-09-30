@@ -17,7 +17,8 @@ parameters:
         # socialite auth_driver is off unless a consumer installs it. It is not
         # in require-dev either, because Socialite pins guzzle <=7 while the
         # rest of the suite is on 8. Analysing the file without the class is
-        # the accurate state, not a gap to paper over.
+        # the accurate state, not a gap to paper over. Only the adapter names
+        # Socialite; the controller talks to usarrs' OAuthProvider (Spec #142).
         -
             identifier: class.notFound
-            path: src/Http/Controllers/SocialiteController.php
+            path: src/Auth/SocialiteOAuthProvider.php

@@ -18,7 +18,9 @@ use Marque\Trove\Registry\DashboardPanel;
 use Marque\Trove\Registry\DashboardPanelRegistry;
 use Marque\Trove\Registry\NavItem;
 use Marque\Trove\Registry\NavRegistry;
+use Marque\Usarrs\Auth\SocialiteOAuthProvider;
 use Marque\Usarrs\Contracts\InviteServiceInterface;
+use Marque\Usarrs\Contracts\OAuthProvider;
 use Marque\Usarrs\Livewire\Admin\UserIndex;
 use Marque\Usarrs\Livewire\Admin\UserShow;
 use Marque\Usarrs\Livewire\Auth\Login;
@@ -49,6 +51,10 @@ class UsarrsServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/usarrs.php', 'usarrs');
 
         $this->app->bind(InviteServiceInterface::class, InviteService::class);
+
+        // Socialite behind a seam usarrs owns (Spec #142): only
+        // SocialiteOAuthProvider names Socialite, and tests swap in a fake.
+        $this->app->bind(OAuthProvider::class, SocialiteOAuthProvider::class);
 
         // usarrs is the only thing allowed to register /login, /register, and
         // the rest of the auth surface. Fortify is used as an action library

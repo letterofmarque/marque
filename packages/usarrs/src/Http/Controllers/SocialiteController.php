@@ -5,41 +5,48 @@ declare(strict_types=1);
 namespace Marque\Usarrs\Http\Controllers;
 
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
-use Laravel\Socialite\Facades\Socialite;
+use Marque\Usarrs\Auth\LoginCompletion;
+use Marque\Usarrs\Contracts\OAuthProvider;
+use Marque\Usarrs\Models\SocialAccount;
 use Symfony\Component\HttpFoundation\RedirectResponse as SymfonyRedirect;
 
 class SocialiteController
 {
+    public function __construct(private readonly OAuthProvider $oauth) {}
+
     public function redirect(string $provider): SymfonyRedirect
     {
         $this->validateProvider($provider);
 
-        return Socialite::driver($provider)->redirect();
+        return $this->oauth->redirect($provider);
     }
 
+    /**
+     * Resolve the returning user by linked identity — (provider, provider's
+     * user id) — and nothing else (Spec #142).
+     *
+     * This used to look the user up by the email the provider reported and
+     * sign in whoever it found, creating an account if nobody matched: a
+     * provider asserting the admin's address signed the asserter in as the
+     * admin, past 2FA and past closed registration (job #10818).
+     */
     public function callback(string $provider): RedirectResponse
     {
         $this->validateProvider($provider);
 
-        $socialUser = Socialite::driver($provider)->user();
+        $identity = $this->oauth->user($provider);
+        $link = SocialAccount::resolve($identity->provider, $identity->id);
 
-        $model = config('trove.user_model', 'App\\Models\\User');
-        $user = $model::where('email', $socialUser->getEmail())->first();
-
-        if (! $user) {
-            $user = $model::create([
-                'name' => $socialUser->getName() ?? $socialUser->getNickname(),
-                'email' => $socialUser->getEmail(),
-                'password' => Hash::make(bin2hex(random_bytes(16))),
-            ]);
+        if ($link === null) {
+            // Not linked to anyone. Never fall back to matching the email —
+            // that is the takeover. (Spec #142 CP4 turns an email match into a
+            // confirmation sent to the account's own address; CP5 creates an
+            // account where registration rules allow.)
+            return redirect()->route('login')
+                ->withErrors(['email' => __('No account here is linked to that :provider account.', ['provider' => ucfirst($provider)])]);
         }
 
-        Auth::login($user, remember: true);
-        session()->regenerate();
-
-        return redirect('/');
+        return redirect(app(LoginCompletion::class)->begin($link->user, remember: true));
     }
 
     protected function validateProvider(string $provider): void
