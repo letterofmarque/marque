@@ -4,22 +4,36 @@ declare(strict_types=1);
 
 namespace Marque\Usarrs\Http\Controllers;
 
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 use Marque\Usarrs\Auth\LoginCompletion;
+use Marque\Usarrs\Auth\OAuthIdentity;
+use Marque\Usarrs\Auth\RegistrationRules;
 use Marque\Usarrs\Contracts\OAuthProvider;
 use Marque\Usarrs\Models\SocialAccount;
 use Marque\Usarrs\Notifications\OAuthLinkConfirmation;
+use Marque\Usarrs\Services\InviteService;
 use Symfony\Component\HttpFoundation\RedirectResponse as SymfonyRedirect;
 
 class SocialiteController
 {
-    public function __construct(private readonly OAuthProvider $oauth) {}
+    public function __construct(
+        private readonly OAuthProvider $oauth,
+        private readonly RegistrationRules $rules,
+        private readonly InviteService $invites,
+    ) {}
 
-    public function redirect(string $provider): SymfonyRedirect
+    public function redirect(Request $request, string $provider): SymfonyRedirect
     {
         $this->validateProvider($provider);
+
+        // There is no registration form under socialite mode to type an invite
+        // into, so it rides the round trip: /auth/github/redirect?invite=CODE.
+        session()->put('usarrs.oauth.invite', $request->query('invite'));
 
         return $this->oauth->redirect($provider);
     }
@@ -61,8 +75,52 @@ class SocialiteController
             ));
         }
 
-        return redirect()->route('login')
-            ->withErrors(['email' => __('No account here is linked to that :provider account.', ['provider' => ucfirst($provider)])]);
+        return $this->register($identity);
+    }
+
+    /**
+     * A new account for an identity nobody here has — only where /register
+     * would allow one, under the same rules (Spec #142). The callback used to
+     * create an account for anything it didn't recognise, under every mode,
+     * and sign it in unverified.
+     */
+    private function register(OAuthIdentity $identity): RedirectResponse
+    {
+        $inviteCode = session()->pull('usarrs.oauth.invite');
+
+        if ($identity->email === null) {
+            return $this->refuse(__(':provider didn\'t share an email address, so an account can\'t be made from it.', ['provider' => ucfirst($identity->provider)]));
+        }
+
+        if (($refusal = $this->rules->refusal($inviteCode)) !== null) {
+            return $this->refuse($refusal);
+        }
+
+        $user = $this->userModel()::create([
+            'name' => $identity->name ?? $identity->email,
+            'email' => $identity->email,
+            // Nobody knows it and nothing can reset it under socialite mode:
+            // this account is reached through its OAuth link only.
+            'password' => Hash::make(Str::random(64)),
+        ]);
+
+        if (($invite = $this->rules->validInvite($inviteCode)) !== null) {
+            $this->invites->redeem($invite, $user);
+        }
+
+        SocialAccount::forceCreate([
+            'user_id' => $user->getKey(),
+            'provider' => $identity->provider,
+            'provider_user_id' => $identity->id,
+        ]);
+
+        // Unverified, like any other new account. The provider's say-so is not
+        // this site's proof that the address is theirs.
+        if ($user instanceof MustVerifyEmail && ! $user->hasVerifiedEmail()) {
+            $user->sendEmailVerificationNotification();
+        }
+
+        return redirect(app(LoginCompletion::class)->begin($user, remember: true));
     }
 
     /**

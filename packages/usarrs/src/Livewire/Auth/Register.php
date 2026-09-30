@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Hash;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Validate;
 use Marque\Usarrs\Auth\LoginCompletion;
+use Marque\Usarrs\Auth\RegistrationRules;
 use Marque\Usarrs\Enums\AuthDriver;
 use Marque\Usarrs\Livewire\Component;
 use Marque\Usarrs\Services\InviteService;
@@ -36,7 +37,7 @@ class Register extends Component
         $this->invite = request()->query('invite', '');
     }
 
-    public function register(InviteService $inviteService): void
+    public function register(InviteService $inviteService, RegistrationRules $rules): void
     {
         // Checked again here, not only in mount(): a page loaded before the
         // operator changed modes can still be submitted (Spec #142).
@@ -44,14 +45,14 @@ class Register extends Component
 
         $this->validate();
 
-        if (config('usarrs.invites.required', false)) {
-            $invite = $inviteService->findByCode($this->invite);
-            if (! $invite || ! $invite->isValid()) {
-                $this->addError('invite', __('A valid invite code is required.'));
+        // The same rules the OAuth callback asks (Spec #142).
+        if (($refusal = $rules->refusal($this->invite)) !== null) {
+            $this->addError('invite', $refusal);
 
-                return;
-            }
+            return;
         }
+
+        $invite = config('usarrs.invites.required', false) ? $rules->validInvite($this->invite) : null;
 
         $model = config('trove.user_model', 'App\\Models\\User');
         $user = $model::create([
@@ -60,7 +61,7 @@ class Register extends Component
             'password' => Hash::make($this->password),
         ]);
 
-        if (isset($invite) && $invite) {
+        if ($invite !== null) {
             $inviteService->redeem($invite, $user);
         }
 

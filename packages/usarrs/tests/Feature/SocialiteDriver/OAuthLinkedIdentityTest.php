@@ -52,14 +52,8 @@ it('never signs anyone in on an email match alone', function () {
     $this->assertGuest();
 });
 
-it('does not create an account for an unlinked identity (yet — CP5 adds rule-bound creation)', function () {
-    $this->oauth->asserts('github', 'gh-new', 'stranger@example.com');
-
-    $this->get(route('socialite.callback', 'github'));
-
-    $this->assertGuest();
-    expect(TestUser::where('email', 'stranger@example.com')->exists())->toBeFalse();
-});
+// Account creation for an unlinked identity — only where the registration
+// rules allow — is OAuthAccountCreationTest (CP5 of Build #124).
 
 it('sends a linked user with 2FA confirmed to the challenge', function () {
     config()->set('usarrs.two_factor.enabled', true);
