@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Marque\Usarrs\Tests\ManageAuthDisabledTestCase;
+use Marque\Usarrs\Tests\PasskeysEnabledTestCase;
 use Marque\Usarrs\Tests\SocialiteDriverTestCase;
 use Marque\Usarrs\Tests\TestCase;
 use Marque\Usarrs\Tests\ThirdPartyPanelTestCase;
@@ -19,7 +20,7 @@ pest()->extend(TestCase::class)->in(
     'Unit',
     ...array_filter(
         glob(__DIR__.'/Feature/*'),
-        fn (string $path) => ! in_array(basename($path), ['ManageAuthDisabled', 'TrackerBound', 'ThirdParty', 'SocialiteDriver'], true),
+        fn (string $path) => ! in_array(basename($path), ['ManageAuthDisabled', 'TrackerBound', 'ThirdParty', 'SocialiteDriver', 'PasskeysEnabled'], true),
     ),
 );
 
@@ -36,3 +37,4 @@ pest()->extend(ThirdPartyPanelTestCase::class)->in('Feature/ThirdParty');
 // auth_driver=socialite before boot, so the OAuth routes are registered the way
 // they would be on a socialite install (Spec #142).
 pest()->extend(SocialiteDriverTestCase::class)->in('Feature/SocialiteDriver');
+pest()->extend(PasskeysEnabledTestCase::class)->in('Feature/PasskeysEnabled');

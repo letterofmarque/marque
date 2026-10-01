@@ -11,6 +11,7 @@ declare(strict_types=1);
 // address was proven.
 
 use Illuminate\Auth\Notifications\VerifyEmail;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
 use Marque\Usarrs\Livewire\Profile\Edit;
@@ -74,4 +75,32 @@ it('refuses an address another account uses in a different case', function () {
         ->assertHasErrors('email');
 
     expect($this->user->fresh()->email)->toBe('old@example.com');
+});
+
+// CP #784: a soft-deleted account still holds its address in the unique index,
+// so a rule that skipped it (the model's global scopes) let the save through to
+// a constraint violation — a 500.
+it('counts an address held by a soft-deleted account as taken', function () {
+    DB::table('users')->insert([
+        'name' => 'Gone', 'email' => 'gone@example.com', 'password' => 'x',
+        'role' => 'user', 'status' => 'active', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    TestUser::addGlobalScope('hide-gone', fn ($q) => $q->where('email', '!=', 'gone@example.com'));
+
+    Livewire::actingAs($this->user)->test(Edit::class)
+        ->set('email', 'gone@example.com')
+        ->call('save')
+        ->assertHasErrors('email');
+});
+
+// SQLite's lower() folds ASCII only, and PostgreSQL's depends on locale, while
+// PHP's mb_strtolower() folds everything — so comparing lower(column) to a
+// PHP-lowered value never matched a non-ASCII address. Fold both sides in SQL.
+it('matches a non-ASCII address in a different case the way the database folds it', function () {
+    TestUser::factory()->create(['email' => 'ÄRGER@example.com']);
+
+    Livewire::actingAs($this->user)->test(Edit::class)
+        ->set('email', 'ÄRGER@EXAMPLE.COM')
+        ->call('save')
+        ->assertHasErrors('email');
 });

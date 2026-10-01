@@ -234,7 +234,12 @@ an additive credential type, not a driver. Uses
 Unlike Fortify, Passkeys' own routes (`/passkeys/login`, `/user/passkeys/*`) are
 left registered when this feature is on — they're WebAuthn-ceremony JSON endpoints
 with no usarrs equivalent to collide with, called directly by usarrs' own UI via JS.
-They're suppressed when the feature is off.
+They're suppressed when the feature is off, and carry `auth.session` when it's on.
+
+> **Known issue (#10883):** recent Fortify releases (1.39 at least) suppress
+> `laravel/passkeys`' routes in order to serve their own — and usarrs suppresses
+> Fortify's. On those versions the passkey endpoints exist nowhere, so passkey
+> registration and sign-in don't work. Leave passkeys off until this is fixed.
 
 **Passkey sign-in is the one login usarrs doesn't finish itself.** Every other way in
 — password, magic link, OAuth, straight after registering — ends in one place that

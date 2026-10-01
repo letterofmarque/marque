@@ -79,6 +79,16 @@ class UsarrsServiceProvider extends ServiceProvider
             Passkeys::ignoreRoutes();
         } else {
             Passkeys::useUserModel(config('trove.user_model', 'App\\Models\\User'));
+
+            // Their routes carry their own middleware, which never included
+            // auth.session: a session ended everywhere else by a rotated
+            // password hash could still register a passkey here — a way back
+            // in past the inbox proof (CP #784). Set before their routes load
+            // at boot; a guest (the login routes) passes straight through.
+            config(['passkeys.middleware' => array_values(array_unique([
+                ...(array) config('passkeys.middleware', ['web']),
+                'auth.session',
+            ]))]);
         }
     }
 

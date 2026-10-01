@@ -101,7 +101,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   sign-in records the password hash it was made under, so a changed hash ends the
   session everywhere. `AuthenticateSession` is added to Livewire's persistent middleware,
   so it covers component actions too. A user who changes their password on the profile
-  page stays signed in there and is signed out of their other sessions.
+  page stays signed in there and is signed out of their other sessions. Where
+  `laravel/passkeys`' own routes are registered, they carry it too.
 - **`InviteService::redeem()` throws `Marque\Usarrs\Exceptions\InviteAlreadyRedeemed`**
   when the invite is no longer pending and unexpired in the database — used, revoked or
   expired since it was looked up. It used to overwrite whatever was there. The
@@ -131,6 +132,9 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 - **Add `auth.session` to your app's own signed-in routes**
   (`Route::middleware(['auth', 'auth.session'])`). usarrs ends a squatter's sessions
   through it; routes without it are left open to them.
+- **Passkeys: known issue (#10883).** On recent Fortify (1.39 at least) the passkey
+  endpoints aren't registered at all, so passkeys don't work — leave them off for now.
+  Not new in 8.1; found while hardening this release.
 - **Use a shared, persistent cache store** — pending OAuth connections live there
   between the email and the confirmation. `array`, or `file` across several servers,
   breaks every link.

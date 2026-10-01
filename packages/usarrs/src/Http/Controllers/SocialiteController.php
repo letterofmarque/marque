@@ -268,7 +268,7 @@ class SocialiteController
         $model = $this->userModel();
 
         return $model::query()
-            ->whereRaw('lower(email) = ?', [mb_strtolower($email)])
+            ->whereRaw('lower(email) = lower(?)', [$email])
             ->orderBy((new $model)->getKeyName())
             ->first();
     }

@@ -30,8 +30,13 @@ class UniqueEmail implements ValidationRule
         $model = config('trove.user_model', 'App\\Models\\User');
         $instance = new $model;
 
+        // Without global scopes: a soft-deleted account still holds its address
+        // in the unique index, so skipping it only defers the clash to a 500.
+        // Both sides folded by the database, so the comparison is the
+        // engine's own — SQLite's lower() folds ASCII only, PHP's folds all.
         $taken = $model::query()
-            ->whereRaw('lower(email) = ?', [mb_strtolower($value)])
+            ->withoutGlobalScopes()
+            ->whereRaw('lower(email) = lower(?)', [$value])
             ->when($this->ignoreId !== null, fn ($q) => $q->where($instance->getKeyName(), '!=', $this->ignoreId))
             ->exists();
 
