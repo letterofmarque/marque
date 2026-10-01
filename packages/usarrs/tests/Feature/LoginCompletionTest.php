@@ -118,7 +118,15 @@ describe('the seam', function () {
     });
 });
 
+// Asserting only that someone ended up signed in proved nothing about the
+// seam — a direct Auth::login() passes that too (Build #124 CP #764). So the
+// seam is replaced with a spy, and registering must hand it the new user and
+// sign nobody in by itself.
 it('signs a newly registered user in through the seam', function () {
+    $seam = Mockery::spy(LoginCompletion::class);
+    $seam->shouldReceive('begin')->andReturn('/');
+    app()->instance(LoginCompletion::class, $seam);
+
     Livewire::test(Register::class)
         ->set('name', 'New Person')
         ->set('email', 'new@example.com')
@@ -126,5 +134,8 @@ it('signs a newly registered user in through the seam', function () {
         ->set('password_confirmation', 'password123')
         ->call('register');
 
-    $this->assertAuthenticated();
+    $seam->shouldHaveReceived('begin')->once()->withArgs(
+        fn ($user, $remember) => $user->email === 'new@example.com' && $remember === false,
+    );
+    $this->assertGuest();
 });

@@ -20,15 +20,33 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   two-factor challenge, under any registration setting, and unverified. OAuth
   identities are now stored (`usarrs_social_accounts`) and a sign-in resolves only
   through that stored connection. An unconnected identity whose email matches an
-  account emails *that account's own address* a signed link to connect them, instead
-  of signing anyone in. (Spec #142, #10818)
+  account (ignoring case) emails *that account's own address* a signed, single-use
+  link to connect them, instead of signing anyone in. The link opens a page naming the
+  provider account; nothing connects until the holder confirms there, so a mail
+  scanner following links connects nothing. (Spec #142, #10818)
+- **An account made under someone else's address stayed theirs.** OAuth could create
+  an unverified account for an address its creator didn't own; when the real owner
+  later connected their own provider from that inbox, the creator kept their way in.
+  Confirming a connection now verifies the address and removes everything the account
+  gained before it was proven — other provider connections, passkeys, two-factor,
+  remembered sign-ins. Needs your `User` model to implement `MustVerifyEmail`.
+- **One invite could create several accounts.** Concurrent sign-ups carrying the same
+  invite all redeemed it. The invite is now claimed in one conditional write, in the
+  same transaction as the account (and, for OAuth, its connection), on `/register`
+  and the OAuth callback alike.
+- **The OAuth callback told anyone which addresses have accounts** when registration
+  was closed: "we've sent a link" for a known one, "registration is closed" for an
+  unknown one. Both now get the same answer.
 - **Magic-link sign-in skipped two-factor.** A user with 2FA confirmed who followed a
-  magic link was signed straight in. Every interactive login — password, magic link,
-  OAuth, straight after registering — now finishes through one place that applies the
-  challenge.
+  magic link was signed straight in. Every login usarrs performs — password, magic
+  link, OAuth, straight after registering — now finishes through one place that applies
+  the challenge. Passkey sign-in (`laravel/passkeys`' own endpoint, when enabled) is the
+  exception: it asks for no TOTP code afterwards, a passkey being a phishing-resistant
+  factor already.
 - **`socialite` mode wasn't OAuth-only.** Only the form was hidden: password login,
   password registration, password reset and magic-link tokens all still worked. They
-  are now refused on the server. (#10802)
+  are now refused on the server. Passkeys, if you've enabled them, still work
+  alongside OAuth. (#10802)
 - **The OAuth routes existed under every driver**, gated only on
   `socialite_providers` (default `['github']`). They now exist only under `socialite`.
 - **A signed-in user completing OAuth could be switched into another account**, or
@@ -61,6 +79,11 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ### Changed
 
+- **`InviteService::redeem()` throws `Marque\Usarrs\Exceptions\InviteAlreadyRedeemed`**
+  when the invite is no longer pending and unexpired in the database — used, revoked or
+  expired since it was looked up. It used to overwrite whatever was there. The
+  interface signature is unchanged; call it inside the transaction that creates the
+  account, and catch it.
 - **Magic-link verification only works under the `magic_link` driver.** It accepted
   any password-reset token under every driver and signed the user in.
 - **Password reset only exists under `password` and `invite_only`** — what
@@ -75,9 +98,13 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 - **Run `php artisan migrate`** — adds `usarrs_social_accounts`.
 - **socialite sites:** existing OAuth users have no stored connection yet. The first
-  time each signs in with OAuth they're emailed a link to connect it; one click, and
-  every sign-in after goes straight through. Make sure mail works before upgrading.
+  time each signs in with OAuth they're emailed a link to connect it; they confirm on
+  the page it opens, and every sign-in after goes straight through. Make sure mail works
+  before upgrading. The email names the provider account asking to connect — **tell
+  your users to expect it, and to ignore one naming an account that isn't theirs.**
   `laravel/socialite` is still required (it was never a hard dependency).
+- **If you call `InviteService::redeem()` yourself**, catch `InviteAlreadyRedeemed` (see
+  Changed).
 - **OAuth on a non-socialite site stops working.** If you relied on the OAuth routes
   being live alongside `password`, they're gone — that combination was never
   documented and is what let the takeover reach every install.

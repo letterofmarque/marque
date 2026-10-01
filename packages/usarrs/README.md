@@ -92,7 +92,7 @@ a time:
 |---|---|---|
 | `password` | Email + password login and registration | — |
 | `magic_link` | Passwordless email-only login. A link is emailed on request; visiting it logs the user in | Password login and password reset; password-based registration still creates an account, but sign-*in* afterwards is link-only |
-| `socialite` | OAuth sign-in only, via the providers in `config('usarrs.socialite_providers')` (default `['github']`). Requires `composer require laravel/socialite` | Password login, password registration, password reset and magic links — refused on the server, not just hidden. See [OAuth](#oauth-the-socialite-driver) |
+| `socialite` | OAuth sign-in, via the providers in `config('usarrs.socialite_providers')` (default `['github']`) — plus passkeys, if you've enabled them (see [Passkeys](#passkeys-webauthn)). Requires `composer require laravel/socialite` | Password login, password registration, password reset and magic links — refused on the server, not just hidden. See [OAuth](#oauth-the-socialite-driver) |
 | `invite_only` | Password login | Public registration — `GET /register` 404s. New accounts are created only via a redeemed invite (see Invites below) |
 
 Each driver's routes only exist under that driver: the OAuth routes only under
@@ -121,17 +121,31 @@ reporting someone's email address does not make you that someone.
 | Someone completes OAuth and… | What happens |
 |---|---|
 | the identity is connected to an account | signed in to that account — through the two-factor challenge if they have 2FA on |
-| it isn't connected, but its email matches an account here | nobody is signed in. That account's own address is emailed a link, valid 60 minutes, to connect the two; following it connects them and signs in (2FA applies) |
-| it isn't connected and matches no account | an account is created **only if registration is open** — the same rules as `/register`, including required invites — then it's sent the verification email and signed in |
+| it isn't connected, but its email matches an account here (ignoring case) | nobody is signed in. That account's own address is emailed a link, valid 60 minutes and good once. The email and the page it opens name the provider account; nothing is connected until the holder presses **Connect** there, which then signs them in (2FA applies). Opening the link alone — or a mail scanner opening it — does nothing |
+| it isn't connected and matches no account | an account is created **only if registration is open** — the same rules as `/register`, including required invites — then it's sent the verification email and signed in. Where registration is closed, the visitor gets the same answer whether or not the address has an account, so the callback can't be used to probe which addresses exist |
 | they're already signed in | the identity is connected to *their* account. One that's connected to someone else is refused; they are never switched into another account |
 
 **Invites with OAuth:** there's no registration form under this driver, so send the
-invite through the redirect — `/auth/github/redirect?invite=CODE`.
+invite through the redirect — `/auth/github/redirect?invite=CODE`. An invite is
+claimed in the same transaction that creates the account, so two sign-ups racing on
+one invite get one account between them.
+
+**Connecting proves the address.** An account made by OAuth is unverified: a provider
+*reporting* an address isn't proof of owning it. So someone could make an account
+under an address that isn't theirs, before its owner does. When the owner later
+confirms a connection from that address's inbox, usarrs marks the address verified
+and removes everything the account gained before then — other provider connections,
+passkeys, two-factor, remembered sign-ins — since none of it was proven to be the
+owner's. Two limits: this needs your `User` model to implement `MustVerifyEmail`
+(see [Email Verification](#email-verification--password-confirmation)), and a
+session the squatter has open at that moment lasts until it expires.
 
 **Upgrading from before 8.1:** existing OAuth accounts have no stored connection yet.
 The first time each of those users signs in with OAuth, they're emailed the
-connection link above; one click and they're in, and every sign-in after that goes
-straight through.
+connection link above; they confirm on the page it opens, and every sign-in after
+that goes straight through. The email names the provider account asking to connect,
+so tell your users to expect it — and to ignore one naming an account that isn't
+theirs.
 
 ## Email Verification & Password Confirmation
 
@@ -195,6 +209,13 @@ Unlike Fortify, Passkeys' own routes (`/passkeys/login`, `/user/passkeys/*`) are
 left registered when this feature is on — they're WebAuthn-ceremony JSON endpoints
 with no usarrs equivalent to collide with, called directly by usarrs' own UI via JS.
 They're suppressed when the feature is off.
+
+**Passkey sign-in is the one login usarrs doesn't finish itself.** Every other way in
+— password, magic link, OAuth, straight after registering — ends in one place that
+applies the two-factor challenge. A passkey signs in through `laravel/passkeys`' own
+endpoint, under every driver including `socialite`, and asks for no TOTP code
+afterwards: a passkey is already a phishing-resistant factor, so a code on top adds
+little. If you want `socialite` to mean OAuth and nothing else, leave passkeys off.
 
 ## `manage_auth` Escape Hatch
 

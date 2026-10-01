@@ -22,6 +22,10 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * forget the challenge if it cannot sign anyone in without coming through here
  * — which is why this is the only interactive Auth::login() in usarrs, and a
  * test holds it to that.
+ *
+ * Passkey sign-in is outside it: laravel/passkeys signs in through its own
+ * endpoint, with no TOTP afterwards (a passkey is already phishing-resistant).
+ * The README says so rather than claiming every login comes through here.
  */
 class LoginCompletion
 {
