@@ -100,7 +100,9 @@ return [
     */
 
     'profile' => [
+        // check-docs: ignore — not yet built, read by nothing until #10810
         'show_ratio' => true,
+        // check-docs: ignore — not yet built, read by nothing until #10810
         'show_seedtime' => true,
         'show_announce_key' => true,
         'allow_announce_key_regen' => true,

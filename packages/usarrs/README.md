@@ -316,7 +316,7 @@ dashboard has proven itself.
 
 - PHP 8.3+
 - Laravel 13+
-- `laravel/fortify` ^1.37 (pulled in automatically)
+- `laravel/fortify` ^1.30 (pulled in automatically)
 - `laravel/passkeys` (pulled in automatically; only used if passkeys are enabled)
 - Livewire 4+ (guarded — usarrs boots without it, but its auth/profile/admin UI needs it)
 
