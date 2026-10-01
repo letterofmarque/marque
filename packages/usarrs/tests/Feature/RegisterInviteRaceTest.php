@@ -38,3 +38,18 @@ it('makes no account when the invite is redeemed by someone else mid-request', f
     expect(TestUser::where('email', 'racer@example.com')->exists())->toBeFalse();
     $this->assertGuest();
 });
+
+// Build #124 CP #777: the same case-sensitivity hole on /register.
+it('refuses to register an address an account uses in a different case', function () {
+    TestUser::factory()->create(['email' => 'taken@example.com']);
+
+    Livewire::test(Register::class)
+        ->set('name', 'Twin')
+        ->set('email', 'TAKEN@example.com')
+        ->set('password', 'password123')
+        ->set('password_confirmation', 'password123')
+        ->call('register')
+        ->assertHasErrors('email');
+
+    expect(TestUser::count())->toBe(1);
+});

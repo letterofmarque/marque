@@ -136,20 +136,29 @@ account under an address that isn't theirs, before its owner does. When the owne
 later confirms a connection from that address's inbox, usarrs marks the address
 verified and — because OAuth made the account — removes everything it gained before
 then: other provider connections, passkeys, two-factor, remembered sign-ins, and any
-open session (its password hash is rotated; see below). Accounts made before 8.1, which
-have no stored connection, are verified but keep their owner's 2FA and passkeys. This
-needs your `User` model to implement `MustVerifyEmail` (see
+open session (its password hash is rotated; see below). This needs your `User` model to
+implement `MustVerifyEmail` (see
 [Email Verification](#email-verification--password-confirmation)).
+
+What it can't do is tell an old account from a squatted one. Accounts made before 8.1
+— by OAuth, or by `/register` under another driver before a switch to `socialite` —
+have no stored connection, and they're verified on confirmation but **keep** their 2FA,
+passkeys and sessions. That protects every existing user's own setup on upgrade day; the
+cost is that an account somebody squatted *before* 8.1 keeps what they attached. (Before
+8.1 a squatter didn't need to: the callback signed anyone in by email.) If you have
+reason to doubt an old account, an admin can reset its 2FA and passkeys.
 
 An account whose address isn't verified can't connect another provider, and changing
 an account's email on the profile page un-verifies it and sends the new address a
-verification mail.
+verification mail. Addresses are unique ignoring case, on the profile page and `/register`
+alike.
 
 **Put `auth.session` on your own signed-in routes.** Ending an open session works
 through Laravel's `AuthenticateSession` middleware (`auth.session`), which signs out
 a session whose password hash has changed underneath it. usarrs puts it on its own
-signed-in routes and the OAuth routes, and records the hash at every sign-in so no
-session escapes it. Routes your app defines need it too —
+signed-in routes and the OAuth routes, adds it to Livewire's persistent middleware (so
+it also guards component actions in a tab that was already open), and records the hash
+at every sign-in so no session escapes it. Routes your app defines need it too —
 `Route::middleware(['auth', 'auth.session'])` — or a squatter can keep using them.
 
 **The cache must be shared and persistent.** A pending connection is held in the

@@ -6,6 +6,7 @@ namespace Marque\Usarrs\Listeners;
 
 use BadMethodCallException;
 use Illuminate\Auth\Events\Login;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Auth;
 
 /**
@@ -27,24 +28,32 @@ class StampSessionPasswordHash
 {
     public function handle(Login $event): void
     {
-        if ($event->guard !== Auth::getDefaultDriver()) {
+        if ($event->guard === Auth::getDefaultDriver()) {
+            self::stamp($event->user, $event->guard);
+        }
+    }
+
+    /**
+     * Record $user's current hash as the one this session holds — also called
+     * after a user changes their own password, so the change doesn't sign out
+     * the session that made it.
+     */
+    public static function stamp(Authenticatable $user, string $guard): void
+    {
+        $password = $user->getAuthPassword();
+
+        if (! app()->bound('session.store') || ! $password) {
             return;
         }
-
-        $request = request();
-        $password = $event->user->getAuthPassword();
-
-        if (! $request->hasSession() || ! $password) {
-            return;
-        }
-
-        $guard = Auth::guard($event->guard);
 
         try {
-            $password = $guard->hashPasswordForCookie($password);
+            $password = Auth::guard($guard)->hashPasswordForCookie($password);
         } catch (BadMethodCallException) {
         }
 
-        $request->session()->put('password_hash_'.$event->guard, $password);
+        // The session store itself rather than request()->session(): the same
+        // object on a real request, and still there when a Livewire action or
+        // a test runs without one attached to the request.
+        app('session.store')->put('password_hash_'.$guard, $password);
     }
 }

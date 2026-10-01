@@ -60,3 +60,18 @@ it('refuses an address another account uses, instead of failing', function () {
 
     expect($this->user->fresh()->email)->toBe('old@example.com');
 });
+
+// PostgreSQL and SQLite compare case-sensitively, so `Victim@example.com` passed
+// a plain unique rule beside `victim@example.com` — and the OAuth callback,
+// matching case-insensitively, could then route the victim's own confirmation
+// to the wrong account (CP #777).
+it('refuses an address another account uses in a different case', function () {
+    TestUser::factory()->create(['email' => 'taken@example.com']);
+
+    Livewire::actingAs($this->user)->test(Edit::class)
+        ->set('email', 'Taken@Example.com')
+        ->call('save')
+        ->assertHasErrors('email');
+
+    expect($this->user->fresh()->email)->toBe('old@example.com');
+});

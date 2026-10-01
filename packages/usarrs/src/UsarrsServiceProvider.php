@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Marque\Usarrs;
 
 use Illuminate\Auth\Events\Login as LoginEvent;
+use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -86,6 +87,12 @@ class UsarrsServiceProvider extends ServiceProvider
         // Every sign-in records the password hash it signed in under, so
         // auth.session can end it if that hash rotates (CP #776).
         Event::listen(LoginEvent::class, StampSessionPasswordHash::class);
+
+        // Livewire re-applies a route's middleware to its component updates
+        // only from a fixed list, which names Jetstream's AuthenticateSession
+        // but not Laravel's. Without this, a tab opened before the hash
+        // rotated kept working — every action in it (CP #777).
+        Livewire::addPersistentMiddleware([AuthenticateSession::class]);
 
         // manage_auth is the one-way escape hatch (Spec #92): routes/auth.php
         // is usarrs' entire login/register/2FA-challenge/password-reset/

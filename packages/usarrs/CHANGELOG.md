@@ -30,12 +30,17 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   Confirming a connection now verifies the address and, for an account OAuth made,
   removes everything it gained before it was proven — other provider connections,
   passkeys, two-factor, remembered sign-ins — and ends its open sessions by rotating the
-  password hash under `auth.session`. Accounts from before 8.1 are verified but keep
-  their 2FA and passkeys. Needs your `User` model to implement `MustVerifyEmail`.
+  password hash under `auth.session` — Livewire actions in an already-open tab included.
+  Needs your `User` model to implement `MustVerifyEmail`. Accounts from before 8.1 have
+  no stored connection, so they're verified but keep their 2FA, passkeys and sessions:
+  that protects existing users on upgrade, and means an account squatted *before* 8.1
+  keeps what was attached (see the README).
 - **Changing an account's email kept it verified.** Switching to your own inbox,
   verifying, and switching back left an account "verified" under someone else's
   address. A changed email now un-verifies the account and sends the new address a
-  verification mail; it must also be unique (it was a 500 before).
+  verification mail. Addresses must now be unique ignoring case, on the profile page and
+  `/register` — PostgreSQL and SQLite let `Victim@` sit beside `victim@` (and a clash on
+  the profile page was a 500).
 - **An unverified account could connect another provider** — a way back in that
   outlived the owner taking the account over. Now refused until the address is verified.
 - **The connection email rendered the provider's display name as markdown**, so a
@@ -94,8 +99,9 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 - **usarrs' signed-in routes and the OAuth routes carry `auth.session`**, and every
   sign-in records the password hash it was made under, so a changed hash ends the
-  session everywhere. A user who changes their password on the profile page is signed
-  out of their other sessions — Laravel's own behaviour under that middleware.
+  session everywhere. `AuthenticateSession` is added to Livewire's persistent middleware,
+  so it covers component actions too. A user who changes their password on the profile
+  page stays signed in there and is signed out of their other sessions.
 - **`InviteService::redeem()` throws `Marque\Usarrs\Exceptions\InviteAlreadyRedeemed`**
   when the invite is no longer pending and unexpired in the database — used, revoked or
   expired since it was looked up. It used to overwrite whatever was there. The

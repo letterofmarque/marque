@@ -6,10 +6,12 @@ namespace Marque\Usarrs\Livewire\Profile;
 
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rule;
 use Livewire\Attributes\Validate;
+use Marque\Usarrs\Listeners\StampSessionPasswordHash;
 use Marque\Usarrs\Livewire\Component;
+use Marque\Usarrs\Rules\UniqueEmail;
 
 class Edit extends Component
 {
@@ -41,7 +43,7 @@ class Edit extends Component
     protected function rules(): array
     {
         return [
-            'email' => ['required', 'email', Rule::unique($this->userTable(), 'email')->ignore(auth()->id())],
+            'email' => ['required', 'email', new UniqueEmail(ignoreId: auth()->id())],
         ];
     }
 
@@ -56,33 +58,34 @@ class Edit extends Component
             'bio' => $this->bio ?: null,
         ];
 
-        if ($this->password) {
-            $data['password'] = Hash::make($this->password);
-        }
-
         // A new address is unproven, whatever the old one was. Keeping the
         // verification let a squatter verify their own inbox and switch back
         // to someone else's address as "verified" (Build #124 CP #776).
         $changed = mb_strtolower($this->email) !== mb_strtolower((string) $user->email);
-        if ($changed && $user instanceof MustVerifyEmail) {
-            $data['email_verified_at'] = null;
+
+        if ($this->password) {
+            $data['password'] = Hash::make($this->password);
         }
 
-        $user->forceFill($data)->save();
+        $user->update($data);
 
         if ($changed && $user instanceof MustVerifyEmail) {
+            $user->forceFill(['email_verified_at' => null])->save();
             $user->sendEmailVerificationNotification();
+        }
+
+        // Then through the guard (which checks it against the hash just saved):
+        // it re-issues this device's remember-me cookie under the new hash, and
+        // other sessions end at their next request under auth.session. This
+        // session records the new hash, or it would be the one signed out
+        // (CP #777).
+        if ($this->password) {
+            Auth::logoutOtherDevices($this->password);
+            StampSessionPasswordHash::stamp($user, Auth::getDefaultDriver());
         }
 
         session()->flash('status', __('Profile updated.'));
         $this->redirect(route('profile.show'), navigate: true);
-    }
-
-    private function userTable(): string
-    {
-        $model = config('trove.user_model', 'App\\Models\\User');
-
-        return (new $model)->getTable();
     }
 
     public function render(): View

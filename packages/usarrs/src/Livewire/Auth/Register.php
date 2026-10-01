@@ -14,6 +14,7 @@ use Marque\Usarrs\Auth\RegistrationRules;
 use Marque\Usarrs\Enums\AuthDriver;
 use Marque\Usarrs\Exceptions\InviteAlreadyRedeemed;
 use Marque\Usarrs\Livewire\Component;
+use Marque\Usarrs\Rules\UniqueEmail;
 use Marque\Usarrs\Services\InviteService;
 
 #[Title('Register')]
@@ -22,7 +23,6 @@ class Register extends Component
     #[Validate('required|string|max:255')]
     public string $name = '';
 
-    #[Validate('required|email|unique:users,email')]
     public string $email = '';
 
     #[Validate('required|string|min:8|confirmed')]
@@ -31,6 +31,15 @@ class Register extends Component
     public string $password_confirmation = '';
 
     public string $invite = '';
+
+    /**
+     * The address must be unused in any case (CP #777) — a rule object, so it
+     * can't sit in an attribute.
+     */
+    protected function rules(): array
+    {
+        return ['email' => ['required', 'email', new UniqueEmail]];
+    }
 
     public function mount(): void
     {
