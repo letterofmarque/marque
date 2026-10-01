@@ -130,15 +130,32 @@ invite through the redirect — `/auth/github/redirect?invite=CODE`. An invite i
 claimed in the same transaction that creates the account, so two sign-ups racing on
 one invite get one account between them.
 
-**Connecting proves the address.** An account made by OAuth is unverified: a provider
-*reporting* an address isn't proof of owning it. So someone could make an account
-under an address that isn't theirs, before its owner does. When the owner later
-confirms a connection from that address's inbox, usarrs marks the address verified
-and removes everything the account gained before then — other provider connections,
-passkeys, two-factor, remembered sign-ins — since none of it was proven to be the
-owner's. Two limits: this needs your `User` model to implement `MustVerifyEmail`
-(see [Email Verification](#email-verification--password-confirmation)), and a
-session the squatter has open at that moment lasts until it expires.
+**Connecting proves the address.** An account made by OAuth starts unverified: a
+provider *reporting* an address isn't proof of owning it. So someone could make an
+account under an address that isn't theirs, before its owner does. When the owner
+later confirms a connection from that address's inbox, usarrs marks the address
+verified and — because OAuth made the account — removes everything it gained before
+then: other provider connections, passkeys, two-factor, remembered sign-ins, and any
+open session (its password hash is rotated; see below). Accounts made before 8.1, which
+have no stored connection, are verified but keep their owner's 2FA and passkeys. This
+needs your `User` model to implement `MustVerifyEmail` (see
+[Email Verification](#email-verification--password-confirmation)).
+
+An account whose address isn't verified can't connect another provider, and changing
+an account's email on the profile page un-verifies it and sends the new address a
+verification mail.
+
+**Put `auth.session` on your own signed-in routes.** Ending an open session works
+through Laravel's `AuthenticateSession` middleware (`auth.session`), which signs out
+a session whose password hash has changed underneath it. usarrs puts it on its own
+signed-in routes and the OAuth routes, and records the hash at every sign-in so no
+session escapes it. Routes your app defines need it too —
+`Route::middleware(['auth', 'auth.session'])` — or a squatter can keep using them.
+
+**The cache must be shared and persistent.** A pending connection is held in the
+default cache store between the email and the confirmation. With the `array` store,
+or a per-server `file` store behind a load balancer, every link reads as "already
+used or expired".
 
 **Upgrading from before 8.1:** existing OAuth accounts have no stored connection yet.
 The first time each of those users signs in with OAuth, they're emailed the

@@ -63,8 +63,11 @@ Route::middleware(config('usarrs.middleware', ['web']))
         // OAuth door it never chose. The callbacks double as account linking
         // for a user who is already signed in.
         if (AuthDriver::from(config('usarrs.auth_driver', 'password')) === AuthDriver::Socialite) {
-            Route::get('auth/{provider}/redirect', [SocialiteController::class, 'redirect'])->name('socialite.redirect');
-            Route::get('auth/{provider}/callback', [SocialiteController::class, 'callback'])->name('socialite.callback');
+            // auth.session: a signed-in session whose password hash has rotated
+            // under it — a squatter's, once the owner proved the inbox — is
+            // ended here, not allowed to connect another provider (CP #776).
+            Route::get('auth/{provider}/redirect', [SocialiteController::class, 'redirect'])->middleware('auth.session')->name('socialite.redirect');
+            Route::get('auth/{provider}/callback', [SocialiteController::class, 'callback'])->middleware('auth.session')->name('socialite.callback');
 
             // The emailed "connect this account?" link — signed and expiring.
             // It opens a page naming the provider account; connecting is a
@@ -76,7 +79,7 @@ Route::middleware(config('usarrs.middleware', ['web']))
     });
 
 // Logout (requires auth)
-Route::middleware(config('usarrs.auth_middleware', ['web', 'auth']))
+Route::middleware([...config('usarrs.auth_middleware', ['web', 'auth']), 'auth.session'])
     ->prefix(config('usarrs.prefix', ''))
     ->group(function () {
         Route::post('logout', LogoutController::class)->name('logout');
@@ -86,7 +89,7 @@ Route::middleware(config('usarrs.auth_middleware', ['web', 'auth']))
 // names, paths, and the {id}/{hash} param shape are fixed by core Laravel's
 // own Illuminate\Auth\Notifications\VerifyEmail, which hardcodes
 // 'verification.verify' — not usarrs' choice to make.
-Route::middleware(config('usarrs.auth_middleware', ['web', 'auth']))
+Route::middleware([...config('usarrs.auth_middleware', ['web', 'auth']), 'auth.session'])
     ->prefix(config('usarrs.prefix', ''))
     ->group(function () {
         Route::get('email/verify', [EmailVerificationController::class, 'notice'])

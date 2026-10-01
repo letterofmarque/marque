@@ -121,7 +121,7 @@ class SocialiteController
         try {
             $user = DB::transaction(function () use ($identity, $invite) {
                 $user = $this->userModel()::create([
-                    'name' => $identity->name ?? $identity->email,
+                    'name' => $identity->name ?? $identity->nickname ?? $identity->email,
                     'email' => $identity->email,
                     // Nobody knows it and nothing can reset it under socialite
                     // mode: this account is reached through its OAuth link only.
@@ -174,13 +174,12 @@ class SocialiteController
             ->exists();
 
         // Except where nobody has proven the address: that connection may be a
-        // squatter's, and confirming drops it (ConfirmOAuthLink::proveInbox()).
+        // squatter's, and confirming drops it (ConfirmOAuthLink::stripUnprovenAccount()).
         if ($alreadyHasOne && ! ConfirmOAuthLink::unproven($holder)) {
             return;
         }
 
-        $label = trim(($identity->name ?? '').($identity->email !== null ? " ({$identity->email})" : ''));
-        $label = $label !== '' ? $label : $identity->id;
+        $label = $identity->label();
 
         $token = Str::random(40);
         Cache::put(ConfirmOAuthLink::CACHE_PREFIX.$token, [
@@ -208,6 +207,15 @@ class SocialiteController
     {
         $user = auth()->user();
         $provider = ucfirst($identity->provider);
+
+        // Nobody has proven this account's address, so it may be a squatter's;
+        // another provider on it would be a way back in that survives the owner
+        // taking it over (CP #776).
+        if (ConfirmOAuthLink::unproven($user)) {
+            return redirect()->route('profile.show')
+                ->withErrors(['email' => __('Verify your email address before connecting :provider.', ['provider' => $provider])]);
+        }
+
         $existing = SocialAccount::resolve($identity->provider, $identity->id);
 
         if ($existing !== null) {

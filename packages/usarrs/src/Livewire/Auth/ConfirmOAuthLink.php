@@ -11,6 +11,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Laravel\Fortify\Actions\DisableTwoFactorAuthentication;
 use Livewire\Attributes\Locked;
@@ -32,8 +33,9 @@ use Marque\Usarrs\Models\SocialAccount;
  * The emailed URL is signed and expiring; the `token` in it is the key to a
  * pending connection held server-side, which connect() consumes.
  *
- * Connecting also proves the inbox (CP #763): an unverified account is
- * verified, and stripped of what it gained before — see proveInbox().
+ * Connecting also proves the inbox (CP #763, #776): an unverified account is
+ * verified, and — if OAuth made it — stripped of what it gained before; see
+ * stripUnprovenAccount().
  */
 #[Title('Connect account')]
 class ConfirmOAuthLink extends Component
@@ -77,15 +79,25 @@ class ConfirmOAuthLink extends Component
         $name = ucfirst($this->provider);
         $unproven = self::unproven($user);
 
+        // Only an account that already holds an OAuth connection can be a
+        // squatter's: OAuth is the only way one is made under socialite mode,
+        // and since 8.1 every account it makes is connected as it's made.
+        // Accounts from before 8.1 were made unverified with no stored
+        // connection; their owners keep what they set up (CP #776).
+        $strip = $unproven && SocialAccount::query()
+            ->where('user_id', $user->getKey())
+            ->where(fn ($q) => $q->where('provider', '!=', $this->provider)->orWhere('provider_user_id', '!=', $pending['provider_user_id']))
+            ->exists();
+
         if ($existing !== null && $existing->user_id !== $user->getKey()) {
             $this->addError('token', __('That :provider account is already connected to a different account.', ['provider' => $name]));
 
             return;
         }
 
-        // An unproven account's existing connection is dropped below, so it
-        // doesn't stand in the way.
-        if ($existing === null && ! $unproven) {
+        // An account being stripped loses its existing connection below, so
+        // that doesn't stand in the way.
+        if ($existing === null && ! $strip) {
             $alreadyHasOne = SocialAccount::query()
                 ->where('user_id', $user->getKey())
                 ->where('provider', $this->provider)
@@ -99,9 +111,14 @@ class ConfirmOAuthLink extends Component
         }
 
         try {
-            DB::transaction(function () use ($user, $pending, $existing, $unproven) {
+            DB::transaction(function () use ($user, $pending, $existing, $unproven, $strip) {
+                if ($strip) {
+                    $this->stripUnprovenAccount($user, $pending['provider_user_id']);
+                }
+
                 if ($unproven) {
-                    $this->proveInbox($user, $pending['provider_user_id']);
+                    $user->markEmailAsVerified();
+                    event(new Verified($user));
                 }
 
                 if ($existing === null) {
@@ -134,20 +151,24 @@ class ConfirmOAuthLink extends Component
 
     /**
      * Following the emailed link is the first proof anyone has given that they
-     * own this address — so verify it, and drop every way in the account gained
-     * before that (Build #124 CP #763).
+     * own this address. If the account was made by OAuth before that proof, it
+     * may have been made by somebody else entirely — a provider that merely
+     * reported this address — so drop every way in it gained before then
+     * (Build #124 CP #763, #776).
      *
-     * The account may have been made by somebody else entirely: OAuth with a
-     * provider that merely reported this address. Whatever they attached —
-     * another provider, a passkey, two-factor (which would lock the owner out
-     * behind the squatter's codes), a remembered sign-in — went on before
-     * anybody proved the inbox, so none of it is the owner's.
+     * Whatever the squatter attached goes: another provider, a passkey,
+     * two-factor (which would lock the owner out behind the squatter's codes),
+     * a remembered sign-in. And their open session: the password hash rotates
+     * — nobody knows or uses it under socialite mode — and `auth.session`
+     * (on usarrs' own routes, and the README asks it of the app's) ends any
+     * session holding the old one. Sessions only expire when idle, so without
+     * this an active squatter kept the account indefinitely.
      *
-     * Not reached: a session the squatter has open right now. Laravel can only
-     * end other sessions by password, and this account has none anyone knows.
-     * It ends when the session expires.
+     * The tracker announce key is deliberately left alone: rotating it makes the
+     * owner re-download every torrent. An unproven account shouldn't be issued
+     * one at all (#10879).
      */
-    private function proveInbox(Authenticatable $user, string $keepProviderUserId): void
+    private function stripUnprovenAccount(Authenticatable $user, string $keepProviderUserId): void
     {
         SocialAccount::query()
             ->where('user_id', $user->getKey())
@@ -161,9 +182,7 @@ class ConfirmOAuthLink extends Component
         app(DisableTwoFactorAuthentication::class)($user);
 
         $user->setRememberToken(Str::random(60));
-        $user->markEmailAsVerified();
-
-        event(new Verified($user));
+        $user->forceFill([$user->getAuthPasswordName() => Hash::make(Str::random(64))])->save();
     }
 
     public function render(): View

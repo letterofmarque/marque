@@ -29,9 +29,9 @@ class FakeOAuthProvider implements OAuthProvider
         return $this->next ?? throw new \LogicException('FakeOAuthProvider: set $next before the callback');
     }
 
-    public function asserts(string $provider, string $id, ?string $email, ?string $name = 'OAuth Person'): self
+    public function asserts(string $provider, string $id, ?string $email, ?string $name = 'OAuth Person', ?string $nickname = null): self
     {
-        $this->next = new OAuthIdentity($provider, $id, $email, $name);
+        $this->next = new OAuthIdentity($provider, $id, $email, $name, $nickname);
 
         return $this;
     }

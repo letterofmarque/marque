@@ -19,7 +19,7 @@ use Marque\Usarrs\Livewire\Profile\Show as ProfileShow;
 */
 
 // Profile routes (authenticated)
-Route::middleware(config('usarrs.auth_middleware', ['web', 'auth']))
+Route::middleware([...config('usarrs.auth_middleware', ['web', 'auth']), 'auth.session'])
     ->prefix(config('usarrs.prefix', ''))
     ->group(function () {
         // Registered unconditionally, on every install shape. Gating this on
@@ -38,7 +38,7 @@ Route::middleware(config('usarrs.auth_middleware', ['web', 'auth']))
     });
 
 // Admin routes
-Route::middleware(config('usarrs.admin_middleware', ['web', 'auth', 'verified']))
+Route::middleware([...config('usarrs.admin_middleware', ['web', 'auth', 'verified']), 'auth.session'])
     ->prefix(config('usarrs.prefix', ''))
     ->group(function () {
         Route::get('admin/users', UserIndex::class)->name('admin.users.index');

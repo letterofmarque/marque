@@ -320,6 +320,70 @@ describe('confirming proves the inbox', function () {
             ->and($account->two_factor_confirmed_at)->toBeNull();
     });
 
+    // Build #124 CP #776. Sessions expire only when idle, so a squatter who
+    // keeps theirs alive kept the account after the owner proved the inbox —
+    // and could connect a fresh identity from it, for good.
+    it("ends the squatter's open session", function () {
+        $this->oauth->asserts('gitlab', 'gl-attacker', 'victim@example.com', 'Not The Victim');
+        $this->get(route('socialite.callback', 'gitlab'));
+        $account = TestUser::where('email', 'victim@example.com')->sole();
+        $squatterSession = session()->all();
+        $this->flushSession();
+        $this->app['auth']->forgetGuards();
+
+        victimConfirms($this, $account, 'github', 'gh-victim');
+
+        // The squatter comes back with the session they kept.
+        $this->flushSession();
+        $this->app['auth']->forgetGuards();
+        $this->withSession($squatterSession);
+
+        $this->get(route('profile.show'))->assertRedirect(route('login'));
+        $this->assertGuest();
+    });
+
+    it("refuses a connection from the squatter's open session", function () {
+        $this->oauth->asserts('gitlab', 'gl-attacker', 'victim@example.com', 'Not The Victim');
+        $this->get(route('socialite.callback', 'gitlab'));
+        $account = TestUser::where('email', 'victim@example.com')->sole();
+        $squatterSession = session()->all();
+        $this->flushSession();
+        $this->app['auth']->forgetGuards();
+
+        victimConfirms($this, $account, 'github', 'gh-victim');
+
+        $this->flushSession();
+        $this->app['auth']->forgetGuards();
+        $this->withSession($squatterSession);
+        $this->oauth->asserts('gitlab', 'gl-attacker-2', 'elsewhere@example.com');
+        $this->get(route('socialite.callback', 'gitlab'));
+
+        expect(SocialAccount::resolve('gitlab', 'gl-attacker-2')?->user_id)->not->toBe($account->getKey());
+    });
+
+    // Accounts made by OAuth before 8.1 were never verified, and had no stored
+    // connection (the table is new). Their owners confirming their own address
+    // on upgrade day must not cost them the 2FA and passkeys they set up. Only
+    // an account that already holds an OAuth connection — every account OAuth
+    // has made since 8.1 — can be a squatter's.
+    it("verifies a pre-8.1 account but keeps its owner's passkeys and two-factor", function () {
+        $this->member->forceFill(['email_verified_at' => null])->save();
+        $this->member->passkeys()->create(['name' => 'Mine', 'credential_id' => 'cred-legacy', 'credential' => ['type' => 'public-key']]);
+        $this->member->forceFill([
+            'two_factor_secret' => Fortify::currentEncrypter()->encrypt(app(Google2FA::class)->generateSecretKey()),
+            'two_factor_confirmed_at' => now(),
+        ])->save();
+
+        Livewire::test(ConfirmOAuthLink::class, ['provider' => 'github', 'token' => tokenOf(emailedConfirmation($this))])
+            ->call('connect');
+
+        $member = $this->member->fresh();
+        expect($member->hasVerifiedEmail())->toBeTrue()
+            ->and($member->passkeys()->count())->toBe(1)
+            ->and($member->two_factor_confirmed_at)->not->toBeNull()
+            ->and(SocialAccount::resolve('github', 'gh-77')?->user_id)->toBe($member->getKey());
+    });
+
     it('keeps the connections of an account whose address was already proven', function () {
         SocialAccount::forceCreate(['user_id' => $this->member->getKey(), 'provider' => 'gitlab', 'provider_user_id' => 'gl-mine']);
 
@@ -370,4 +434,37 @@ it('reports a connection made concurrently instead of failing', function () {
         ->assertHasErrors('token');
 
     $this->assertGuest();
+});
+
+// Build #124 CP #776. The label named the provider account by display name and
+// email — but the email is, by construction, the recipient's own, and the
+// display name is whatever the asserting party chose. It said nothing an
+// attacker couldn't copy. The provider's own handle and id are what tell one
+// account from another.
+it('names the provider account by its handle and id, not by the address it shares', function () {
+    $this->oauth->asserts('github', 'gh-583231', 'member@example.com', 'Octo Cat', 'octocat');
+    $this->get(route('socialite.callback', 'github'));
+
+    Notification::assertSentTo($this->member, OAuthLinkConfirmation::class, function (OAuthLinkConfirmation $n) {
+        $intro = implode(' ', $n->toMail($this->member)->introLines);
+
+        return str_contains($intro, '@octocat')
+            && str_contains($intro, 'gh-583231')
+            && ! str_contains($intro, 'member@example.com');
+    });
+});
+
+// The display name went into a markdown mail as-is: a provider name of
+// "[Reset your password](https://evil.example)" rendered as a live link in
+// this site's own mail.
+it('renders a provider display name as text, never as markup', function () {
+    $this->oauth->asserts('github', 'gh-77', 'member@example.com', '[Reset your password now](https://evil.example/phish) <b>x</b>', 'see https://evil.example/bare');
+    $this->get(route('socialite.callback', 'github'));
+
+    Notification::assertSentTo($this->member, OAuthLinkConfirmation::class, function (OAuthLinkConfirmation $n) {
+        $html = (string) $n->toMail($this->member)->render();
+
+        return ! str_contains($html, 'href="https://evil.example')
+            && ! str_contains($html, '<b>x</b>');
+    });
 });

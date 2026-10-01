@@ -113,3 +113,17 @@ it('reports a connection made concurrently instead of failing', function () {
 
     $this->assertAuthenticatedAs($this->me);
 });
+
+// Build #124 CP #776. An account nobody has proven the address of may be a
+// squatter's; connecting a provider to it is a way back in that outlives the
+// owner taking it over.
+it('refuses to connect a provider to an account whose address is unproven', function () {
+    $this->me->forceFill(['email_verified_at' => null])->save();
+    $this->oauth->asserts('gitlab', 'gl-9', 'me@example.com');
+
+    $this->actingAs($this->me)->get(route('socialite.callback', 'gitlab'))
+        ->assertSessionHasErrors('email');
+
+    expect(SocialAccount::resolve('gitlab', 'gl-9'))->toBeNull();
+    $this->assertAuthenticatedAs($this->me);
+});

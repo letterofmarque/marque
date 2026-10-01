@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Marque\Usarrs;
 
+use Illuminate\Auth\Events\Login as LoginEvent;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Fortify\Fortify;
@@ -21,6 +23,7 @@ use Marque\Trove\Registry\NavRegistry;
 use Marque\Usarrs\Auth\SocialiteOAuthProvider;
 use Marque\Usarrs\Contracts\InviteServiceInterface;
 use Marque\Usarrs\Contracts\OAuthProvider;
+use Marque\Usarrs\Listeners\StampSessionPasswordHash;
 use Marque\Usarrs\Livewire\Admin\UserIndex;
 use Marque\Usarrs\Livewire\Admin\UserShow;
 use Marque\Usarrs\Livewire\Auth\ConfirmOAuthLink;
@@ -80,6 +83,10 @@ class UsarrsServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Every sign-in records the password hash it signed in under, so
+        // auth.session can end it if that hash rotates (CP #776).
+        Event::listen(LoginEvent::class, StampSessionPasswordHash::class);
+
         // manage_auth is the one-way escape hatch (Spec #92): routes/auth.php
         // is usarrs' entire login/register/2FA-challenge/password-reset/
         // magic-link/socialite/logout surface, and it's skipped outright when

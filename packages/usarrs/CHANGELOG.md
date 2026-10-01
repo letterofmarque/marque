@@ -9,7 +9,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [Unreleased]
 
-> Security: OAuth sign-in no longer signs in whoever has the email the provider reports, and every login path now goes through the two-factor challenge; plus the dashboard gets its panels.
+> Security: OAuth sign-in no longer signs in whoever has the email the provider reports, and password, magic-link and OAuth sign-in all go through the two-factor challenge; plus the dashboard gets its panels.
 
 ### Security
 
@@ -27,9 +27,22 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 - **An account made under someone else's address stayed theirs.** OAuth could create
   an unverified account for an address its creator didn't own; when the real owner
   later connected their own provider from that inbox, the creator kept their way in.
-  Confirming a connection now verifies the address and removes everything the account
-  gained before it was proven — other provider connections, passkeys, two-factor,
-  remembered sign-ins. Needs your `User` model to implement `MustVerifyEmail`.
+  Confirming a connection now verifies the address and, for an account OAuth made,
+  removes everything it gained before it was proven — other provider connections,
+  passkeys, two-factor, remembered sign-ins — and ends its open sessions by rotating the
+  password hash under `auth.session`. Accounts from before 8.1 are verified but keep
+  their 2FA and passkeys. Needs your `User` model to implement `MustVerifyEmail`.
+- **Changing an account's email kept it verified.** Switching to your own inbox,
+  verifying, and switching back left an account "verified" under someone else's
+  address. A changed email now un-verifies the account and sends the new address a
+  verification mail; it must also be unique (it was a 500 before).
+- **An unverified account could connect another provider** — a way back in that
+  outlived the owner taking the account over. Now refused until the address is verified.
+- **The connection email rendered the provider's display name as markdown**, so a
+  name like `[Reset your password](https://…)` became a live link in this site's own
+  mail. It also identified the provider account by that name and the recipient's own
+  email — nothing an attacker couldn't copy. It now shows the provider's handle and
+  id, as plain text.
 - **One invite could create several accounts.** Concurrent sign-ups carrying the same
   invite all redeemed it. The invite is now claimed in one conditional write, in the
   same transaction as the account (and, for OAuth, its connection), on `/register`
@@ -79,6 +92,10 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ### Changed
 
+- **usarrs' signed-in routes and the OAuth routes carry `auth.session`**, and every
+  sign-in records the password hash it was made under, so a changed hash ends the
+  session everywhere. A user who changes their password on the profile page is signed
+  out of their other sessions — Laravel's own behaviour under that middleware.
 - **`InviteService::redeem()` throws `Marque\Usarrs\Exceptions\InviteAlreadyRedeemed`**
   when the invite is no longer pending and unexpired in the database — used, revoked or
   expired since it was looked up. It used to overwrite whatever was there. The
@@ -105,6 +122,12 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   `laravel/socialite` is still required (it was never a hard dependency).
 - **If you call `InviteService::redeem()` yourself**, catch `InviteAlreadyRedeemed` (see
   Changed).
+- **Add `auth.session` to your app's own signed-in routes**
+  (`Route::middleware(['auth', 'auth.session'])`). usarrs ends a squatter's sessions
+  through it; routes without it are left open to them.
+- **Use a shared, persistent cache store** — pending OAuth connections live there
+  between the email and the confirmation. `array`, or `file` across several servers,
+  breaks every link.
 - **OAuth on a non-socialite site stops working.** If you relied on the OAuth routes
   being live alongside `password`, they're gone — that combination was never
   documented and is what let the takeover reach every install.

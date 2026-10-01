@@ -27,7 +27,8 @@ class SocialiteOAuthProvider implements OAuthProvider
             provider: $provider,
             id: (string) $user->getId(),
             email: $user->getEmail(),
-            name: $user->getName() ?? $user->getNickname(),
+            name: $user->getName(),
+            nickname: $user->getNickname(),
         );
     }
 }
