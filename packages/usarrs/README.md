@@ -93,7 +93,7 @@ a time:
 | `password` | Email + password login and registration | — |
 | `magic_link` | Passwordless email-only login. A link is emailed on request; visiting it logs the user in | Password login and password reset; password-based registration still creates an account, but sign-*in* afterwards is link-only |
 | `socialite` | OAuth sign-in, via the providers in `config('usarrs.socialite_providers')` (default `['github']`) — plus passkeys, if you've enabled them (see [Passkeys](#passkeys-webauthn)). Requires `composer require laravel/socialite` | Password login, password registration, password reset and magic links — refused on the server, not just hidden. See [OAuth](#oauth-the-socialite-driver) |
-| `invite_only` | Password login | Public registration — `GET /register` 404s. New accounts are created only via a redeemed invite (see Invites below) |
+| `invite_only` | Password login | Registration of any kind — `GET /register` 404s, and no route creates an account. Invites don't open it yet (#10801): for invite-gated sign-up, use `password` with `invites.required` |
 
 Each driver's routes only exist under that driver: the OAuth routes only under
 `socialite`, magic-link verification only under `magic_link`, and password reset
@@ -108,7 +108,7 @@ holds under every `auth_driver` value, including `invite_only`, where a bare
 rather than silently creating an account underneath the driver's restriction. This
 matters because every official Laravel starter kit (React, Vue, Livewire) bundles
 Fortify with its own routes active by default — installing one alongside usarrs, or
-just having Fortify present for its 2FA/passkey actions, used to leave that second
+just having Fortify present for its 2FA actions, used to leave that second
 front door open. See the [manage_auth](#manage_auth-escape-hatch) section below for
 the full opt-out story.
 
@@ -146,7 +146,8 @@ have no stored connection, and they're verified on confirmation but **keep** the
 passkeys and sessions. That protects every existing user's own setup on upgrade day; the
 cost is that an account somebody squatted *before* 8.1 keeps what they attached. (Before
 8.1 a squatter didn't need to: the callback signed anyone in by email.) If you have
-reason to doubt an old account, an admin can reset its 2FA and passkeys.
+reason to doubt an old account, clear its 2FA and passkeys directly — the `two_factor_*`
+columns on the user and its rows in `passkeys`; there's no admin action for it yet.
 
 An account whose address isn't verified can't connect another provider, and changing
 an account's email on the profile page un-verifies it and sends the new address a
@@ -185,7 +186,7 @@ as they would in a stock Laravel app:
 | `verification.notice` | `GET /email/verify` | "Check your email" prompt |
 | `verification.verify` | `GET /email/verify/{id}/{hash}` | The signed link from the verification email |
 | `verification.send` | `POST /email/verification-notification` | Resend the verification email |
-| `password.confirm` | `GET/POST /user/confirm-password` | Re-enter your password before a sensitive action |
+| `password.confirm` | `GET /user/confirm-password` | Re-enter your password before a sensitive action |
 
 **Your `User` model needs `implements \Illuminate\Contracts\Auth\MustVerifyEmail`
 to use email verification** — not just the trait. This trips people up: Laravel's own
@@ -279,9 +280,9 @@ using it.
 ],
 ```
 
-Independent of `auth_driver` — combine `invite_only` with `invites.enabled` for a
-fully closed, invite-gated tracker, or leave invites off and use `invite_only` alone
-to close registration without an invite system.
+Independent of `auth_driver`. For an invite-gated tracker, use the `password` driver
+with `invites.enabled` and `invites.required`: `/register` then needs a valid invite.
+`invite_only` currently closes registration entirely, invites included (#10801).
 
 ## Dashboard
 
@@ -289,7 +290,8 @@ to close registration without an invite system.
 user. **The route is registered on every install**, whatever else is present, so
 `route('dashboard.index')` is always safe to link to — no `Route::has()` guard needed. A
 Dashboard entry is added to the navigation for signed-in users, and `marque:install`
-offers it as the home page (the default for a private tracker).
+offers it as the home page (the default for a private tracker) — in the installer on
+`main`; `marque/marque` hasn't been tagged yet.
 
 The page renders panels from trove's `DashboardPanelRegistry`. usarrs registers these, each
 appearing only when it has something true to say:
@@ -315,10 +317,10 @@ dashboard has proven itself.
 ## Requirements
 
 - PHP 8.3+
-- Laravel 13+
+- Laravel 13
 - `laravel/fortify` ^1.30 (pulled in automatically)
 - `laravel/passkeys` (pulled in automatically; only used if passkeys are enabled)
-- Livewire 4+ (guarded — usarrs boots without it, but its auth/profile/admin UI needs it)
+- Livewire 4 (pulled in automatically)
 
 ## License
 

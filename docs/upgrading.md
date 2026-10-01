@@ -14,7 +14,7 @@ package, including the small ones that never warranted a write-up.
 
 ## Requirements
 
-**PHP 8.3+ and Laravel 13+.** Composer enforces this — if your app doesn't meet it,
+**PHP 8.3+ and Laravel 13.** Composer enforces this — if your app doesn't meet it,
 installing or upgrading any Marque package will refuse with a dependency conflict.
 
 The Laravel floor has been 13 since [Marque 3.0](releases/3.0.md). The PHP floor
