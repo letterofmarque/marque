@@ -10,6 +10,7 @@ changelogs — edit those, not this.*
 
 ## 2026-10-01
 
+- **[marque 1.0.0](packages/marque/CHANGELOG.md)** — First release of the installer: one composer require, then `php artisan marque:install` interviews you and wires a working tracker.
 - **[usarrs 8.1.0](packages/usarrs/CHANGELOG.md)** — Security: OAuth sign-in no longer signs in whoever has the email the provider reports, and password, magic-link and OAuth sign-in all go through the two-factor challenge; plus the dashboard gets its panels.
 
 ## 2026-09-25

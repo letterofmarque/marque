@@ -58,9 +58,20 @@ one of them produces an app that looks installed and is not.
 
 ## Re-running it
 
-`marque:install` is safe to run again. It detects what is already in place and
-offers only the gaps, which is also how you add a package (forums, say) after
-the initial setup.
+`marque:install` is safe to run again, and that's how you add a package (forums,
+say) after the initial setup. It reads what composer already has installed:
+
+- **The tracker type isn't asked again.** A public tracker stays public and a
+  private one stays private. Pressing Enter can't add the other tracker beside it.
+- **Extras already installed aren't offered**, and only what's missing is
+  composer-required.
+- **An app holding both tracker types is refused** before any question, because
+  hound's keyless announce endpoint beside bloodhound's authenticated one is exactly
+  what the installer exists to prevent. Remove one with `composer remove`, then run
+  it again.
+
+The later steps (stylesheet, User model, home page, admin) skip work that's
+already done.
 
 ## Licence
 

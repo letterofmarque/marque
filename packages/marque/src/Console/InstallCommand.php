@@ -19,6 +19,8 @@ use Marque\Marque\Install\EnvironmentCheck;
 use Marque\Marque\Install\EnvironmentReport;
 use Marque\Marque\Install\EnvWriter;
 use Marque\Marque\Install\HomePage;
+use Marque\Marque\Install\InstalledPackages;
+use Marque\Marque\Install\MixedTrackerInstall;
 use Marque\Marque\Install\PackageSelection;
 use Marque\Marque\Install\SelfVerification;
 use Marque\Marque\Install\StylesheetWiring;
@@ -82,8 +84,22 @@ class InstallCommand extends Command
             return self::FAILURE;
         }
 
+        // What is already installed decides the tracker on a re-run, and an app
+        // holding both halves is refused before anyone is asked anything
+        // (#10803).
+        $installed = $this->laravel->make(InstalledPackages::class);
+
+        try {
+            $existing = PackageSelection::fromInstalled($installed);
+        } catch (MixedTrackerInstall $e) {
+            $this->newLine();
+            $this->components->error($e->getMessage());
+
+            return self::FAILURE;
+        }
+
         $this->newLine();
-        $selection = $this->interview();
+        $selection = $this->interview($existing);
 
         $check->runConditional($report, $selection->needsRedis());
 
@@ -101,7 +117,7 @@ class InstallCommand extends Command
             return self::FAILURE;
         }
 
-        if (! $this->installPackages($selection)) {
+        if (! $this->installPackages($selection, $installed)) {
             return self::FAILURE;
         }
 
@@ -124,37 +140,46 @@ class InstallCommand extends Command
      * the operator has typed one — so a refusal on the far side is still
      * honest when it says nothing was changed.
      */
-    private function interview(): PackageSelection
+    private function interview(?PackageSelection $existing): PackageSelection
     {
         $this->components->info('Setting up Marque');
 
-        $type = select(
-            label: 'What kind of tracker is this?',
-            options: [
-                'private' => 'Private — accounts, invites, ratio tracking',
-                'public' => 'Public — open announce, no account needed',
-            ],
-            default: 'private',
-        );
+        // A re-run never re-asks the tracker question. Its default was
+        // private, so pressing Enter on a public install used to add
+        // bloodhound beside hound (#10803).
+        if ($existing !== null) {
+            $this->components->info(sprintf(
+                'This is already a %s tracker — keeping it. Adding anything else stays on that tracker.',
+                $existing->isPrivate() ? 'private' : 'public',
+            ));
+            $selection = $existing;
+        } else {
+            $type = select(
+                label: 'What kind of tracker is this?',
+                options: [
+                    'private' => 'Private — accounts, invites, ratio tracking',
+                    'public' => 'Public — open announce, no account needed',
+                ],
+                default: 'private',
+            );
 
-        $selection = $type === 'private'
-            ? PackageSelection::private()
-            : PackageSelection::public();
-
-        if (confirm(label: 'Add the REST API?', default: false)) {
-            $selection = $selection->withApi();
+            $selection = $type === 'private'
+                ? PackageSelection::private()
+                : PackageSelection::public();
         }
 
-        if (confirm(label: 'Add forums and torrent comments?', default: false)) {
-            $selection = $selection->withForums();
-        }
+        // Only what isn't installed yet is offered.
+        $extras = [
+            'marque/cennad' => ['Add the REST API?', false, fn (PackageSelection $s) => $s->withApi()],
+            'marque/parley' => ['Add forums and torrent comments?', false, fn (PackageSelection $s) => $s->withForums()],
+            'marque/taxonomy' => ['Add the content taxonomy engine?', false, fn (PackageSelection $s) => $s->withTaxonomy()],
+            'marque/skipper' => ['Add the admin panel?', true, fn (PackageSelection $s) => $s->withAdminPanel()],
+        ];
 
-        if (confirm(label: 'Add the content taxonomy engine?', default: false)) {
-            $selection = $selection->withTaxonomy();
-        }
-
-        if (confirm(label: 'Add the admin panel?', default: true)) {
-            $selection = $selection->withAdminPanel();
+        foreach ($extras as $package => [$label, $default, $add]) {
+            if (! $selection->includes($package) && confirm(label: $label, default: $default)) {
+                $selection = $add($selection);
+            }
         }
 
         $this->setSiteName();
@@ -234,9 +259,16 @@ class InstallCommand extends Command
         }
     }
 
-    private function installPackages(PackageSelection $selection): bool
+    private function installPackages(PackageSelection $selection, InstalledPackages $installed): bool
     {
-        $packages = $selection->packages();
+        $packages = $selection->toRequire($installed);
+
+        if ($packages === []) {
+            $this->newLine();
+            $this->components->info('Nothing new to install — everything chosen is already in place.');
+
+            return true;
+        }
 
         $this->newLine();
         $this->components->info('Installing '.implode(', ', $packages));

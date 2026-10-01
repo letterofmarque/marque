@@ -5,7 +5,9 @@ All notable changes to `marque/marque` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.0] — 2026-10-01
+
+> First release of the installer: one composer require, then `php artisan marque:install` interviews you and wires a working tracker.
 
 ### Added
 
@@ -28,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bypassed. So the wrong tracker package is never installed rather than being
   disabled by config, and a future edit adding one here fails `ManifestTest`.
 
+- **A re-run starts from what's installed.** The tracker question isn't asked again, so
+  a public tracker can't have bloodhound added beside hound by pressing Enter. Extras
+  already present aren't offered or re-required, and an app that already holds both
+  tracker types is refused before any question. (#10803)
 - **"The dashboard" as a home page option, and the default for a private tracker.**
   `/` redirects to usarrs's `dashboard.index`, which exists on every install the
   installer produces. A public tracker still defaults to the splash page: its visitors are

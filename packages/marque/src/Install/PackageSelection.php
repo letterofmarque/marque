@@ -24,6 +24,8 @@ final class PackageSelection
 
     private const PUBLIC_TRACKER = ['marque/hound', 'marque/disguise'];
 
+    private const EXTRAS = ['marque/cennad', 'marque/parley', 'marque/taxonomy', 'marque/skipper'];
+
     /** @var list<string> */
     private array $extras = [];
 
@@ -41,6 +43,61 @@ final class PackageSelection
     public static function public(): self
     {
         return new self(self::PUBLIC_TRACKER, false);
+    }
+
+    /**
+     * The selection an existing install already embodies, or null on an app
+     * with no tracker yet (#10803).
+     *
+     * Either half identifies the tracker: an app with only disguise left is
+     * still a public install, and bloodhound would still be the wrong thing to
+     * add. An app holding a half of each is refused rather than guessed at.
+     * Extras already present are carried in, so the interview skips them and
+     * the later wiring steps still know they are there.
+     *
+     * @throws MixedTrackerInstall
+     */
+    public static function fromInstalled(InstalledPackages $installed): ?self
+    {
+        $private = array_values(array_filter(self::PRIVATE_TRACKER, $installed->has(...)));
+        $public = array_values(array_filter(self::PUBLIC_TRACKER, $installed->has(...)));
+
+        if ($private !== [] && $public !== []) {
+            throw new MixedTrackerInstall(sprintf(
+                'This app has both tracker types installed (%s). That is a keyless announce endpoint beside an '
+                .'authenticated one. Remove one with composer remove, then run marque:install again.',
+                implode(', ', [...$private, ...$public]),
+            ));
+        }
+
+        if ($private === [] && $public === []) {
+            return null;
+        }
+
+        $selection = $private !== [] ? self::private() : self::public();
+
+        foreach (self::EXTRAS as $extra) {
+            if ($installed->has($extra)) {
+                $selection = $selection->with($extra);
+            }
+        }
+
+        return $selection;
+    }
+
+    public function includes(string $package): bool
+    {
+        return in_array($package, $this->packages(), true);
+    }
+
+    /**
+     * What composer still has to fetch: the selection minus what is installed.
+     *
+     * @return list<string>
+     */
+    public function toRequire(InstalledPackages $installed): array
+    {
+        return array_values(array_filter($this->packages(), fn (string $package): bool => ! $installed->has($package)));
     }
 
     public function isPrivate(): bool
