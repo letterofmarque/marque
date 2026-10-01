@@ -6,9 +6,11 @@ namespace Marque\Usarrs\Http\Controllers;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
@@ -16,6 +18,7 @@ use Marque\Usarrs\Auth\LoginCompletion;
 use Marque\Usarrs\Auth\OAuthIdentity;
 use Marque\Usarrs\Auth\RegistrationRules;
 use Marque\Usarrs\Contracts\OAuthProvider;
+use Marque\Usarrs\Exceptions\InviteAlreadyRedeemed;
 use Marque\Usarrs\Livewire\Auth\ConfirmOAuthLink;
 use Marque\Usarrs\Models\SocialAccount;
 use Marque\Usarrs\Notifications\OAuthLinkConfirmation;
@@ -36,7 +39,9 @@ class SocialiteController
 
         // There is no registration form under socialite mode to type an invite
         // into, so it rides the round trip: /auth/github/redirect?invite=CODE.
-        session()->put('usarrs.oauth.invite', $request->query('invite'));
+        // Anything but a string (?invite[]=x) is no invite, not a TypeError.
+        $invite = $request->query('invite');
+        session()->put('usarrs.oauth.invite', is_string($invite) ? $invite : null);
 
         return $this->oauth->redirect($provider);
     }
@@ -71,18 +76,32 @@ class SocialiteController
 
         // Not linked to anyone. Never sign in on the email — that is the
         // takeover. If it matches an account, ask that account's own inbox.
-        $holder = $identity->email === null ? null : $this->userModel()::where('email', $identity->email)->first();
+        $inviteCode = session()->pull('usarrs.oauth.invite');
+
+        if ($identity->email === null) {
+            return $this->refuse(__(':provider didn\'t share an email address, so an account can\'t be made from it.', ['provider' => ucfirst($provider)]));
+        }
+
+        $holder = $this->userByEmail($identity->email);
 
         if ($holder !== null) {
             $this->sendConfirmation($holder, $identity);
-
-            return redirect()->route('login')->with('status', __(
-                'That :provider account isn\'t connected here yet. If an account here uses its email address, we\'ve sent it a link to connect them — check your email.',
-                ['provider' => ucfirst($provider)],
-            ));
         }
 
-        return $this->register($identity);
+        $sentLink = __('If an account here uses that :provider account\'s email address, we\'ve sent it a link to connect them — check your email.', ['provider' => ucfirst($provider)]);
+
+        // Where no account could be made, a known address and an unknown one
+        // get the same answer. "Sent a link" for one and "registration is
+        // closed" for the other told anybody which addresses have accounts.
+        if (($refusal = $this->rules->refusal($inviteCode)) !== null) {
+            return $this->refuse($refusal.' '.$sentLink);
+        }
+
+        if ($holder !== null) {
+            return redirect()->route('login')->with('status', __('That :provider account isn\'t connected here yet.', ['provider' => ucfirst($provider)]).' '.$sentLink);
+        }
+
+        return $this->register($identity, $inviteCode);
     }
 
     /**
@@ -90,36 +109,42 @@ class SocialiteController
      * would allow one, under the same rules (Spec #142). The callback used to
      * create an account for anything it didn't recognise, under every mode,
      * and sign it in unverified.
+     *
+     * The account, the invite and the link commit together (Build #124
+     * CP #763): an invite lost to a concurrent request, or the same identity
+     * linked by one, leaves no account behind and no error page.
      */
-    private function register(OAuthIdentity $identity): RedirectResponse
+    private function register(OAuthIdentity $identity, ?string $inviteCode): RedirectResponse
     {
-        $inviteCode = session()->pull('usarrs.oauth.invite');
+        $invite = $this->rules->validInvite($inviteCode);
 
-        if ($identity->email === null) {
-            return $this->refuse(__(':provider didn\'t share an email address, so an account can\'t be made from it.', ['provider' => ucfirst($identity->provider)]));
+        try {
+            $user = DB::transaction(function () use ($identity, $invite) {
+                $user = $this->userModel()::create([
+                    'name' => $identity->name ?? $identity->email,
+                    'email' => $identity->email,
+                    // Nobody knows it and nothing can reset it under socialite
+                    // mode: this account is reached through its OAuth link only.
+                    'password' => Hash::make(Str::random(64)),
+                ]);
+
+                if ($invite !== null) {
+                    $this->invites->redeem($invite, $user);
+                }
+
+                SocialAccount::forceCreate([
+                    'user_id' => $user->getKey(),
+                    'provider' => $identity->provider,
+                    'provider_user_id' => $identity->id,
+                ]);
+
+                return $user;
+            });
+        } catch (InviteAlreadyRedeemed) {
+            return $this->refuse(__('That invite has already been used.'));
+        } catch (UniqueConstraintViolationException) {
+            return $this->refuse(__('That :provider account was connected moments ago — try signing in again.', ['provider' => ucfirst($identity->provider)]));
         }
-
-        if (($refusal = $this->rules->refusal($inviteCode)) !== null) {
-            return $this->refuse($refusal);
-        }
-
-        $user = $this->userModel()::create([
-            'name' => $identity->name ?? $identity->email,
-            'email' => $identity->email,
-            // Nobody knows it and nothing can reset it under socialite mode:
-            // this account is reached through its OAuth link only.
-            'password' => Hash::make(Str::random(64)),
-        ]);
-
-        if (($invite = $this->rules->validInvite($inviteCode)) !== null) {
-            $this->invites->redeem($invite, $user);
-        }
-
-        SocialAccount::forceCreate([
-            'user_id' => $user->getKey(),
-            'provider' => $identity->provider,
-            'provider_user_id' => $identity->id,
-        ]);
 
         // Unverified, like any other new account. The provider's say-so is not
         // this site's proof that the address is theirs.
@@ -134,6 +159,8 @@ class SocialiteController
      * Email the account holder a link to connect this identity — unless the
      * account already has one for this provider, when connecting would be
      * refused anyway and the mail would only be noise (or a way to spam them).
+     * The mail goes whether or not registration is open, so what the visitor
+     * is told can't depend on it.
      *
      * The link carries a one-time token; what it would connect is held here,
      * server-side, and consumed when the holder confirms on the page it opens
@@ -146,7 +173,9 @@ class SocialiteController
             ->where('provider', $identity->provider)
             ->exists();
 
-        if ($alreadyHasOne) {
+        // Except where nobody has proven the address: that connection may be a
+        // squatter's, and confirming drops it (ConfirmOAuthLink::proveInbox()).
+        if ($alreadyHasOne && ! ConfirmOAuthLink::unproven($holder)) {
             return;
         }
 
@@ -197,11 +226,20 @@ class SocialiteController
                 ->withErrors(['email' => __('Your account is already connected to a different :provider account.', ['provider' => $provider])]);
         }
 
-        SocialAccount::forceCreate([
-            'user_id' => $user->getAuthIdentifier(),
-            'provider' => $identity->provider,
-            'provider_user_id' => $identity->id,
-        ]);
+        try {
+            // Its own transaction, so a failed insert rolls back to a savepoint
+            // rather than aborting any transaction around it (PostgreSQL).
+            DB::transaction(fn () => SocialAccount::forceCreate([
+                'user_id' => $user->getAuthIdentifier(),
+                'provider' => $identity->provider,
+                'provider_user_id' => $identity->id,
+            ]));
+        } catch (UniqueConstraintViolationException) {
+            // Connected concurrently — by this account (a double submit) or another.
+            return SocialAccount::resolve($identity->provider, $identity->id)?->user_id === $user->getAuthIdentifier()
+                ? redirect()->route('profile.show')->with('status', __(':provider is already connected to your account.', ['provider' => $provider]))
+                : redirect()->route('profile.show')->withErrors(['email' => __('That :provider account is already connected to a different account.', ['provider' => $provider])]);
+        }
 
         return redirect()->route('profile.show')->with('status', __(':provider connected.', ['provider' => $provider]));
     }
@@ -209,6 +247,22 @@ class SocialiteController
     private function refuse(string $message): RedirectResponse
     {
         return redirect()->route('login')->withErrors(['email' => $message]);
+    }
+
+    /**
+     * The account using this address, ignoring case. PostgreSQL and SQLite
+     * compare case-sensitively, so a provider reporting `Member@x` missed the
+     * account `member@x` — a second account for one inbox, or a lockout.
+     * lower() is the same function on all four engines.
+     */
+    private function userByEmail(string $email): ?Authenticatable
+    {
+        $model = $this->userModel();
+
+        return $model::query()
+            ->whereRaw('lower(email) = ?', [mb_strtolower($email)])
+            ->orderBy((new $model)->getKeyName())
+            ->first();
     }
 
     private function userModel(): string

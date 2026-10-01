@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Marque\Usarrs\Enums\InviteStatus;
+use Marque\Usarrs\Exceptions\InviteAlreadyRedeemed;
 use Marque\Usarrs\Models\Invite;
 use Marque\Usarrs\Services\InviteService;
 use Marque\Usarrs\Tests\TestUser;
@@ -79,4 +80,29 @@ test('can create invite after previous ones are used', function () {
     $this->service->redeem($invite, $newUser);
 
     expect($this->service->canCreateInvite($this->user))->toBeTrue();
+});
+
+// Build #124 CP #763. Redeeming used to write "used" over whatever was there,
+// so two registrations racing on one invite both got it.
+test('refuses to redeem an invite someone else redeemed first', function () {
+    $invite = $this->service->create($this->user);
+    $first = TestUser::factory()->create();
+    $second = TestUser::factory()->create();
+    $stale = Invite::find($invite->id); // loaded while still pending
+
+    $this->service->redeem($invite, $first);
+
+    expect(fn () => $this->service->redeem($stale, $second))->toThrow(InviteAlreadyRedeemed::class)
+        ->and($invite->fresh()->used_by_id)->toBe($first->id);
+});
+
+test('refuses to redeem an expired or revoked invite', function () {
+    $expired = $this->service->create($this->user);
+    $expired->update(['expires_at' => now()->subMinute()]);
+    $revoked = $this->service->create($this->user);
+    $this->service->revoke($revoked);
+    $newUser = TestUser::factory()->create();
+
+    expect(fn () => $this->service->redeem($expired, $newUser))->toThrow(InviteAlreadyRedeemed::class)
+        ->and(fn () => $this->service->redeem($revoked, $newUser))->toThrow(InviteAlreadyRedeemed::class);
 });

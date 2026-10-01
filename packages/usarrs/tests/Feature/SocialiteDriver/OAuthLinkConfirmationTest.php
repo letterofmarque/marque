@@ -17,6 +17,7 @@ declare(strict_types=1);
 // Every test here follows the URL the controller actually emailed — not one
 // this file builds — so a controller that signed the wrong thing fails.
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Fortify\Fortify;
 use Livewire\Livewire;
@@ -199,4 +200,174 @@ describe('confirming on the page', function () {
 
         expect(SocialAccount::count())->toBe(0);
     });
+});
+
+// Build #124 CP #763 (corrects CP #736). Confirming the emailed link is the
+// first thing anyone has done that proves the inbox. An account created by
+// OAuth was never proven: its creator only had a provider that *reported* the
+// address. So an attacker could create the account first, under the victim's
+// address, and keep their own connection after the victim confirmed theirs
+// into it. Confirming now verifies the address and drops what the account
+// gained before anyone proved it.
+describe('confirming proves the inbox', function () {
+    beforeEach(function () {
+        config()->set('usarrs.socialite_providers', ['github', 'gitlab']);
+    });
+
+    /** The attacker's account: made by OAuth under an address they don't own. */
+    function squat(object $test, string $provider, string $id): TestUser
+    {
+        $test->oauth->asserts($provider, $id, 'victim@example.com', 'Not The Victim');
+        $test->get(route('socialite.callback', $provider));
+        auth()->logout();
+
+        return TestUser::where('email', 'victim@example.com')->sole();
+    }
+
+    /** The victim's own OAuth trip, and the token the controller mailed them. */
+    function victimConfirms(object $test, TestUser $account, string $provider, string $id, bool $thenSignOut = true): void
+    {
+        $test->oauth->asserts($provider, $id, 'victim@example.com', 'The Victim');
+        $test->get(route('socialite.callback', $provider));
+
+        $url = null;
+        Notification::assertSentTo($account, OAuthLinkConfirmation::class, function (OAuthLinkConfirmation $n) use (&$url) {
+            $url = $n->url;
+
+            return true;
+        });
+
+        Livewire::test(ConfirmOAuthLink::class, ['provider' => $provider, 'token' => tokenOf($url)])->call('connect');
+
+        if ($thenSignOut) {
+            auth()->logout();
+        }
+    }
+
+    it('marks the address verified', function () {
+        $this->member->forceFill(['email_verified_at' => null])->save();
+
+        Livewire::test(ConfirmOAuthLink::class, ['provider' => 'github', 'token' => tokenOf(emailedConfirmation($this))])
+            ->call('connect');
+
+        expect($this->member->fresh()->hasVerifiedEmail())->toBeTrue();
+    });
+
+    it('drops a connection the account gained before its address was proven', function () {
+        $account = squat($this, 'gitlab', 'gl-attacker');
+
+        victimConfirms($this, $account, 'github', 'gh-victim');
+
+        expect(SocialAccount::resolve('gitlab', 'gl-attacker'))->toBeNull()
+            ->and(SocialAccount::resolve('github', 'gh-victim')?->user_id)->toBe($account->getKey());
+
+        // And the attacker's identity no longer signs anyone in.
+        $this->oauth->asserts('gitlab', 'gl-attacker', 'victim@example.com');
+        $this->get(route('socialite.callback', 'gitlab'));
+        $this->assertGuest();
+    });
+
+    it('lets the owner in even when the squatter took the same provider', function () {
+        $account = squat($this, 'github', 'gh-attacker');
+
+        victimConfirms($this, $account, 'github', 'gh-victim');
+
+        expect(SocialAccount::resolve('github', 'gh-attacker'))->toBeNull()
+            ->and(SocialAccount::resolve('github', 'gh-victim')?->user_id)->toBe($account->getKey());
+    });
+
+    it('ends any remembered sign-in from before the address was proven', function () {
+        // The attacker signs in remembered — every OAuth login is — and keeps
+        // that cookie. (squat() signs out afterwards, and signing out cycles the
+        // token, so take it from a fresh remembered login.)
+        $account = squat($this, 'gitlab', 'gl-attacker');
+        $this->oauth->asserts('gitlab', 'gl-attacker', 'victim@example.com');
+        $this->get(route('socialite.callback', 'gitlab'));
+        $before = $account->fresh()->getRememberToken();
+        expect($before)->not->toBeEmpty();
+        // Leave without logout(), which would cycle the token and hide the bug.
+        $this->flushSession();
+        $this->app['auth']->forgetGuards();
+
+        victimConfirms($this, $account, 'github', 'gh-victim', thenSignOut: false);
+
+        expect($account->fresh()->getRememberToken())->not->toBe($before);
+    });
+
+    // Profile security settings sit behind `auth`, not `verified`, so the
+    // squatter could add a passkey (a way back in) or two-factor (the owner
+    // locked out by the squatter's codes) as well as an OAuth connection.
+    it('drops a passkey the account gained before its address was proven', function () {
+        $account = squat($this, 'gitlab', 'gl-attacker');
+        $account->passkeys()->create(['name' => 'Squatter', 'credential_id' => 'cred-squat', 'credential' => ['type' => 'public-key']]);
+
+        victimConfirms($this, $account, 'github', 'gh-victim');
+
+        expect($account->passkeys()->count())->toBe(0);
+    });
+
+    it('turns off two-factor the squatter set up', function () {
+        $account = squat($this, 'gitlab', 'gl-attacker');
+        $account->forceFill([
+            'two_factor_secret' => Fortify::currentEncrypter()->encrypt(app(Google2FA::class)->generateSecretKey()),
+            'two_factor_confirmed_at' => now(),
+        ])->save();
+
+        victimConfirms($this, $account, 'github', 'gh-victim');
+
+        $account->refresh();
+        expect($account->two_factor_secret)->toBeNull()
+            ->and($account->two_factor_confirmed_at)->toBeNull();
+    });
+
+    it('keeps the connections of an account whose address was already proven', function () {
+        SocialAccount::forceCreate(['user_id' => $this->member->getKey(), 'provider' => 'gitlab', 'provider_user_id' => 'gl-mine']);
+
+        Livewire::test(ConfirmOAuthLink::class, ['provider' => 'github', 'token' => tokenOf(emailedConfirmation($this))])
+            ->call('connect');
+
+        expect(SocialAccount::resolve('gitlab', 'gl-mine')?->user_id)->toBe($this->member->getKey());
+    });
+
+    it('keeps the passkeys and two-factor of an account whose address was already proven', function () {
+        $this->member->passkeys()->create(['name' => 'Mine', 'credential_id' => 'cred-mine', 'credential' => ['type' => 'public-key']]);
+        $this->member->forceFill(['two_factor_secret' => 'kept', 'two_factor_confirmed_at' => null])->save();
+
+        Livewire::test(ConfirmOAuthLink::class, ['provider' => 'github', 'token' => tokenOf(emailedConfirmation($this))])
+            ->call('connect');
+
+        expect($this->member->passkeys()->count())->toBe(1)
+            ->and($this->member->fresh()->two_factor_secret)->toBe('kept');
+    });
+});
+
+// PostgreSQL and SQLite compare strings case-sensitively. A provider reporting
+// `Member@Example.com` for the account `member@example.com` used to miss it —
+// a second account for the same inbox, or, with registration closed, a lockout.
+it('matches the account whatever case the provider reports its address in', function () {
+    $this->oauth->asserts('github', 'gh-77', 'Member@Example.COM');
+
+    $this->get(route('socialite.callback', 'github'));
+
+    Notification::assertSentTo($this->member, OAuthLinkConfirmation::class);
+    expect(TestUser::count())->toBe(1);
+});
+
+// Two clicks, two tabs, or a retry can connect the same pending link at once.
+// The loser must hear "already connected", not see a 500.
+it('reports a connection made concurrently instead of failing', function () {
+    $token = tokenOf(emailedConfirmation($this));
+    $other = TestUser::factory()->create();
+    SocialAccount::creating(function () use ($other) {
+        DB::table('usarrs_social_accounts')->insert([
+            'user_id' => $other->getKey(), 'provider' => 'github', 'provider_user_id' => 'gh-77',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+    });
+
+    Livewire::test(ConfirmOAuthLink::class, ['provider' => 'github', 'token' => $token])
+        ->call('connect')
+        ->assertHasErrors('token');
+
+    $this->assertGuest();
 });

@@ -11,6 +11,7 @@ declare(strict_types=1);
 // that one; an unlinked identity went down the email-match or account-creation
 // paths as if nobody were signed in.
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Marque\Usarrs\Contracts\OAuthProvider;
 use Marque\Usarrs\Models\SocialAccount;
@@ -93,4 +94,22 @@ it('refuses a second identity from a provider the account already has', function
 
     $this->assertAuthenticatedAs($this->me);
     expect(SocialAccount::resolve('github', 'gh-another'))->toBeNull();
+});
+
+// Build #124 CP #763: the same identity connected concurrently — the loser is
+// told it is connected elsewhere, not shown a 500.
+it('reports a connection made concurrently instead of failing', function () {
+    SocialAccount::creating(function () {
+        DB::table('usarrs_social_accounts')->insert([
+            'user_id' => $this->someoneElse->getKey(), 'provider' => 'gitlab', 'provider_user_id' => 'gl-9',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+    });
+    $this->oauth->asserts('gitlab', 'gl-9', 'me@example.com');
+
+    $this->actingAs($this->me)->get(route('socialite.callback', 'gitlab'))
+        ->assertRedirect(route('profile.show'))
+        ->assertSessionHasErrors('email');
+
+    $this->assertAuthenticatedAs($this->me);
 });

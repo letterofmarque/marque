@@ -9,6 +9,7 @@ declare(strict_types=1);
 // account is unverified and sent the verification email like anyone else.
 
 use Illuminate\Auth\Notifications\VerifyEmail;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Marque\Usarrs\Contracts\InviteServiceInterface;
@@ -102,4 +103,90 @@ it('creates nothing for an identity with no email address', function () {
 
     expect(TestUser::count())->toBe(0);
     $this->assertGuest();
+});
+
+// Build #124 CP #763 (corrects CP #736).
+
+// Checking an invite and then redeeming it unconditionally let N concurrent
+// callbacks carrying one invite each make an account. Redeeming now claims the
+// invite only if it is still pending, and an account made on an invite that
+// was lost in the race is rolled back with it.
+it('makes no account when the invite is redeemed by someone else mid-request', function () {
+    config()->set('usarrs.invites.enabled', true);
+    config()->set('usarrs.invites.required', true);
+    $inviter = TestUser::factory()->create();
+    $invite = app(InviteServiceInterface::class)->create($inviter);
+    $winner = TestUser::factory()->create();
+
+    // The concurrent request wins between the check and the redemption.
+    TestUser::creating(function (TestUser $user) use ($invite, $winner) {
+        if ($user->email === 'newcomer@example.com') {
+            DB::table('invites')->where('id', $invite->id)->update(['status' => 'used', 'used_by_id' => $winner->getKey()]);
+        }
+    });
+
+    $this->get(route('socialite.redirect', ['provider' => 'github', 'invite' => $invite->code]));
+    $this->oauth->asserts('github', 'gh-new', 'newcomer@example.com');
+    $this->get(route('socialite.callback', 'github'))->assertSessionHasErrors('email');
+
+    // (The winner's write is undone here too — in this test it runs inside the
+    // losing request's transaction. A real competitor commits on its own.)
+    expect(newcomer())->toBeNull()
+        ->and(SocialAccount::count())->toBe(0);
+    $this->assertGuest();
+});
+
+// The same identity arriving twice at once: the second must not leave an
+// orphaned account behind, or fail with a 500.
+it('makes no account, and no error page, when the identity is linked mid-request', function () {
+    $someone = TestUser::factory()->create();
+    TestUser::created(function (TestUser $user) use ($someone) {
+        if ($user->email === 'newcomer@example.com') {
+            DB::table('usarrs_social_accounts')->insert([
+                'user_id' => $someone->getKey(), 'provider' => 'github', 'provider_user_id' => 'gh-new',
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+    });
+    $this->oauth->asserts('github', 'gh-new', 'newcomer@example.com');
+
+    $this->get(route('socialite.callback', 'github'))
+        ->assertRedirect(route('login'))
+        ->assertSessionHasErrors('email');
+
+    expect(newcomer())->toBeNull();
+    $this->assertGuest();
+});
+
+it('treats an invite that is not a string as no invite', function () {
+    config()->set('usarrs.invites.enabled', true);
+    config()->set('usarrs.invites.required', true);
+
+    $this->get(route('socialite.redirect', 'github').'?invite[]=x');
+    $this->oauth->asserts('github', 'gh-new', 'newcomer@example.com');
+
+    $this->get(route('socialite.callback', 'github'))->assertSessionHasErrors('email');
+
+    expect(newcomer())->toBeNull();
+});
+
+// With registration closed, "we've sent a link" for a known address and
+// "registration is closed" for an unknown one told anybody which addresses
+// have accounts here. Both now get the same answer.
+it('answers the same whether or not the address has an account, when registration is closed', function () {
+    config()->set('usarrs.invites.enabled', true);
+    config()->set('usarrs.invites.required', true);
+    TestUser::factory()->create(['email' => 'member@example.com']);
+
+    $this->oauth->asserts('github', 'gh-a', 'member@example.com');
+    $known = $this->get(route('socialite.callback', 'github'));
+    $knownSession = [session('status'), session('errors')?->getBag('default')->toArray()];
+    $this->flushSession();
+
+    $this->oauth->asserts('github', 'gh-b', 'nobody@example.com');
+    $unknown = $this->get(route('socialite.callback', 'github'));
+    $unknownSession = [session('status'), session('errors')?->getBag('default')->toArray()];
+
+    expect($known->headers->get('Location'))->toBe($unknown->headers->get('Location'))
+        ->and($knownSession)->toBe($unknownSession);
 });

@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace Marque\Usarrs\Livewire\Auth;
 
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Validate;
 use Marque\Usarrs\Auth\LoginCompletion;
 use Marque\Usarrs\Auth\RegistrationRules;
 use Marque\Usarrs\Enums\AuthDriver;
+use Marque\Usarrs\Exceptions\InviteAlreadyRedeemed;
 use Marque\Usarrs\Livewire\Component;
 use Marque\Usarrs\Services\InviteService;
 
@@ -55,14 +57,27 @@ class Register extends Component
         $invite = config('usarrs.invites.required', false) ? $rules->validInvite($this->invite) : null;
 
         $model = config('trove.user_model', 'App\\Models\\User');
-        $user = $model::create([
-            'name' => $this->name,
-            'email' => $this->email,
-            'password' => Hash::make($this->password),
-        ]);
 
-        if ($invite !== null) {
-            $inviteService->redeem($invite, $user);
+        // One transaction: an invite lost to a concurrent registration takes
+        // this account with it (Build #124 CP #763).
+        try {
+            $user = DB::transaction(function () use ($model, $invite, $inviteService) {
+                $user = $model::create([
+                    'name' => $this->name,
+                    'email' => $this->email,
+                    'password' => Hash::make($this->password),
+                ]);
+
+                if ($invite !== null) {
+                    $inviteService->redeem($invite, $user);
+                }
+
+                return $user;
+            });
+        } catch (InviteAlreadyRedeemed) {
+            $this->addError('invite', __('That invite has already been used.'));
+
+            return;
         }
 
         $this->redirect(app(LoginCompletion::class)->begin($user, remember: false), navigate: true);
