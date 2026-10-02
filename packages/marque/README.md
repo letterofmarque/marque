@@ -1,6 +1,7 @@
 # marque/marque
 
-**Start here.** One require, one command, a working tracker.
+**Start here.** One require and one command wire a working tracker, once you have a
+mailer, Redis and built assets (see below).
 
 ```bash
 composer require marque/marque

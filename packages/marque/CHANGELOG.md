@@ -44,7 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tracker types is refused before any question. (#10803)
 - **"The dashboard" as a home page option, and the default for a private tracker.**
   `/` redirects to usarrs's `dashboard.index`, which exists on every install the
-  installer produces (it requires usarrs ^8.0). A public tracker still defaults to the
+  installer produces (it requires usarrs ^8.1, which ships the dashboard's panels). A public tracker still defaults to the
   splash page: its visitors are mostly guests, and the dashboard sits behind a login.
   Self-verification loads `/dashboard` too. When an admin account exists it does so as
   that admin, where a redirect counts as a failure, so every registered panel actually

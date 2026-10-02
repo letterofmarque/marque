@@ -45,7 +45,8 @@ composer require marque/marque
 php artisan marque:install
 ```
 
-That is the whole thing. `marque:install` asks what you are building — private
+Those two commands do the work, once the prerequisites below are in place (a mailer,
+Redis, and built assets). `marque:install` asks what you are building — private
 or public tracker, whether you want the API, forums, a taxonomy, an admin panel
 — installs exactly those packages, and wires them into your app: routes, config,
 migrations, your `User` model, the Tailwind sources your templates need, and a
@@ -59,8 +60,12 @@ already done. It still asks the site name and whether to create an admin.
 **You will need a mailer configured first.** Registration, password reset and
 invites all need one, and the installer sets up your admin account by emailing
 you a link to choose a password — so without mail you would end up with an
-account you could never sign in as. The installer refuses to start until
-`MAIL_MAILER` is set to something that delivers.
+account you could never sign in as. The installer refuses to start while
+`MAIL_MAILER` is `log`, `array` or unset, or `smtp` with no host. It checks the
+setting, not that mail actually arrives.
+
+**You will need Redis running.** Every tracker keeps its peers in Redis, so the
+installer refuses to continue if it can't reach the connection threepio uses.
 
 **Build your assets before you run it, and again after** — `npm install && npm run
 build`. Laravel doesn't ship compiled assets, and until they're built every page fails
