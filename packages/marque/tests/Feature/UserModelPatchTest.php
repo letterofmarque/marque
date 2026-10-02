@@ -304,4 +304,58 @@ PHP;
 
         $this->assertStringNotContainsString('remember_token', $diff);
     }
+
+    // Job #131. usarrs gates /admin on `verified`, and 8.1 proves an OAuth
+    // owner's inbox through the same interface — but Laravel ships it commented
+    // out, so the gate passed everyone. A tracker wants verified addresses.
+
+    public function test_a_stock_model_needs_must_verify_email(): void
+    {
+        $this->write($this->stockUserModel());
+
+        $this->assertContains(
+            'Illuminate\Contracts\Auth\MustVerifyEmail',
+            $this->patcher()->pending(private: false)['interfaces'],
+        );
+    }
+
+    public function test_it_uncomments_laravels_own_import_rather_than_adding_a_second(): void
+    {
+        $this->write($this->stockUserModel());
+
+        $this->patcher()->apply(private: false);
+        $after = $this->read();
+
+        $this->assertStringNotContainsString('// use Illuminate\Contracts\Auth\MustVerifyEmail;', $after);
+        $this->assertSame(1, substr_count($after, 'use Illuminate\Contracts\Auth\MustVerifyEmail;'));
+        $this->assertMatchesRegularExpression('/class User extends Authenticatable implements [^{]*\bMustVerifyEmail\b/', $after);
+    }
+
+    public function test_it_never_declares_must_verify_email_twice(): void
+    {
+        $this->write(str_replace(
+            'class User extends Authenticatable',
+            'class User extends Authenticatable implements MustVerifyEmail',
+            $this->stockUserModel(),
+        ));
+
+        $this->patcher()->apply(private: true);
+
+        $this->assertSame(1, substr_count($this->read(), 'MustVerifyEmail,'), 'MustVerifyEmail declared once');
+        $this->assertSame(1, substr_count($this->read(), "\nuse Illuminate\\Contracts\\Auth\\MustVerifyEmail;"), 'imported once, live');
+    }
+
+    public function test_a_model_already_verifying_email_is_left_alone_for_it(): void
+    {
+        $this->write(str_replace(
+            ['// use Illuminate\Contracts\Auth\MustVerifyEmail;', 'class User extends Authenticatable'],
+            ['use Illuminate\Contracts\Auth\MustVerifyEmail;', 'class User extends Authenticatable implements MustVerifyEmail'],
+            $this->stockUserModel(),
+        ));
+
+        $this->assertNotContains(
+            'Illuminate\Contracts\Auth\MustVerifyEmail',
+            $this->patcher()->pending(private: true)['interfaces'],
+        );
+    }
 }

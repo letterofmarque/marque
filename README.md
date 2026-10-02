@@ -52,8 +52,9 @@ migrations, your `User` model, the Tailwind sources your templates need, and a
 front page. Then it checks the result actually responds before telling you it
 worked.
 
-It is safe to re-run. A second pass finds what is already in place and offers
-only the gaps, which is also how you add forums later.
+It is safe to re-run, and that's how you add forums later. A second pass keeps the
+tracker you have, offers only the extras you don't, and skips the wiring that's
+already done. It still asks the site name and whether to create an admin.
 
 **You will need a mailer configured first.** Registration, password reset and
 invites all need one, and the installer sets up your admin account by emailing
@@ -61,9 +62,11 @@ you a link to choose a password — so without mail you would end up with an
 account you could never sign in as. The installer refuses to start until
 `MAIL_MAILER` is set to something that delivers.
 
-**Build your assets afterwards** — `npm install && npm run build`, or
-`npm run dev` while you work. Laravel does not ship compiled assets, and until
-you build them every page fails on a missing Vite manifest.
+**Build your assets before you run it, and again after** — `npm install && npm run
+build`. Laravel doesn't ship compiled assets, and until they're built every page fails
+on a missing Vite manifest, which fails the installer's own final check. It adds the
+packages' Tailwind sources, so build again afterwards (or keep `npm run dev` running)
+to see their styles.
 
 ### Wiring it up by hand
 

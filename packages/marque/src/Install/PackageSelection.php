@@ -85,6 +85,34 @@ final class PackageSelection
         return $selection;
     }
 
+    /**
+     * A selection from its parts, as InstallAnswers carries it. Only packages
+     * the installer itself offers are accepted: the parts arrive on a command
+     * line, and must not become a way to wire in anything else.
+     *
+     * @param  list<mixed>  $extras
+     */
+    public static function rebuild(bool $private, array $extras): self
+    {
+        $selection = $private ? self::private() : self::public();
+
+        foreach ($extras as $extra) {
+            if (! in_array($extra, self::EXTRAS, true)) {
+                throw new \InvalidArgumentException('Not a package marque:install offers: '.json_encode($extra));
+            }
+
+            $selection = $selection->with($extra);
+        }
+
+        return $selection;
+    }
+
+    /** @return list<string> the optional packages chosen, tracker excluded */
+    public function extras(): array
+    {
+        return $this->extras;
+    }
+
     public function includes(string $package): bool
     {
         return in_array($package, $this->packages(), true);

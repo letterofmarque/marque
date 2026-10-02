@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Marque\Marque\Tests;
 
+use Marque\Marque\Install\ComposerResult;
+use Marque\Marque\Install\ComposerRunner;
 use Marque\Marque\MarqueServiceProvider;
 use Orchestra\Testbench\TestCase as BaseTestCase;
 
@@ -23,6 +25,26 @@ abstract class TestCase extends BaseTestCase
         return [
             MarqueServiceProvider::class,
         ];
+    }
+
+    /**
+     * No test may run a real `composer require`. Testbench's skeleton app
+     * symlinks this package's vendor/, so one that slipped through rewrote the
+     * package's own dependencies and deleted Pest (Job #131, 2026-10-02). The
+     * command resolves ComposerRunner from the container; a test that wants
+     * composer to "succeed" binds its own fake over this.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->app->bind(ComposerRunner::class, fn () => new class('/nowhere') extends ComposerRunner
+        {
+            public function require(array $packages, ?callable $onOutput = null): ComposerResult
+            {
+                throw new \LogicException('A test reached a real composer require: '.implode(' ', $packages));
+            }
+        });
     }
 
     protected function defineEnvironment($app): void

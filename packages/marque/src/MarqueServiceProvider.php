@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Marque\Marque;
 
 use Illuminate\Support\ServiceProvider;
+use Marque\Marque\Console\FinishInstallCommand;
 use Marque\Marque\Console\InstallCommand;
 
 /**
@@ -27,6 +28,7 @@ class MarqueServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 InstallCommand::class,
+                FinishInstallCommand::class,
             ]);
         }
     }

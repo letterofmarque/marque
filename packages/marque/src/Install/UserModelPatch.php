@@ -37,6 +37,14 @@ final class UserModelPatch
 
     private const USER_CONTRACT = 'Marque\Trove\Contracts\UserInterface';
 
+    /**
+     * usarrs gates /admin on the `verified` middleware, and proves an OAuth
+     * owner's inbox through this interface — but Laravel ships it commented
+     * out, so that gate passed everybody (Job #131). A tracker wants verified
+     * addresses.
+     */
+    private const VERIFY_CONTRACT = 'Illuminate\Contracts\Auth\MustVerifyEmail';
+
     public function __construct(private readonly string $path) {}
 
     /**
@@ -60,8 +68,9 @@ final class UserModelPatch
                 fn (string $fqcn): bool => ! $this->alreadyUses($contents, $fqcn),
             )),
             'interfaces' => array_values(array_filter(
-                [self::USER_CONTRACT],
-                fn (string $fqcn): bool => ! $this->alreadyUses($contents, $fqcn),
+                [self::USER_CONTRACT, self::VERIFY_CONTRACT],
+                fn (string $fqcn): bool => ! ($this->alreadyUses($contents, $fqcn)
+                    && $this->alreadyImplements($contents, $this->shortName($fqcn))),
             )),
         ];
     }
@@ -179,7 +188,9 @@ final class UserModelPatch
         $pending = $this->pending($private);
 
         foreach ([...$pending['traits'], ...$pending['interfaces']] as $fqcn) {
-            $contents = $this->addImport($contents, $fqcn);
+            if (! $this->alreadyUses($contents, $fqcn)) {
+                $contents = $this->addImport($contents, $fqcn);
+            }
         }
 
         foreach ($pending['traits'] as $fqcn) {
@@ -187,7 +198,9 @@ final class UserModelPatch
         }
 
         foreach ($pending['interfaces'] as $fqcn) {
-            $contents = $this->addInterface($contents, $this->shortName($fqcn));
+            if (! $this->alreadyImplements($contents, $this->shortName($fqcn))) {
+                $contents = $this->addInterface($contents, $this->shortName($fqcn));
+            }
         }
 
         return $contents;
@@ -201,6 +214,14 @@ final class UserModelPatch
      */
     private function addImport(string $contents, string $fqcn): string
     {
+        // Laravel's own commented-out import (`// use ...MustVerifyEmail;`) is
+        // made live rather than left beside a second copy.
+        $commented = '/^\/\/\s*use\s+'.preg_quote($fqcn, '/').'\s*;$/m';
+
+        if (preg_match($commented, $contents) === 1) {
+            return preg_replace($commented, "use {$fqcn};", $contents, 1) ?? $contents;
+        }
+
         if (preg_match_all('/^use\s+[^;]+;$/m', $contents, $m, PREG_OFFSET_CAPTURE) === 0) {
             return $contents;
         }
@@ -263,6 +284,16 @@ final class UserModelPatch
     private function alreadyUses(string $contents, string $fqcn): bool
     {
         return preg_match('/^use\s+'.preg_quote($fqcn, '/').'\s*;/m', $contents) === 1;
+    }
+
+    /**
+     * Whether the class declaration already names this interface — which a
+     * model can do with the import still commented out, as Laravel's own
+     * docs suggest editing it.
+     */
+    private function alreadyImplements(string $contents, string $interface): bool
+    {
+        return preg_match('/^class\s+User\s+extends\s+\S+\s+implements\s+[^{]*\b'.preg_quote($interface, '/').'\b/m', $contents) === 1;
     }
 
     private function shortName(string $fqcn): string

@@ -12,6 +12,11 @@ and wires them into your app — routes, config, migrations, the User model, and
 the Tailwind sources your templates need. It then checks the result actually
 responds before telling you it worked.
 
+Build your front-end assets (`npm install && npm run build`) **before** running it,
+because the final check loads real pages and they fail without a built manifest. Build
+them again **after**, because it adds the packages' Tailwind sources and their styles
+only appear once rebuilt. The installer doesn't run npm for you yet (#10796).
+
 ## What this package is
 
 A front door. It requires the four packages every Marque deployment needs:

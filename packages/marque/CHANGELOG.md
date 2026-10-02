@@ -30,13 +30,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bypassed. So the wrong tracker package is never installed rather than being
   disabled by config, and a future edit adding one here fails `ManifestTest`.
 
+- **One run finishes the job.** composer require runs in a subprocess, and the process
+  that started it can't load what it just installed, or the User model it just patched.
+  So after the file edits (stylesheet, User model, home page), the rest (config,
+  migrations, the admin account, the self-check) runs in a fresh `php artisan` process,
+  `marque:install:finish`, which boots with all of it loaded.
+- **The User model patch adds `MustVerifyEmail`** (uncommenting Laravel's own import), so
+  the `verified` checks are real: usarrs' /admin, and its proof that an OAuth sign-in's
+  owner holds the inbox. The diff screen says how many existing users haven't verified.
 - **A re-run starts from what's installed.** The tracker question isn't asked again, so
   a public tracker can't have bloodhound added beside hound by pressing Enter. Extras
   already present aren't offered or re-required, and an app that already holds both
   tracker types is refused before any question. (#10803)
 - **"The dashboard" as a home page option, and the default for a private tracker.**
   `/` redirects to usarrs's `dashboard.index`, which exists on every install the
-  installer produces. A public tracker still defaults to the splash page: its visitors are
-  mostly guests, and the dashboard sits behind a login. Self-verification now also loads
-  `/dashboard` as the new admin — a redirect counts as a failure — which renders every
-  registered panel for real rather than only proving a route exists.
+  installer produces (it requires usarrs ^8.0). A public tracker still defaults to the
+  splash page: its visitors are mostly guests, and the dashboard sits behind a login.
+  Self-verification loads `/dashboard` too. When an admin account exists it does so as
+  that admin, where a redirect counts as a failure, so every registered panel actually
+  renders; without one it's a guest probe.
