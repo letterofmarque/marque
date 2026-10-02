@@ -33,7 +33,7 @@ jobs:
   # already; this is the same check moved earlier, where it is cheap to fix.
   lint:
     name: Lint and changelog
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v7
@@ -59,7 +59,7 @@ jobs:
   # level and what it would take to raise it.
   static-analysis:
     name: PHPStan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
