@@ -7,6 +7,23 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [6.1.1] — 2026-10-03
+
+> Ships the README corrections 6.1.0 should have contained; 6.1.0's code is unchanged and correct.
+
+### Fixed
+
+- **6.1.0 on Packagist was missing its README corrections.** The split tool tagged the
+  previous tree (an apostrophe in a commit message broke it). 6.1.0's code, including the
+  key hold-back and the announce status check, did ship. 6.1.1 adds the docs:
+  - timing, Redis and peer-response settings are threepio's (`redis.prefix` defaults to
+    `marque:`)
+  - the client lists are top-level `whitelist` / `blacklist`
+  - the announce log is on by default
+  - the announce flow writes to the ledger, not a queue
+  - 9 whitelisted clients, four ledger commands
+  - known-unbuilt keys are marked as such
+
 ## [6.1.0] — 2026-10-03
 
 > Security: banned and disabled users can no longer announce, and an app that verifies email addresses issues announce keys on verification instead of at sign-up.

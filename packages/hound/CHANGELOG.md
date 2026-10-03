@@ -7,7 +7,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [Unreleased]
+## [3.3.0] — 2026-10-03
 
 > Swarm counts fall back as peers leave (a stopped announce removes the peer, an hourly sweep clears expired ones), and announce and scrape paths are configurable for migrating public trackers.
 

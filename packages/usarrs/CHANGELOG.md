@@ -7,6 +7,23 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [8.2.1] — 2026-10-03
+
+> Ships what 8.2.0 should have contained: 8.2.0 reached Packagist without its last fix (manage_auth off no longer errors for unverified members) and its README corrections.
+
+### Fixed
+
+- **8.2.0 on Packagist was missing its last commits.** The split that publishes this
+  package committed nothing (an apostrophe in a commit message broke the split tool) and
+  tagged the previous tree, so 8.2.0 lacked the two fixes below. Take 8.2.1. The split is
+  fixed, and the release tooling now checks the published tree against the tagged one.
+- **With `manage_auth` off, an unverified member hit a route-not-found error.** It happened
+  at the invite form and on the announce-key notice, because both pointed at
+  `verification.notice`, which usarrs registers only while it manages auth. The invite
+  form now refuses with a 403 and the notice drops its link.
+- README corrections: which statuses are refused, how passkey sign-in is refused, and the
+  installer's dashboard option shipping since `marque/marque` 1.0.0.
+
 ## [8.2.0] — 2026-10-03
 
 > Security: banned users are refused everywhere, sign-in and the two-factor challenge are rate-limited, and adding passkeys, two-factor, invites or announce keys needs a verified address; passkeys now work on current Fortify, and invite_only lets invites in.
