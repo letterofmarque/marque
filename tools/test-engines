@@ -160,10 +160,16 @@ engine_env() {
     local engine="$1" db="$2"
     local port="${ENGINE_PORT[$engine]:-}"
 
+    # Each worker gets its own Redis database too, numbered like its SQL one.
+    # bloodhound, threepio and hound tests flushdb, and on one shared Redis a
+    # flush in one worker wipes peers another worker's test just wrote. Same
+    # isolation as the SQL databases, for the same reason (Job #141).
+    local redis="REDIS_DB=${db##*_}"
+
     case "$engine" in
-        sqlite)  echo "DB_CONNECTION=sqlite" ;;
+        sqlite)  echo "DB_CONNECTION=sqlite $redis" ;;
         mysql|mariadb|pgsql|pgsql16)
-            echo "DB_CONNECTION=$(driver_for "$engine") DB_PORT=$port DB_DATABASE=$db" ;;
+            echo "DB_CONNECTION=$(driver_for "$engine") DB_PORT=$port DB_DATABASE=$db $redis" ;;
         *) echo "unknown engine: $engine" >&2; return 1 ;;
     esac
 }
