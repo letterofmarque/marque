@@ -7,7 +7,9 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [Unreleased]
+## [6.1.0] — 2026-10-03
+
+> Security: banned and disabled users can no longer announce, and an app that verifies email addresses issues announce keys on verification instead of at sign-up.
 
 ### Security
 

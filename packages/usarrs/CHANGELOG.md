@@ -7,7 +7,9 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [Unreleased]
+## [8.2.0] — 2026-10-03
+
+> Security: banned users are refused everywhere, sign-in and the two-factor challenge are rate-limited, and adding passkeys, two-factor, invites or announce keys needs a verified address; passkeys now work on current Fortify, and invite_only lets invites in.
 
 ### Security
 
