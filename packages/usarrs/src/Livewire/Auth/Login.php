@@ -6,6 +6,8 @@ namespace Marque\Usarrs\Livewire\Auth;
 
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Validate;
 use Marque\Usarrs\Auth\LoginCompletion;
@@ -44,16 +46,33 @@ class Login extends Component
 
         $this->validate();
 
+        // Laravel's standard: five a minute per email and IP (#10856). Checked
+        // before the password is, so the sixth try is refused even when right.
+        if (RateLimiter::tooManyAttempts($this->throttleKey(), 5)) {
+            $seconds = RateLimiter::availableIn($this->throttleKey());
+            $this->addError('email', __('auth.throttle', ['seconds' => $seconds, 'minutes' => ceil($seconds / 60)]));
+
+            return;
+        }
+
         if (! Auth::validate(['email' => $this->email, 'password' => $this->password])) {
+            RateLimiter::hit($this->throttleKey());
             $this->addError('email', __('These credentials do not match our records.'));
 
             return;
         }
 
+        RateLimiter::clear($this->throttleKey());
+
         $model = config('trove.user_model', 'App\\Models\\User');
         $user = $model::where('email', $this->email)->first();
 
         $this->redirect(app(LoginCompletion::class)->begin($user, $this->remember), navigate: true);
+    }
+
+    private function throttleKey(): string
+    {
+        return 'usarrs.login:'.Str::transliterate(Str::lower($this->email)).'|'.request()->ip();
     }
 
     protected function sendMagicLink(): void

@@ -18,6 +18,12 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   refuses the paths that skip the seam (passkeys, remember-me), and the middleware
   is pushed onto the `web` group so a live session ends on its next request to any
   page. A user with no status is never refused; an unrecognised status is.
+- **Nothing was rate-limited.** The two-factor challenge accepted unlimited guesses
+  per pending login, so a 6-digit code could be brute-forced in hours. A code could
+  also be reused inside its window, and password login and password confirmation
+  were unthrottled. Now each is limited to five a minute: password login per email
+  and IP, the challenge per pending login (codes and recovery codes together), and
+  confirmation per user. A TOTP code works once per user.
 
 ## [8.1.0] — 2026-10-01
 

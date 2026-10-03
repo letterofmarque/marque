@@ -243,6 +243,28 @@ Uses Fortify's own TOTP action classes (`EnableTwoFactorAuthentication`,
 and `TwoFactorChallenge` (login-time) Livewire components. To use it, your `User`
 model needs `Laravel\Fortify\TwoFactorAuthenticatable`.
 
+### Rate limits
+
+| Where | Limit | Keyed on |
+|---|---|---|
+| Password login | 5 a minute | email (case-folded) and IP |
+| Two-factor challenge | 5 a minute, codes and recovery codes together | the pending login |
+| Password confirmation | 5 a minute | the signed-in user |
+
+The challenge limit isn't keyed on IP. Anyone at the challenge already has the
+password, and an IP key would let them switch addresses to get five more guesses.
+A successful attempt resets the count.
+
+**A TOTP code works once.** usarrs keeps the timestamp of each user's last
+accepted code and only accepts a newer one. That way a code seen over someone's
+shoulder or in a log can't be reused while it's still valid. Fortify's own
+provider keys this on the code alone, so two users who happen to share a code
+block each other. usarrs keys it per user.
+
+The limits and the used-code record live in your app's cache store. A cache
+that doesn't persist between requests, such as the `array` driver, turns both
+off.
+
 ## Passkeys (WebAuthn)
 
 Off by default (`config('usarrs.passkeys.enabled')`, `USARRS_PASSKEYS_ENABLED`). Also
