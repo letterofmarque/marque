@@ -9,7 +9,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [6.1.1] — 2026-10-03
 
-> Ships the README corrections 6.1.0 should have contained; 6.1.0's code is unchanged and correct.
+> Ships the README corrections 6.1.0 should have contained; no code changes (comments only in the config).
 
 ### Fixed
 
@@ -22,7 +22,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   - the announce log is on by default
   - the announce flow writes to the ledger, not a queue
   - 9 whitelisted clients, four ledger commands
-  - known-unbuilt keys are marked as such
+  - known-unbuilt and retired keys carry check-docs markers in the config (and the
+    retired `queue.*` rows in the README)
 
 ## [6.1.0] — 2026-10-03
 

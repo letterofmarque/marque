@@ -11,7 +11,7 @@ changelogs — edit those, not this.*
 ## 2026-10-03
 
 - **[bloodhound 6.1.0](packages/bloodhound/CHANGELOG.md)** — Security: banned and disabled users can no longer announce, and an app that verifies email addresses issues announce keys on verification instead of at sign-up.
-- **[bloodhound 6.1.1](packages/bloodhound/CHANGELOG.md)** — Ships the README corrections 6.1.0 should have contained; 6.1.0's code is unchanged and correct.
+- **[bloodhound 6.1.1](packages/bloodhound/CHANGELOG.md)** — Ships the README corrections 6.1.0 should have contained; no code changes (comments only in the config).
 - **[hound 3.3.0](packages/hound/CHANGELOG.md)** — Swarm counts fall back as peers leave (a stopped announce removes the peer, an hourly sweep clears expired ones), and announce and scrape paths are configurable for migrating public trackers.
 - **[usarrs 8.2.0](packages/usarrs/CHANGELOG.md)** — Security: banned users are refused everywhere, sign-in and the two-factor challenge are rate-limited, and adding passkeys, two-factor, invites or announce keys needs a verified address; passkeys now work on current Fortify, and invite_only lets invites in.
 - **[usarrs 8.2.1](packages/usarrs/CHANGELOG.md)** — Ships what 8.2.0 should have contained: 8.2.0 reached Packagist without its last fix (manage_auth off no longer errors for unverified members) and its README corrections.

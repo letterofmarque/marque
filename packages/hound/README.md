@@ -88,8 +88,9 @@ a web browser rather than a BitTorrent client.
 7. Bencoded peer list returned
 
 There is no user lookup, no anti-cheat pass, no byte accounting and no ledger. A public
-announce touches the database only to identify the torrent and, when the swarm has
-actually moved, to update its counts.
+announce touches the database only to identify the torrent, to increment
+`times_completed` on a `completed` event, and, when the swarm has actually moved, to
+update its counts.
 
 ### Scrape
 
@@ -132,8 +133,11 @@ straight away. A peer that vanishes without sending `stopped` (client killed, ma
 is caught by **`hound:sync-swarm-counts`**, which hound schedules hourly. It sweeps each
 torrent's expired peers out of Redis and writes the settled counts back to the row. That
 needs [Laravel's scheduler running](https://laravel.com/docs/scheduling#running-the-scheduler).
-Until the sweep runs, a torrent whose swarm vanished keeps its last-known counts for up to
-an hour.
+A vanished peer counts as expired once `peer_expiry` has passed since its last announce
+(an hour by default), and the next hourly sweep removes it. So a torrent whose swarm
+vanished keeps its last-known counts for up to about two hours. The scheduler is a hard
+requirement: threepio drops a torrent's peer list from Redis after twice `peer_expiry`,
+and if no sweep has run by then the counts can no longer be corrected.
 
 ```bash
 php artisan hound:sync-swarm-counts
@@ -155,16 +159,19 @@ only one available.
 | Key | Default | Description |
 |-----|---------|-------------|
 | `ip_limiting.enabled` | `true` | Enable the per-IP peer cap |
-| `ip_limiting.max_per_ip` | `50` | Max concurrent peers from one IP |
+| `ip_limiting.max_per_ip` | `50` | Max distinct peer IDs from one IP |
 
 ```env
 HOUND_IP_LIMITING=true
 HOUND_MAX_PER_IP=50
 ```
 
-Peers over the cap get a bencoded `Too many connections from your IP` failure. The count
-is across all torrents, not per torrent — a single IP seeding 50 torrents is at the limit.
-Raise it if you expect legitimate NAT'd or institutional traffic.
+At the cap, **every** announce from that IP gets a bencoded `Too many connections from your
+IP` failure, including re-announces from peers already in the swarm and `stopped` (so
+those peers leave only when they expire). The count is of distinct peer IDs across all
+torrents, so a client that uses one peer ID for every torrent counts once. Raise it if you
+expect legitimate NAT'd or institutional traffic. (#10804 covers the peer-handling
+problems behind this.)
 
 ### Logging — planned, not yet built
 
@@ -196,7 +203,7 @@ Set these in `config/threepio.php`, not here:
 | `peer_expiry` | `3600` | Seconds before inactive peers are dropped |
 | `max_peers_per_announce` | `50` | Ceiling on peers returned, regardless of `numwant` |
 | `peer_response_format` | `auto` | `auto`, `compact`, or `dictionary` |
-| `blacklisted_ports` | *(see config)* | Direct Connect, Kazaa, eMule, Gnutella, legacy BT range |
+| `blacklisted_ports` | *(see config)* | Direct Connect, Kazaa, eMule, Gnutella, WinMX, legacy BT range |
 | `redis.connection` | `default` | Laravel Redis connection name |
 | `redis.prefix` | `marque:` | Key namespace |
 

@@ -23,6 +23,12 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 - **`hound:sync-swarm-counts`**, scheduled hourly. It sweeps peers that expired without
   a `stopped` announce and writes the settled seeder/leecher counts back to each torrent.
 
+### Changed
+
+- **Requires `marque/threepio` ^3.1** (was ^3.0). The sweep relies on threepio 3.1's
+  non-recursive peer removal; on threepio 3.0.0 it would loop on the first expired peer.
+  threepio 3.1.0 has been out since 2026-09-04, and `composer update` picks it up.
+
 ### Fixed
 
 - **Swarm counts only ever went up.** A `stopped` announce never removed the peer, and
