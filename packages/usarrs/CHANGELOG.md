@@ -17,13 +17,17 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   working. Now the login seam refuses them with the reason, a `Login` listener
   refuses the paths that skip the seam (passkeys, remember-me), and the middleware
   is pushed onto the `web` group so a live session ends on its next request to any
-  page. A user with no status is never refused; an unrecognised status is.
+  page. Only `banned`, `disabled` and `pending` refuse: an app's own `status` column
+  can mean anything, so any other value, or no status at all, is left alone.
 - **Nothing was rate-limited.** The two-factor challenge accepted unlimited guesses
   per pending login, so a 6-digit code could be brute-forced in hours. A code could
   also be reused inside its window, and password login and password confirmation
   were unthrottled. Now each is limited to five a minute: password login per email
   and IP, the challenge per pending login (codes and recovery codes together), and
-  confirmation per user. A TOTP code works once per user.
+  confirmation per user. Each attempt is counted before it's checked, atomically,
+  so parallel bursts can't get past the count. A TOTP code works once per user,
+  including one from the next time step, and including two requests racing with
+  the same code.
 - **An unverified account could add passkeys and two-factor, create invites, and
   hold an announce key.** Profile, security and invite routes sat behind `auth`, not
   `verified`. Each of those actions now needs a verified address, as connecting an
@@ -49,13 +53,22 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 - **The invite email went to the member who created the invite, not the person
   invited.** It now goes to the recipient address. It also no longer reads the dead
   `id.app_name` config key.
+- **The invite link ignored `usarrs.prefix`**, so on a prefixed install it led to a
+  404. Members can now email at most ten invites an hour.
+- **After confirming a password, users landed on `/`** instead of the page that
+  asked them to confirm.
+- **Removing a passkey from the profile page skipped password confirmation**, which
+  the `DELETE` endpoint requires. When adding a passkey needs a confirmed password,
+  the page now sends the user to confirm it and brings them back, instead of failing
+  with a script error.
 - **Passkeys didn't work on current Fortify.** Fortify 1.39 suppresses `laravel/passkeys`'
   routes in order to serve its own, and usarrs suppresses Fortify's, so the WebAuthn
   endpoints existed nowhere. Registering a passkey failed and passkey sign-in didn't
   exist. usarrs now registers those endpoints itself, with `laravel/passkeys`'
   controllers, paths and names, on any Fortify version. They carry `auth.session`,
-  `password.confirm` for management, and a 6-a-minute throttle (Fortify had replaced
-  that throttle with nothing). Also fixed: a passkey sign-in landed on Fortify's
+  `verified` and `password.confirm` for adding, and a named `usarrs-passkeys`
+  throttle (Fortify had replaced laravel/passkeys' throttle with nothing). With
+  `manage_auth` off, usarrs leaves laravel/passkeys to register its own. Also fixed: a passkey sign-in landed on Fortify's
   `/home` instead of `/`; the profile page's passkey script parsed the wrong part of
   the options response; and the passkey user model was reset by Fortify.
 

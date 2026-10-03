@@ -8,6 +8,7 @@ declare(strict_types=1);
 // sign-in didn't exist. The old tests touched only the Livewire component and
 // the model. These drive the real endpoints with a software authenticator.
 
+use Illuminate\Support\Facades\Route;
 use Marque\Usarrs\Tests\SoftAuthenticator;
 use Marque\Usarrs\Tests\TestUser;
 
@@ -75,11 +76,23 @@ it('refuses a passkey sign-in by a banned user, with a 422 rather than a session
 it('throttles passkey sign-in attempts', function () {
     // Fortify 1.39 replaces laravel/passkeys' throttle with its own limiter,
     // which is unset unless the app configured Fortify, so there was none.
-    foreach (range(1, 6) as $_) {
+    foreach (range(1, 10) as $_) {
         $this->getJson('/passkeys/login/options')->assertOk();
     }
 
     $this->getJson('/passkeys/login/options')->assertTooManyRequests();
+});
+
+it('keeps its own throttle bucket, apart from the app\'s other throttled routes (Job #141 review)', function () {
+    // An unnamed throttle keys on domain + IP, so it shared one bucket with
+    // every other unnamed throttle in the app.
+    Route::middleware(['web', 'throttle:6,1'])->get('/_test/throttled', fn () => 'ok');
+
+    foreach (range(1, 6) as $_) {
+        $this->get('/_test/throttled')->assertOk();
+    }
+
+    $this->getJson('/passkeys/login/options')->assertOk();
 });
 
 it('asks for a confirmed password before managing passkeys', function () {

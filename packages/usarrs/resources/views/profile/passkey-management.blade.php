@@ -41,7 +41,20 @@
                         const optionsResponse = await fetch(@js($optionsUrl), {
                             headers: { 'Accept': 'application/json' },
                         });
-                        const { options } = await optionsResponse.json();
+
+                        // 423: the password needs confirming first. Go and do
+                        // that, and come back here.
+                        if (optionsResponse.status === 423) {
+                            return this.$wire.requirePasswordConfirmation();
+                        }
+
+                        const optionsData = await optionsResponse.json();
+
+                        if (! optionsResponse.ok) {
+                            throw new Error(optionsData.message);
+                        }
+
+                        const { options } = optionsData;
 
                         const credential = await navigator.credentials.create({
                             publicKey: PublicKeyCredential.parseCreationOptionsFromJSON(options),

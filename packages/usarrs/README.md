@@ -98,9 +98,12 @@ if they already are:
   downloading everywhere. It also covers Livewire actions from a tab that was
   already open.
 
-A user with no `status` at all is never refused, because an app without that
-column has no concept of a ban. A status value usarrs doesn't recognise is
-refused.
+Only the three statuses usarrs defines as inactive are refused: `banned`,
+`disabled` and `pending`. usarrs adds the `status` column only if your app
+doesn't already have one. If yours does, it can hold whatever your app
+means by it (`enabled`, `1`, your own enum), and none of that is treated as
+a ban. A user with no status at all is never refused. bloodhound's announce
+check refuses the same three values, plus an `enabled` column set to false.
 
 ## Auth Driver
 
@@ -273,9 +276,24 @@ model needs `Laravel\Fortify\TwoFactorAuthenticatable`.
 | Two-factor challenge | 5 a minute, codes and recovery codes together | the pending login |
 | Password confirmation | 5 a minute | the signed-in user |
 
+Each attempt is counted before the answer is checked, as an atomic increment.
+Checking first and counting only failures would let a burst of parallel
+requests through before any of them was counted. A successful attempt resets
+the count.
+
 The challenge limit isn't keyed on IP. Anyone at the challenge already has the
 password, and an IP key would let them switch addresses to get five more guesses.
-A successful attempt resets the count.
+
+**The trade-off is that limits can be used to lock people out.**
+
+- Someone who has a user's password can keep that user out of the two-factor
+  challenge, recovery codes included, for as long as they keep guessing.
+- Someone holding a hijacked session can do the same to password confirmation.
+- Password login is keyed on email and IP. If your app sits behind a proxy
+  you haven't configured `TrustProxies` for, every visitor shares one IP, and
+  anyone can lock any account out of password login. Configure trusted proxies.
+
+Ten invites a member can email per hour is a limit too: see [Invites](#invites).
 
 **A TOTP code works once.** usarrs keeps the timestamp of each user's last
 accepted code and only accepts a newer one. That way a code seen over someone's
@@ -301,19 +319,28 @@ own controllers, paths and route names:
 
 | Route name | Path | Middleware (plus `web`, `auth.session`) |
 |---|---|---|
-| `passkey.login-options` | `GET /passkeys/login/options` | `guest`, `throttle:6,1` |
-| `passkey.login` | `POST /passkeys/login` | `guest`, `throttle:6,1` |
-| `passkey.confirm-options` | `GET /passkeys/confirm/options` | `auth`, `throttle:6,1` |
-| `passkey.confirm` | `POST /passkeys/confirm` | `auth`, `throttle:6,1` |
-| `passkey.registration-options` | `GET /user/passkeys/options` | `auth`, `password.confirm`, `throttle:6,1` |
-| `passkey.store` | `POST /user/passkeys` | `auth`, `password.confirm`, `throttle:6,1` |
+| `passkey.login-options` | `GET /passkeys/login/options` | `guest`, `throttle:usarrs-passkeys` |
+| `passkey.login` | `POST /passkeys/login` | `guest`, `throttle:usarrs-passkeys` |
+| `passkey.confirm-options` | `GET /passkeys/confirm/options` | `auth`, `throttle:usarrs-passkeys` |
+| `passkey.confirm` | `POST /passkeys/confirm` | `auth`, `throttle:usarrs-passkeys` |
+| `passkey.registration-options` | `GET /user/passkeys/options` | `auth`, `verified`, `password.confirm`, `throttle:usarrs-passkeys` |
+| `passkey.store` | `POST /user/passkeys` | `auth`, `verified`, `password.confirm`, `throttle:usarrs-passkeys` |
 | `passkey.destroy` | `DELETE /user/passkeys/{passkey}` | `auth`, `password.confirm` |
 
-`laravel/passkeys` is never allowed to register them. This works the same on
+`usarrs-passkeys` is a named limiter, so it doesn't share a bucket with the
+app's other throttled routes. It allows 10 requests a minute per user, or per
+IP for guests, which is five sign-ins (options, then the assertion). Removing
+a passkey from the profile page also asks for a confirmed password, as the
+`DELETE` endpoint does. When adding one needs a confirmed password first, the
+page sends the user to confirm it and then returns them.
+
+While usarrs manages auth, `laravel/passkeys` is never allowed to register them. This works the same on
 every Fortify version usarrs allows (`^1.30`). Fortify 1.39 suppresses
 `laravel/passkeys`' routes to serve its own, and usarrs suppresses Fortify's, so
 until this was fixed the endpoints existed nowhere and passkeys didn't work at all (#10883).
-They're absent when passkeys are off, and when `manage_auth` is false.
+They're absent when passkeys are off. With `manage_auth` false, usarrs
+registers none of them and leaves `laravel/passkeys` to register its own (or
+Fortify to suppress them, as 1.39 does).
 
 With passkeys on, the login page shows **Sign in with a passkey** under every
 driver. A passkey sign-in lands on `/`, like every other usarrs sign-in, and a
@@ -366,7 +393,10 @@ Two ways to run an invite-gated tracker:
   form is visible to everyone but won't create an account without a valid invite.
 
 An invite created with a recipient address is emailed **to that address**, with a
-`/register?invite=CODE` link. Any valid invite presented at registration is used
+`/register?invite=CODE` link (under `usarrs.prefix` if you set one). A member can
+email at most ten invites an hour. Without that, creating, revoking and creating
+again would let anyone send this site's invite email to any address, as often as
+they liked. Any valid invite presented at registration is used
 up, whether or not `invites.required` is on, and the same applies to an OAuth
 sign-up that carries one.
 

@@ -24,6 +24,7 @@ return new class extends Migration
             $table->rememberToken();
             $table->string('role')->default('user');
             $table->boolean('enabled')->default(true);
+            $table->string('status')->nullable();
         });
 
         // announce_key, uploaded, downloaded, seedtime are added by the real

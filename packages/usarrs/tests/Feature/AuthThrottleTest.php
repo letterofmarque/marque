@@ -98,6 +98,23 @@ describe('the two-factor challenge', function () {
         $this->assertGuest();
     });
 
+    it('refuses a code from the next time step the second time it is used (Job #141 review)', function () {
+        // An authenticator running a little fast sends the T+1 code. With no
+        // earlier code on record, the step stored used to be the current one
+        // (T), not the one that matched (T+1), so the same code passed twice.
+        [$user, $secret] = challengedUser();
+        $engine = app(Google2FA::class);
+        $code = $engine->oathTotp($secret, $engine->getTimestamp() + 1);
+
+        Livewire::test(TwoFactorChallenge::class)->set('code', $code)->call('challenge')->assertRedirect('/');
+        Auth::logout();
+        session()->put(['login.id' => $user->getKey(), 'login.remember' => false]);
+
+        Livewire::test(TwoFactorChallenge::class)->set('code', $code)->call('challenge')->assertHasErrors('code');
+
+        $this->assertGuest();
+    });
+
     it('does not let one user\'s used code block another user who happens to share it', function () {
         // Fortify keys its replay cache on the code alone. usarrs keys it on
         // the user, so a coincidence across accounts refuses nobody.

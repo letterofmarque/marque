@@ -40,11 +40,9 @@ class TwoFactorChallenge extends Component
         $this->validate();
 
         $user = $this->pendingUser();
-        $this->ensureNotThrottled($user, 'code');
+        $this->countAttempt($user, 'code');
 
         if (! $this->verifyOnce($engine, $user)) {
-            RateLimiter::hit($this->throttleKey($user));
-
             throw ValidationException::withMessages([
                 'code' => [__('The provided two factor authentication code was invalid.')],
             ]);
@@ -58,12 +56,10 @@ class TwoFactorChallenge extends Component
         $this->validate(['recoveryCode' => 'required|string']);
 
         $user = $this->pendingUser();
-        $this->ensureNotThrottled($user, 'recoveryCode');
+        $this->countAttempt($user, 'recoveryCode');
         $codes = $user->recoveryCodes();
 
         if (! in_array($this->recoveryCode, $codes, true)) {
-            RateLimiter::hit($this->throttleKey($user));
-
             throw ValidationException::withMessages([
                 'recoveryCode' => [__('The provided recovery code was invalid.')],
             ]);
@@ -91,38 +87,45 @@ class TwoFactorChallenge extends Component
     }
 
     /**
-     * A code works once (#10856). The last accepted code's timestamp is kept
-     * per user, and only a newer one is accepted, so a code seen over a
-     * shoulder or in a log can't be replayed inside its window. Fortify's own
-     * provider keys this on the code alone, which lets two users who happen to
-     * share a code block each other.
+     * A code works once (#10856). The last accepted code's step is kept per
+     * user and only a newer one is accepted, so a code seen over a shoulder or
+     * in a log can't be replayed inside its window. Fortify's own provider keys
+     * this on the code alone, which lets two users who happen to share a code
+     * block each other.
+     *
+     * The old step defaults to 0, not null: with null, Google2FA answers `true`
+     * instead of the step that matched, and storing the current step let a
+     * T+1 code through twice. Claiming the step with an atomic add means two
+     * requests racing with the same code can't both pass (Job #141 review).
      */
     private function verifyOnce(Google2FA $engine, mixed $user): bool
     {
         $key = 'usarrs.two-factor.used:'.$user->getKey();
+        $ttl = ($engine->getWindow() ?: 1) * 60 * 2;
 
-        $timestamp = $engine->verifyKeyNewer(
+        $step = $engine->verifyKeyNewer(
             Fortify::currentEncrypter()->decrypt($user->two_factor_secret),
             $this->code,
-            Cache::get($key),
+            (int) Cache::get($key, 0),
         );
 
-        if ($timestamp === false) {
+        if (! is_int($step) || ! Cache::add($key.':'.$step, true, $ttl)) {
             return false;
         }
 
-        if ($timestamp === true) {
-            $timestamp = $engine->getTimestamp();
-        }
-
-        Cache::put($key, $timestamp, ($engine->getWindow() ?: 1) * 60 * 2);
+        Cache::put($key, $step, $ttl);
 
         return true;
     }
 
-    private function ensureNotThrottled(mixed $user, string $field): void
+    /**
+     * Counted before the code is checked, as an atomic increment: checking
+     * first and counting only failures let a burst of parallel requests all
+     * pass the check before any was counted (Job #141 review).
+     */
+    private function countAttempt(mixed $user, string $field): void
     {
-        if (! RateLimiter::tooManyAttempts($this->throttleKey($user), self::MAX_ATTEMPTS)) {
+        if (RateLimiter::hit($this->throttleKey($user)) <= self::MAX_ATTEMPTS) {
             return;
         }
 

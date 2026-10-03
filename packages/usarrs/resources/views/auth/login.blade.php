@@ -88,7 +88,13 @@
                                 const optionsResponse = await fetch(@js(route('passkey.login-options')), {
                                     headers: { 'Accept': 'application/json' },
                                 });
-                                const { options } = await optionsResponse.json();
+                                const optionsData = await optionsResponse.json();
+
+                                if (! optionsResponse.ok) {
+                                    throw new Error(optionsData.message);
+                                }
+
+                                const { options } = optionsData;
 
                                 const credential = await navigator.credentials.get({
                                     publicKey: PublicKeyCredential.parseRequestOptionsFromJSON(options),

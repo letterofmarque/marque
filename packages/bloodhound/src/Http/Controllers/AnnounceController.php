@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Marque\Bloodhound\Http\Controllers;
 
+use BackedEnum;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
@@ -135,20 +136,35 @@ class AnnounceController extends Controller
 
     /**
      * Check if user is enabled.
+     *
+     * Reads the attributes. This used to ask property_exists(), which is
+     * always false for an Eloquent attribute, so every user counted as
+     * enabled and a banned one kept announcing (found in Job #141).
+     *
+     * Only values that mean "not active" refuse: an app's own status column
+     * can hold anything, and a value bloodhound doesn't recognise is not a
+     * ban. The inactive set matches usarrs' UserStatus, without depending on
+     * it.
      */
     private function isUserEnabled(UserInterface $user): bool
     {
-        // Check for common 'enabled' column patterns
-        if (property_exists($user, 'enabled')) {
-            return $user->enabled === true || $user->enabled === 'yes' || $user->enabled === 1;
+        if (! method_exists($user, 'getAttribute')) {
+            return true;
         }
 
-        if (property_exists($user, 'status')) {
-            return $user->status === 'active' || $user->status === 'enabled';
+        $enabled = $user->getAttribute('enabled');
+
+        if ($enabled !== null && in_array($enabled, [false, 0, '0', 'no'], true)) {
+            return false;
         }
 
-        // Assume enabled if no status field
-        return true;
+        $status = $user->getAttribute('status');
+
+        if ($status instanceof BackedEnum) {
+            $status = $status->value;
+        }
+
+        return ! in_array($status, ['banned', 'disabled', 'pending'], true);
     }
 
     /**

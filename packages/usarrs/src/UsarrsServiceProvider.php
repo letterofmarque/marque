@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace Marque\Usarrs;
 
 use Illuminate\Auth\Events\Login as LoginEvent;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Fortify\Fortify;
 use Laravel\Passkeys\Passkeys;
@@ -73,12 +76,17 @@ class UsarrsServiceProvider extends ServiceProvider
         // route reachable underneath usarrs' own auth_driver checks.
         Fortify::ignoreRoutes();
 
-        // laravel/passkeys never registers its own routes: usarrs registers
-        // the same endpoints in routes/auth.php, with its own middleware. Left
-        // to themselves they were at the mercy of whichever Fortify was
-        // installed. Fortify 1.39 suppresses them to serve its own, which usarrs
-        // suppresses in turn, so the endpoints existed nowhere (#10883).
-        Passkeys::ignoreRoutes();
+        // While usarrs manages auth, laravel/passkeys never registers its own
+        // routes: usarrs registers the same endpoints in routes/auth.php, with
+        // its own middleware. Left to themselves they were at the mercy of
+        // whichever Fortify was installed. Fortify 1.39 suppresses them to
+        // serve its own, which usarrs suppresses in turn, so the endpoints
+        // existed nowhere (#10883). With manage_auth off, routes/auth.php isn't
+        // loaded, so laravel/passkeys keeps its own when passkeys are on (Job
+        // #141 review), and nothing is exposed when they're off.
+        if (config('usarrs.manage_auth', true) || ! config('usarrs.passkeys.enabled', false)) {
+            Passkeys::ignoreRoutes();
+        }
     }
 
     public function boot(): void
@@ -152,6 +160,12 @@ class UsarrsServiceProvider extends ServiceProvider
     {
         // Fortify resets this to the auth provider's model in its register().
         Passkeys::useUserModel(config('trove.user_model', 'App\\Models\\User'));
+
+        // Its own bucket. An unnamed throttle keys on domain and IP, shared
+        // with every other unnamed throttle in the app (Job #141 review).
+        // Ten requests a minute is five sign-ins: options, then the assertion.
+        RateLimiter::for('usarrs-passkeys', fn (Request $request) => Limit::perMinute(10)
+            ->by('usarrs-passkeys|'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
 
         // A banned user's passkey signs no one in: refused with a 422 before
         // any session exists. The Login listener stays as the backstop.

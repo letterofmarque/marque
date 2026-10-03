@@ -4,21 +4,16 @@ declare(strict_types=1);
 
 use Laravel\Passkeys\Contracts\PasskeyUser;
 use Laravel\Passkeys\Passkey;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use Marque\Usarrs\Livewire\Profile\PasskeyManagement;
 use Marque\Usarrs\Tests\TestUser;
 
-// The actual WebAuthn ceremony (navigator.credentials.create/get, the
-// browser<->authenticator cryptographic exchange) cannot be exercised
-// headlessly — GenerateRegistrationOptions/StorePasskey/VerifyPasskey all
-// require a real Webauthn\PublicKeyCredential produced by a browser and a
-// real authenticator (Touch ID, Windows Hello, a hardware key). There is no
-// meaningful way to fake a valid attestation in a Pest test without
-// reimplementing an authenticator. What's covered here is everything around
-// that boundary: config gating, the model contract, and passkey management
-// (list/rename/delete) once a passkey already exists in the database — the
-// registration/login ceremony itself needs a manual or Playwright pass
-// against a real browser, tracked as a gap, not silently skipped.
+// The Livewire component and the model: config gating, the model contract,
+// and management (list/delete) once a passkey exists. The WebAuthn ceremony
+// itself is PasskeysEnabled/PasskeyCeremonyTest, which drives the real
+// endpoints with a software authenticator (#10883). The browser-side script
+// still needs a real browser.
 
 beforeEach(function () {
     $this->user = TestUser::factory()->create();
@@ -68,12 +63,52 @@ test('user can delete their own passkey', function () {
         'credential' => ['type' => 'public-key'],
     ]);
 
-    $this->actingAs($this->user);
+    $this->actingAs($this->user)->withSession(['auth.password_confirmed_at' => time()]);
 
     Livewire::test(PasskeyManagement::class)
         ->call('delete', $passkey->id);
 
     expect(Passkey::find($passkey->id))->toBeNull();
+});
+
+test('removing a passkey asks for a confirmed password first, as the DELETE endpoint does (Job #141 review)', function () {
+    config()->set('usarrs.passkeys.enabled', true);
+
+    $passkey = $this->user->passkeys()->create([
+        'name' => 'My Yubikey',
+        'credential_id' => 'abc123',
+        'credential' => ['type' => 'public-key'],
+    ]);
+
+    $this->actingAs($this->user);
+
+    Livewire::test(PasskeyManagement::class)
+        ->call('delete', $passkey->id)
+        ->assertRedirect(route('password.confirm'));
+
+    expect(Passkey::find($passkey->id))->not->toBeNull();
+});
+
+test('sends the user to confirm their password and back, when adding a passkey needs it', function () {
+    // The page's script calls this when the options endpoint answers 423.
+    config()->set('usarrs.passkeys.enabled', true);
+    $this->actingAs($this->user);
+
+    $component = Livewire::test(PasskeyManagement::class);
+    $page = $component->get('returnTo');
+
+    $component->call('requirePasswordConfirmation')->assertRedirect(route('password.confirm'));
+
+    expect($page)->toStartWith(url('/'))
+        ->and(session('url.intended'))->toBe($page);
+});
+
+test('the page to return to cannot be changed by the client', function () {
+    config()->set('usarrs.passkeys.enabled', true);
+    $this->actingAs($this->user);
+
+    expect(fn () => Livewire::test(PasskeyManagement::class)->set('returnTo', 'https://evil.example'))
+        ->toThrow(CannotUpdateLockedPropertyException::class);
 });
 
 test('user cannot delete another users passkey', function () {

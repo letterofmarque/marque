@@ -61,3 +61,18 @@ test('confirming with the wrong password fails validation and does not set the s
 
     expect(session('auth.password_confirmed_at'))->toBeNull();
 });
+
+test('confirming returns the user to the page that asked for it (Job #141 review)', function () {
+    $user = TestUser::factory()->create(['password' => bcrypt('correct-password')]);
+
+    Route::middleware(['web', 'auth', 'password.confirm'])
+        ->get('/test-confirm-only', fn () => 'ok');
+
+    $this->actingAs($user)->get('/test-confirm-only')->assertRedirect(route('password.confirm'));
+
+    Livewire::actingAs($user)
+        ->test(PasswordConfirm::class)
+        ->set('password', 'correct-password')
+        ->call('confirm')
+        ->assertRedirect(url('/test-confirm-only'));
+});

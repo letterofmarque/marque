@@ -37,7 +37,8 @@ class PasswordConfirm extends Component
         // guess the password here without going near the login form.
         $key = 'usarrs.confirm-password:'.auth()->id();
 
-        if (RateLimiter::tooManyAttempts($key, 5)) {
+        // Counted before the check, atomically (Job #141 review).
+        if (RateLimiter::hit($key) > 5) {
             throw ValidationException::withMessages([
                 'password' => [__('Too many attempts. Try again in :seconds seconds.', ['seconds' => RateLimiter::availableIn($key)])],
             ]);
@@ -46,8 +47,6 @@ class PasswordConfirm extends Component
         $confirmed = $confirmPassword($guard, auth()->user(), $this->password);
 
         if (! $confirmed) {
-            RateLimiter::hit($key);
-
             throw ValidationException::withMessages([
                 'password' => [__('This password does not match our records.')],
             ]);
@@ -56,7 +55,9 @@ class PasswordConfirm extends Component
         RateLimiter::clear($key);
         session()->put('auth.password_confirmed_at', Date::now()->unix());
 
-        $this->redirect(url('/'), navigate: true);
+        // Back to the page that asked, as Laravel's own confirm flow does: the
+        // password.confirm middleware records it (Job #141 review).
+        $this->redirect(session()->pull('url.intended', url('/')), navigate: true);
     }
 
     public function render(): View

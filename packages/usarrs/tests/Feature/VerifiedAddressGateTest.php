@@ -9,10 +9,12 @@ declare(strict_types=1);
 // was already gated (CP #776, OAuthSignedInLinkingTest); passkeys are in
 // PasskeysEnabled/, announce keys in TrackerBound/.
 
+use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
 use Marque\Usarrs\Livewire\Invite\InviteCreate;
 use Marque\Usarrs\Livewire\Profile\TwoFactorSetup;
 use Marque\Usarrs\Models\Invite;
+use Marque\Usarrs\Notifications\InviteNotification;
 use Marque\Usarrs\Tests\TestUser;
 
 describe('two-factor authentication', function () {
@@ -66,5 +68,31 @@ describe('invites', function () {
         Livewire::actingAs(TestUser::factory()->create())->test(InviteCreate::class)->call('create');
 
         expect(Invite::count())->toBe(1);
+    });
+});
+
+describe('invite email', function () {
+    // Job #141 review: invites now reach the address typed in, and creating,
+    // revoking and creating again sent as many as anyone liked.
+    it('stops sending invite emails past ten an hour for one member', function () {
+        config()->set('usarrs.invites.enabled', true);
+        config()->set('usarrs.invites.max_per_user', 100);
+        Notification::fake();
+        $user = TestUser::factory()->create();
+
+        foreach (range(1, 10) as $n) {
+            Livewire::actingAs($user)->test(InviteCreate::class)
+                ->set('recipientEmail', "friend{$n}@example.com")
+                ->call('create')
+                ->assertHasNoErrors();
+        }
+
+        Livewire::actingAs($user)->test(InviteCreate::class)
+            ->set('recipientEmail', 'one-more@example.com')
+            ->call('create')
+            ->assertHasErrors('recipientEmail');
+
+        expect(Invite::count())->toBe(10);
+        Notification::assertSentOnDemandTimes(InviteNotification::class, 10);
     });
 });

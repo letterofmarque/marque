@@ -16,6 +16,12 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   an unverified user and issues it when Laravel's `Verified` event fires. A user who
   already has a key keeps it, so nobody has to re-download their `.torrent` files.
   Not retroactive: unverified users who already hold a key keep it.
+- **Banned and disabled users could keep announcing.** The announce check asked
+  `property_exists()` about `enabled` and `status`, which is always false for an
+  Eloquent attribute, so every user counted as enabled. It now reads the
+  attributes. An `enabled` column set to false refuses, as do the statuses
+  `banned`, `disabled` and `pending`, which are the same set usarrs refuses. Any
+  other status value is left alone.
 
 ## [6.0.0] — 2026-09-25
 

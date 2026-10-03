@@ -118,7 +118,7 @@ if (config('usarrs.passkeys.enabled', false)) {
     Route::middleware([...config('usarrs.middleware', ['web']), 'auth.session'])
         ->prefix(config('usarrs.prefix', ''))
         ->group(function () {
-            $throttle = 'throttle:6,1';
+            $throttle = 'throttle:usarrs-passkeys';
 
             Route::middleware(['guest', $throttle])->group(function () {
                 Route::get('passkeys/login/options', [PasskeyLoginController::class, 'index'])->name('passkey.login-options');

@@ -60,12 +60,15 @@ describe('the login seam', function () {
         $this->assertAuthenticatedAs($user);
     });
 
-    it('refuses a status it does not recognise, rather than letting it through', function () {
-        $user = TestUser::factory()->create(['status' => 'frozen']);
+    it('lets through a status it does not recognise — an app\'s own column is not a ban', function () {
+        // usarrs only adds `status` when the app has none, so the column may
+        // mean anything. Refusing everything but "active" logged out every
+        // user of an app whose status read "enabled" (Job #141 review).
+        $user = TestUser::factory()->create(['status' => 'enabled']);
 
         app(LoginCompletion::class)->begin($user, remember: false);
 
-        $this->assertGuest();
+        $this->assertAuthenticatedAs($user);
     });
 });
 

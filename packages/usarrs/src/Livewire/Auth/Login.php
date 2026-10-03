@@ -46,9 +46,11 @@ class Login extends Component
 
         $this->validate();
 
-        // Laravel's standard: five a minute per email and IP (#10856). Checked
-        // before the password is, so the sixth try is refused even when right.
-        if (RateLimiter::tooManyAttempts($this->throttleKey(), 5)) {
+        // Laravel's standard: five a minute per email and IP (#10856). Counted
+        // before the password is checked, as an atomic increment, so the sixth
+        // try is refused even when right and a parallel burst can't slip past
+        // the count (Job #141 review).
+        if (RateLimiter::hit($this->throttleKey()) > 5) {
             $seconds = RateLimiter::availableIn($this->throttleKey());
             $this->addError('email', __('auth.throttle', ['seconds' => $seconds, 'minutes' => ceil($seconds / 60)]));
 
@@ -56,7 +58,6 @@ class Login extends Component
         }
 
         if (! Auth::validate(['email' => $this->email, 'password' => $this->password])) {
-            RateLimiter::hit($this->throttleKey());
             $this->addError('email', __('These credentials do not match our records.'));
 
             return;
