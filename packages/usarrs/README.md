@@ -82,6 +82,26 @@ Override any of them by publishing the config. If you point `guest_middleware`
 at a custom stack, keep a `guest`-equivalent in it or logged-in users will see
 the login form again.
 
+### Banned, disabled and pending users
+
+A user whose `status` is anything but `active` can't sign in, and is signed out
+if they already are:
+
+- **Every sign-in path refuses them.** Password, magic link, OAuth and the
+  two-factor challenge all finish in one place, which turns an inactive user
+  back to the login form with the reason ("This account has been banned.").
+  Ways in that don't pass through it, like passkey sign-in or a remember-me
+  cookie, are caught on Laravel's `Login` event and get a 403.
+- **A live session ends on its next request**, on any page in the `web`
+  middleware group and not just usarrs' own. usarrs pushes
+  `EnsureUserIsActive` onto that group, so a ban covers browsing and
+  downloading everywhere. It also covers Livewire actions from a tab that was
+  already open.
+
+A user with no `status` at all is never refused, because an app without that
+column has no concept of a ban. A status value usarrs doesn't recognise is
+refused.
+
 ## Auth Driver
 
 `config('usarrs.auth_driver')` controls the top-level login/registration flow. Set

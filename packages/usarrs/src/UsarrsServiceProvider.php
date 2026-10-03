@@ -24,6 +24,8 @@ use Marque\Trove\Registry\NavRegistry;
 use Marque\Usarrs\Auth\SocialiteOAuthProvider;
 use Marque\Usarrs\Contracts\InviteServiceInterface;
 use Marque\Usarrs\Contracts\OAuthProvider;
+use Marque\Usarrs\Http\Middleware\EnsureUserIsActive;
+use Marque\Usarrs\Listeners\RefuseInactiveLogin;
 use Marque\Usarrs\Listeners\StampSessionPasswordHash;
 use Marque\Usarrs\Livewire\Admin\UserIndex;
 use Marque\Usarrs\Livewire\Admin\UserShow;
@@ -97,6 +99,11 @@ class UsarrsServiceProvider extends ServiceProvider
         // Every sign-in records the password hash it signed in under, so
         // auth.session can end it if that hash rotates (CP #776).
         Event::listen(LoginEvent::class, StampSessionPasswordHash::class);
+
+        // A banned user is refused however they sign in, and a live session
+        // ends on its next request to any web page, not just usarrs' (#10857).
+        Event::listen(LoginEvent::class, RefuseInactiveLogin::class);
+        $this->app['router']->pushMiddlewareToGroup('web', EnsureUserIsActive::class);
 
         // Livewire re-applies a route's middleware to its component updates
         // only from a fixed list, which names Jetstream's AuthenticateSession

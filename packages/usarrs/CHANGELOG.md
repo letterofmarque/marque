@@ -7,6 +7,18 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+### Security
+
+- **Banned users could still sign in.** `EnsureUserIsActive` existed but nothing
+  registered it, and no sign-in path checked `status`. So a banned, disabled or
+  pending user signed in normally by every route, and an existing session kept
+  working. Now the login seam refuses them with the reason, a `Login` listener
+  refuses the paths that skip the seam (passkeys, remember-me), and the middleware
+  is pushed onto the `web` group so a live session ends on its next request to any
+  page. A user with no status is never refused; an unrecognised status is.
+
 ## [8.1.0] — 2026-10-01
 
 > Security: OAuth sign-in no longer signs in whoever has the email the provider reports, and password, magic-link and OAuth sign-in all go through the two-factor challenge; plus the dashboard gets its panels.

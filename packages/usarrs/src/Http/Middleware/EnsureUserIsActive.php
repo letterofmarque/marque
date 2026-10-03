@@ -6,26 +6,25 @@ namespace Marque\Usarrs\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Marque\Usarrs\Enums\UserStatus;
+use Marque\Usarrs\Listeners\RefuseInactiveLogin;
 use Symfony\Component\HttpFoundation\Response;
 
+/**
+ * Ends the session of a user who is no longer active (#10857).
+ *
+ * Pushed onto the whole `web` group, not just usarrs' routes: a ban that only
+ * held on /profile would leave the user browsing and downloading everywhere
+ * else. Livewire's update endpoint runs in that group too, so a tab opened
+ * before the ban can't keep acting.
+ */
 class EnsureUserIsActive
 {
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
 
-        if ($user && method_exists($user, 'getAttribute')) {
-            $status = $user->getAttribute('status');
-
-            if ($status && $status !== UserStatus::Active->value && $status !== UserStatus::Active) {
-                Auth::logout();
-                $request->session()->invalidate();
-                $request->session()->regenerateToken();
-
-                abort(403, 'Your account has been suspended.');
-            }
+        if ($user) {
+            RefuseInactiveLogin::refuse($user);
         }
 
         return $next($request);

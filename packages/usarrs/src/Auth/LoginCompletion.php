@@ -6,7 +6,10 @@ namespace Marque\Usarrs\Auth;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\MessageBag;
+use Illuminate\Support\ViewErrorBag;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Marque\Usarrs\Enums\UserStatus;
 
 /**
  * The one place an interactive login is finished (Spec #142).
@@ -35,6 +38,15 @@ class LoginCompletion
      */
     public function begin(Authenticatable $user, bool $remember): string
     {
+        // A banned, disabled or pending user is turned back here, before the
+        // challenge, on every path at once (#10857). Saying why is safe: the
+        // first factor has already been proven.
+        if (($refusal = UserStatus::refusalFor($user)) !== null) {
+            session()->flash('errors', (new ViewErrorBag)->put('default', new MessageBag(['email' => [$refusal]])));
+
+            return route('login');
+        }
+
         if ($this->requiresTwoFactorChallenge($user)) {
             session()->put([
                 'login.id' => $user->getAuthIdentifier(),
