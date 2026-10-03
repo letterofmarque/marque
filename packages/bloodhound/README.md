@@ -186,6 +186,10 @@ Covered in full under [Announce URL shape](#announce-url-shape) above.
 
 ### Timing
 
+Timing, Redis and the peer response are threepio's settings, in `config/threepio.php`
+(env vars `THREEPIO_*`). bloodhound keeps its peers through threepio, so it uses them;
+publish threepio's config to change them.
+
 | Key | Default | Description |
 |-----|---------|-------------|
 | `announce_interval` | `1800` | Seconds between announces (sent to clients) |
@@ -194,12 +198,16 @@ Covered in full under [Announce URL shape](#announce-url-shape) above.
 
 ### Redis
 
+From `config/threepio.php`, as above.
+
 | Key | Default | Description |
 |-----|---------|-------------|
 | `redis.connection` | `default` | Laravel Redis connection name |
-| `redis.prefix` | `bloodhound:` | Key namespace |
+| `redis.prefix` | `marque:` | Key namespace |
 
 ### Peer Response
+
+From `config/threepio.php`, as above.
 
 | Key | Default | Description |
 |-----|---------|-------------|
@@ -214,8 +222,8 @@ Bloodhound validates BitTorrent clients by peer ID. Default mode is `whitelist` 
 |-----|---------|-------------|
 | `client_validation.enabled` | `true` | Enable client checks |
 | `client_validation.mode` | `whitelist` | `whitelist` or `blacklist` |
-| `client_validation.whitelist` | *(see config)* | Allowed clients with version ranges |
-| `client_validation.blacklist` | *(see config)* | Blocked clients (Xunlei, etc.) |
+| `whitelist` | *(see config)* | Allowed clients with version ranges, a top-level key |
+| `blacklist` | *(see config)* | Blocked clients (Xunlei, etc.), a top-level key |
 
 Each whitelist entry specifies a peer ID pattern, version format, and allowed version range. You can add custom clients or adjust version requirements.
 
@@ -245,9 +253,9 @@ Violations fire a `CheatDetected` event and are logged to Redis for admin review
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `queue.enabled` | `true` | **No longer read** |
-| `queue.connection` | `null` | **No longer read** |
-| `queue.queue` | `tracker` | **No longer read** |
+| `queue.enabled` | `true` | **No longer read** <!-- check-docs: ignore — retired by the ledger, removed at the next major (#10816) --> |
+| `queue.connection` | `null` | **No longer read** <!-- check-docs: ignore — retired by the ledger, removed at the next major (#10816) --> |
+| `queue.queue` | `tracker` | **No longer read** <!-- check-docs: ignore — retired by the ledger, removed at the next major (#10816) --> |
 
 Byte counts no longer travel through a queue. They are written to the ledger on the
 announce path and folded into totals by `bloodhound:aggregate-ledger`. These keys are
@@ -277,11 +285,9 @@ people banned.
 Turning it off is supported, but it disables reconciliation, the rebuild command, and the
 arithmetic audit along with it. You are choosing to accumulate numbers nothing can verify.
 
-Turn this on if you want to investigate a cheating report or settle a disputed ratio after the fact. It is off by default because full-detail logging on a busy tracker is real, ongoing storage growth, and that shouldn't be imposed on every install.
-
 | Key | Default | Description |
 |-----|---------|-------------|
-| `announce_log.enabled` | `false` | Master switch |
+| `announce_log.enabled` | `true` | Master switch |
 | `announce_log.connection` | `null` | Database connection (null = app default) |
 | `announce_log.retention_days` | `null` | Days to keep rows (null = forever) |
 

@@ -84,12 +84,15 @@ return [
     |
     */
 
+    // check-docs: ignore — documented but not yet enforced, read by nothing until #10732
     'ratio_mode' => env('BLOODHOUND_RATIO_MODE', 'full'),
 
     // Minimum ratio required (only applies when ratio_mode = 'full')
+    // check-docs: ignore — not yet enforced, read by nothing until #10732
     'min_ratio' => env('BLOODHOUND_MIN_RATIO', 0.5),
 
     // Minimum seed time in seconds (only applies when ratio_mode = 'seedtime')
+    // check-docs: ignore — not yet enforced, read by nothing until #10732
     'min_seedtime' => env('BLOODHOUND_MIN_SEEDTIME', 86400), // 24 hours
 
     /*
@@ -220,6 +223,7 @@ return [
         'max_connections_per_ip' => env('BLOODHOUND_MAX_CONN_IP', 10),
 
         // Block announces from known datacenter/proxy IPs (requires external list)
+        // check-docs: ignore — never built, needs a design decision first (#10813)
         'block_datacenter_ips' => env('BLOODHOUND_BLOCK_DC_IPS', false),
     ],
 
@@ -239,8 +243,11 @@ return [
     */
 
     'queue' => [
+        // check-docs: ignore — retired by the ledger, removed at the next major (#10816)
         'enabled' => env('BLOODHOUND_QUEUE_STATS', true),
+        // check-docs: ignore — retired by the ledger, removed at the next major (#10816)
         'connection' => env('BLOODHOUND_QUEUE_CONNECTION', null), // null = default
+        // check-docs: ignore — retired by the ledger, removed at the next major (#10816)
         'queue' => env('BLOODHOUND_QUEUE_NAME', 'tracker'),
     ],
 
