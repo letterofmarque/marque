@@ -5,6 +5,28 @@ All notable changes to `marque/squidink` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
+## [Unreleased]
+
+> Raises the `league/commonmark` floor past two advisories. squidink itself was not
+> exposed to either.
+
+### Security
+
+- **`league/commonmark` constraint raised from `^2.10` to `^2.10.2`.** Versions up to
+  2.10.1 carry two advisories: a DisallowedRawHtml bypass when a disallowed tag name
+  ends the raw-HTML literal ([GHSA-97jj-33gv-5xf9](https://github.com/advisories/GHSA-97jj-33gv-5xf9),
+  medium) and quadratic-time parsing in the GFM Table extension
+  ([GHSA-3q6v-r5mr-hxv8](https://github.com/advisories/GHSA-3q6v-r5mr-hxv8), high).
+
+  Neither reaches squidink's Markdown parser. It loads only the CommonMark core and
+  Strikethrough extensions, not DisallowedRawHtml or Table. It strips raw HTML at
+  parse time, and its own AST mapping drops any HTML node that remains. The floor
+  moves anyway: Laravel and other packages in your app use `league/commonmark` too,
+  some with the GFM extensions, and this keeps a vulnerable version from resolving.
+
+  New tests pin the behaviour down: raw HTML is dropped in every shape the advisory
+  describes, and GFM table syntax stays a paragraph of text.
+
 ## [1.1.1] — 2026-09-11
 
 > Comment-only: two references to the renamed shell package.

@@ -230,3 +230,28 @@ describe('MarkdownParser schema enforcement', function () {
         expect(array_values($texts)[0]->text())->toBe('Important');
     });
 });
+
+// league/commonmark's 2026-09 advisories (GHSA-97jj-33gv-5xf9, GHSA-3q6v-r5mr-hxv8)
+// are in two GFM extensions squidink does not load: DisallowedRawHtml and Table.
+// These pin that down, so loading either one later is a deliberate decision.
+describe('MarkdownParser raw HTML and GFM extensions', function () {
+    it('drops raw HTML whatever shape the tag takes', function (string $source) {
+        $html = app(\Marque\SquidInk\SquidInk::class)->convert($source);
+
+        expect(strtolower($html))->not->toContain('<script')
+            ->and(strtolower($html))->not->toContain('<iframe');
+    })->with([
+        'inline' => 'a <script>alert(1)</script> b',
+        'block' => "<script>\nalert(1)\n</script>",
+        'tag name ends the literal' => 'a <script',
+        'tag name ends the line' => "<iframe\nsrc=x>",
+        'tag name ends the input' => "text\n\n<script",
+    ]);
+
+    it('does not parse GFM tables', function () {
+        $doc = parseMarkdown("| a | b |\n|---|---|\n| 1 | 2 |");
+
+        // One paragraph of text: no table, row or cell node of any kind.
+        expect(array_values(array_unique(nodeTypes($doc))))->toBe(['document', 'paragraph', 'text']);
+    });
+});
