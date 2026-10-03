@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
+use Laravel\Passkeys\Http\Controllers\PasskeyConfirmationController;
+use Laravel\Passkeys\Http\Controllers\PasskeyLoginController;
+use Laravel\Passkeys\Http\Controllers\PasskeyRegistrationController;
 use Marque\Usarrs\Enums\AuthDriver;
 use Marque\Usarrs\Http\Controllers\EmailVerificationController;
 use Marque\Usarrs\Http\Controllers\LogoutController;
@@ -104,3 +107,30 @@ Route::middleware([...config('usarrs.auth_middleware', ['web', 'auth']), 'auth.s
 
         Route::get('user/confirm-password', PasswordConfirm::class)->name('password.confirm');
     });
+
+// Passkeys — laravel/passkeys' WebAuthn endpoints, registered here rather than
+// by laravel/passkeys itself (#10883). Same paths, names and controllers, with
+// usarrs' middleware: auth.session throughout, so a session ended by a rotated
+// password hash can't add a passkey (CP #784); a confirmed password to manage
+// them; and a throttle that Fortify 1.39 would otherwise have removed.
+if (config('usarrs.passkeys.enabled', false)) {
+    Route::middleware([...config('usarrs.middleware', ['web']), 'auth.session'])
+        ->prefix(config('usarrs.prefix', ''))
+        ->group(function () {
+            $throttle = 'throttle:6,1';
+
+            Route::middleware(['guest', $throttle])->group(function () {
+                Route::get('passkeys/login/options', [PasskeyLoginController::class, 'index'])->name('passkey.login-options');
+                Route::post('passkeys/login', [PasskeyLoginController::class, 'store'])->name('passkey.login');
+            });
+
+            Route::middleware('auth')->group(function () use ($throttle) {
+                Route::get('passkeys/confirm/options', [PasskeyConfirmationController::class, 'index'])->middleware($throttle)->name('passkey.confirm-options');
+                Route::post('passkeys/confirm', [PasskeyConfirmationController::class, 'store'])->middleware($throttle)->name('passkey.confirm');
+
+                Route::get('user/passkeys/options', [PasskeyRegistrationController::class, 'index'])->middleware(['password.confirm', $throttle])->name('passkey.registration-options');
+                Route::post('user/passkeys', [PasskeyRegistrationController::class, 'store'])->middleware(['password.confirm', $throttle])->name('passkey.store');
+                Route::delete('user/passkeys/{passkey}', [PasskeyRegistrationController::class, 'destroy'])->middleware('password.confirm')->name('passkey.destroy');
+            });
+        });
+}

@@ -281,15 +281,28 @@ an additive credential type, not a driver. Uses
 `Laravel\Passkeys\PasskeyAuthenticatable` and must implement
 `Laravel\Passkeys\Contracts\PasskeyUser`.
 
-Unlike Fortify, Passkeys' own routes (`/passkeys/login`, `/user/passkeys/*`) are
-left registered when this feature is on — they're WebAuthn-ceremony JSON endpoints
-with no usarrs equivalent to collide with, called directly by usarrs' own UI via JS.
-They're suppressed when the feature is off, and carry `auth.session` when it's on.
+**usarrs registers the passkey endpoints itself**, using `laravel/passkeys`'
+own controllers, paths and route names:
 
-> **Known issue (#10883):** recent Fortify releases (1.39 at least) suppress
-> `laravel/passkeys`' routes in order to serve their own — and usarrs suppresses
-> Fortify's. On those versions the passkey endpoints exist nowhere, so passkey
-> registration and sign-in don't work. Leave passkeys off until this is fixed.
+| Route name | Path | Middleware (plus `web`, `auth.session`) |
+|---|---|---|
+| `passkey.login-options` | `GET /passkeys/login/options` | `guest`, `throttle:6,1` |
+| `passkey.login` | `POST /passkeys/login` | `guest`, `throttle:6,1` |
+| `passkey.confirm-options` | `GET /passkeys/confirm/options` | `auth`, `throttle:6,1` |
+| `passkey.confirm` | `POST /passkeys/confirm` | `auth`, `throttle:6,1` |
+| `passkey.registration-options` | `GET /user/passkeys/options` | `auth`, `password.confirm`, `throttle:6,1` |
+| `passkey.store` | `POST /user/passkeys` | `auth`, `password.confirm`, `throttle:6,1` |
+| `passkey.destroy` | `DELETE /user/passkeys/{passkey}` | `auth`, `password.confirm` |
+
+`laravel/passkeys` is never allowed to register them. This works the same on
+every Fortify version usarrs allows (`^1.30`). Fortify 1.39 suppresses
+`laravel/passkeys`' routes to serve its own, and usarrs suppresses Fortify's, so
+until this was fixed the endpoints existed nowhere and passkeys didn't work at all (#10883).
+They're absent when passkeys are off, and when `manage_auth` is false.
+
+With passkeys on, the login page shows **Sign in with a passkey** under every
+driver. A passkey sign-in lands on `/`, like every other usarrs sign-in, and a
+banned or inactive user's passkey is refused (422) before any session exists.
 
 **Passkey sign-in is the one login usarrs doesn't finish itself.** Every other way in
 — password, magic link, OAuth, straight after registering — ends in one place that

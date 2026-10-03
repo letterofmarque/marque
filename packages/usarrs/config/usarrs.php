@@ -69,10 +69,10 @@ return [
     | Laravel\Passkeys\PasskeyAuthenticatable and implement
     | Laravel\Passkeys\Contracts\PasskeyUser on your User model to use it.
     |
-    | When enabled, Passkeys' own JSON API routes (/passkeys/login,
-    | /user/passkeys/*) are left registered — they're WebAuthn-ceremony
-    | endpoints usarrs' own UI calls via JS, not a competing login/register
-    | page the way Fortify's routes are. When disabled, they're suppressed.
+    | When enabled, usarrs registers laravel/passkeys' WebAuthn endpoints
+    | (/passkeys/login, /user/passkeys/*) itself, with its own middleware, on
+    | any Fortify version, and the login page offers passkey sign-in. When
+    | disabled, none of it exists.
     |
     */
 

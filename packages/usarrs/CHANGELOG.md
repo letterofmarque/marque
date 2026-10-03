@@ -43,6 +43,21 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 - **The invite email went to the member who created the invite, not the person
   invited.** It now goes to the recipient address. It also no longer reads the dead
   `id.app_name` config key.
+- **Passkeys didn't work on current Fortify.** Fortify 1.39 suppresses `laravel/passkeys`'
+  routes in order to serve its own, and usarrs suppresses Fortify's, so the WebAuthn
+  endpoints existed nowhere. Registering a passkey failed and passkey sign-in didn't
+  exist. usarrs now registers those endpoints itself, with `laravel/passkeys`'
+  controllers, paths and names, on any Fortify version. They carry `auth.session`,
+  `password.confirm` for management, and a 6-a-minute throttle (Fortify had replaced
+  that throttle with nothing). Also fixed: a passkey sign-in landed on Fortify's
+  `/home` instead of `/`; the profile page's passkey script parsed the wrong part of
+  the options response; and the passkey user model was reset by Fortify.
+
+### Added
+
+- **Sign in with a passkey** on the login page, when passkeys are enabled.
+- A banned or inactive user's passkey is refused (422) through `laravel/passkeys`'
+  login authorization hook, before any session exists.
 
 ## [8.1.0] — 2026-10-01
 

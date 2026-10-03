@@ -64,5 +64,60 @@
                 </x-deck::text>
             @endif
         @endif
+
+        @if (config('usarrs.passkeys.enabled', false) && Route::has('passkey.login'))
+            {{-- A passkey signs in under every driver (see the README's
+                 Passkeys section). The endpoints are laravel/passkeys',
+                 registered by usarrs (#10883). --}}
+            <div x-data="usarrsPasskeySignIn()" class="space-y-2">
+                <x-deck::button variant="outline" class="w-full" x-on:click="signIn">
+                    {{ __('Sign in with a passkey') }}
+                </x-deck::button>
+                <x-deck::text class="text-center text-sm text-red-600" x-show="error" x-text="error" x-cloak></x-deck::text>
+            </div>
+
+            <script>
+                function usarrsPasskeySignIn() {
+                    return {
+                        error: null,
+
+                        async signIn() {
+                            this.error = null;
+
+                            try {
+                                const optionsResponse = await fetch(@js(route('passkey.login-options')), {
+                                    headers: { 'Accept': 'application/json' },
+                                });
+                                const { options } = await optionsResponse.json();
+
+                                const credential = await navigator.credentials.get({
+                                    publicKey: PublicKeyCredential.parseRequestOptionsFromJSON(options),
+                                });
+
+                                const response = await fetch(@js(route('passkey.login')), {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'Accept': 'application/json',
+                                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                    },
+                                    body: JSON.stringify({ credential: credential.toJSON() }),
+                                });
+
+                                const data = await response.json();
+
+                                if (! response.ok) {
+                                    throw new Error(data.message);
+                                }
+
+                                window.location = data.redirect;
+                            } catch (e) {
+                                this.error = e.message || @js(__('Passkey sign-in failed.'));
+                            }
+                        },
+                    };
+                }
+            </script>
+        @endif
     </div>
 </div>
