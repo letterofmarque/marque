@@ -25,7 +25,9 @@
     {{-- No key until the address is proven (#10879). --}}
     <x-deck::text class="text-sm text-zinc-500">
         {{ __('Verify your email address to get an announce key.') }}
-        <a href="{{ route('verification.notice') }}" class="underline">{{ __('Resend the verification email') }}</a>
+        @if (Route::has('verification.notice'))
+            <a href="{{ route('verification.notice') }}" class="underline">{{ __('Resend the verification email') }}</a>
+        @endif
     </x-deck::text>
 @else
     <x-deck::button size="sm" wire:click="regenerateAnnounceKey">{{ __('Generate announce key') }}</x-deck::button>

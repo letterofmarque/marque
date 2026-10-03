@@ -6,6 +6,7 @@ namespace Marque\Usarrs\Livewire\Invite;
 
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Validate;
 use Marque\Usarrs\Auth\VerifiedAddress;
@@ -24,7 +25,11 @@ class InviteCreate extends Component
 
         // An unproven address may be a squatter's, and its invites would
         // outlive the owner taking the account back (#10879).
+        // With manage_auth off there is no verification page of usarrs' to
+        // send them to, so refuse here instead.
         if (VerifiedAddress::missing(auth()->user())) {
+            abort_unless(Route::has('verification.notice'), 403, __('Verify your email address before creating invites.'));
+
             $this->redirect(route('verification.notice'), navigate: true);
         }
     }
