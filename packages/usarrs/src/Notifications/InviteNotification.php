@@ -24,7 +24,7 @@ class InviteNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
-        $appName = config('id.app_name', config('app.name', 'Marque'));
+        $appName = config('app.name', 'Marque');
 
         return (new MailMessage)
             ->subject("You've been invited to {$appName}")

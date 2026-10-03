@@ -33,6 +33,16 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   exactly one verification email: usarrs leaves it to Laravel's
   `SendEmailVerificationNotification` listener when the app registers one, and
   sends it itself otherwise. The OAuth path didn't fire `Registered` before.
+- **`invite_only` made invites unusable.** `/register` returned a 404 before reading the
+  invite code, and it was the only place an invite was redeemed, so under
+  `invite_only` no account could be created by any route. Now a valid invite opens
+  the form (`/register?invite=CODE`), and anything else still gets the 404.
+- **Invites were only used up when `invites.required` was on.** With invites merely
+  enabled, an invite stayed pending after someone joined with it. Any valid invite
+  presented at registration is now redeemed.
+- **The invite email went to the member who created the invite, not the person
+  invited.** It now goes to the recipient address. It also no longer reads the dead
+  `id.app_name` config key.
 
 ## [8.1.0] — 2026-10-01
 

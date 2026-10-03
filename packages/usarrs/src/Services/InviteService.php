@@ -6,6 +6,7 @@ namespace Marque\Usarrs\Services;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Notification;
 use Marque\Usarrs\Contracts\InviteServiceInterface;
 use Marque\Usarrs\Enums\InviteStatus;
 use Marque\Usarrs\Exceptions\InviteAlreadyRedeemed;
@@ -24,8 +25,10 @@ class InviteService implements InviteServiceInterface
             'expires_at' => now()->addDays(config('usarrs.invites.expiry_days', 7)),
         ]);
 
-        if ($recipientEmail && method_exists($creator, 'notify')) {
-            $creator->notify(new InviteNotification($invite));
+        // To the person invited. This used to notify the creator, so the
+        // recipient never got the link (found in Job #141).
+        if ($recipientEmail) {
+            Notification::route('mail', $recipientEmail)->notify(new InviteNotification($invite));
         }
 
         return $invite;

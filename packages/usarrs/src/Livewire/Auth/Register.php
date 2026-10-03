@@ -42,18 +42,24 @@ class Register extends Component
         return ['email' => ['required', 'email', new UniqueEmail]];
     }
 
-    public function mount(): void
+    public function mount(RegistrationRules $rules): void
     {
-        abort_unless($this->driver()->allowsPasswordRegistration(), 404);
+        $this->invite = (string) request()->query('invite', '');
 
-        $this->invite = request()->query('invite', '');
+        // Under invite_only the form opens only for someone holding a usable
+        // invite. It used to 404 before the code was even read (#10801).
+        abort_unless(
+            $this->driver()->allowsPasswordRegistration()
+                || ($this->driver()->requiresInvite() && $rules->validInvite($this->invite) !== null),
+            404,
+        );
     }
 
     public function register(InviteService $inviteService, RegistrationRules $rules): void
     {
         // Checked again here, not only in mount(): a page loaded before the
         // operator changed modes can still be submitted (Spec #142).
-        abort_unless($this->driver()->allowsPasswordRegistration(), 404);
+        abort_unless($this->driver()->allowsPasswordRegistration() || $this->driver()->requiresInvite(), 404);
 
         $this->validate();
 
@@ -64,7 +70,7 @@ class Register extends Component
             return;
         }
 
-        $invite = config('usarrs.invites.required', false) ? $rules->validInvite($this->invite) : null;
+        $invite = $rules->validInvite($this->invite);
 
         $model = config('trove.user_model', 'App\\Models\\User');
 
@@ -103,7 +109,7 @@ class Register extends Component
     public function render(): View
     {
         return $this->usarrsView('usarrs::auth.register', [
-            'inviteRequired' => config('usarrs.invites.required', false),
+            'inviteRequired' => app(RegistrationRules::class)->inviteRequired(),
         ]);
     }
 }

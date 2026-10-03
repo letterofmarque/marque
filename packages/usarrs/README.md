@@ -113,7 +113,7 @@ a time:
 | `password` | Email + password login and registration | — |
 | `magic_link` | Passwordless email-only login. A link is emailed on request; visiting it logs the user in | Password login and password reset; password-based registration still creates an account, but sign-*in* afterwards is link-only |
 | `socialite` | OAuth sign-in, via the providers in `config('usarrs.socialite_providers')` (default `['github']`) — plus passkeys, if you've enabled them (see [Passkeys](#passkeys-webauthn)). Requires `composer require laravel/socialite` | Password login, password registration, password reset and magic links — refused on the server, not just hidden. See [OAuth](#oauth-the-socialite-driver) |
-| `invite_only` | Password login | Registration of any kind — `GET /register` 404s, and no route creates an account. Invites don't open it yet (#10801): for invite-gated sign-up, use `password` with `invites.required` |
+| `invite_only` | Password login, and registration through an invite | Open sign-up: `GET /register` is a 404 unless it carries a valid, unused, unexpired invite (`/register?invite=CODE`, the link in the invite email). Needs `invites.enabled` so members can create invites |
 
 Each driver's routes only exist under that driver: the OAuth routes only under
 `socialite`, magic-link verification only under `magic_link`, and password reset
@@ -329,9 +329,18 @@ using it.
 ],
 ```
 
-Independent of `auth_driver`. For an invite-gated tracker, use the `password` driver
-with `invites.enabled` and `invites.required`: `/register` then needs a valid invite.
-`invite_only` currently closes registration entirely, invites included (#10801).
+Two ways to run an invite-gated tracker:
+
+- **`auth_driver=invite_only`** with `invites.enabled`. `/register` doesn't exist
+  for anyone without an invite: it's a 404 unless the request carries a valid one.
+  This is the fully closed shape.
+- **`auth_driver=password`** with `invites.enabled` and `invites.required`. The
+  form is visible to everyone but won't create an account without a valid invite.
+
+An invite created with a recipient address is emailed **to that address**, with a
+`/register?invite=CODE` link. Any valid invite presented at registration is used
+up, whether or not `invites.required` is on, and the same applies to an OAuth
+sign-up that carries one.
 
 ## Dashboard
 

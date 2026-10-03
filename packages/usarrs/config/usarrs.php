@@ -12,7 +12,7 @@ return [
     | - "password": Traditional email + password login
     | - "magic_link": Passwordless email-only login
     | - "socialite": OAuth provider buttons only
-    | - "invite_only": Password login, registration disabled (invite-only)
+    | - "invite_only": Password login; registration only with a valid invite
     |
     */
 

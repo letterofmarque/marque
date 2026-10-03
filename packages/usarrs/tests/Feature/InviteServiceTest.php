@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\Notification;
 use Marque\Usarrs\Enums\InviteStatus;
 use Marque\Usarrs\Exceptions\InviteAlreadyRedeemed;
 use Marque\Usarrs\Models\Invite;
+use Marque\Usarrs\Notifications\InviteNotification;
 use Marque\Usarrs\Services\InviteService;
 use Marque\Usarrs\Tests\TestUser;
 
@@ -28,6 +30,25 @@ test('can create invite with recipient email', function () {
     $invite = $this->service->create($this->user, 'recipient@example.com');
 
     expect($invite->recipient_email)->toBe('recipient@example.com');
+});
+
+test('emails the invite to the recipient, not to the member who created it (found in Job #141)', function () {
+    Notification::fake();
+
+    $invite = $this->service->create($this->user, 'recipient@example.com');
+
+    Notification::assertSentOnDemand(InviteNotification::class, function (InviteNotification $n, array $channels, object $notifiable) use ($invite) {
+        return $notifiable->routes['mail'] === 'recipient@example.com' && $n->invite->is($invite);
+    });
+    Notification::assertNotSentTo($this->user, InviteNotification::class);
+});
+
+test('sends nothing when the invite has no recipient', function () {
+    Notification::fake();
+
+    $this->service->create($this->user);
+
+    Notification::assertNothingSent();
 });
 
 test('can redeem an invite', function () {

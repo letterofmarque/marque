@@ -30,11 +30,13 @@ class RegistrationRules
      */
     public function refusal(?string $inviteCode): ?string
     {
-        if (! AuthDriver::from(config('usarrs.auth_driver', 'password'))->supportsRegistration()) {
+        $driver = AuthDriver::from(config('usarrs.auth_driver', 'password'));
+
+        if (! $driver->supportsRegistration() && ! $driver->requiresInvite()) {
             return __('Registration is closed.');
         }
 
-        if (config('usarrs.invites.required', false) && $this->validInvite($inviteCode) === null) {
+        if ($this->inviteRequired() && $this->validInvite($inviteCode) === null) {
             return __('A valid invite code is required.');
         }
 
@@ -42,7 +44,19 @@ class RegistrationRules
     }
 
     /**
+     * Whether a new account needs an invite: because the operator said so, or
+     * because the driver is invite_only.
+     */
+    public function inviteRequired(): bool
+    {
+        return config('usarrs.invites.required', false)
+            || AuthDriver::from(config('usarrs.auth_driver', 'password'))->requiresInvite();
+    }
+
+    /**
      * The invite to redeem for a new account, if one was given and is usable.
+     * Redeemed whenever it is, required or not — an invite that was used to
+     * join is used up (#10801).
      */
     public function validInvite(?string $inviteCode): ?Invite
     {

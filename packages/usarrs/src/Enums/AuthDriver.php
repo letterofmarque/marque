@@ -11,6 +11,11 @@ enum AuthDriver: string
     case Socialite = 'socialite';
     case InviteOnly = 'invite_only';
 
+    /**
+     * Whether anyone may sign up, invite or not — what the "Register" link on
+     * the login page means. Under invite_only the answer is no, but an invite
+     * still opens the door: see requiresInvite().
+     */
     public function supportsRegistration(): bool
     {
         return match ($this) {
@@ -20,7 +25,17 @@ enum AuthDriver: string
     }
 
     /**
-     * Whether the password registration form is open. Not the same question
+     * Whether a new account needs a valid invite whatever invites.required
+     * says. invite_only used to close registration outright, invites included,
+     * so no account could be made by any route (#10801).
+     */
+    public function requiresInvite(): bool
+    {
+        return $this === self::InviteOnly;
+    }
+
+    /**
+     * Whether the password registration form is open to everyone. Not the same question
      * as supportsRegistration(): under socialite, accounts are created — by
      * OAuth — but never through a password form (Spec #142).
      */
