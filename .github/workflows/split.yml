@@ -59,7 +59,12 @@ jobs:
           fetch-depth: 0
 
       - name: Split ${{ matrix.package.repo_name }}
-        uses: symplify/monorepo-split-github-action@v2.3.0
+        # Pinned to upstream master, not a tag. v2.3.0 put the commit message
+        # into a shell command unquoted, so an apostrophe in it broke the commit,
+        # and it exited 0 anyway: usarrs 8.2.0 and bloodhound 6.1.0 shipped an
+        # older tree under a green run. The quoting fix (#60) and fail-on-error
+        # (#48) are on master but in no tagged release yet (latest v2.4.5).
+        uses: symplify/monorepo-split-github-action@64498811856d440ceeea37737feac43ffcb2c623
         env:
           GITHUB_TOKEN: ${{ secrets.SPLIT_TOKEN }}
         with:
@@ -104,7 +109,12 @@ jobs:
           echo "Splitting ${PACKAGE} at ${VERSION} -> letterofmarque/${REPO}"
 
       - name: Split ${{ steps.tag.outputs.package }} (${{ steps.tag.outputs.version }})
-        uses: symplify/monorepo-split-github-action@v2.3.0
+        # Pinned to upstream master, not a tag. v2.3.0 put the commit message
+        # into a shell command unquoted, so an apostrophe in it broke the commit,
+        # and it exited 0 anyway: usarrs 8.2.0 and bloodhound 6.1.0 shipped an
+        # older tree under a green run. The quoting fix (#60) and fail-on-error
+        # (#48) are on master but in no tagged release yet (latest v2.4.5).
+        uses: symplify/monorepo-split-github-action@64498811856d440ceeea37737feac43ffcb2c623
         env:
           GITHUB_TOKEN: ${{ secrets.SPLIT_TOKEN }}
         with:
