@@ -7,6 +7,16 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+### Security
+
+- **An announce key was issued to every new user, verified or not.** If the app's
+  `User` implements `MustVerifyEmail`, `HasTrackerStats` now holds the key back from
+  an unverified user and issues it when Laravel's `Verified` event fires. A user who
+  already has a key keeps it, so nobody has to re-download their `.torrent` files.
+  Not retroactive: unverified users who already hold a key keep it.
+
 ## [6.0.0] — 2026-09-25
 
 > Announce keys move into a table bloodhound owns and other packages read tracker figures through a declared contract; the announce URL's shape also becomes configurable for migrating trackers.

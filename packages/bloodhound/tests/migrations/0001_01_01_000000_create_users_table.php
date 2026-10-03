@@ -15,6 +15,7 @@ return new class extends Migration
             $table->string('name');
             $table->string('email')->unique();
             $table->string('password')->nullable();
+            $table->timestamp('email_verified_at')->nullable();
 
             // Laravel's own users table has this, and package migrations
             // legitimately position columns relative to it. SQLite ignores

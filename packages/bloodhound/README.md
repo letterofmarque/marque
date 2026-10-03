@@ -48,7 +48,16 @@ migrating an existing tracker. See [Announce URL shape](#announce-url-shape).
 Users authenticate via their announce key. Keys live in bloodhound's own `announce_keys`
 table: `HasTrackerStats` issues one when a user is created, and other code reads or
 regenerates it through trove's `TrackerStatsInterface`, which bloodhound binds — see
-[trove's README](../trove/README.md). The legacy `users.announce_key` column is deprecated
+[trove's README](../trove/README.md).
+
+**If your `User` implements `MustVerifyEmail`, the key waits for a verified
+address.** An unverified sign-up gets no key, and bloodhound issues one when
+Laravel's `Verified` event fires. Without this, someone could sign up with
+another person's address and announce before anyone proved the inbox. Taking
+the key back afterwards would mean rotating it, and every rotation makes the
+user re-download their `.torrent` files. A user who already has a key keeps it
+when their address is verified. Users created already verified, and apps that
+don't verify addresses, get a key at creation as before. The legacy `users.announce_key` column is deprecated
 and never read. Peer data is stored in Redis; the announce path makes one query to resolve
 the user.
 

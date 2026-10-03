@@ -97,12 +97,16 @@ describe('with a tracker bound', function () {
             ->assertDontSee('tablekeytablekeytablekeytablekey');
     });
 
-    it('omits the key section when the tracker has no key for the user', function () {
+    // This used to omit the section, which left a user with no key no way to
+    // get one: bloodhound now holds keys back until an address is verified
+    // (#10879), so "no key" is an ordinary state with a button.
+    it('offers to generate a key when the tracker has none for the user', function () {
         unset($this->tracker->keys[$this->user->id]);
 
         $this->actingAs($this->user)
             ->get(route('profile.stats'))
-            ->assertDontSee('Announce Key');
+            ->assertSee('Announce Key')
+            ->assertSee(__('Generate announce key'));
     });
 
     // getRatio() returned null for an infinite ratio and the view printed it

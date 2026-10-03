@@ -111,8 +111,9 @@ Route::middleware([...config('usarrs.auth_middleware', ['web', 'auth']), 'auth.s
 // Passkeys — laravel/passkeys' WebAuthn endpoints, registered here rather than
 // by laravel/passkeys itself (#10883). Same paths, names and controllers, with
 // usarrs' middleware: auth.session throughout, so a session ended by a rotated
-// password hash can't add a passkey (CP #784); a confirmed password to manage
-// them; and a throttle that Fortify 1.39 would otherwise have removed.
+// password hash can't add a passkey (CP #784); a verified address to add one
+// (#10879) and a confirmed password to manage them; and a throttle that
+// Fortify 1.39 would otherwise have removed.
 if (config('usarrs.passkeys.enabled', false)) {
     Route::middleware([...config('usarrs.middleware', ['web']), 'auth.session'])
         ->prefix(config('usarrs.prefix', ''))
@@ -128,8 +129,8 @@ if (config('usarrs.passkeys.enabled', false)) {
                 Route::get('passkeys/confirm/options', [PasskeyConfirmationController::class, 'index'])->middleware($throttle)->name('passkey.confirm-options');
                 Route::post('passkeys/confirm', [PasskeyConfirmationController::class, 'store'])->middleware($throttle)->name('passkey.confirm');
 
-                Route::get('user/passkeys/options', [PasskeyRegistrationController::class, 'index'])->middleware(['password.confirm', $throttle])->name('passkey.registration-options');
-                Route::post('user/passkeys', [PasskeyRegistrationController::class, 'store'])->middleware(['password.confirm', $throttle])->name('passkey.store');
+                Route::get('user/passkeys/options', [PasskeyRegistrationController::class, 'index'])->middleware(['verified', 'password.confirm', $throttle])->name('passkey.registration-options');
+                Route::post('user/passkeys', [PasskeyRegistrationController::class, 'store'])->middleware(['verified', 'password.confirm', $throttle])->name('passkey.store');
                 Route::delete('user/passkeys/{passkey}', [PasskeyRegistrationController::class, 'destroy'])->middleware('password.confirm')->name('passkey.destroy');
             });
         });

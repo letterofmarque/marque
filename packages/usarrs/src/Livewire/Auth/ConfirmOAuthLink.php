@@ -17,6 +17,7 @@ use Laravel\Fortify\Actions\DisableTwoFactorAuthentication;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Marque\Usarrs\Auth\LoginCompletion;
+use Marque\Usarrs\Auth\VerifiedAddress;
 use Marque\Usarrs\Livewire\Component;
 use Marque\Usarrs\Models\SocialAccount;
 
@@ -146,7 +147,7 @@ class ConfirmOAuthLink extends Component
      */
     public static function unproven(Authenticatable $user): bool
     {
-        return $user instanceof MustVerifyEmail && ! $user->hasVerifiedEmail();
+        return VerifiedAddress::missing($user);
     }
 
     /**

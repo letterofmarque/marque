@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Marque\Bloodhound;
 
+use Illuminate\Auth\Events\Verified;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\ServiceProvider;
@@ -15,6 +16,7 @@ use Marque\Bloodhound\Console\Commands\ReconcileLedger;
 use Marque\Bloodhound\Console\Commands\SyncSwarmCounts;
 use Marque\Bloodhound\Contracts\AnnounceLogServiceInterface;
 use Marque\Bloodhound\Events\TorrentCompleted;
+use Marque\Bloodhound\Listeners\IssueAnnounceKeyOnVerification;
 use Marque\Bloodhound\Listeners\RecordCompletion;
 use Marque\Bloodhound\Models\AnnounceLog;
 use Marque\Bloodhound\Services\AnnounceLogService;
@@ -121,6 +123,7 @@ class BloodhoundServiceProvider extends ServiceProvider
     protected function registerEventListeners(): void
     {
         Event::listen(TorrentCompleted::class, RecordCompletion::class);
+        Event::listen(Verified::class, IssueAnnounceKeyOnVerification::class);
     }
 
     /**

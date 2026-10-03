@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Marque\Bloodhound\Concerns;
 
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Marque\Trove\Contracts\TrackerStatsInterface;
 use Marque\Trove\Contracts\UserInterface;
 
@@ -35,7 +36,8 @@ trait HasTrackerStats
     }
 
     /**
-     * Issue a key when a user is created.
+     * Issue a key when a user is created, or when their address is verified
+     * if the app verifies addresses.
      *
      * Written to announce_keys through the tracker's own service, never to
      * users.announce_key, which is deprecated. Read a key back with
@@ -48,6 +50,13 @@ trait HasTrackerStats
     public static function bootHasTrackerStats(): void
     {
         static::created(function ($model) {
+            // An app that verifies addresses gets the key on verification
+            // instead (IssueAnnounceKeyOnVerification): a sign-up nobody has
+            // proven the address of could be anyone's (usarrs #10879).
+            if ($model instanceof MustVerifyEmail && ! $model->hasVerifiedEmail()) {
+                return;
+            }
+
             if ($model instanceof UserInterface) {
                 app(TrackerStatsInterface::class)->regenerateAnnounceKey($model);
             }

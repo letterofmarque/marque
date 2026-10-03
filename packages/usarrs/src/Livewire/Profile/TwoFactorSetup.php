@@ -11,6 +11,7 @@ use Laravel\Fortify\Actions\EnableTwoFactorAuthentication;
 use Laravel\Fortify\Actions\GenerateNewRecoveryCodes;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Livewire\Attributes\Validate;
+use Marque\Usarrs\Auth\VerifiedAddress;
 use Marque\Usarrs\Livewire\Component;
 
 class TwoFactorSetup extends Component
@@ -26,11 +27,19 @@ class TwoFactorSetup extends Component
 
     public function enable(EnableTwoFactorAuthentication $action): void
     {
+        if ($this->addressUnproven()) {
+            return;
+        }
+
         $action(auth()->user());
     }
 
     public function confirm(ConfirmTwoFactorAuthentication $action): void
     {
+        if ($this->addressUnproven()) {
+            return;
+        }
+
         $this->validate();
 
         $action(auth()->user(), $this->code);
@@ -63,6 +72,21 @@ class TwoFactorSetup extends Component
             'qrCodeSvg' => ! empty($user->two_factor_secret) && empty($user->two_factor_confirmed_at) ? $user->twoFactorQrCodeSvg() : null,
             'recoveryCodes' => ! empty($user->two_factor_confirmed_at) && ! empty($user->two_factor_recovery_codes) ? $user->recoveryCodes() : null,
         ])->title(__('Two-Factor Authentication'));
+    }
+
+    /**
+     * Two-factor is a way in; an account nobody has proven the address of
+     * doesn't get to add one (#10879).
+     */
+    private function addressUnproven(): bool
+    {
+        if (! VerifiedAddress::missing(auth()->user())) {
+            return false;
+        }
+
+        $this->addError('email', __('Verify your email address before turning on two-factor authentication.'));
+
+        return true;
     }
 
     private function userSupportsTwoFactor(): bool

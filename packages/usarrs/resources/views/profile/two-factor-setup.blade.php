@@ -7,6 +7,8 @@
         </div>
     @endif
 
+    <x-deck::error name="email" />
+
     @if (! $enabled)
         <x-deck::button wire:click="enable">{{ __('Enable Two-Factor Authentication') }}</x-deck::button>
     @elseif (! $confirmed)

@@ -232,6 +232,21 @@ event with `SendEmailVerificationNotification`; when that listener is
 registered, usarrs leaves the sending to it, and only sends the mail itself when
 the listener is absent. Either way the user gets exactly one mail.
 
+**What needs a verified address.** An account nobody has proven the address of
+may be a squatter's, and anything it attaches outlives the real owner taking the
+account back. So by default an unverified account can't:
+
+| Action | Where it's refused |
+|---|---|
+| Add a passkey | `verified` middleware on `/user/passkeys/options` and `POST /user/passkeys` |
+| Turn on two-factor authentication | `TwoFactorSetup` (enable and confirm) |
+| Connect an OAuth provider while signed in | the OAuth callback |
+| Create an invite | `/invites/create` redirects to `verification.notice`; the action refuses too |
+| Get an announce key | the Generate/Regenerate action. bloodhound also holds the key back at sign-up and issues it on verification |
+
+An app whose `User` doesn't implement `MustVerifyEmail` has opted out of
+verification, and none of these checks apply to it.
+
 Password confirmation needs no opt-in trait — it works against any authenticated user
 out of the box.
 

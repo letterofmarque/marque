@@ -24,6 +24,12 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   were unthrottled. Now each is limited to five a minute: password login per email
   and IP, the challenge per pending login (codes and recovery codes together), and
   confirmation per user. A TOTP code works once per user.
+- **An unverified account could add passkeys and two-factor, create invites, and
+  hold an announce key.** Profile, security and invite routes sat behind `auth`, not
+  `verified`. Each of those actions now needs a verified address, as connecting an
+  OAuth provider already did. An app whose `User` doesn't implement
+  `MustVerifyEmail` is unaffected. Pair this with bloodhound's matching change,
+  which holds a new user's key back until verification.
 
 ### Fixed
 
@@ -56,6 +62,10 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 ### Added
 
 - **Sign in with a passkey** on the login page, when passkeys are enabled.
+- **A Generate announce key button** for a user who has no key. Previously the key
+  section simply didn't render, so such a user had no way to get one. It shows only
+  to a verified address and isn't subject to `allow_announce_key_regen`, because
+  that switch is about replacing a key, not getting a first one.
 - A banned or inactive user's passkey is refused (422) through `laravel/passkeys`'
   login authorization hook, before any session exists.
 

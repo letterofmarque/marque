@@ -6,6 +6,7 @@ namespace Marque\Usarrs\Livewire\Dashboard;
 
 use Illuminate\Contracts\View\View;
 use Marque\Trove\Contracts\UserInterface;
+use Marque\Usarrs\Auth\VerifiedAddress;
 use Marque\Usarrs\Livewire\Profile\AnnounceKeyManagement;
 
 /**
@@ -25,6 +26,7 @@ class AnnounceKeyPanel extends AnnounceKeyManagement
         return view('usarrs::dashboard.panels.announce-key', [
             'announceKey' => $user instanceof UserInterface ? $this->tracker()?->announceKeyFor($user) : null,
             'allowRegen' => config('usarrs.profile.allow_announce_key_regen', true),
+            'addressUnproven' => VerifiedAddress::missing($user),
         ]);
     }
 }

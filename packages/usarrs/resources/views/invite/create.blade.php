@@ -9,6 +9,8 @@
         <x-deck::heading size="xl" class="mb-6">{{ __('Create Invite') }}</x-deck::heading>
 
         <form wire:submit="create" class="flex flex-col gap-6">
+            <x-deck::error name="email" />
+
             <x-deck::field :label="__('Recipient Email')" name="recipientEmail">
                 <x-deck::input
                     wire:model="recipientEmail"

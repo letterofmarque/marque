@@ -17,7 +17,7 @@
     @if ($showAnnounceKey)
         <div class="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-900">
             <x-deck::heading size="sm" class="mb-4">{{ __('Announce Key') }}</x-deck::heading>
-            @include('usarrs::partials.announce-key', ['announceKey' => $announceKey, 'allowRegen' => $allowRegen])
+            @include('usarrs::partials.announce-key', ['announceKey' => $announceKey, 'allowRegen' => $allowRegen, 'addressUnproven' => $addressUnproven])
         </div>
     @endif
 
