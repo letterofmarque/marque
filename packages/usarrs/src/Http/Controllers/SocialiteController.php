@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Marque\Usarrs\Http\Controllers;
 
 use Illuminate\Contracts\Auth\Authenticatable;
-use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,6 +14,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Marque\Usarrs\Auth\LoginCompletion;
+use Marque\Usarrs\Auth\NewAccount;
 use Marque\Usarrs\Auth\OAuthIdentity;
 use Marque\Usarrs\Auth\RegistrationRules;
 use Marque\Usarrs\Contracts\OAuthProvider;
@@ -148,9 +148,7 @@ class SocialiteController
 
         // Unverified, like any other new account. The provider's say-so is not
         // this site's proof that the address is theirs.
-        if ($user instanceof MustVerifyEmail && ! $user->hasVerifiedEmail()) {
-            $user->sendEmailVerificationNotification();
-        }
+        NewAccount::announce($user);
 
         return redirect(app(LoginCompletion::class)->begin($user, remember: true));
     }

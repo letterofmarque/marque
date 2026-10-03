@@ -25,6 +25,15 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   and IP, the challenge per pending login (codes and recovery codes together), and
   confirmation per user. A TOTP code works once per user.
 
+### Fixed
+
+- **Password registration never sent the verification email.** The new account was
+  signed in, met the `verified` middleware, and got no mail until the user found
+  "resend". `/register` and the OAuth callback now both fire `Registered` and send
+  exactly one verification email: usarrs leaves it to Laravel's
+  `SendEmailVerificationNotification` listener when the app registers one, and
+  sends it itself otherwise. The OAuth path didn't fire `Registered` before.
+
 ## [8.1.0] — 2026-10-01
 
 > Security: OAuth sign-in no longer signs in whoever has the email the provider reports, and password, magic-link and OAuth sign-in all go through the two-factor challenge; plus the dashboard gets its panels.

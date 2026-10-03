@@ -225,6 +225,13 @@ class User extends Authenticatable implements MustVerifyEmail
 }
 ```
 
+**Every new account is sent the verification email**, whether it came from
+`/register` or the OAuth callback. Both fire Laravel's `Registered` event, so
+your app can hook new accounts. A stock Laravel 11+ app already listens for that
+event with `SendEmailVerificationNotification`; when that listener is
+registered, usarrs leaves the sending to it, and only sends the mail itself when
+the listener is absent. Either way the user gets exactly one mail.
+
 Password confirmation needs no opt-in trait — it works against any authenticated user
 out of the box.
 

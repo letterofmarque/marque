@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Hash;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Validate;
 use Marque\Usarrs\Auth\LoginCompletion;
+use Marque\Usarrs\Auth\NewAccount;
 use Marque\Usarrs\Auth\RegistrationRules;
 use Marque\Usarrs\Enums\AuthDriver;
 use Marque\Usarrs\Exceptions\InviteAlreadyRedeemed;
@@ -88,6 +89,8 @@ class Register extends Component
 
             return;
         }
+
+        NewAccount::announce($user);
 
         $this->redirect(app(LoginCompletion::class)->begin($user, remember: false), navigate: true);
     }

@@ -8,8 +8,11 @@ declare(strict_types=1);
 // registration rules allow one, exactly as /register applies them, and the new
 // account is unverified and sent the verification email like anyone else.
 
+use Illuminate\Auth\Events\Registered;
+use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Marque\Usarrs\Contracts\InviteServiceInterface;
@@ -47,6 +50,22 @@ it('leaves the new account unverified and sends the verification email', functio
 
     expect(newcomer()->hasVerifiedEmail())->toBeFalse();
     Notification::assertSentTo(newcomer(), VerifyEmail::class);
+});
+
+it('sends the verification email once, and fires Registered, even when the app wires Laravel\'s listener (#10840)', function () {
+    // The same path as /register, so the two can't drift.
+    Event::forget(Registered::class);
+    Event::listen(Registered::class, SendEmailVerificationNotification::class);
+    $fired = 0;
+    Event::listen(Registered::class, function () use (&$fired) {
+        $fired++;
+    });
+    $this->oauth->asserts('github', 'gh-new', 'newcomer@example.com');
+
+    $this->get(route('socialite.callback', 'github'));
+
+    Notification::assertSentToTimes(newcomer(), VerifyEmail::class, 1);
+    expect($fired)->toBe(1);
 });
 
 it('gives the new account no password anyone could know', function () {
