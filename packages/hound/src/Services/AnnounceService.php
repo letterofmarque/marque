@@ -56,7 +56,7 @@ final class AnnounceService
         $eventEnum = AnnounceEvent::tryFrom($event ?? '');
 
         return match ($eventEnum) {
-            AnnounceEvent::Stopped => $this->handleStopped($torrent),
+            AnnounceEvent::Stopped => $this->handleStopped($torrent, $peerId),
             AnnounceEvent::Completed => $this->handleCompleted($torrent, $peerId, $ip, $port, $uploaded, $downloaded, $left, $isSeeder, $compact, $numWant),
             default => $this->handleRegular($torrent, $peerId, $ip, $port, $uploaded, $downloaded, $left, $isSeeder, $compact, $numWant),
         };
@@ -64,9 +64,14 @@ final class AnnounceService
 
     /**
      * Handle stopped event - peer is leaving the swarm.
+     *
+     * This used to only read the counts, so a peer that left stayed counted
+     * forever (#10800).
      */
-    private function handleStopped(Torrent $torrent): Response
+    private function handleStopped(Torrent $torrent, string $peerId): Response
     {
+        $this->peerService->removePeer($torrent->id, $peerId);
+
         $seeders = $this->peerService->getSeeders($torrent->id);
         $leechers = $this->peerService->getLeechers($torrent->id);
 

@@ -9,7 +9,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [Unreleased]
 
-> Announce and scrape paths are configurable, for migrating public trackers.
+> Swarm counts fall back as peers leave (a stopped announce removes the peer, an hourly sweep clears expired ones), and announce and scrape paths are configurable for migrating public trackers.
 
 ### Added
 
@@ -20,6 +20,14 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
   Paths only: hound is keyless by design, so none of bloodhound's key options apply
   here. Route names stay `tracker.announce` and `tracker.scrape` regardless.
+- **`hound:sync-swarm-counts`**, scheduled hourly. It sweeps peers that expired without
+  a `stopped` announce and writes the settled seeder/leecher counts back to each torrent.
+
+### Fixed
+
+- **Swarm counts only ever went up.** A `stopped` announce never removed the peer, and
+  nothing swept peers that expired without one, so every peer that ever announced stayed
+  counted. `stopped` now removes the peer, and the new command handles the rest (#10800).
 
 ## [3.2.0] — 2026-09-04
 

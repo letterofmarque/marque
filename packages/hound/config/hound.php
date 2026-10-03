@@ -62,7 +62,9 @@ return [
     */
 
     'logging' => [
+        // check-docs: ignore — not yet built, read by nothing until #10809
         'enabled' => env('HOUND_LOGGING', false),
+        // check-docs: ignore — not yet built, read by nothing until #10809
         'channel' => env('HOUND_LOG_CHANNEL', 'stack'),
     ],
 ];

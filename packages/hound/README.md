@@ -83,7 +83,7 @@ a web browser rather than a BitTorrent client.
 2. Torrent looked up by info_hash — an unregistered hash is refused
 3. Port checked against threepio's blacklist
 4. IP peer count checked against the limit
-5. Peer upserted in Redis under user ID `0` (anonymous)
+5. Peer upserted in Redis under user ID `0` (anonymous), or removed on a `stopped` announce
 6. Swarm counts projected onto the `torrents` row when they've changed
 7. Bencoded peer list returned
 
@@ -127,12 +127,17 @@ dead torrents", "sort by seeders" — and SQL cannot query Redis. So each announ
 writes `seeders` and `leechers` onto the `torrents` row, skipping the write entirely when
 neither has changed (which is most announces).
 
-Note the gap this leaves, and that hound does not close: a peer that vanishes without
-sending `stopped` expires quietly out of Redis, and with nothing announcing afterwards the
-row keeps advertising a swarm that no longer exists. Bloodhound has
-`bloodhound:sync-swarm-counts` scheduled hourly to settle this; **hound ships no
-equivalent command**. On a public tracker with steady traffic the next announce corrects
-it, but a torrent whose swarm empties completely will hold its last-known counts.
+A `stopped` announce removes the peer, so a client that leaves properly is counted out
+straight away. A peer that vanishes without sending `stopped` (client killed, machine off)
+is caught by **`hound:sync-swarm-counts`**, which hound schedules hourly. It sweeps each
+torrent's expired peers out of Redis and writes the settled counts back to the row. That
+needs [Laravel's scheduler running](https://laravel.com/docs/scheduling#running-the-scheduler).
+Until the sweep runs, a torrent whose swarm vanished keeps its last-known counts for up to
+an hour.
+
+```bash
+php artisan hound:sync-swarm-counts
+```
 
 ## Configuration
 
@@ -161,12 +166,15 @@ Peers over the cap get a bencoded `Too many connections from your IP` failure. T
 is across all torrents, not per torrent — a single IP seeding 50 torrents is at the limit.
 Raise it if you expect legitimate NAT'd or institutional traffic.
 
-### Logging
+### Logging — planned, not yet built
+
+These keys ship in `config/hound.php` but **nothing reads them yet**. Setting them does
+nothing today (#10809).
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `logging.enabled` | `false` | Enable announce logging |
-| `logging.channel` | `stack` | Laravel log channel |
+| `logging.enabled` | `false` | Announce logging, once built <!-- check-docs: ignore — not yet built, read by nothing until #10809 --> |
+| `logging.channel` | `stack` | Laravel log channel, once built <!-- check-docs: ignore — not yet built, read by nothing until #10809 --> |
 
 ```env
 HOUND_LOGGING=false
