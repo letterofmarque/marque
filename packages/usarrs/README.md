@@ -84,14 +84,15 @@ the login form again.
 
 ### Banned, disabled and pending users
 
-A user whose `status` is anything but `active` can't sign in, and is signed out
+A user whose `status` is `banned`, `disabled` or `pending` can't sign in, and is signed out
 if they already are:
 
 - **Every sign-in path refuses them.** Password, magic link, OAuth and the
   two-factor challenge all finish in one place, which turns an inactive user
   back to the login form with the reason ("This account has been banned.").
-  Ways in that don't pass through it, like passkey sign-in or a remember-me
-  cookie, are caught on Laravel's `Login` event and get a 403.
+  Passkey sign-in, which doesn't pass through it, is refused (422) before any
+  session exists. A remember-me cookie is caught on Laravel's `Login` event and
+  gets a 403.
 - **A live session ends on its next request**, on any page in the `web`
   middleware group and not just usarrs' own. usarrs pushes
   `EnsureUserIsActive` onto that group, so a ban covers browsing and
@@ -406,8 +407,8 @@ sign-up that carries one.
 user. **The route is registered on every install**, whatever else is present, so
 `route('dashboard.index')` is always safe to link to — no `Route::has()` guard needed. A
 Dashboard entry is added to the navigation for signed-in users, and `marque:install`
-offers it as the home page (the default for a private tracker) — in the installer on
-`main`; `marque/marque` hasn't been tagged yet.
+offers it as the home page (the default for a private tracker), since `marque/marque`
+1.0.0.
 
 The page renders panels from trove's `DashboardPanelRegistry`. usarrs registers these, each
 appearing only when it has something true to say:

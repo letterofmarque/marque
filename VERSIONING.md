@@ -16,8 +16,8 @@ and we break it, that is a bug in our release, not in your constraint.
 | Pre-release features, opt-in | `^3.1@beta` | 3.1.0-beta1 and later |
 | Bleeding edge, no guarantees | `dev-main` | whatever is on main right now |
 
-**`^3.0` is the right choice for almost everyone**, and it is what `composer require`
-gives you by default. You receive new features and bug fixes automatically, and never
+**A caret on the current major (`^3.0` in this table's example) is the right choice for
+almost everyone**, and it is what `composer require` gives you by default. You receive new features and bug fixes automatically, and never
 a breaking change without an explicit major bump on your side.
 
 We cut minor releases **frequently** — a feature that is merged and green is usually
@@ -129,7 +129,7 @@ technical reason.
 
 The cost is that **the test suite is pinned to Pest 4**, because Pest 5 requires PHP 8.4.
 Adopting any Pest 5 feature means raising the PHP floor back to 8.4, which is a MAJOR for
-all eleven packages. As of 5.1 the suite uses only `it`, `test`, `expect`, `describe`,
+all fourteen packages. As of 5.1 the suite uses only `it`, `test`, `expect`, `describe`,
 `beforeEach` and `uses` — the Pest 1-era core — so nothing is lost today. But TIA
 (test-impact analysis), the agent browser plugin, built-in Rector and agent evals are all
 Pest 5-only and stay out of reach while the floor is 8.3.

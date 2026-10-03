@@ -134,10 +134,10 @@ key formats are disjoint first.
 
 1. Announce key validated, user looked up
 2. Torrent identified by info_hash
-3. Anti-cheat checks run
-4. Client validated against whitelist
+3. Client validated against whitelist
+4. Anti-cheat checks run
 5. Peer upserted in Redis, stats calculated
-6. Upload/download deltas queued for database update
+6. Upload/download deltas written to the announce ledger; totals are folded in by `bloodhound:aggregate-ledger`
 7. Bencoded peer list returned to client
 
 ### Peer Storage
@@ -216,7 +216,7 @@ From `config/threepio.php`, as above.
 
 ### Client Validation
 
-Bloodhound validates BitTorrent clients by peer ID. Default mode is `whitelist` with 17 pre-configured clients including qBittorrent, Deluge, Transmission, rTorrent, libtorrent, Vuze, and others.
+Bloodhound validates BitTorrent clients by peer ID. Default mode is `whitelist` with 9 pre-configured clients: qBittorrent, Deluge, Transmission, libtorrent, rTorrent, uTorrent, BitTorrent, Vuze and BiglyBT.
 
 | Key | Default | Description |
 |-----|---------|-------------|
@@ -327,7 +327,7 @@ This is the mechanism for keeping a high-write-volume table off your main databa
 
 #### Retention and pruning
 
-`retention_days` is `null` by default, which means **keep everything forever**. With logging enabled and no retention set, this table grows without bound on a busy tracker. That default is deliberate - once you've opted into logging, how long to keep it is your call, not ours - but it is your job to make it.
+`retention_days` is `null` by default, which means **keep everything forever**. With logging on (the default) and no retention set, this table grows without bound on a busy tracker. That default is deliberate - how long to keep the source of truth for ratio is your call, not ours - but it is your job to make it.
 
 Set `retention_days` and the scheduled `bloodhound:prune-announce-log` command keeps the table bounded:
 
@@ -341,7 +341,7 @@ It's registered on Laravel's scheduler to run daily, so it needs [the scheduler 
 
 This is a Bloodhound feature and has no equivalent in [marque/hound](https://packagist.org/packages/marque/hound). Public trackers are deliberately anonymous - `hound` records no user against an announce at all - so ratio verification and cheat investigation aren't concepts that apply there.
 
-The existing anti-cheat Redis `suspicious` list keeps working exactly as before whether or not you enable this, since it has no toggle of its own and operators who haven't opted in still need it.
+The existing anti-cheat Redis `suspicious` list keeps working exactly as before whether or not you enable this, since it has no toggle of its own and operators who turn the log off still need it.
 
 #### Querying the log
 
@@ -376,7 +376,7 @@ Bloodhound ships no UI for this. Browsing the log is left to your application.
 
 ### Verifying the numbers
 
-Three commands, and the reason they exist: before the ledger, a byte count could be lost
+Four commands, and the reason they exist: before the ledger, a byte count could be lost
 or corrupted and **nothing anywhere would know**. The totals were accumulators with
 nothing behind them, so a wrong number stayed wrong forever and the first anyone heard of
 it was a user disputing a ban.

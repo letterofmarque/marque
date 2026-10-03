@@ -128,7 +128,7 @@ composer require marque/squidink
 # Torrent comments and a lightweight forum
 composer require marque/parley
 
-# Declarative taxonomy engine (usually pulled in by a marque/taxonomy-* package)
+# Declarative taxonomy engine (you declare the levels and facets in YAML)
 composer require marque/taxonomy
 
 # Admin panel — lists the admin screens your installed packages register
@@ -147,7 +147,7 @@ composer require marque/skipper
 - Redis-backed peer storage for high performance
 - Version-based client whitelist/blacklist
 - Anti-cheat detection (speed limits, swarm consistency, connection limits)
-- Ratio tracking modes: full, off, seedtime (ratioless)
+- Ratio tracking modes (full, off, seedtime) — planned, not yet enforced (#10732)
 - Support for compact and dictionary peer formats
 
 ### Guise (Web UI)
@@ -164,7 +164,7 @@ composer require marque/skipper
 
 ### Cennad (API)
 - RESTful torrent endpoints
-- Token-based authentication (Laravel Passport)
+- Token authentication through the app's `auth:api` guard (Sanctum, Passport or any compatible guard)
 - Configurable routes and middleware
 
 ### Parley (Discussion)
@@ -189,7 +189,7 @@ composer require marque/skipper
   recoverable, enforced by foreign keys rather than by convention
 - Cascading upload form and an admin screen that populates declared levels but deliberately
   cannot create or remove one
-- Ships no domain vocabulary at all; `marque/taxonomy-*` packages supply that
+- Ships no domain vocabulary at all; your app declares its own levels and facets in YAML
 
 ## Configuration
 
@@ -209,7 +209,7 @@ php artisan vendor:publish --tag=taxonomy-config
 Packages follow [Semantic Versioning](https://semver.org) and are versioned
 independently — `marque/guise` at 3.4.0 alongside `marque/threepio` at 3.0.1 is normal.
 
-Most people want `^3.0`, which is what `composer require` gives you by default: new
+Most people want a caret on the current major (`^8.2` for usarrs today), which is what `composer require` gives you by default: new
 features and fixes automatically, never a breaking change. Minor releases are cut
 frequently, so you should not need to track `dev-main` to get a finished feature.
 
@@ -237,12 +237,12 @@ picks it up automatically. Two things to watch:
   more than three tags arrive in a single push — the tags land, nothing splits, and
   Packagist is never notified. It fails silently.
 - **Release in dependency order.** A package must be published before anything that
-  requires it: `threepio` → `trove` and `ise` → everything else.
+  requires it: `threepio` → `trove` and `deck` → everything else.
 
 If a split is missed, re-trigger it from an existing tag:
 
 ```bash
-gh workflow run 'Split Monorepo' -f tag=guise/v3.1.0
+gh workflow run 'Split Monorepo' -f tag=guise/v5.0.0
 ```
 
 ## Development
