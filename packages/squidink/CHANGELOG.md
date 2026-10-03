@@ -5,7 +5,7 @@ All notable changes to `marque/squidink` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
-## [Unreleased]
+## [1.1.2] — 2026-10-04
 
 > Raises the `league/commonmark` floor past two advisories. squidink itself was not
 > exposed to either.
