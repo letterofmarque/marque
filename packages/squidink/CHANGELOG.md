@@ -24,8 +24,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md).
   moves anyway: Laravel and other packages in your app use `league/commonmark` too,
   some with the GFM extensions, and this keeps a vulnerable version from resolving.
 
-  New tests pin the behaviour down: raw HTML is dropped in every shape the advisory
-  describes, and GFM table syntax stays a paragraph of text.
+  New tests pin the behaviour down: raw HTML in every shape the advisory describes is
+  dropped or escaped, never emitted, and GFM table syntax stays a paragraph of text.
 
 ### Fixed
 
@@ -33,8 +33,15 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md).
   `cache.*` keys, and every read renders afresh. The README and config now describe
   the cache as planned (#10811). Likewise, `image_resolver` and the `Image` node
   described a marque/stow resolver as if it could be installed; no such package exists
-  yet, and every image reference renders as-is (#10814). Documentation only:
-  behaviour is unchanged.
+  yet, and every image reference renders as-is (#10814).
+- **Four more README and config claims corrected**, found by the release read-through.
+  Narrowing a schema does delete a disallowed code block or image, content included.
+  Shortcodes are not schema-filtered. Image sources are scheme-filtered in the HTML
+  renderer, not a mark constructor. The parser list offered `"plain"`, which does not
+  exist. The README also now warns that listing parsers or shortcodes in config
+  replaces the defaults. The code fixes for the first two are #10936.
+
+  Documentation only: behaviour is unchanged.
 
 ## [1.1.1] — 2026-09-11
 

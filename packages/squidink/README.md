@@ -117,9 +117,12 @@ $schema = new Schema(
 );
 ```
 
-Content a schema disallows is **degraded, not deleted**: a disallowed node is
-unwrapped and its children kept, and a disallowed mark is dropped from the text it
-annotated. Narrowing a schema costs a post its colours, never its words.
+Content a schema disallows is mostly **degraded, not deleted**: a disallowed container
+node is unwrapped and its children kept, and a disallowed mark is dropped from the text it
+annotated. Two exceptions: a disallowed **code block** or **image** is removed together
+with its content, because the code text and the alt text are not child nodes. Shortcode
+nodes are not schema-filtered at all; registered shortcodes render whatever the schema
+says. Both are open (#10936).
 
 ## Extending
 
@@ -160,7 +163,9 @@ final class TextileParser implements Parser
 ```
 
 **A parser must never throw on malformed input.** Whatever it cannot understand
-becomes literal text. Register it in `config/squidink.php`, or:
+becomes literal text. Register it in the `parsers` array in `config/squidink.php`.
+Listing any parser there replaces the shipped defaults, so include `MarkdownParser` and
+`BBCodeParser` if you still want them. Or register it at runtime:
 
 ```php
 app(SquidInk::class)->registerParser(new TextileParser);
@@ -251,7 +256,9 @@ final class TorrentShortcode implements Shortcode
 }
 ```
 
-Add it to the `shortcodes` array in `config/squidink.php`. Unregistered shortcodes
+Add it to the `shortcodes` array in `config/squidink.php`. Listing any shortcode there
+replaces the shipped defaults, so include `SpoilerShortcode` and `MediaInfoShortcode` if
+you still want them. Unregistered shortcodes
 render as literal text rather than erroring, so content written on a site with more
 shortcodes installed still reads sensibly here.
 
@@ -300,9 +307,12 @@ php artisan vendor:publish --tag=squidink-views
 ## Security
 
 - **Closed vocabulary.** A parser cannot produce a node the schema does not declare,
-  so unsupported or hostile input cannot become unexpected output.
-- **Scheme filtering on every link and image**, in the mark constructor rather than in
-  each parser — so a new parser inherits it and cannot forget it. `javascript:`,
+  so unsupported or hostile input cannot become unexpected output. Shortcodes are a
+  separate pass that runs after the schema filter: only registered shortcodes exist,
+  but the schema does not restrict them (#10936).
+- **Scheme filtering on every link and image**: links in the `Link` mark's constructor,
+  image sources in the HTML renderer. Neither lives in a parser, so a new parser inherits
+  both and cannot forget them. `javascript:`,
   `data:` and `vbscript:` are refused, and the text renders unlinked rather than
   vanishing.
 - **Colours and sizes are validated against fixed sets**, never passed through to a

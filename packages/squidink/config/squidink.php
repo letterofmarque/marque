@@ -12,7 +12,7 @@ return [
     | of stored text records the parser it was written with, so changing this
     | affects new content only — existing content keeps rendering correctly.
     |
-    | Supported: "markdown", "bbcode", "plain"
+    | Supported: "markdown", "bbcode", or the name() of a parser you register
     |
     */
 
@@ -23,8 +23,9 @@ return [
     | Parsers
     |--------------------------------------------------------------------------
     |
-    | Registered input syntaxes. Each maps a name to a class implementing
-    | Marque\SquidInk\Contracts\Parser. Add your own here.
+    | Registered input syntaxes: a list of classes implementing
+    | Marque\SquidInk\Contracts\Parser. Each registers under its own name().
+    | Add your own here.
     |
     */
 
@@ -42,8 +43,8 @@ return [
     | Renderers
     |--------------------------------------------------------------------------
     |
-    | Registered output formats. Each maps a name to a class implementing
-    | Marque\SquidInk\Contracts\Renderer.
+    | Registered output formats: a list of classes implementing
+    | Marque\SquidInk\Contracts\Renderer. Each registers under its own name().
     |
     */
 
@@ -62,7 +63,9 @@ return [
     |
     | Which nodes and marks documents may contain. This is the security model,
     | not a style preference: a parser cannot produce a node that is not listed
-    | here, so unsupported input can never become unexpected output.
+    | here, so unsupported input can never become unexpected output. document,
+    | paragraph and text are always allowed. Shortcode nodes are added after
+    | this filter runs and are not restricted by it (#10936).
     |
     | Trimming this list is how you restrict what users can write. An empty
     | array means "everything the schema knows about".
