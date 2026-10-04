@@ -10,12 +10,13 @@ use Marque\SquidInk\Document\Node;
  * An image reference.
  *
  * SquidInk deliberately does NOT resolve the reference. It holds whatever the
- * author wrote — usually a URL — and an image resolver decides what that means
- * at render time.
+ * author wrote — usually a URL — so that an image resolver can decide what it
+ * means at render time.
  *
- * Installing marque/stow registers a resolver that fetches the image once and
- * stores it locally, which fixes both link rot and leaking viewers' IPs to
- * third-party image hosts. Without a resolver the reference renders as-is.
+ * No resolver exists yet, so the reference renders as-is. The planned one is a
+ * marque/stow package that fetches the image once and stores it locally, which
+ * fixes both link rot and leaking viewers' IPs to third-party image hosts
+ * (#10814).
  */
 final class Image extends Node
 {

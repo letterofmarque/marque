@@ -104,16 +104,21 @@ return [
     | Rendered Output Cache
     |--------------------------------------------------------------------------
     |
-    | Text is read far more often than it is written, so rendered output is
-    | cached and invalidated on edit. Set "enabled" to false to render on every
-    | read (useful while developing a parser or renderer).
+    | Planned, not built: nothing reads these keys yet, and every read renders
+    | afresh (#10811). The intent is that rendered output is cached and
+    | invalidated on edit, because text is read far more often than it is
+    | written.
     |
     */
 
     'cache' => [
+        // check-docs: ignore — not yet built, read by nothing until #10811
         'enabled' => env('SQUIDINK_CACHE', true),
+        // check-docs: ignore — not yet built, read by nothing until #10811
         'store' => env('SQUIDINK_CACHE_STORE'),
+        // check-docs: ignore — not yet built, read by nothing until #10811
         'ttl' => 60 * 60 * 24 * 7,
+        // check-docs: ignore — not yet built, read by nothing until #10811
         'prefix' => 'squidink',
     ],
 
@@ -126,12 +131,13 @@ return [
     | holding whatever reference the author wrote, and a resolver decides what
     | that means.
     |
-    | Installing marque/stow registers a resolver that fetches remote images and
-    | stores them locally, which prevents both link rot and leaking your users'
-    | IP addresses to third-party image hosts. With no resolver registered, the
-    | reference renders as-is.
+    | Planned, not built: nothing reads this key yet, and every reference renders
+    | as-is. The intended resolver is a marque/stow package that fetches remote
+    | images and stores them locally, preventing both link rot and leaking your
+    | users' IP addresses to third-party image hosts (#10814).
     |
     */
 
+    // check-docs: ignore — not yet built, read by nothing until #10814
     'image_resolver' => null,
 ];

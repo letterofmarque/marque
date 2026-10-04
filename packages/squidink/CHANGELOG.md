@@ -27,6 +27,15 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md).
   New tests pin the behaviour down: raw HTML is dropped in every shape the advisory
   describes, and GFM table syntax stays a paragraph of text.
 
+### Fixed
+
+- **The README said rendered output is cached. It is not.** Nothing reads the
+  `cache.*` keys, and every read renders afresh. The README and config now describe
+  the cache as planned (#10811). Likewise, `image_resolver` and the `Image` node
+  described a marque/stow resolver as if it could be installed; no such package exists
+  yet, and every image reference renders as-is (#10814). Documentation only:
+  behaviour is unchanged.
+
 ## [1.1.1] — 2026-09-11
 
 > Comment-only: two references to the renamed shell package.

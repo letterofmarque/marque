@@ -74,8 +74,9 @@ typed when they edit. Recording the parser per record means content written unde
 different syntaxes coexists forever — a site can enable BBCode later, or import
 legacy content, without rewriting a single existing row.
 
-Rendered output is cached (see `config/squidink.php`), because text is read far more
-often than it is written.
+Rendered output is not cached yet: every read renders afresh. A cache is planned, because
+text is read far more often than it is written. Its keys are already in
+`config/squidink.php` and do nothing until it is built (#10811).
 
 ## The document model
 
