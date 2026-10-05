@@ -155,9 +155,9 @@ trigger to look for a shared parent, not the second.
 That third registry exists: `DashboardPanelRegistry` (trove 4.3). All three share
 `register()` (a duplicate identifier throws), `all()` and `find()`. They differ in
 `visibleTo()`: nav and dashboard panels take a user, admin screens take a `Role`. Whether
-the shared half earns a parent class hasn't been decided. Extracting one changes trove's
-public registry surface, which VERSIONING.md treats as a major on trove, so it waits for
-a trove major.
+the shared half earns a parent class hasn't been decided. A parent that keeps every
+existing signature is a minor on trove; one that changes or removes any of them is a
+major (VERSIONING.md, "The surface registries").
 
 ### Things that bit, and are worth not rediscovering
 

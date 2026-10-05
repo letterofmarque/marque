@@ -123,6 +123,8 @@ expect "$out" "taxonomy: marque/taxonomy-sport does not exist" \
     'packages/taxonomy/README.md:[0-9]+ .*package-name.*taxonomy-sport'
 expect "$out" "new-package.md: nunomaduro/pao is abandoned" \
     'docs/new-package.md:[0-9]+ .*package-name.*nunomaduro/pao'
+expect "$out" "integration.md: the id:: component prefix named as current" \
+    'docs/integration.md:43 .*package-name.*id::'
 
 expect "$out" "usarrs: fortify ^1.37 documented, composer.json says ^1.30" \
     'packages/usarrs/README.md:[0-9]+ .*requirement.*laravel/fortify.*1\.37.*1\.30'

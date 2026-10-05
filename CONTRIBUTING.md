@@ -154,8 +154,8 @@ Packages reference each other via path repositories, so local changes are reflec
 
 Read **[docs/new-package.md](docs/new-package.md)** first. It carries the conventions
 (starting version, optional-dependency detection, mass assignment, the four-engine test
-harness) and, more usefully, the handful of steps that fail *silently* rather than
-loudly — two of which have caught out every new package added so far.
+harness), the traps that cost earlier packages a debugging session, and the one-time
+steps a maintainer has to do before a new package can ship.
 
 ## Testing
 
@@ -207,7 +207,7 @@ tools/test-engines --packages trove pgsql   # one package, one engine
 **Don't use `composer test` against a real engine.** Composer kills any script after 300
 seconds, and three suites (usarrs, taxonomy, bloodhound) take longer than that on MySQL.
 They die mid-run, printing usage text that looks like a corrupt result. `tools/test-engines`
-calls Pest directly, gives each package its own database, and runs packages in parallel.
+calls Pest directly, starts each package on a fresh database, and runs packages in parallel.
 
 MariaDB is a distinct engine, not a MySQL alias — Laravel ships its own `MariaDbConnection`
 and grammar, and the two diverge on JSON storage, index length limits and `RETURNING`. It
@@ -237,7 +237,7 @@ tools/test-engines sqlite
 
 ## Docs that match the code
 
-`tools/check-docs` checks the public docs against the code on every push (CI's lint job
+`tools/check-docs` checks the public docs against the code on every push to main and every pull request (CI's lint job
 runs it). It catches the lookup kind of wrong claim:
 - config keys a README documents that the config file doesn't have, or that nothing reads
 - defaults the config file disagrees with

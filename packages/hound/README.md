@@ -83,7 +83,7 @@ a web browser rather than a BitTorrent client.
 2. Torrent looked up by info_hash — an unregistered hash is refused
 3. Port checked against threepio's blacklist
 4. IP peer count checked against the limit
-5. Peer upserted in Redis under user ID `0` (anonymous), or removed on a `stopped` announce
+5. Peer upserted in Redis with no user (`userId: null`), or removed on a `stopped` announce
 6. Swarm counts projected onto the `torrents` row when they've changed
 7. Bencoded peer list returned
 
@@ -136,8 +136,8 @@ needs [Laravel's scheduler running](https://laravel.com/docs/scheduling#running-
 A vanished peer counts as expired once `peer_expiry` has passed since its last announce
 (an hour by default), and the next hourly sweep removes it. So a torrent whose swarm
 vanished keeps its last-known counts for up to about two hours. The scheduler is a hard
-requirement: threepio drops a torrent's peer list from Redis after twice `peer_expiry`,
-and if no sweep has run by then the counts can no longer be corrected.
+requirement: only the sweep removes a peer that vanished without saying `stopped`, so
+without it the counts never fall. A missed run only delays the correction.
 
 ```bash
 php artisan hound:sync-swarm-counts
@@ -170,8 +170,9 @@ At the cap, **every** announce from that IP gets a bencoded `Too many connection
 IP` failure, including re-announces from peers already in the swarm and `stopped` (so
 those peers leave only when they expire). The count is of distinct peer IDs across all
 torrents, so a client that uses one peer ID for every torrent counts once. Raise it if you
-expect legitimate NAT'd or institutional traffic. (#10804 covers the peer-handling
-problems behind this.)
+expect legitimate NAT'd or institutional traffic. Before threepio 3.2.1 and hound 3.3.1,
+dead peers could stay in the IP count for good, locking a busy IP out; that's fixed
+(#10804).
 
 ### Logging — planned, not yet built
 

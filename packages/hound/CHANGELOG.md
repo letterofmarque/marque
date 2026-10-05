@@ -16,8 +16,10 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 - **Every peer hound ever saw went into one Redis set that never shrank.** Hound passed
   `userId: 0` to threepio, which treats 0 as a real user id, so a `user:0:peers` set
   gathered every anonymous peer. Hound now passes `null`, and keeps no per-user state
-  (#10804). After upgrading, `redis-cli del <prefix>user:0:peers` frees what's there.
-  The default prefix is `marque:`. Take threepio 3.2.1 too: it fixes per-IP counts
+  (#10804). After upgrading, delete the old set to free what's there. Its key is Laravel's
+  `REDIS_PREFIX` (default `<app-name>-database-`) followed by `marque:user:0:peers`, in your
+  Redis connection's database:
+  `redis-cli --scan --pattern '*marque:user:0:peers' | xargs -r redis-cli del`. Take threepio 3.2.1 too: it fixes per-IP counts
   that could lock a busy IP out under `ip_limiting`.
 
 ## [3.3.0] — 2026-10-03

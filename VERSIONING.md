@@ -131,7 +131,7 @@ The cost is that **the test suite is pinned to Pest 4**, because Pest 5 requires
 Adopting any Pest 5 feature means raising the PHP floor back to 8.4, which is a MAJOR for
 all fourteen packages. The suite uses only long-standing Pest features (`it`, `test`,
 `expect`, `describe`, `beforeEach`, `afterEach`, datasets via `->with()` and `dataset()`,
-`->throws()`, and `pest()->extend()`), none of them Pest 5-only, so nothing is lost today. But TIA
+`->throws()`, `uses()` and `pest()->extend()`), none of them Pest 5-only, so nothing is lost today. But TIA
 (test-impact analysis), the agent browser plugin, built-in Rector and agent evals are all
 Pest 5-only and stay out of reach while the floor is 8.3.
 
