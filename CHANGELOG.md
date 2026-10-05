@@ -11,7 +11,9 @@ changelogs — edit those, not this.*
 ## 2026-10-05
 
 - **[cennad 4.2.0](packages/cennad/CHANGELOG.md)** — The API is rate limited, as `rate_limit` always said it was: 60 requests a minute per
+- **[hound 3.3.1](packages/hound/CHANGELOG.md)** — Anonymous peers no longer pile into one ever-growing Redis set.
 - **[squidink 1.1.3](packages/squidink/CHANGELOG.md)** — Narrowing a schema no longer deletes code blocks or image alt text, runs blocks
+- **[threepio 3.2.1](packages/threepio/CHANGELOG.md)** — Peer lists are a random selection, not the same peers reshuffled; the decoder rejects malformed bencode; and dead peers no longer linger in the swarm counters or the per-IP and per-user sets.
 
 ## 2026-10-04
 
