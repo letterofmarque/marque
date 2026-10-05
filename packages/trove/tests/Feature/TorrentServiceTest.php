@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
+use Illuminate\Http\UploadedFile;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Storage;
+use Marque\Threepio\Support\Bencode;
 use Marque\Trove\Models\Torrent;
 use Marque\Trove\Services\TorrentService;
 use Marque\Trove\Tests\TestUser;
@@ -141,5 +144,77 @@ describe('TorrentService', function () {
 
         expect($result)->toBeTrue()
             ->and(Torrent::find($id))->toBeNull();
+    });
+});
+
+// #10946. The info_hash was sha1(encode(decode(info))), which normalises the
+// dictionary. Clients hash the bytes as the file holds them, so a torrent whose
+// info isn't canonical bencode was stored under a hash nobody announces.
+describe('info_hash on upload', function () {
+    function uploadTorrent(object $test, string $info): Torrent
+    {
+        Storage::fake(config('trove.storage_disk', 'local'));
+
+        $file = UploadedFile::fake()->createWithContent(
+            'x.torrent',
+            'd8:announce13:http://x/ann/4:info'.$info.'e',
+        );
+
+        return $test->service->createFromUpload($file, $test->user, 'Upload');
+    }
+
+    test('is sha1 of the info dictionary exactly as the file holds it', function () {
+        // `name` before `length`: legal in the wild, not canonical.
+        $info = 'd4:name4:test6:lengthi5e12:piece lengthi16384e6:pieces20:'.str_repeat('a', 20).'e';
+
+        $torrent = uploadTorrent($this, $info);
+
+        expect($torrent->info_hash)->toBe(sha1($info))
+            ->and($torrent->size)->toBe(5);
+    });
+
+    test('is unchanged for a canonical torrent', function () {
+        $info = 'd6:lengthi5e4:name4:test12:piece lengthi16384e6:pieces20:'.str_repeat('a', 20).'e';
+
+        expect(uploadTorrent($this, $info)->info_hash)->toBe(sha1($info));
+    });
+});
+
+describe('trove:check-info-hashes', function () {
+    function storeTorrent(object $test, string $info, string $storedHash): Torrent
+    {
+        $disk = config('trove.storage_disk', 'local');
+        $path = 'torrents/'.$storedHash.'.torrent';
+        Storage::disk($disk)->put($path, 'd4:info'.$info.'e');
+
+        return Torrent::create([
+            'info_hash' => $storedHash,
+            'name' => 'T '.$storedHash,
+            'user_id' => $test->user->id,
+            'torrent_file' => $path,
+        ]);
+    }
+
+    test('lists torrents stored under a hash their file does not have, and changes nothing', function () {
+        Storage::fake(config('trove.storage_disk', 'local'));
+        $bad = 'd4:name1:x6:lengthi1ee';
+        $good = 'd6:lengthi1e4:name1:ye';
+        $wrong = storeTorrent($this, $bad, sha1(Bencode::encode(Bencode::decode($bad))));
+        storeTorrent($this, $good, sha1($good));
+
+        $this->artisan('trove:check-info-hashes')
+            ->expectsOutputToContain("#{$wrong->id}: stored {$wrong->info_hash}, file is ".sha1($bad))
+            ->expectsOutputToContain('1 of 2')
+            ->assertExitCode(1);
+
+        expect($wrong->fresh()->info_hash)->not->toBe(sha1($bad));
+    });
+
+    test('exits 0 when every stored hash matches its file', function () {
+        Storage::fake(config('trove.storage_disk', 'local'));
+        $good = 'd6:lengthi1e4:name1:ye';
+        storeTorrent($this, $good, sha1($good));
+
+        $this->artisan('trove:check-info-hashes')->assertExitCode(0);
     });
 });

@@ -25,7 +25,7 @@
     ],
     "require": {
         "php": "^8.3",
-        "marque/threepio": "^3.0",
+        "marque/threepio": "^3.3",
         "illuminate/support": "^13.0",
         "illuminate/database": "^13.0",
         "illuminate/events": "^13.0"

@@ -153,14 +153,17 @@ class TorrentService implements TorrentServiceInterface
         $content = file_get_contents($file->getRealPath());
         $decoded = Bencode::decode($content);
 
-        if (! isset($decoded['info'])) {
+        if (! isset($decoded['info']) || ! is_array($decoded['info'])) {
             throw new \InvalidArgumentException('Invalid torrent file: missing info dictionary');
         }
 
         $info = $decoded['info'];
 
-        // Calculate info_hash (SHA1 of bencoded info dictionary)
-        $infoHash = sha1(Bencode::encode($info));
+        // sha1 over the info dictionary's ORIGINAL bytes, which is what every
+        // client computes. Re-encoding the decoded array normalises it (key
+        // order, list-vs-dictionary), and a torrent whose info wasn't already
+        // canonical got stored under a hash no client announces (#10946).
+        $infoHash = sha1(Bencode::rawDictionary($content)['info']);
 
         // Calculate total size
         $size = 0;

@@ -6,6 +6,7 @@ namespace Marque\Trove;
 
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use Marque\Trove\Console\Commands\CheckInfoHashes;
 use Marque\Trove\Contracts\TorrentServiceInterface;
 use Marque\Trove\Models\Torrent;
 use Marque\Trove\Policies\TorrentPolicy;
@@ -37,6 +38,10 @@ class TroveServiceProvider extends ServiceProvider
         $this->registerPolicies();
 
         if ($this->app->runningInConsole()) {
+            $this->commands([
+                CheckInfoHashes::class,
+            ]);
+
             $this->publishes([
                 __DIR__.'/../config/trove.php' => config_path('trove.php'),
             ], 'trove-config');

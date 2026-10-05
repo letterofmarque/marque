@@ -7,6 +7,30 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+> Uploads are hashed the way clients hash them, so a torrent whose info dictionary isn't canonical bencode gets the info_hash it's announced under, and `trove:check-info-hashes` finds the ones stored wrongly before.
+
+### Fixed
+
+- **A non-canonical torrent was stored under an info_hash no client announces.** Uploads
+  were hashed as `sha1(Bencode::encode($decoded['info']))`. The round trip normalises the
+  info dictionary: key order, a dictionary with keys "0", "1"… turning into a list. When
+  the uploaded file wasn't already canonical, the stored hash differed from the one every
+  client computes over the file's own bytes, so the torrent never saw a peer. The download
+  serves the original file, which hid the problem. The info_hash is now sha1 of the info
+  dictionary's original bytes (#10946).
+
+### Added
+
+- **`php artisan trove:check-info-hashes`** lists torrents stored under a hash their own
+  .torrent doesn't have, with both hashes, and exits non-zero if there are any. Report
+  only: rewriting a stored hash is left to you.
+
+### Changed
+
+- **Requires `marque/threepio` ^3.3**, for `Bencode::rawDictionary()`.
+
 ## [4.3.0] — 2026-09-25
 
 > Declares the tracker stats contract, so packages ask the installed tracker for a user's figures and announce key instead of probing the User model.

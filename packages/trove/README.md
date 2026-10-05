@@ -124,7 +124,8 @@ $service = app(TorrentServiceInterface::class);
 // List with pagination and search
 $torrents = $service->list(perPage: 25, search: 'ubuntu');
 
-// Upload a .torrent file (extracts info_hash, size, file count automatically)
+// Upload a .torrent file (extracts info_hash, size, file count automatically).
+// The info_hash is sha1 of the info dictionary's original bytes, as clients compute it.
 $torrent = $service->createFromUpload($file, $user, 'Ubuntu 24.04', 'Official ISO');
 
 // Find by info hash
@@ -136,6 +137,21 @@ $service->update($torrent, ['name' => 'New Name']);
 // Delete (removes stored file too)
 $service->delete($torrent);
 ```
+
+### Checking stored info hashes
+
+Before trove 4.4, uploads were hashed from the decoded-and-re-encoded info dictionary. A
+torrent whose info wasn't canonical bencode was stored under a hash no client announces,
+and never saw a peer. To find any such torrents:
+
+```bash
+php artisan trove:check-info-hashes
+```
+
+It re-hashes each stored .torrent the way clients do, lists every torrent whose stored
+`info_hash` differs (with both hashes), and exits non-zero if it finds any. It changes
+nothing. The correct hash may already belong to another row, and anything keyed on the old
+one needs thought, so fixing them is your call.
 
 ## Dashboard panels
 
