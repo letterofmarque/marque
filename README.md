@@ -207,7 +207,7 @@ php artisan vendor:publish --tag=taxonomy-config
 ## Versioning
 
 Packages follow [Semantic Versioning](https://semver.org) and are versioned
-independently — `marque/guise` at 3.4.0 alongside `marque/threepio` at 3.0.1 is normal.
+independently, so packages sit on different majors (usarrs on 8, threepio on 3) and that is normal.
 
 Most people want a caret on the current major (`^8.2` for usarrs today), which is what `composer require` gives you by default: new
 features and fixes automatically, never a breaking change. Minor releases are cut

@@ -29,7 +29,8 @@
  *                    checked in the config file, so it is caught whatever the
  *                    README says
  *   package-name     `marque/<name>` that is not a package here, or a known-dead
- *                    name (ise, id, nunomaduro/pao) used as if current
+ *                    name (ise, id, nunomaduro/pao) used as if current: `ise`,
+ *                    an `id::`/`ise::` component prefix, "the id package"
  *   requirement      a constraint in a README's Requirements section that its
  *                    composer.json disagrees with
  *   tag              `<package>/vX.Y.Z` that was never tagged
@@ -639,6 +640,15 @@ function checkNames(string $text, int $line, ?string $marker, callable $emit, ?s
     }
     if (preg_match('/`ise`/', $text)) {
         $emit($line, 'package-name', '`ise` was renamed to deck', $marker);
+    }
+    // A bare `id` is a column or JSON field all over these docs, so the old
+    // package is matched only in forms that can't be anything else: its Blade
+    // component prefix, and "the id package".
+    if (preg_match('/(?<![\w-])(id|ise)::/', $text, $ns)) {
+        $emit($line, 'package-name', "`{$ns[1]}::` components are deck's now (`deck::`)", $marker);
+    }
+    if (preg_match('/\bthe `?id`? package\b/i', $text)) {
+        $emit($line, 'package-name', '"the id package" is marque/deck now', $marker);
     }
     if (preg_match('#(?<![\w/.-])nunomaduro/pao\b#', $text)) {
         $emit($line, 'package-name', '`nunomaduro/pao` is abandoned — use laravel/pao', $marker);

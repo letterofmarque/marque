@@ -232,6 +232,18 @@ echo 'Pairs well with `marque/ise`.' >>"$SCRATCH/name/packages/acme/README.md"
 run_case name
 expect "$out" "package-name: a dead package named as current" 'package-name.*marque/ise'
 
+make_repo "$SCRATCH/idns"
+echo 'It references no `id::` component, and nothing from the id package.' >>"$SCRATCH/idns/packages/acme/README.md"
+run_case idns
+expect "$out" "package-name: the id:: component namespace (2026-09-28 sweep, integration.md:43)" 'package-name.*id::'
+expect "$out" "package-name: 'the id package' as if current" 'package-name.*the id package'
+
+make_repo "$SCRATCH/idfield"
+echo 'Each torrent has an `id`, and `user.id` names the uploader.' >>"$SCRATCH/idfield/packages/acme/README.md"
+run_case idfield
+[[ $status -eq 0 ]] && pass "package-name: an \`id\` field is not the id package" \
+    || fail "package-name: an \`id\` field is not the id package" "$out"
+
 make_repo "$SCRATCH/renamed"
 echo 'Formerly `marque/ise`, renamed to deck.' >>"$SCRATCH/renamed/packages/acme/README.md"
 run_case renamed

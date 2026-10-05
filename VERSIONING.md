@@ -1,8 +1,8 @@
 # Versioning Policy
 
 Marque packages follow [Semantic Versioning](https://semver.org). Each package in
-`packages/` is versioned and released independently — `marque/guise` being at 3.4.0
-while `marque/threepio` sits at 3.0.1 is normal and expected.
+`packages/` is versioned and released independently, so one package on its eighth major
+while another is still on its third is normal and expected.
 
 This document is the contract. If you pin a constraint based on what is written here
 and we break it, that is a bug in our release, not in your constraint.
@@ -129,8 +129,9 @@ technical reason.
 
 The cost is that **the test suite is pinned to Pest 4**, because Pest 5 requires PHP 8.4.
 Adopting any Pest 5 feature means raising the PHP floor back to 8.4, which is a MAJOR for
-all fourteen packages. As of 5.1 the suite uses only `it`, `test`, `expect`, `describe`,
-`beforeEach` and `uses` — the Pest 1-era core — so nothing is lost today. But TIA
+all fourteen packages. The suite uses only long-standing Pest features (`it`, `test`,
+`expect`, `describe`, `beforeEach`, `afterEach`, datasets via `->with()` and `dataset()`,
+`->throws()`, and `pest()->extend()`), none of them Pest 5-only, so nothing is lost today. But TIA
 (test-impact analysis), the agent browser plugin, built-in Rector and agent evals are all
 Pest 5-only and stay out of reach while the floor is 8.3.
 
