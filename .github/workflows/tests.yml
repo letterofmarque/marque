@@ -53,6 +53,12 @@ jobs:
       - name: Check the root changelog is current
         run: tools/build-changelog --check
 
+      # Settings, defaults, package names, constraints and tags the public docs
+      # mention, checked against the code. Known-unbuilt keys carry a
+      # `check-docs: ignore — … #NNNN` marker and are listed, not failed.
+      - name: Check the docs against the code
+        run: tools/check-docs
+
   # PHPStan cannot join the lint job: it needs each package's own vendor/ to
   # resolve models and facades, so it installs per package the way the test
   # matrix does. Level 1 across all twelve — see docs/how.md for why that
