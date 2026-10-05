@@ -5,6 +5,26 @@ All notable changes to `marque/squidink` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
+## [Unreleased]
+
+> Narrowing a schema no longer deletes code blocks, image alt text or the schema's
+> authority over shortcodes, matching what the README promised from 1.0. Only apps with
+> a narrowed schema see a difference.
+
+### Fixed
+
+- **A disallowed code block or image no longer vanishes with its content.** Unwrapping
+  kept a disallowed node's children, but a code block's text and an image's alt text
+  aren't children, so both were deleted outright. Narrowing a schema should cost
+  formatting, never words. A disallowed code block now becomes a paragraph of its lines,
+  code-marked and joined with hard breaks where the schema allows those. A disallowed
+  image becomes its alt text, and one with no alt still disappears (#10936).
+- **Shortcodes obey the schema.** The shortcode pass ran after the parser's schema
+  filter, so `{spoiler}` rendered as `<details>` even under a schema without
+  `shortcode`. The schema now filters again after the pass, and a disallowed shortcode
+  unwraps to its content (#10936). If you narrowed `schema.nodes` and still want
+  shortcodes, add `'shortcode'` to the list.
+
 ## [1.1.2] — 2026-10-04
 
 > Raises the `league/commonmark` floor past two advisories. squidink itself was not

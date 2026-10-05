@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Marque\SquidInk\Document\Schema;
 use Marque\SquidInk\SquidInk;
 
 function convertHtml(string $source): string
@@ -129,5 +130,30 @@ describe('Shortcode rendering per format', function () {
             ->toContain('squidink-mediainfo')
             ->and(convertHtml('{mediainfo}Format: Matroska{/mediainfo}'))
             ->toContain('Matroska');
+    });
+});
+
+describe('Shortcodes and the schema', function () {
+    it('unwraps a shortcode the schema does not allow, keeping its content', function () {
+        $html = app(SquidInk::class)->convert(
+            '{spoiler}the ending{/spoiler}',
+            'markdown',
+            'html',
+            Schema::minimal(),
+        );
+
+        expect($html)->not->toContain('<details')
+            ->and($html)->toContain('the ending');
+    });
+
+    it('keeps a shortcode the schema allows', function () {
+        $html = app(SquidInk::class)->convert(
+            '{spoiler}the ending{/spoiler}',
+            'markdown',
+            'html',
+            new Schema(['shortcode']),
+        );
+
+        expect($html)->toContain('<details class="squidink-spoiler">');
     });
 });

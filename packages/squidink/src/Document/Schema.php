@@ -183,9 +183,11 @@ final class Schema
     /**
      * Strips anything this schema does not permit, in place.
      *
-     * Disallowed nodes are removed but their children are kept and spliced into
+     * Disallowed nodes are removed but their content is kept and spliced into
      * the parent — narrowing a schema should degrade formatting, not delete the
-     * text someone wrote. Disallowed marks are dropped from the text they
+     * text someone wrote. For most nodes the content is their children. A code
+     * block and an image hold their words in a property instead, so they get a
+     * fallback (see contentOf()). Disallowed marks are dropped from the text they
      * annotate, leaving the text itself intact.
      *
      * This is what parsers use. It is the difference between "your post broke"
@@ -207,14 +209,63 @@ final class Schema
             }
 
             // Unwrap: keep the content, lose the container.
-            foreach ($child->children() as $grandchild) {
-                $kept[] = $grandchild;
+            foreach ($this->contentOf($child) as $content) {
+                $kept[] = $content;
             }
         }
 
         $node->replaceChildren($kept);
 
         return $node;
+    }
+
+    /**
+     * What survives of a node this schema does not allow.
+     *
+     * Children, for anything that has them. A code block's text and an image's
+     * alt live in properties, so plain unwrapping would delete them: the code
+     * becomes a paragraph of its lines (code-marked and broken by hard breaks
+     * where this schema allows those), and the image becomes its alt text.
+     *
+     * @return list<Node>
+     */
+    private function contentOf(Node $node): array
+    {
+        if ($node instanceof CodeBlock) {
+            return $node->code() === '' ? [] : [new Paragraph(children: $this->codeLines($node->code()))];
+        }
+
+        if ($node instanceof Image) {
+            return in_array($node->alt(), [null, ''], true) ? [] : [new Text($node->alt())];
+        }
+
+        return $node->children();
+    }
+
+    /**
+     * @return list<Node>
+     */
+    private function codeLines(string $code): array
+    {
+        $marks = $this->allowsMark('code') ? [new CodeMark] : [];
+
+        if (! $this->allowsNode('hard_break')) {
+            return [new Text($code, $marks)];
+        }
+
+        $nodes = [];
+
+        foreach (preg_split('/\R/', $code) as $i => $line) {
+            if ($i > 0) {
+                $nodes[] = new HardBreak;
+            }
+
+            if ($line !== '') {
+                $nodes[] = new Text($line, $marks);
+            }
+        }
+
+        return $nodes;
     }
 
     private function filterMarks(Node $node): void

@@ -116,11 +116,19 @@ final class SquidInk
             throw UnknownFormat::parser($name, $this->parsers());
         }
 
-        $document = $this->parsers[$name]->parse($source, $schema ?? $this->schema);
+        $schema ??= $this->schema;
+
+        $document = $this->parsers[$name]->parse($source, $schema);
 
         // Shortcodes are a pass over the parsed tree rather than something each
-        // parser implements, so every input syntax gets them for free.
-        $this->shortcodes?->process($document);
+        // parser implements, so every input syntax gets them for free. The pass
+        // adds shortcode nodes after the parser has filtered, so the schema runs
+        // again over its result: a schema without "shortcode" unwraps them to
+        // their content like any other disallowed node.
+        if ($this->shortcodes !== null) {
+            $this->shortcodes->process($document);
+            $schema->filter($document);
+        }
 
         return $document;
     }

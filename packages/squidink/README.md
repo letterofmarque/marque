@@ -117,12 +117,11 @@ $schema = new Schema(
 );
 ```
 
-Content a schema disallows is mostly **degraded, not deleted**: a disallowed container
-node is unwrapped and its children kept, and a disallowed mark is dropped from the text it
-annotated. Two exceptions: a disallowed **code block** or **image** is removed together
-with its content, because the code text and the alt text are not child nodes. Shortcode
-nodes are not schema-filtered at all; registered shortcodes render whatever the schema
-says. Both are open (#10936).
+Content a schema disallows is **degraded, not deleted**: a disallowed node is unwrapped
+and its children kept, and a disallowed mark is dropped from the text it annotated. A
+disallowed code block becomes a paragraph of its lines, and a disallowed image becomes its
+alt text. Shortcodes obey the schema too: without `shortcode`, a spoiler unwraps to its
+content. Narrowing a schema costs a post its formatting, never its words.
 
 ## Extending
 
@@ -307,9 +306,8 @@ php artisan vendor:publish --tag=squidink-views
 ## Security
 
 - **Closed vocabulary.** A parser cannot produce a node the schema does not declare,
-  so unsupported or hostile input cannot become unexpected output. Shortcodes are a
-  separate pass that runs after the schema filter: only registered shortcodes exist,
-  but the schema does not restrict them (#10936).
+  so unsupported or hostile input cannot become unexpected output. That includes
+  shortcodes: the schema filters again after the shortcode pass.
 - **Scheme filtering on every link and image**: links in the `Link` mark's constructor,
   image sources in the HTML renderer. Neither lives in a parser, so a new parser inherits
   both and cannot forget them. `javascript:`,

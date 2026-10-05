@@ -64,8 +64,8 @@ return [
     | Which nodes and marks documents may contain. This is the security model,
     | not a style preference: a parser cannot produce a node that is not listed
     | here, so unsupported input can never become unexpected output. document,
-    | paragraph and text are always allowed. Shortcode nodes are added after
-    | this filter runs and are not restricted by it (#10936).
+    | paragraph and text are always allowed. Shortcodes are filtered too, so
+    | leave out "shortcode" to turn them all off.
     |
     | Trimming this list is how you restrict what users can write. An empty
     | array means "everything the schema knows about".
