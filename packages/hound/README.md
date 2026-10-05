@@ -170,9 +170,9 @@ At the cap, **every** announce from that IP gets a bencoded `Too many connection
 IP` failure, including re-announces from peers already in the swarm and `stopped` (so
 those peers leave only when they expire). The count is of distinct peer IDs across all
 torrents, so a client that uses one peer ID for every torrent counts once. Raise it if you
-expect legitimate NAT'd or institutional traffic. Before threepio 3.2.1 and hound 3.3.1,
-dead peers could stay in the IP count for good, locking a busy IP out; that's fixed
-(#10804).
+expect legitimate NAT'd or institutional traffic. Before threepio 3.2.1, dead peers could
+stay in the IP count for good, locking a busy IP out. Hound accepts any threepio 3.x, so
+make sure you're on 3.2.1 or later for the fix (#10804).
 
 ### Logging — planned, not yet built
 
