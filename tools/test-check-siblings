@@ -34,11 +34,27 @@ GUISE_JSON="$ROOT/packages/guise/composer.json"
 GUISE_BACKUP="$(mktemp)"
 cp "$GUISE_JSON" "$GUISE_BACKUP"
 
+# The stale-lock replay edits parley's local lock, which is untracked — so it
+# is backed up and restored the same way, or the next real run inherits it.
+PARLEY_LOCK="$ROOT/packages/parley/composer.lock"
+PARLEY_LOCK_BACKUP="$(mktemp)"
+[[ -f "$PARLEY_LOCK" ]] && cp "$PARLEY_LOCK" "$PARLEY_LOCK_BACKUP"
+
+# restore() puts both files back and can run any number of times; the
+# backups are only removed by cleanup() at exit, so an early restore (the
+# guise replay below) cannot strand a later one.
 restore() {
     cp "$GUISE_BACKUP" "$GUISE_JSON"
-    rm -f "$GUISE_BACKUP"
+    if [[ -s "$PARLEY_LOCK_BACKUP" ]]; then
+        cp "$PARLEY_LOCK_BACKUP" "$PARLEY_LOCK"
+    fi
 }
-trap restore EXIT INT TERM
+
+cleanup() {
+    restore
+    rm -f "$GUISE_BACKUP" "$PARLEY_LOCK_BACKUP"
+}
+trap cleanup EXIT INT TERM
 
 break_guise() {
     # Back to the state that produced the 2026-09-11 failure.
@@ -83,7 +99,6 @@ else
 fi
 
 restore
-cp "$GUISE_JSON" "$GUISE_BACKUP"   # keep the trap honest after an early restore
 
 OUTPUT=$(tools/check-siblings parley 2>&1)
 STATUS=$?
@@ -92,6 +107,47 @@ if [[ $STATUS -eq 0 ]]; then
     pass 'the repaired constraint exits zero'
 else
     fail "the repaired constraint still fails (got $STATUS)" "$OUTPUT"
+fi
+
+# ── the stale-lock replay ────────────────────────────────────────────────
+#
+# 2026-10-04, squidink 1.1.2: squidink raised its league/commonmark floor to
+# ^2.10.2 while parley's local lock still held 2.10.0. A scoped update may not
+# move a dependency the lock pins, so the check failed and pointed at parley's
+# perfectly good `marque/squidink ^1.0` (#10935). A fresh checkout — what CI
+# and consumers resolve — has no lock at all, so that is not a broken sibling.
+
+printf '\n\033[1mThe 2026-10-04 stale-lock replay\033[0m\n'
+
+if [[ ! -f "$PARLEY_LOCK" ]]; then
+    printf '  \033[2m- skipped: packages/parley has no composer.lock to make stale\033[0m\n'
+else
+    python3 - "$PARLEY_LOCK" <<'PY'
+import json, sys
+path = sys.argv[1]
+lock = json.load(open(path))
+for pkg in lock['packages']:
+    if pkg['name'] == 'league/commonmark':
+        pkg['version'] = '2.10.0'
+json.dump(lock, open(path, 'w'), indent=4)
+PY
+
+    OUTPUT=$(tools/check-siblings squidink 2>&1)
+    STATUS=$?
+
+    if [[ $STATUS -eq 0 ]]; then
+        pass 'a sibling held back only by its local lock passes'
+    else
+        fail "a stale local lock failed the check (got $STATUS)" "$OUTPUT"
+    fi
+
+    if grep -qi 'lock' <<<"$OUTPUT"; then
+        pass 'the report says the local lock was stale'
+    else
+        fail 'the report does not mention the stale lock' "$OUTPUT"
+    fi
+
+    restore
 fi
 
 # ── the graph ────────────────────────────────────────────────────────────

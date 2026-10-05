@@ -101,15 +101,33 @@ check_one() {
         return 0
     fi
 
+    # A scoped update may not move anything the sibling's lock pins. When the
+    # target raised the floor of a shared dependency (squidink 1.1.2 took
+    # league/commonmark to ^2.10.2), a sibling whose local lock is older fails
+    # here although nothing is wrong with it: the locks are untracked, and a
+    # fresh checkout — CI, a consumer — resolves from scratch (#10935). So retry
+    # letting dependencies move. A stale marque/* constraint still fails, since
+    # the path repos are canonical and -W cannot change the sibling's own
+    # requirement.
+    out=$(cd "$PACKAGES_DIR/$sibling" && composer update "marque/$target" \
+        --with-all-dependencies --dry-run --no-interaction --no-audit 2>&1)
+    status=$?
+
+    if [[ $status -eq 0 ]]; then
+        printf '  \033[32m✓\033[0m %-12s %s  \033[2m(its local lock was stale: resolves once dependencies update)\033[0m\n' \
+            "$sibling" "$constraint"
+        return 0
+    fi
+
     printf '  \033[31m✗\033[0m %-12s %s\n' "$sibling" "$constraint"
 
     # Composer's own resolution error names the exact constraint that could not
     # be satisfied, which is the single most useful line on the screen. Printed
     # verbatim rather than summarised — the 2026-09-11 break was diagnosed from
-    # precisely this text.
-    grep -E 'could not be resolved|requires .*marque|higher repository priority' <<<"$out" \
-        | head -4 \
-        | sed 's/^/      /'
+    # precisely this text. Every line of each Problem, not just the first few:
+    # the line that matters is often the last.
+    sed -n '/Problem [0-9]/,/^$/p' <<<"$out" \
+        | sed '/^$/d; s/^/      /'
 
     return 1
 }
