@@ -131,11 +131,13 @@ final class AnnounceService
         bool $compact,
         int $numWant,
     ): Response {
-        // Upsert peer in Redis (userId 0 = anonymous/public)
+        // A public tracker has no users. null, not 0: threepio treats 0 as a
+        // real user id, and every anonymous peer ever seen piled into one
+        // `user:0:peers` set that never shrank (#10804).
         $this->peerService->upsertPeer(
             torrentId: $torrent->id,
             peerId: $peerId,
-            userId: 0,
+            userId: null,
             ip: $ip,
             port: $port,
             uploaded: $uploaded,

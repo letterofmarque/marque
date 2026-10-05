@@ -7,6 +7,19 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+> Anonymous peers no longer pile into one ever-growing Redis set.
+
+### Fixed
+
+- **Every peer hound ever saw went into one Redis set that never shrank.** Hound passed
+  `userId: 0` to threepio, which treats 0 as a real user id, so a `user:0:peers` set
+  gathered every anonymous peer. Hound now passes `null`, and keeps no per-user state
+  (#10804). After upgrading, `redis-cli del <prefix>user:0:peers` frees what's there.
+  The default prefix is `marque:`. Take threepio 3.2.1 too: it fixes per-IP counts
+  that could lock a busy IP out under `ip_limiting`.
+
 ## [3.3.0] — 2026-10-03
 
 > Swarm counts fall back as peers leave (a stopped announce removes the peer, an hourly sweep clears expired ones), and announce and scrape paths are configurable for migrating public trackers.

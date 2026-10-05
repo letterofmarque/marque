@@ -79,3 +79,15 @@ it('schedules the sweep hourly', function () {
     expect($events)->toHaveCount(1)
         ->and($events->first()->expression)->toBe('0 * * * *');
 });
+
+// #10804. Hound passed userId 0, which threepio treats as a real user, so every
+// anonymous peer ever seen went into one `user:0:peers` set that never shrank.
+it('keeps no per-user peer set, since a public tracker has no users', function () {
+    swarmAnnounce($this, '-qB4500-dddddddddddd', left: 0, event: 'started');
+
+    $redis = Redis::connection(config('threepio.redis.connection', 'default'));
+    $prefix = config('threepio.redis.prefix', 'marque:');
+
+    expect($redis->exists($prefix.'user:0:peers'))->toBe(0)
+        ->and(app(PeerService::class)->getSeeders($this->torrent->id))->toBe(1);
+});
