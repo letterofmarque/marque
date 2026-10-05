@@ -15,12 +15,11 @@ interface TorrentServiceInterface
     /**
      * List torrents the viewer is allowed to see.
      *
-     * $viewer defaults to the authenticated user rather than to null. Null is
-     * a real value here — it means "a guest", and guests see only unrestricted
-     * torrents — so an omitted argument must not be mistaken for one, or a
-     * caller that forgets to pass a viewer silently gets the guest list
-     * instead of the caller's own. Pass null explicitly for genuine guest
-     * browsing.
+     * $viewer defaults to the authenticated user: null and an omitted argument
+     * both mean ViewerScope::current(), so a caller that forgets to pass a
+     * viewer gets the caller's own list, never the guest list by accident.
+     * Pass ViewerScope::guest() explicitly for genuine guest browsing; guests
+     * see only unrestricted torrents.
      *
      * @return LengthAwarePaginator<int, Torrent>
      */

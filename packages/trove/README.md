@@ -36,10 +36,10 @@ php artisan migrate
 
 ## What's Included
 
-- **Torrent model** - info_hash, metadata, file storage, bencode parsing
+- **Torrent model** - info_hash, metadata, file storage
 - **TorrentService** - CRUD, .torrent file upload/parsing, search
 - **Role system** - User, Uploader, Moderator, Admin hierarchy
-- **Tracker stats** - Announce key generation, upload/download/seedtime tracking per user
+- **Tracker stats contract** - `TrackerStatsInterface` and the `TrackerStats` / `TorrentStats` value objects; a tracker package (bloodhound) implements it, issuing keys and tracking bytes
 - **Authorization** - Policies for create, update, delete operations
 
 ## User Model Setup
@@ -84,7 +84,7 @@ $user->isUploader();
 $user->hasRoleAtLeast(Role::Moderator);
 ```
 
-`HasTrackerStats` issues each new user an announce key and gives the model a few
+`HasTrackerStats` issues each new user an announce key (on email verification, when the app verifies addresses) and gives the model a few
 formatting helpers (`getRatioForHumans()`, `getUploadedForHumans()`, …).
 
 **To read tracker figures or a user's announce key from your own code, ask the tracker**
@@ -128,7 +128,8 @@ $torrents = $service->list(perPage: 25, search: 'ubuntu');
 // The info_hash is sha1 of the info dictionary's original bytes, as clients compute it.
 $torrent = $service->createFromUpload($file, $user, 'Ubuntu 24.04', 'Official ISO');
 
-// Find by info hash
+// Find by info hash. Unscoped: it ignores min_role, for tracker and internal lookups.
+// Don't show its result to a user without checking the policy.
 $torrent = $service->findByInfoHash('a1b2c3d4...');
 
 // Update
@@ -149,7 +150,9 @@ php artisan trove:check-info-hashes
 ```
 
 It re-hashes each stored .torrent the way clients do, lists every torrent whose stored
-`info_hash` differs (with both hashes), and exits non-zero if it finds any. It changes
+`info_hash` differs (with both hashes), and exits non-zero if it finds any. A torrent whose
+file is missing, isn't valid bencode or has no info dictionary is listed as a warning and
+skipped, and doesn't affect the exit code. It changes
 nothing. The correct hash may already belong to another row, and anything keyed on the old
 one needs thought, so fixing them is your call.
 
@@ -229,7 +232,7 @@ Ratio enforcement isn't configured here. It belongs to the tracker, and bloodhou
 Trove creates:
 
 - `torrents` table (info_hash, name, description, size, file_count, torrent_file, user_id,
-  min_role, seeders, leechers, times_completed, visible)
+  min_role, seeders, leechers, times_completed)
 - Adds a `role` column to the users table
 
 That is all trove adds to `users`. The tracker columns (`uploaded`, `downloaded`,
@@ -282,7 +285,8 @@ Enforcement happens in two places, and both matter:
   carries the announce key.
 - `Torrent::scopeVisibleTo($user)` covers listings. A policy guards a single
   record; without the scope, restricted torrents would still appear in every
-  index, API collection and count. `TorrentService` applies it for you.
+  index, API collection and count. `TorrentService`'s `list()` and `find()` apply it for
+  you; `findByInfoHash()` deliberately does not.
 
 ```php
 // Everything the current user may see:

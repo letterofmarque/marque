@@ -210,6 +210,23 @@ describe('trove:check-info-hashes', function () {
         expect($wrong->fresh()->info_hash)->not->toBe(sha1($bad));
     });
 
+    test('warns about and skips a file with no info dictionary, a missing file, or bad bencode', function () {
+        Storage::fake(config('trove.storage_disk', 'local'));
+        $disk = Storage::disk(config('trove.storage_disk', 'local'));
+        $disk->put('torrents/noinfo.torrent', 'd8:announce3:x:ye');
+        $disk->put('torrents/bad.torrent', 'not bencode');
+        foreach (['noinfo', 'bad', 'gone'] as $i => $name) {
+            Torrent::create(['info_hash' => str_repeat((string) $i, 40), 'name' => $name, 'user_id' => $this->user->id, 'torrent_file' => "torrents/{$name}.torrent"]);
+        }
+
+        $this->artisan('trove:check-info-hashes')
+            ->expectsOutputToContain('no info dictionary')
+            ->expectsOutputToContain('unreadable')
+            ->expectsOutputToContain('file missing')
+            ->expectsOutputToContain('0 of 0 torrent(s) are stored under the wrong info_hash; 3 skipped')
+            ->assertExitCode(0);
+    });
+
     test('exits 0 when every stored hash matches its file', function () {
         Storage::fake(config('trove.storage_disk', 'local'));
         $good = 'd6:lengthi1e4:name1:ye';

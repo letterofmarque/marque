@@ -33,25 +33,37 @@ class CheckInfoHashes extends Command
         $disk = Storage::disk(config('trove.storage_disk', 'local'));
         $checked = 0;
         $mismatched = 0;
+        $skipped = 0;
 
         Torrent::query()
             ->whereNotNull('torrent_file')
             ->select(['id', 'info_hash', 'torrent_file'])
-            ->chunkById(max(1, (int) $this->option('chunk')), function ($torrents) use ($disk, &$checked, &$mismatched): void {
+            ->chunkById(max(1, (int) $this->option('chunk')), function ($torrents) use ($disk, &$checked, &$mismatched, &$skipped): void {
                 foreach ($torrents as $torrent) {
                     if (! $disk->exists($torrent->torrent_file)) {
                         $this->warn("#{$torrent->id}: file missing ({$torrent->torrent_file})");
+                        $skipped++;
 
                         continue;
                     }
 
                     try {
-                        $actual = sha1(Bencode::rawDictionary((string) $disk->get($torrent->torrent_file))['info'] ?? '');
+                        $raw = Bencode::rawDictionary((string) $disk->get($torrent->torrent_file));
                     } catch (InvalidArgumentException $e) {
                         $this->warn("#{$torrent->id}: unreadable .torrent ({$e->getMessage()})");
+                        $skipped++;
 
                         continue;
                     }
+
+                    if (! isset($raw['info'])) {
+                        $this->warn("#{$torrent->id}: .torrent has no info dictionary");
+                        $skipped++;
+
+                        continue;
+                    }
+
+                    $actual = sha1($raw['info']);
 
                     $checked++;
 
@@ -62,7 +74,8 @@ class CheckInfoHashes extends Command
                 }
             });
 
-        $this->info("{$mismatched} of {$checked} torrent(s) are stored under the wrong info_hash.");
+        $this->info("{$mismatched} of {$checked} torrent(s) are stored under the wrong info_hash"
+            .($skipped > 0 ? "; {$skipped} skipped (see warnings)." : '.'));
 
         return $mismatched === 0 ? self::SUCCESS : self::FAILURE;
     }

@@ -24,8 +24,17 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 ### Added
 
 - **`php artisan trove:check-info-hashes`** lists torrents stored under a hash their own
-  .torrent doesn't have, with both hashes, and exits non-zero if there are any. Report
+  .torrent doesn't have, with both hashes, and exits non-zero if there are any. A missing
+  file, invalid bencode or a file with no info dictionary is a warning, and skipped. Report
   only: rewriting a stored hash is left to you.
+
+### Changed (docs)
+
+- The README no longer lists a `visible` column (a later migration drops it), credits
+  trove with key issuing (bloodhound does that), or calls the model a bencode parser. It
+  notes that `findByInfoHash()` ignores `min_role`. `TorrentServiceInterface`'s comment
+  no longer says null means a guest: null means the current user, and guests are
+  `ViewerScope::guest()`.
 
 ### Changed
 
