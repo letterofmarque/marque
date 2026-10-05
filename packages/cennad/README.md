@@ -55,6 +55,8 @@ Response:
         "size": 734003200,
         "size_formatted": "700 MB",
         "file_count": 12,
+        "seeders": 4,
+        "leechers": 1,
         "has_torrent_file": true,
         "created_at": "2026-01-15T10:30:00Z",
         "updated_at": "2026-01-15T10:30:00Z",
@@ -98,7 +100,8 @@ Cennad uses Trove's `TorrentPolicy` for access control:
 
 | Action | Who Can |
 |--------|---------|
-| List / View | Any authenticated user |
+| List | Anyone `read_middleware` lets through. The list only holds torrents the viewer's role may see |
+| View | The same, except a torrent with a `min_role` needs a viewer at that role or above (guests see only unrestricted torrents) |
 | Update | Torrent owner or Moderator+ |
 | Delete | Moderator+ |
 
@@ -139,7 +142,11 @@ RateLimiter::for('cennad', fn (Request $request) => Limit::perMinute(300)->by($r
 
 ## Authentication
 
-Cennad uses Laravel's standard `auth:api` guard. Configure authentication in your application - Sanctum, Passport, or any guard that satisfies `auth:api` will work.
+The default middleware uses `auth:api`, which needs a guard named `api` in
+`config/auth.php`. Stock Laravel defines only `web`, so an app has to add one. Passport's
+install adds it. With Sanctum, either define `'api' => ['driver' => 'sanctum', 'provider' => null]`,
+or set `read_middleware` and `write_middleware` to `['api', 'auth:sanctum']`. Any guard
+works, as long as the middleware names it.
 
 Reads and writes are configured separately so a public tracker can expose its catalogue
 without exposing its write endpoints. **Both default to requiring authentication**, because
