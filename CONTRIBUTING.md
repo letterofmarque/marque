@@ -235,6 +235,38 @@ for pkg in packages/*/; do (cd "$pkg" && composer install --quiet); done
 tools/test-engines sqlite
 ```
 
+## Docs that match the code
+
+`tools/check-docs` checks the public docs against the code on every push (CI's lint job
+runs it). It catches the lookup kind of wrong claim:
+- config keys a README documents that the config file doesn't have, or that nothing reads
+- defaults the config file disagrees with
+- keys a package ships that nothing reads
+- renamed or nonexistent package names
+- Requirements constraints that drifted from `composer.json`
+- example tags that were never cut
+
+```bash
+tools/check-docs        # exit 0 clean, 1 with findings
+```
+
+If a doc deliberately mentions something the check can't confirm, mark it, with a reason,
+on the line or the line before:
+
+```
+<!-- check-docs: ignore — reason -->        (Markdown)
+// check-docs: ignore — reason              (config files)
+```
+
+Ignored findings are still printed, and a marker with no reason is itself a finding. The
+main use is a config key for a feature that's designed but not built yet. It stays in the
+config, marked `// check-docs: ignore — not yet built, read by nothing until #<issue>`, and
+the README calls it planned. So the "ignored" list doubles as the register of unfinished
+promises.
+
+Behaviour and prose ("X is rejected", "Y is cached") can't be looked up. Those get read
+against the code before each release.
+
 ## Static Analysis
 
 PHPStan (with Larastan) runs at level 1 across every package:
