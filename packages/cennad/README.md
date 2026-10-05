@@ -58,8 +58,8 @@ Response:
         "seeders": 4,
         "leechers": 1,
         "has_torrent_file": true,
-        "created_at": "2026-01-15T10:30:00Z",
-        "updated_at": "2026-01-15T10:30:00Z",
+        "created_at": "2026-01-15T10:30:00.000000Z",
+        "updated_at": "2026-01-15T10:30:00.000000Z",
         "user": {
             "id": 1,
             "name": "uploader"
@@ -126,9 +126,10 @@ deprecation notice and are removed in 5.0.
 
 Every cennad route carries `throttle:cennad`, a named limiter allowing `rate_limit`
 requests a minute (60 by default). Reads and writes share one count. Signed-in users are
-counted by their id, and guests by IP when the catalogue is open to them. Past the limit a
-request gets `429 Too Many Requests` with a `Retry-After` header. Every response carries
-`X-RateLimit-Limit` and `X-RateLimit-Remaining`.
+counted by their id, and everyone else by IP. On read routes opened to guests no guard
+runs, so a client sending a token there is counted by IP too. Past the limit a request
+gets `429 Too Many Requests` with a `Retry-After` header. While the limit is on, every
+response carries `X-RateLimit-Limit` and `X-RateLimit-Remaining`.
 
 The limiter is appended after your `read_middleware` and `write_middleware`, so replacing
 those lists can't drop it by accident. To turn it off, for example because your app
@@ -143,8 +144,9 @@ RateLimiter::for('cennad', fn (Request $request) => Limit::perMinute(300)->by($r
 ## Authentication
 
 The default middleware uses `auth:api`, which needs a guard named `api` in
-`config/auth.php`. Stock Laravel defines only `web`, so an app has to add one. Passport's
-install adds it. With Sanctum, either define `'api' => ['driver' => 'sanctum', 'provider' => null]`,
+`config/auth.php`. Stock Laravel defines only `web`, and neither `passport:install` nor
+`install:api` adds one, so you add it yourself. With Passport, that's
+`'api' => ['driver' => 'passport', 'provider' => 'users']`. With Sanctum, either define `'api' => ['driver' => 'sanctum', 'provider' => null]`,
 or set `read_middleware` and `write_middleware` to `['api', 'auth:sanctum']`. Any guard
 works, as long as the middleware names it.
 
