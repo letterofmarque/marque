@@ -440,4 +440,4 @@ dashboard has proven itself.
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).

@@ -190,6 +190,7 @@ Tagged as `acme/v1.0.0`.
 - PHP 8.3+
 - `laravel/fortify` ^1.30
 MD
+    echo 'MIT License' >"$d/packages/acme/LICENSE"
     git -C "$d" init -q
     git -C "$d" -c user.email=t@t -c user.name=t add -A
     git -C "$d" -c user.email=t@t -c user.name=t commit -qm init
@@ -246,6 +247,11 @@ make_repo "$SCRATCH/tag"
 sed -i 's/acme\/v1.0.0/acme\/v1.1.0/' "$SCRATCH/tag/packages/acme/README.md"
 run_case tag
 expect "$out" "tag: a version that was never tagged" 'tag.*acme/v1\.1\.0'
+
+make_repo "$SCRATCH/licence"
+rm "$SCRATCH/licence/packages/acme/LICENSE"
+run_case licence
+expect "$out" "licence: a package with no LICENSE file" 'packages/acme.*licence'
 
 make_repo "$SCRATCH/hatch"
 echo 'Pairs well with `marque/ise`. <!-- check-docs: ignore — deliberate, testing the hatch -->' \

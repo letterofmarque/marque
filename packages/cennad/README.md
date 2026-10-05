@@ -172,4 +172,4 @@ governed by Trove's `TorrentPolicy` on top of whatever middleware you set.
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).

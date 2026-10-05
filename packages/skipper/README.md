@@ -113,3 +113,7 @@ Published views land in `resources/views/vendor/skipper` and override the packag
 ## Requirements
 
 PHP 8.3+, Laravel 13+, `marque/trove`, `marque/deck`, Livewire 4.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

@@ -227,4 +227,4 @@ them into one IP and trips the IP limit immediately.
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).

@@ -130,4 +130,4 @@ package that ships views:
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).

@@ -33,6 +33,10 @@
  *   requirement      a constraint in a README's Requirements section that its
  *                    composer.json disagrees with
  *   tag              `<package>/vX.Y.Z` that was never tagged
+ *   licence          a package with no LICENSE file. Each split repo is one
+ *                    package directory, so a root LICENSE never reaches
+ *                    Packagist, and MIT's one condition is shipping its text
+ *                    (#10944)
  *
  * The escape hatch
  * ----------------
@@ -133,6 +137,14 @@ foreach ($configs as $name => $config) {
             continue;
         }
         finding($config['file'], $line, 'config-dead', "`$path` is shipped in config/$name.php but nothing reads it");
+    }
+}
+
+// ── licence files ────────────────────────────────────────────────────────
+
+foreach (array_keys($packages) as $package) {
+    if (! is_file("$root/packages/$package/LICENSE")) {
+        finding("packages/$package", 1, 'licence', 'no LICENSE file — the split repo would ship without the licence text');
     }
 }
 

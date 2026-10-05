@@ -458,4 +458,4 @@ Bloodhound applies `BlockBrowsers` middleware to tracker endpoints. This rejects
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).

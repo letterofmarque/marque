@@ -185,4 +185,4 @@ If you need to render one directly rather than routing to it:
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).

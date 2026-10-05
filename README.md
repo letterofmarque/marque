@@ -275,4 +275,4 @@ composer require marque/trove:@dev marque/bloodhound:@dev
 
 ## License
 
-MIT License - [Letter Of Marque Software](https://lom.software)
+MIT License - [Letter Of Marque Software](https://lom.software). See [LICENSE](LICENSE).

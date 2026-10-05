@@ -245,6 +245,7 @@ runs it). It catches the lookup kind of wrong claim:
 - renamed or nonexistent package names
 - Requirements constraints that drifted from `composer.json`
 - example tags that were never cut
+- a package without its own `LICENSE` file (each package is published as its own repo)
 
 ```bash
 tools/check-docs        # exit 0 clean, 1 with findings

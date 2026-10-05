@@ -81,4 +81,4 @@ already done.
 
 ## Licence
 
-MIT.
+MIT. See [LICENSE](LICENSE).

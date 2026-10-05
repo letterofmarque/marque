@@ -298,4 +298,4 @@ that has not announced yet hides everything in it.
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).

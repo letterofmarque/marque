@@ -128,4 +128,4 @@ If you need to reference the components directly:
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).
