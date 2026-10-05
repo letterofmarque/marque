@@ -213,7 +213,7 @@ describe('trove:check-info-hashes', function () {
     test('warns about and skips a file with no info dictionary, a missing file, or bad bencode', function () {
         Storage::fake(config('trove.storage_disk', 'local'));
         $disk = Storage::disk(config('trove.storage_disk', 'local'));
-        $disk->put('torrents/noinfo.torrent', 'd8:announce3:x:ye');
+        $disk->put('torrents/noinfo.torrent', 'd4:infoi1ee'); // an info that isn't a dictionary
         $disk->put('torrents/bad.torrent', 'not bencode');
         foreach (['noinfo', 'bad', 'gone'] as $i => $name) {
             Torrent::create(['info_hash' => str_repeat((string) $i, 40), 'name' => $name, 'user_id' => $this->user->id, 'torrent_file' => "torrents/{$name}.torrent"]);

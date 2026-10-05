@@ -56,7 +56,9 @@ class CheckInfoHashes extends Command
                         continue;
                     }
 
-                    if (! isset($raw['info'])) {
+                    // Present AND a dictionary: an `info` holding a string or an
+                    // integer would otherwise be hashed and reported as a mismatch.
+                    if (! str_starts_with($raw['info'] ?? '', 'd')) {
                         $this->warn("#{$torrent->id}: .torrent has no info dictionary");
                         $skipped++;
 

@@ -128,8 +128,8 @@ $torrents = $service->list(perPage: 25, search: 'ubuntu');
 // The info_hash is sha1 of the info dictionary's original bytes, as clients compute it.
 $torrent = $service->createFromUpload($file, $user, 'Ubuntu 24.04', 'Official ISO');
 
-// Find by info hash. Unscoped: it ignores min_role, for tracker and internal lookups.
-// Don't show its result to a user without checking the policy.
+// Find by info hash. Unscoped: it ignores min_role. Meant for internal lookups, so check
+// the policy before showing its result to a user.
 $torrent = $service->findByInfoHash('a1b2c3d4...');
 
 // Update
@@ -151,7 +151,7 @@ php artisan trove:check-info-hashes
 
 It re-hashes each stored .torrent the way clients do, lists every torrent whose stored
 `info_hash` differs (with both hashes), and exits non-zero if it finds any. A torrent whose
-file is missing, isn't valid bencode or has no info dictionary is listed as a warning and
+file is missing, isn't valid bencode or has no info dictionary (missing, or not a dictionary) is listed as a warning and
 skipped, and doesn't affect the exit code. It changes
 nothing. The correct hash may already belong to another row, and anything keyed on the old
 one needs thought, so fixing them is your call.

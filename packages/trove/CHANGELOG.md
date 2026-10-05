@@ -7,6 +7,17 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+> `trove:check-info-hashes` also skips a .torrent whose `info` isn't a dictionary.
+
+### Fixed
+
+- **`trove:check-info-hashes` hashed an `info` that wasn't a dictionary** (a string or an
+  integer) and reported it as a mismatch. It now warns and skips it, like a missing one.
+  Uploads can't create such a file, since they reject a non-dictionary info, so only a row
+  pointed at a hand-made file was affected. Found by the 4.4.0 read-through.
+
 ## [4.4.0] — 2026-10-06
 
 > Uploads are hashed the way clients hash them, so a torrent whose info dictionary isn't canonical bencode gets the info_hash it's announced under, and `trove:check-info-hashes` finds the ones stored wrongly before.
