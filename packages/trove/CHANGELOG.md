@@ -7,7 +7,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [Unreleased]
+## [4.4.0] — 2026-10-06
 
 > Uploads are hashed the way clients hash them, so a torrent whose info dictionary isn't canonical bencode gets the info_hash it's announced under, and `trove:check-info-hashes` finds the ones stored wrongly before.
 
