@@ -7,7 +7,7 @@ tracker platform. Torrent comments and a lightweight forum, from one data model.
   threads
     ├─ threadable set, no title    →  comments on a torrent, or anything else
     ├─ threadable null, has title  →  a forum thread
-    └─ pinned + locked, no title   →  an announcement
+    └─ pinned + locked, has title  →  an announcement (a forum thread)
 ```
 
 ## Why
@@ -54,21 +54,25 @@ class Torrent extends Model
 ```
 
 ```php
-$torrent->comments($userId);   // the comment thread, created on first use
+$torrent->comments($userId);   // the comment thread; creates it if there isn't one
+$torrent->commentThread();     // the thread or null, never creates
 $torrent->commentCount();
 $torrent->hasComments();
 $torrent->latestComment();
 ```
 
-The thread is created lazily — reading it never creates a row, so a torrent nobody has
-commented on yet holds no thread. Only posting does.
+The thread is created lazily, not alongside the torrent. `comments()` creates it on first
+call, so use `commentThread()`, `commentCount()`, `hasComments()` or `latestComment()`
+to read without creating a row. A torrent whose page only reads through those holds no
+thread until someone posts.
 
 ### Attaching to a model you don't own
 
 If the model belongs to a package that can't take a dependency on parley — the situation
 guise is in with trove's `Torrent`, since trove is Marque's one mandatory package — use
 `ThreadServiceInterface::threadFor()` instead of the trait. It resolves the same thread by
-morph class and key, without requiring `HasThreads` on the model at all:
+morph class and key, without requiring `HasThreads` on the model at all. Like
+`comments()`, it creates the thread if there isn't one, owned by the user you pass:
 
 ```php
 use Marque\Parley\Contracts\ThreadServiceInterface;
@@ -169,14 +173,14 @@ too quickly — try again in a moment"), the same as an empty or over-length pos
 unhandled exception.
 
 It ships off by default rather than on, matching every other opt-in toggle in the Marque
-suite (2FA, passkeys, `usarrs.manage_auth`) — an upgrade should never silently start
+suite (2FA, passkeys): an upgrade should never silently start
 rejecting a legitimate user's fast-typing session. That default is only safe because
 turning it on is a one-line config change you make *before* going live, not after.
 
 ## What's out of scope
 
 Private messages, reputation, badges, signatures, polls, rich moderation queues, and
-full-text search beyond a basic `LIKE`. The moment any of these is genuinely wanted, a
+search. Parley has no search at all, not even a basic `LIKE`. The moment any of these is genuinely wanted, a
 dedicated forum platform (Discourse, etc.) is the better answer — parley is not trying to
 compete with one.
 

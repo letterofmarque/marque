@@ -33,6 +33,7 @@ return [
     */
 
     'comments' => [
+        // check-docs: ignore — not yet built, read by nothing until #10812
         'enabled' => env('PARLEY_COMMENTS', true),
     ],
 
@@ -71,6 +72,7 @@ return [
 
     'nesting' => [
         'indent_depth' => 5,
+        // check-docs: ignore — not yet built, read by nothing until #10812
         'collapsible' => true,
     ],
 
@@ -91,6 +93,7 @@ return [
 
     'format' => [
         'parser' => env('PARLEY_PARSER'),
+        // check-docs: ignore — not yet built, read by nothing until #10812
         'schema' => 'permissive',
 
         // Source-text length cap for a post body, enforced at the Livewire
@@ -135,6 +138,7 @@ return [
 
     'moderation' => [
         'role' => 'moderator',
+        // check-docs: ignore — not yet built, read by nothing until #10812
         'edit_window' => null,
         'lock_blocks_edits' => env('PARLEY_LOCK_BLOCKS_EDITS', false),
     ],
@@ -180,6 +184,7 @@ return [
 
     'routes' => [
         'enabled' => true,
+        // check-docs: ignore — not yet built, read by nothing until #10812
         'middleware' => ['web'],
     ],
 
