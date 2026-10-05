@@ -11,7 +11,7 @@ changelogs — edit those, not this.*
 ## 2026-10-05
 
 - **[cennad 4.2.0](packages/cennad/CHANGELOG.md)** — The API is rate limited, as `rate_limit` always said it was: 60 requests a minute per
-- **[squidink 1.1.3](packages/squidink/CHANGELOG.md)** — Narrowing a schema no longer deletes code blocks, image alt text or the schema's
+- **[squidink 1.1.3](packages/squidink/CHANGELOG.md)** — Narrowing a schema no longer deletes code blocks or image alt text, runs blocks
 
 ## 2026-10-04
 

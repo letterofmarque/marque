@@ -7,6 +7,7 @@ use Marque\SquidInk\Parsers\BBCodeParser;
 use Marque\SquidInk\Parsers\MarkdownParser;
 use Marque\SquidInk\Renderers\HtmlRenderer;
 use Marque\SquidInk\Renderers\PlainTextRenderer;
+use Marque\SquidInk\SquidInk;
 
 /**
  * The proof that the document model is genuinely format-agnostic.
@@ -155,5 +156,44 @@ describe('both parsers respect the schema identically', function () {
 
         expect(nodeTypes($markdown))->not->toContain('image')
             ->and(nodeTypes($bbcode))->not->toContain('image');
+    });
+});
+
+describe('Narrowing a schema keeps words apart', function () {
+    it('keeps unwrapped blocks from running together', function (string $renderer) {
+        $out = app(SquidInk::class)->convert(
+            "# Heading words\n\n- item one\n- item two\n\nPara.",
+            'markdown',
+            $renderer,
+            Schema::minimal(),
+        );
+
+        expect($out)->not->toContain('wordsitem')
+            ->and($out)->not->toContain('oneitem')
+            ->and($out)->not->toContain('twoPara')
+            ->and($out)->toContain('Heading words')
+            ->and($out)->toContain('item two');
+    })->with(['html', 'text']);
+
+    it('wraps an unwrapped block in a paragraph in HTML', function () {
+        $html = app(SquidInk::class)->convert(
+            "# Heading words\n\nPara.",
+            'markdown',
+            'html',
+            Schema::minimal(),
+        );
+
+        expect($html)->toBe('<p>Heading words</p><p>Para.</p>');
+    });
+
+    it('does not nest a paragraph when an inline shortcode unwraps', function () {
+        $html = app(SquidInk::class)->convert(
+            'see {spoiler}x{/spoiler} here',
+            'markdown',
+            'html',
+            Schema::minimal(),
+        );
+
+        expect($html)->toBe('<p>see x here</p>');
     });
 });

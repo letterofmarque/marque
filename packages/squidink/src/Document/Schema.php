@@ -75,6 +75,12 @@ final class Schema
      */
     private const REQUIRED_NODES = ['document', 'paragraph', 'text'];
 
+    /** Nodes that sit inside a paragraph or heading rather than beside them. */
+    private const INLINE_NODES = ['text', 'hard_break', 'image'];
+
+    /** Nodes whose children are inline: unwrapping a block in here must not add a paragraph. */
+    private const INLINE_PARENTS = ['paragraph', 'heading'];
+
     /** @var list<string> */
     private array $nodes;
 
@@ -187,7 +193,9 @@ final class Schema
      * the parent — narrowing a schema should degrade formatting, not delete the
      * text someone wrote. For most nodes the content is their children. A code
      * block and an image hold their words in a property instead, so they get a
-     * fallback (see contentOf()). Disallowed marks are dropped from the text they
+     * fallback (see contentOf()), and a dropped hard break becomes a newline. An
+     * unwrapped block's inline content is regrouped into paragraphs, so its words
+     * stay apart from the next block's. Disallowed marks are dropped from the text they
      * annotate, leaving the text itself intact.
      *
      * This is what parsers use. It is the difference between "your post broke"
@@ -208,9 +216,18 @@ final class Schema
                 continue;
             }
 
-            // Unwrap: keep the content, lose the container.
-            foreach ($this->contentOf($child) as $content) {
-                $kept[] = $content;
+            // Unwrap: keep the content, lose the container. A block's inline
+            // content is regrouped into paragraphs so it cannot run into the
+            // words of the block beside it ("Heading wordsitem one").
+            $content = $this->contentOf($child);
+
+            if (! in_array($child->type(), self::INLINE_NODES, true)
+                && ! in_array($node->type(), self::INLINE_PARENTS, true)) {
+                $content = $this->paragraphed($content);
+            }
+
+            foreach ($content as $piece) {
+                $kept[] = $piece;
             }
         }
 
@@ -239,7 +256,45 @@ final class Schema
             return in_array($node->alt(), [null, ''], true) ? [] : [new Text($node->alt())];
         }
 
+        // A line break separates words; dropping it outright would join them.
+        if ($node instanceof HardBreak) {
+            return [new Text("\n")];
+        }
+
         return $node->children();
+    }
+
+    /**
+     * Wraps each run of inline nodes in a paragraph, leaving blocks as they are.
+     *
+     * @param  list<Node>  $nodes
+     * @return list<Node>
+     */
+    private function paragraphed(array $nodes): array
+    {
+        $result = [];
+        $run = [];
+
+        foreach ($nodes as $node) {
+            if (in_array($node->type(), self::INLINE_NODES, true)) {
+                $run[] = $node;
+
+                continue;
+            }
+
+            if ($run !== []) {
+                $result[] = new Paragraph(children: $run);
+                $run = [];
+            }
+
+            $result[] = $node;
+        }
+
+        if ($run !== []) {
+            $result[] = new Paragraph(children: $run);
+        }
+
+        return $result;
     }
 
     /**

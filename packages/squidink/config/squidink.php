@@ -65,7 +65,8 @@ return [
     | not a style preference: a parser cannot produce a node that is not listed
     | here, so unsupported input can never become unexpected output. document,
     | paragraph and text are always allowed. Shortcodes are filtered too, so
-    | leave out "shortcode" to turn them all off.
+    | leave out "shortcode" to turn them all off: a paired one keeps its content,
+    | and an unpaired one, which has none, is removed.
     |
     | Trimming this list is how you restrict what users can write. An empty
     | array means "everything the schema knows about".

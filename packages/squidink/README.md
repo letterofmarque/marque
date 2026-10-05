@@ -120,8 +120,11 @@ $schema = new Schema(
 Content a schema disallows is **degraded, not deleted**: a disallowed node is unwrapped
 and its children kept, and a disallowed mark is dropped from the text it annotated. A
 disallowed code block becomes a paragraph of its lines, and a disallowed image becomes its
-alt text. Shortcodes obey the schema too: without `shortcode`, a spoiler unwraps to its
-content. Narrowing a schema costs a post its formatting, never its words.
+alt text. A disallowed block's text becomes a paragraph, and a disallowed line break
+becomes a newline, so words never run together. Shortcodes obey the schema too: without
+`shortcode`, a spoiler unwraps to its content, and an unpaired shortcode with no content
+(`{torrent id=5}`) is removed. Narrowing a schema costs a post its formatting, never its
+words.
 
 ## Extending
 

@@ -7,8 +7,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
 ## [1.1.3] — 2026-10-05
 
-> Narrowing a schema no longer deletes code blocks, image alt text or the schema's
-> authority over shortcodes, matching what the README promised from 1.0. Only apps with
+> Narrowing a schema no longer deletes code blocks or image alt text, runs blocks
+> together, or lets shortcodes past it, matching what the README promised from 1.0. Only apps with
 > a narrowed schema see a difference.
 
 ### Fixed
@@ -22,8 +22,14 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md).
 - **Shortcodes obey the schema.** The shortcode pass ran after the parser's schema
   filter, so `{spoiler}` rendered as `<details>` even under a schema without
   `shortcode`. The schema now filters again after the pass, and a disallowed shortcode
-  unwraps to its content (#10936). If you narrowed `schema.nodes` and still want
-  shortcodes, add `'shortcode'` to the list.
+  unwraps to its content (#10936). An unpaired shortcode has no content, so it is
+  removed. If you narrowed `schema.nodes` and still want shortcodes, add
+  `'shortcode'` to the list.
+- **Unwrapped blocks no longer run into each other.** Under a narrowed schema, a heading
+  followed by a list rendered as `Heading wordsitem oneitem two`, in HTML and in plain
+  text. A disallowed hard break joined its two lines the same way. A disallowed block's
+  inline content now becomes its own paragraph, and a disallowed hard break becomes a
+  newline. Found by the release read-through.
 
 ## [1.1.2] — 2026-10-04
 

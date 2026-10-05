@@ -88,9 +88,25 @@ describe('Schema filtering', function () {
 
         Schema::minimal()->filter($doc);
 
+        // A block's inline content becomes a paragraph of its own, so it can't run
+        // into the next block's words.
+        $paragraph = $doc->children()[0];
+
         expect($doc->children())->toHaveCount(1)
-            ->and($doc->children()[0])->toBeInstanceOf(Text::class)
-            ->and($doc->children()[0]->text())->toBe('a heading');
+            ->and($paragraph)->toBeInstanceOf(Paragraph::class)
+            ->and($paragraph->children()[0]->text())->toBe('a heading');
+    });
+
+    it('turns a disallowed hard break into a newline, keeping the words apart', function () {
+        $doc = new Document(children: [
+            new Paragraph(children: [new Text('line a'), new HardBreak, new Text('line b')]),
+        ]);
+
+        (new Schema(['paragraph']))->filter($doc);
+
+        $texts = array_map(fn ($n) => $n->text(), $doc->children()[0]->children());
+
+        expect(implode('', $texts))->toBe("line a\nline b");
     });
 
     it('removes a disallowed leaf node entirely', function () {
