@@ -18,7 +18,9 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md).
   aren't children, so both were deleted outright. Narrowing a schema should cost
   formatting, never words. A disallowed code block now becomes a paragraph of its lines,
   code-marked and joined with hard breaks where the schema allows those. A disallowed
-  image becomes its alt text, and one with no alt still disappears (#10936).
+  image becomes its alt text, and one with no alt still disappears. A disallowed
+  quote keeps its attribution (`[quote=Bob]`) as a "Bob:" paragraph ahead of its
+  content, which is how the plain-text renderer already shows it (#10936).
 - **Shortcodes obey the schema.** The shortcode pass ran after the parser's schema
   filter, so `{spoiler}` rendered as `<details>` even under a schema without
   `shortcode`. The schema now filters again after the pass, and a disallowed shortcode

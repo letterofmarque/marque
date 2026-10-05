@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Marque\SquidInk\Document\Marks\Bold;
 use Marque\SquidInk\Document\Marks\Colour;
 use Marque\SquidInk\Document\Marks\Link;
+use Marque\SquidInk\Document\Nodes\BlockQuote;
 use Marque\SquidInk\Document\Nodes\CodeBlock;
 use Marque\SquidInk\Document\Nodes\Document;
 use Marque\SquidInk\Document\Nodes\HardBreak;
@@ -146,6 +147,19 @@ describe('Schema filtering', function () {
         expect($paragraph->children())->toHaveCount(1)
             ->and($paragraph->children()[0]->text())->toBe("a\nb")
             ->and($paragraph->children()[0]->hasMark('code'))->toBeFalse();
+    });
+
+    it('keeps a disallowed quote\'s attribution', function () {
+        // Who said it is a property, not a child, so plain unwrapping lost it.
+        $quote = new BlockQuote('Bob');
+        $quote->append(new Paragraph(children: [new Text('said this')]));
+        $doc = new Document(children: [$quote]);
+
+        Schema::minimal()->filter($doc);
+
+        expect($doc->children())->toHaveCount(2)
+            ->and($doc->children()[0]->children()[0]->text())->toBe('Bob:')
+            ->and($doc->children()[1]->children()[0]->text())->toBe('said this');
     });
 
     it('drops an empty disallowed code block', function () {

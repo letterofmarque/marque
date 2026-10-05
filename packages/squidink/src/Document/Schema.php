@@ -239,10 +239,12 @@ final class Schema
     /**
      * What survives of a node this schema does not allow.
      *
-     * Children, for anything that has them. A code block's text and an image's
-     * alt live in properties, so plain unwrapping would delete them: the code
+     * Children, for anything that has them. A code block's text, an image's alt
+     * and a quote's author live in properties, so plain unwrapping would delete
+     * them: the code
      * becomes a paragraph of its lines (code-marked and broken by hard breaks
-     * where this schema allows those), and the image becomes its alt text.
+     * where this schema allows those), the image becomes its alt text, and the
+     * author becomes an "Author:" paragraph ahead of the quote's content.
      *
      * @return list<Node>
      */
@@ -254,6 +256,12 @@ final class Schema
 
         if ($node instanceof Image) {
             return in_array($node->alt(), [null, ''], true) ? [] : [new Text($node->alt())];
+        }
+
+        // Who said it is content, not formatting: the plain-text renderer keeps
+        // it the same way, as "Author:" before the quote.
+        if ($node instanceof BlockQuote && $node->author() !== null) {
+            return [new Paragraph(children: [new Text($node->author().':')]), ...$node->children()];
         }
 
         // A line break separates words; dropping it outright would join them.
