@@ -11,6 +11,7 @@ use Marque\SquidInk\Document\Nodes\OrderedList;
 use Marque\SquidInk\Document\Nodes\Text;
 use Marque\SquidInk\Document\Schema;
 use Marque\SquidInk\Parsers\MarkdownParser;
+use Marque\SquidInk\SquidInk;
 
 function parseMarkdown(string $source, ?Schema $schema = null): Document
 {
@@ -236,7 +237,7 @@ describe('MarkdownParser schema enforcement', function () {
 // These pin that down, so loading either one later is a deliberate decision.
 describe('MarkdownParser raw HTML and GFM extensions', function () {
     it('drops raw HTML whatever shape the tag takes', function (string $source) {
-        $html = app(\Marque\SquidInk\SquidInk::class)->convert($source);
+        $html = app(SquidInk::class)->convert($source);
 
         expect(strtolower($html))->not->toContain('<script')
             ->and(strtolower($html))->not->toContain('<iframe');
