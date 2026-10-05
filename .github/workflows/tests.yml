@@ -36,7 +36,12 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
+      # check-docs verifies the tags the docs name (`guise/v5.0.0`), and a
+      # default checkout fetches none, so every tag would read as missing.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
