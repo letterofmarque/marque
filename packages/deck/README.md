@@ -3,8 +3,9 @@
 App layout shell and shared Blade UI components for the [Marque](https://github.com/letterofmarque/marque) tracker platform.
 
 `deck` provides the page shell (layout, navigation, footer) and a small set of Blade
-components used across the Marque frontend packages — `guise`, `disguise`, `usarrs`,
-`parley`, `squidink`, `taxonomy` and `skipper`. It is the surface everything else
+components used across the Marque frontend packages: `guise`, `disguise`, `usarrs`,
+`parley` and `skipper`. `squidink` and `taxonomy` deliberately use none of them, so
+they work in an app without deck. It is the surface everything else
 stands on, which is where the name comes from.
 
 > Formerly published as `marque/ise`, and `marque/id` before that. `ise` was the shared
@@ -108,15 +109,17 @@ floor. Same idea, different lifecycles, deliberately not one abstraction.
 
 ## Styling
 
-Components use Tailwind utility classes with `dark:` variants throughout. Make sure the
-package views are covered by your Tailwind content paths:
+Components use Tailwind utility classes with `dark:` variants throughout. Tailwind 4
+only generates classes it finds in the files it scans, and a fresh Laravel app scans
+nothing under `vendor/`. Add an `@source` line to `resources/css/app.css` for each Marque
+package that ships views:
 
-```js
-// tailwind.config.js
-content: [
-    './vendor/marque/**/resources/views/**/*.blade.php',
-]
+```css
+@source '../../vendor/marque/deck/resources/views';
+@source '../../vendor/marque/guise/resources/views';
 ```
+
+`php artisan marque:install` writes these lines for the packages it installs.
 
 ## Requirements
 

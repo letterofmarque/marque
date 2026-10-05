@@ -37,7 +37,7 @@ $this->app->make(AdminScreenRegistry::class)->register(new AdminScreen(
     component: 'my-package-client-whitelist',   // a Livewire component
     path: 'admin/clients',
     minimumRole: Role::Moderator,
-    icon: 'shield-check',
+    icon: 'pencil',
     group: 'Tracker',
     position: 20,
 ));
@@ -45,12 +45,12 @@ $this->app->make(AdminScreenRegistry::class)->register(new AdminScreen(
 
 | Field | Purpose |
 |---|---|
-| `identifier` | Unique across all packages. The route name is derived as `admin.<identifier>` |
+| `identifier` | Unique across all packages. The route name is derived as `admin.<identifier>`, unless your package binds its own route at that path (see below) |
 | `label` | What the panel shows |
 | `component` | The Livewire component that renders the screen |
 | `path` | Where it lives |
 | `minimumRole` | The floor. Enforced on the listing **and** on the request |
-| `icon` | Optional, rendered from `deck`'s icon set |
+| `icon` | Optional, rendered from `deck`'s icon set, which is small: `arrow-left`, `arrow-down-tray`, `magnifying-glass`, `pencil`, `plus`. Any other name renders nothing |
 | `group` | Optional heading. Ungrouped screens fall under `skipper.default_group` |
 | `position` | Ordering within the group. Lower first |
 
@@ -61,10 +61,17 @@ later.
 Registration is legal any time up to `booted`, so it does not matter whether your provider
 boots before or after skipper's.
 
+**A package can serve the screen from its own route.** If a route is already bound at the
+screen's path, skipper doesn't generate one: the panel links to the package's route, and
+that route keeps its own name and its own authorisation. usarrs does this, serving
+`admin/users` as `admin.users.index`. Skipper's request-time `minimumRole` check (below)
+only applies to routes skipper generated, so a package that binds its own route must
+protect it itself.
+
 ## Stability
 
-**The registration contract is public API from 1.0.0.** `Marque\Trove\Registry\` —
-`AdminScreen`, `AdminScreenRegistry`, and their public surface — follows semver on
+**The registration contract is public API from trove 4.x.** `Marque\Trove\Registry\`
+(`AdminScreen`, `AdminScreenRegistry`, and their public surface) follows semver on
 `marque/trove`. Build against it.
 
 What is *not* covered by that promise: how skipper renders the panel. The views, the
@@ -74,7 +81,8 @@ Your screen is a Livewire component you own; the panel just lists and routes it.
 ## Permissions
 
 `minimumRole` is checked twice, against the same registry entry: once when building the
-panel listing, and once when the request is authorised. Filtering a menu is not protecting
+panel listing, and once when the request is authorised (on the routes skipper generates;
+see above for a package's own route). Filtering a menu is not protecting
 a screen — without the second check, a moderator reaches an admin screen by typing its URL.
 
 Roles come from trove (`user` → `uploader` → `moderator` → `admin`), and a screen is visible

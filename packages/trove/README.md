@@ -19,7 +19,7 @@ composer require marque/trove marque/guise marque/usarrs
 ```
 
 Each resolves its own supporting packages (`threepio` for the BitTorrent protocol,
-`ise` for the UI shell). All three verified working as sets, 2026-09-10.
+`deck` for the UI shell).
 
 ## Installation
 
@@ -202,18 +202,23 @@ Published to `config/trove.php`:
 |-----|---------|-------------|
 | `user_model` | `App\Models\User` | Your User model class |
 | `storage_disk` | `local` | Filesystem disk for .torrent files |
-| `ratio_mode` | `full` | Ratio enforcement: `full`, `off`, or `seedtime` |
-| `min_ratio` | `0.5` | Minimum required ratio (when mode is `full`) |
-| `min_seedtime` | `86400` | Minimum seedtime in seconds (when mode is `seedtime`) |
 | `hide_dead_torrents` | `false` | Hide torrents with no seeders from listings |
+
+Ratio enforcement isn't configured here. It belongs to the tracker, and bloodhound's
+`ratio_mode` / `min_ratio` / `min_seedtime` keys are planned and not enforced yet
+(#10732).
 
 ## Migrations
 
 Trove creates:
 
-- `torrents` table (info_hash, name, description, size, file_count, torrent_file, user_id, min_role, seeders, leechers)
-- Adds `role` column to users table
-- Adds `announce_key`, `uploaded`, `downloaded`, `seedtime` columns to users table
+- `torrents` table (info_hash, name, description, size, file_count, torrent_file, user_id,
+  min_role, seeders, leechers, times_completed, visible)
+- Adds a `role` column to the users table
+
+That is all trove adds to `users`. The tracker columns (`uploaded`, `downloaded`,
+`seedtime`) come from bloodhound's migrations, and announce keys live in bloodhound's own
+`announce_keys` table.
 
 Publish migrations to customise them:
 

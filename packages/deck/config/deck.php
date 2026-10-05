@@ -14,7 +14,8 @@ return [
 
     'app_name' => env('APP_NAME', 'Marque'),
 
-    // Future: support theme variants
+    // Theme variants: planned, not built, and nothing reads this key yet.
+    // check-docs: ignore — placeholder, read by nothing until #10815 decides it
     'theme' => env('DECK_THEME', 'default'),
 
     'show_footer' => true,
