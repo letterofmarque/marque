@@ -2,7 +2,7 @@
     $toolbar = $this->toolbar;
     $editorId = 'squidink-'.$this->name;
 
-    // No component from the id package is referenced here, for the same reason as
+    // No component from marque/deck is referenced here, for the same reason as
     // the Blade editor: Blade resolves components at compile time, so guarding one
     // with class_exists() does not stop the view exploding where marque/deck is
     // absent.

@@ -39,20 +39,20 @@ All routes require authentication and email verification.
 | Route | Component | Role Required | Description |
 |-------|-----------|---------------|-------------|
 | `GET /torrents` | Index | Any | Browse and search torrents |
-| `GET /torrents/{id}` | Show | Any | View torrent details |
+| `GET /torrents/{torrent}` | Show | Any | View torrent details |
 | `GET /torrents/upload` | Upload | Uploader+ | Upload a .torrent file |
-| `GET /torrents/{id}/edit` | Edit | Owner / Moderator+ | Edit torrent metadata |
-| `GET /torrents/{id}/download` | *(controller)* | Any | Download .torrent file |
+| `GET /torrents/{torrent}/edit` | Edit | Owner / Moderator+ | Edit torrent metadata |
+| `GET /torrents/{torrent}/download` | *(controller)* | Any | Download .torrent file |
 
 ## Components
 
 ### Torrent Index
 
-Paginated torrent listing with live search (300ms debounce). Shows name, size, file count, uploader, and date. Search is reflected in the URL for bookmarking.
+Paginated torrent listing with live search (300ms debounce). Shows name, size, file count, seeders, leechers, uploader, and date. Search is reflected in the URL for bookmarking. When `trove.hide_dead_torrents` is on, a "Show dead torrents" toggle brings back torrents with no seeders.
 
 ### Torrent Show
 
-Detailed view with torrent metadata (size, file count, info hash, uploader, upload time). Includes download button when a .torrent file is available, and an edit button for authorised users.
+Detailed view with torrent metadata (size, file count, info hash, uploader, upload time). Includes download button when a .torrent file is available, and an edit button for authorised users. When `marque/parley` is installed and its provider is loaded, the page embeds the torrent's comment thread.
 
 ### Torrent Upload
 
@@ -72,7 +72,7 @@ Published to `config/guise.php`:
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `layout` | `layouts.app` | Blade layout for full-page components |
+| `layout` | `deck::layouts.app` | Blade layout for full-page components |
 | `prefix` | *(empty)* | URL prefix for routes (e.g. `tracker`) |
 | `middleware` | `['web', 'auth', 'verified']` | Middleware stack |
 
@@ -104,7 +104,7 @@ Publish the views to override them:
 php artisan vendor:publish --tag=guise-views
 ```
 
-Views are published to `resources/views/vendor/guise/`. All views use Flux UI components and Tailwind CSS with dark mode support.
+Views are published to `resources/views/vendor/guise/`. All views use `marque/deck`'s Blade components and Tailwind CSS with dark mode support.
 
 ## Livewire Component Names
 

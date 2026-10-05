@@ -18,14 +18,14 @@
 
     $editorId = $id ?? 'squidink-'.$name;
 
-    // This template deliberately references no component from the id package.
+    // This template deliberately references no component from marque/deck.
     // Blade resolves components at COMPILE time, so a `@if (class_exists(...))`
     // guard around one does not help — the compiler tries to locate it either way
     // and the view explodes wherever marque/deck is not installed. A text pipeline
     // must not require a UI package to render, so this template owns its own
-    // markup and matches id's classes by hand.
+    // markup and matches deck's classes by hand.
     //
-    // A host that wants id's components can publish these views
+    // A host that wants deck's components can publish these views
     // (`--tag=squidink-views`) and swap them in; that is the seam for it.
 
     $controlClasses = 'w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 font-mono text-sm text-zinc-900
