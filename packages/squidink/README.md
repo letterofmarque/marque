@@ -317,8 +317,8 @@ php artisan vendor:publish --tag=squidink-views
   `data:` and `vbscript:` are refused, and the text renders unlinked rather than
   vanishing.
 - **Colours and sizes are validated**, colours against a fixed list of names or a strict
-  `#rgb` / `#rrggbb` hex pattern, sizes against a fixed set. Neither is passed through to a
-  style attribute, so neither can be a CSS injection vector.
+  `#rgb` / `#rrggbb` hex pattern, sizes against a fixed set. Only a value that passed
+  reaches a `style` attribute, so neither can be a CSS injection vector.
 - **Raw HTML in source is dropped** by the Markdown parser and escaped by the BBCode
   parser. Both are inert.
 - **Malformed input degrades, never throws.** Unclosed and unknown tags become the
