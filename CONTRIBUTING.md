@@ -125,7 +125,7 @@ Those are generated mirrors — issues and pull requests are turned off on all o
 
 - PHP 8.3+ (8.4 works too — CI tests both)
 - Composer
-- Redis (for Bloodhound tests)
+- Redis (for the bloodhound, hound and threepio tests)
 - Optionally MySQL, MariaDB and/or PostgreSQL — see [Testing](#testing)
 
 **PHP 8.3 is the floor deliberately**, matching Laravel 13's own. One consequence worth
@@ -169,7 +169,7 @@ composer test
 ```
 
 Output is a single line of JSON rather than a line per test — that's
-[PAO](https://github.com/nunomaduro/pao), installed as a dev dependency in every package:
+[PAO](https://github.com/laravel/pao), installed as a dev dependency in every package:
 
 ```json
 {"tool":"pest","result":"passed","tests":61,"passed":61,"assertions":121,"duration_ms":967}
@@ -184,7 +184,7 @@ cd packages/bloodhound
 ```
 
 Tests default to SQLite in-memory, so no database setup is needed to get started.
-Bloodhound tests require a Redis connection.
+The bloodhound, hound and threepio tests need a Redis connection.
 
 ### Running against a real database
 
@@ -193,16 +193,21 @@ positioning, tolerates an abandoned transaction, and defaults foreign keys off (
 turns them on explicitly). The first real-engine run of this suite found eight test-only
 bugs that had been invisible for the life of the project.
 
-Marque is DB-agnostic, and the suite can be pointed at any of the four supported engines:
+Marque is DB-agnostic, and the repo's compose file brings up the same engines CI uses,
+on ports that stay clear of a system database (MySQL 13306, MariaDB 13307, PostgreSQL
+15432):
 
 ```bash
-DB_CONNECTION=mysql   composer test
-DB_CONNECTION=pgsql   composer test
-DB_CONNECTION=mariadb DB_PORT=3307 composer test
+docker compose up -d
+tools/test-engines                          # every package, all four engines
+tools/test-engines mysql                    # one engine
+tools/test-engines --packages trove pgsql   # one package, one engine
 ```
 
-Defaults to database `marque_test`, user `marque`/`marque` on the engine's standard port;
-override with `DB_HOST` / `DB_PORT` / `DB_DATABASE` / `DB_USERNAME` / `DB_PASSWORD`.
+**Don't use `composer test` against a real engine.** Composer kills any script after 300
+seconds, and three suites (usarrs, taxonomy, bloodhound) take longer than that on MySQL.
+They die mid-run, printing usage text that looks like a corrupt result. `tools/test-engines`
+calls Pest directly, gives each package its own database, and runs packages in parallel.
 
 MariaDB is a distinct engine, not a MySQL alias — Laravel ships its own `MariaDbConnection`
 and grammar, and the two diverge on JSON storage, index length limits and `RETURNING`. It
@@ -222,13 +227,12 @@ A handful of tests are SQLite-specific by nature (`EXPLAIN QUERY PLAN` index pro
 
 ### Running All Tests
 
-From the repo root, run each package's tests:
+From the repo root, every package against SQLite. `tools/test-engines` runs each package's
+own `vendor/bin/pest`, so install every package's dependencies first:
 
 ```bash
-for pkg in packages/*/; do
-    echo "=== Testing $pkg ==="
-    (cd "$pkg" && composer install --quiet && composer test)
-done
+for pkg in packages/*/; do (cd "$pkg" && composer install --quiet); done
+tools/test-engines sqlite
 ```
 
 ## Static Analysis

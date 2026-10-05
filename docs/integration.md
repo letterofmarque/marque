@@ -4,7 +4,7 @@
 
 ## The shape of the problem
 
-Marque's mandatory/optional split (see `docs/why.md`, "Why 9 Packages") means a mandatory package can never `require` an optional one — `trove` has to work in an API-only deployment that never installs `parley`, `usarrs`, or anything else. But optional packages routinely want to *add behaviour to* a model or view that a mandatory or another package owns: parley wants a comment thread on `Torrent`, and the reverse direction (a frontend rendering an optional package's UI) has the same problem one level up.
+Marque's mandatory/optional split (`trove` is the only mandatory package) means a mandatory package can never `require` an optional one — `trove` has to work in an API-only deployment that never installs `parley`, `usarrs`, or anything else. But optional packages routinely want to *add behaviour to* a model or view that a mandatory or another package owns: parley wants a comment thread on `Torrent`, and the reverse direction (a frontend rendering an optional package's UI) has the same problem one level up.
 
 Every existing case in the suite solves this the same way, ad hoc, in provider/view code, without it being written down anywhere. This doc writes it down.
 
@@ -40,7 +40,7 @@ This is how `disguise` already guards Livewire itself (`class_exists(\Livewire\L
 
 `class_exists()` guards **do not work around Blade component tags** (`<x-vendor::tag>` or `<livewire:tag>`). Blade resolves components when the view is *compiled*, not when it runs — so a view containing a reference to an absent package's component tag fails to compile regardless of runtime guards around it.
 
-squidink's `resources/views/components/editor.blade.php` hit this directly: it deliberately owns its markup by hand rather than referencing any `id::` component, with the reasoning recorded inline. The rule of thumb:
+squidink's `resources/views/components/editor.blade.php` hit this directly: it deliberately owns its markup by hand rather than referencing any `deck::` component, with the reasoning recorded inline. The rule of thumb:
 
 - A view that must render whether or not an optional package is installed **owns its markup**, styled to match by hand, not by referencing the optional package's components.
 - A view that only renders when the optional package IS present (guarded by a runtime `class_exists()` check *around the whole `@include`/`<livewire:>` line, at the parent template level*, not inside the child) can safely use that package's own components, since the child view only ever compiles in an app that has it installed.
@@ -89,10 +89,10 @@ if (class_exists(\Marque\Parley\Contracts\ThreadServiceInterface::class)) {
 
 The 2026-08-20 cross-package review found the same pattern hand-copied across packages more than once, each copy drifting slightly because there was nothing to copy *from* — only sibling packages to reverse-engineer:
 
-- `providerIsLoaded()` optional-detection existed correctly in guise→parley, but `id` (now `ise`)'s own nav component (deciding whether to render guise/disguise/usarrs nav items) still used `class_exists()` — the exact anti-pattern this doc's Pattern 1 exists to rule out. The package other packages are meant to copy from was itself the odd one out. **Fixed** as part of the `id`→`ise` rename (2026-08-20) — `Navigation::hasProvider()` now uses `providerIsLoaded()`.
+- `providerIsLoaded()` optional-detection existed correctly in guise→parley, but `id` (now `ise`)'s own nav component (deciding whether to render guise/disguise/usarrs nav items) still used `class_exists()` — the exact anti-pattern this doc's Pattern 1 exists to rule out. The package other packages are meant to copy from was itself the odd one out. **Fixed** as part of the `id`→`ise` rename (2026-08-20). Since then the hard-coded nav has gone altogether: packages register their own entries in trove's `NavRegistry`, so the shell no longer detects anyone.
 - guise, disguise, usarrs, and parley all independently wrote an identical six-line `abstract class Component extends LivewireComponent` with a `<pkg>Layout()`/`<pkg>View()` pair reading `config('<pkg>.layout', 'deck::layouts.app')`. Four hand-copies of the same idea, no shared source. Still open — see below.
 
-**The rule going forward: when a pattern gets written a second time, that is the signal to check whether it belongs one level down — as a real attachment point in the package everything already depends on (`ise` or `trove`) — not just documented more thoroughly where it sits.** Writing a better comparison of the existing copies doesn't stop a third copy from drifting; giving the third package something to `use` or `extend` does.
+**The rule going forward: when a pattern gets written a second time, that is the signal to check whether it belongs one level down — as a real attachment point in the package everything already depends on (`deck` or `trove`) — not just documented more thoroughly where it sits.** Writing a better comparison of the existing copies doesn't stop a third copy from drifting; giving the third package something to `use` or `extend` does.
 
 Concretely: the fix here is for `deck` (formerly `ise`, and `id` before that — see `packages/deck/README.md` for the renames) to ship `Marque\Deck\Livewire\HasConfiguredLayout` — the layout-and-view helper every full-page Livewire component package has been hand-writing — so guise/disguise/usarrs/parley use it instead of their own copies, and a fifth package gets it for free. Not built yet; tracked as job #10560 in Cornerstone.
 
@@ -138,7 +138,7 @@ package a contributor can rely on being present. Putting the contract in `skippe
 instead would force every contributing package to depend on the renderer, i.e. exactly the
 coupling the arrangement exists to avoid.
 
-### Two registries, not one, and no shared base class
+### Three registries, and no shared base class (yet)
 
 `NavRegistry` and `AdminScreenRegistry` look similar and behave differently:
 
@@ -151,6 +151,13 @@ One contract spanning both would mean a visibility callback invoked in two very 
 contexts. They also share almost nothing worth extracting — hold an array, push, return
 filtered — so there is no base class. Per Pattern 4's own test, a third registry is the
 trigger to look for a shared parent, not the second.
+
+That third registry exists: `DashboardPanelRegistry` (trove 4.3). All three share
+`register()` (a duplicate identifier throws), `all()` and `find()`. They differ in
+`visibleTo()`: nav and dashboard panels take a user, admin screens take a `Role`. Whether
+the shared half earns a parent class hasn't been decided. Extracting one changes trove's
+public registry surface, which VERSIONING.md treats as a major on trove, so it waits for
+a trove major.
 
 ### Things that bit, and are worth not rediscovering
 

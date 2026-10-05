@@ -3,44 +3,16 @@
 *Read this before creating a package in `packages/`. Everything here has already
 cost someone a debugging session — most of it twice.*
 
-Three packages have been added since the v2.0 lineup refactor: `squidink` and `parley`
-(both 2026-08-20), and `taxonomy` (in progress, Build #95). The first two hit the same
-gotchas in the same order. This doc exists so the third didn't have to, and the fourth
-won't.
+Five packages have been added since the v2.0 lineup refactor: `squidink` and `parley`
+(both 2026-08-20), then `taxonomy`, `skipper` and the `marque` installer. The first two hit
+the same gotchas in the same order, and this doc exists so later ones don't have to.
 
-## The two that fail silently
+## Before it can ship
 
-These are the dangerous ones. Neither produces an error; both look like success.
-
-### 1. `SPLIT_TOKEN` cannot create a repo under the org
-
-It can push to an existing split repo. It **cannot create a new one**, and when the
-repo is missing the split job **reports success anyway**.
-
-Create the repo manually via the `lomsoftware` gh account *before* the first split,
-then re-trigger with an empty commit:
-
-```bash
-gh repo create letterofmarque/<package> --public
-git commit --allow-empty -m "chore: Trigger split for <package>"
-git push
-```
-
-Verify by checking the split repo directly — never the Actions run list:
-
-```bash
-git ls-remote --tags lom:letterofmarque/<package>
-```
-
-`gh run list --limit N` returns the N most recent runs, which may be older ones if
-nothing was triggered. That is indistinguishable from success.
-
-### 2. A brand-new package needs a one-time manual Packagist submission
-
-The webhook has nothing to fire on until the package exists on Packagist. Submit it
-once, by hand, with `PACKAGIST_API_TOKEN` from Doppler and maintainer `lomsoftware`.
-
-Job #10547 exists solely because this was missed on squidink.
+A brand-new package needs two one-time steps outside this repo: its split repository under
+the `letterofmarque` organisation, and its first Packagist registration. A maintainer does
+both. Say in your pull request that it adds a package, so they happen before the first
+release.
 
 ## Scaffold
 
@@ -65,7 +37,7 @@ packages/<name>/
 [VERSIONING.md](../VERSIONING.md#dependencies-and-floors)), `illuminate/*: ^13.0`,
 whichever `marque/*` packages you genuinely need. Dev: `orchestra/testbench: ^11.0`,
 `pestphp/pest: ^4.7` (**not `^5.0`** — Pest 5 requires PHP 8.4 and would raise the
-floor for every consumer), `mockery/mockery`, `nunomaduro/pao`. Plus
+floor for every consumer), `mockery/mockery`, `laravel/pao`. Plus
 `extra.laravel.providers`, `extra.branch-alias`, `minimum-stability: dev` +
 `prefer-stable`, and path repositories for sibling packages.
 
@@ -149,7 +121,7 @@ optional.
 
 **PHP-side seams compose; view-layer ones do not.** Blade resolves components at
 *compile* time, so a `class_exists()` guard around `<x-deck::button>` still throws
-wherever `ise` is absent. Own your markup, publish views, or take a hard dependency —
+wherever `deck` is absent. Own your markup, publish views, or take a hard dependency —
 never attempt a conditional. This is Spec #83's central finding and it cost a
 checkpoint to discover.
 
@@ -217,18 +189,3 @@ titled things like "Upgrade guide: usarrs v6". That is the exact reading that pr
 **Suite** column for precisely this, so a guide row states which suite release it
 belongs to — fill it in, and keep the release doc unambiguous about which kind of
 number it is quoting.
-
-## Where the real detail lives
-
-Cornerstone Builds carry more than this summary does, including what went wrong and
-what was tried first:
-
-- **Build #81** (`build-parley`) — CP2 scaffold, CP7 ship. The template.
-- **Build #82** (`build-squidink`) — hit the same repo-creation gap first.
-- **Build #95** (`taxonomy-engine`) — current, and the first to start from this doc.
-
-Worth stating plainly, because it is the reason this file exists: **completed Builds are
-a knowledge store, not just a record.** The parley build's checkpoint notes were the most
-useful artefact in the project when scaffolding taxonomy, and they were nearly not
-consulted. If you are about to do something structurally similar to past work, read the
-Build before writing the plan.
