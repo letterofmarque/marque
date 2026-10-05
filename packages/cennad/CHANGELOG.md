@@ -7,6 +7,25 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+> The API is rate limited, as `rate_limit` always said it was: 60 requests a minute per
+> user by default. Until now nothing read the key, and the API was unthrottled.
+
+### Added
+
+- **`rate_limit` is enforced.** Every cennad route now carries `throttle:cennad`, a named
+  limiter allowing `rate_limit` requests a minute, with reads and writes sharing one
+  count. It counts per user when signed in and per IP for guests. Past the limit a
+  request gets `429 Too Many Requests` with `Retry-After`. The key has shipped,
+  documented as "requests per minute", since before 4.0, but nothing read it, and
+  Laravel's `api` group throttles nothing unless an app opts in (#10808).
+
+  **Check your clients.** Anything making more than 60 requests a minute per user (a
+  sync job, an autodl-style poller) will start getting 429s. Raise `CENNAD_RATE_LIMIT`,
+  set it to `0` to turn the limit off, or redefine the `cennad` limiter in your app.
+  The README's "Rate limiting" section covers all three.
+
 ## [4.1.0] — 2026-09-04
 
 > Lowers the PHP floor to 8.3, matching Laravel 13's own requirement.

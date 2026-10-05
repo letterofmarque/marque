@@ -52,6 +52,12 @@ if (config('cennad.protected_middleware') !== null) {
 
 $routePrefix = config('cennad.route_names.prefix', 'cennad');
 
+// Appended rather than left to the middleware config, so replacing a middleware
+// list cannot silently drop the limit. It runs after the guard, so it can count
+// per user; cennad.rate_limit = 0 turns it off.
+$readMiddleware = [...$readMiddleware, 'throttle:cennad'];
+$writeMiddleware = [...$writeMiddleware, 'throttle:cennad'];
+
 // Read routes - authenticated by default; open them explicitly for a public tracker
 Route::prefix($prefix)
     ->middleware($readMiddleware)

@@ -113,11 +113,29 @@ Published to `config/cennad.php`:
 | `write_middleware` | `['api', 'auth:api']` | Middleware for `store`, `update`, `destroy` |
 | `route_names.prefix` | `cennad` | Route name prefix |
 | `route_names.download` | `torrents.download` | Download route name (for link generation) |
-| `rate_limit` | `60` | Requests per minute |
+| `rate_limit` | `60` | Requests per minute, per user (per IP for guests). `0` or `null` turns it off |
 
 `public_middleware` and `protected_middleware` are the pre-4.0 names for `read_middleware`
 and `write_middleware`. They still work and still take precedence, but they emit a
 deprecation notice and are removed in 5.0.
+
+## Rate limiting
+
+Every cennad route carries `throttle:cennad`, a named limiter allowing `rate_limit`
+requests a minute (60 by default). Reads and writes share one count. Signed-in users are
+counted by their id, and guests by IP when the catalogue is open to them. Past the limit a
+request gets `429 Too Many Requests` with a `Retry-After` header. Every response carries
+`X-RateLimit-Limit` and `X-RateLimit-Remaining`.
+
+The limiter is appended after your `read_middleware` and `write_middleware`, so replacing
+those lists can't drop it by accident. To turn it off, for example because your app
+already throttles its API, set `CENNAD_RATE_LIMIT=0`. For a different shape (per token,
+or one limit for reads and another for writes), redefine the `cennad` limiter in your own
+service provider after cennad's has booted:
+
+```php
+RateLimiter::for('cennad', fn (Request $request) => Limit::perMinute(300)->by($request->user()?->id ?: $request->ip()));
+```
 
 ## Authentication
 

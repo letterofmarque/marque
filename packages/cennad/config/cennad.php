@@ -32,6 +32,10 @@ return [
         'download' => env('CENNAD_DOWNLOAD_ROUTE', 'torrents.download'),
     ],
 
-    // API rate limiting (requests per minute)
+    // API rate limit, in requests per minute. Every cennad route carries it,
+    // reads and writes sharing one count. It is counted per user when signed
+    // in, and per IP for guests. Past the limit a request gets 429 Too Many
+    // Requests. null or 0 turns it off, for an app that throttles its API
+    // itself.
     'rate_limit' => env('CENNAD_RATE_LIMIT', 60),
 ];
