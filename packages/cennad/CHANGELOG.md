@@ -7,7 +7,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [Unreleased]
+## [4.2.0] — 2026-10-05
 
 > The API is rate limited, as `rate_limit` always said it was: 60 requests a minute per
 > user by default. Until now nothing read the key, and the API was unthrottled.

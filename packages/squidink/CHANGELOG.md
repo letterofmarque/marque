@@ -5,7 +5,7 @@ All notable changes to `marque/squidink` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
-## [Unreleased]
+## [1.1.3] — 2026-10-05
 
 > Narrowing a schema no longer deletes code blocks, image alt text or the schema's
 > authority over shortcodes, matching what the README promised from 1.0. Only apps with
