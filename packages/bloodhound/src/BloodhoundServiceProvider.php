@@ -23,8 +23,10 @@ use Marque\Bloodhound\Services\AnnounceLogService;
 use Marque\Bloodhound\Services\AnnounceService;
 use Marque\Bloodhound\Services\AntiCheatService;
 use Marque\Bloodhound\Services\ClientValidationService;
+use Marque\Bloodhound\Services\TorrentFilePolicy;
 use Marque\Bloodhound\Services\TrackerStatsService;
 use Marque\Threepio\Services\PeerService;
+use Marque\Trove\Contracts\TorrentFilePolicyInterface;
 use Marque\Trove\Contracts\TrackerStatsInterface;
 
 class BloodhoundServiceProvider extends ServiceProvider
@@ -48,6 +50,10 @@ class BloodhoundServiceProvider extends ServiceProvider
         // consumers asking app()->bound() get a clean "no tracker here".
         // Unconditional on purpose — the figures exist in every ratio_mode.
         $this->app->singleton(TrackerStatsInterface::class, TrackerStatsService::class);
+
+        // What downloads and uploads need from this tracker (#10947): the
+        // member's keyed announce URL, and private torrents by default.
+        $this->app->singleton(TorrentFilePolicyInterface::class, TorrentFilePolicy::class);
 
         // Teach threepio's peer store to recover a lost baseline from the
         // ledger (Spec #99 CP3).

@@ -63,6 +63,25 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Uploads
+    |--------------------------------------------------------------------------
+    |
+    | 'private_flag' is what an uploaded torrent's private flag must be:
+    | 'require' (the default: refuse a torrent that isn't private), 'disallow',
+    | 'warn_if_public', 'warn_if_private' or 'allow'. The flag is inside the
+    | info dictionary, so Marque never sets it for the uploader. A refused
+    | upload tells them to recreate the torrent with "private" ticked. Without
+    | it, clients share peers over DHT and peer exchange, outside the tracker.
+    | An unrecognised value is treated as 'require'.
+    |
+    */
+
+    'uploads' => [
+        'private_flag' => env('BLOODHOUND_PRIVATE_FLAG', 'require'),
+    ],
+
     'routes' => [
         'announce_path' => env('BLOODHOUND_ANNOUNCE_PATH', 'announce'),
         'scrape_path' => env('BLOODHOUND_SCRAPE_PATH', 'scrape'),
