@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\ServiceProvider;
 use Marque\Hound\Console\Commands\SyncSwarmCounts;
 use Marque\Hound\Services\AnnounceService;
+use Marque\Hound\Services\TorrentFilePolicy;
+use Marque\Trove\Contracts\TorrentFilePolicyInterface;
 
 class HoundServiceProvider extends ServiceProvider
 {
@@ -16,6 +18,10 @@ class HoundServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/hound.php', 'hound');
 
         $this->app->singleton(AnnounceService::class);
+
+        // What downloads and uploads need from this tracker (#10947): the open
+        // announce URL, and public torrents by default.
+        $this->app->singleton(TorrentFilePolicyInterface::class, TorrentFilePolicy::class);
     }
 
     public function boot(): void
