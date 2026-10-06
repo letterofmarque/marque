@@ -7,6 +7,9 @@ use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Marque\Guise\Livewire\Torrent\Upload;
 use Marque\Guise\Tests\TestUser;
+use Marque\Trove\Contracts\TorrentFilePolicyInterface;
+use Marque\Trove\Contracts\UserInterface;
+use Marque\Trove\Enums\PrivateFlag;
 use Marque\Trove\Models\Torrent;
 
 beforeEach(function () {
@@ -154,4 +157,52 @@ test('uploaded torrent is associated with authenticated user', function () {
 
     $torrent = Torrent::where('name', 'User Association Test')->first();
     expect($torrent->user_id)->toBe($this->uploader->id);
+});
+
+// #10947: the tracker's private-flag rule is enforced before anything is stored.
+describe('the tracker\'s private-flag rule', function () {
+    function guiseUploadPolicy(PrivateFlag $flag): void
+    {
+        app()->instance(TorrentFilePolicyInterface::class, new class($flag) implements TorrentFilePolicyInterface
+        {
+            public function __construct(private PrivateFlag $flag) {}
+
+            public function privateFlag(): PrivateFlag
+            {
+                return $this->flag;
+            }
+
+            public function announceUrlFor(?UserInterface $user): ?string
+            {
+                return 'https://tracker.example/announce';
+            }
+        });
+    }
+
+    test('a refused torrent shows the reason on the file field and is not stored', function () {
+        guiseUploadPolicy(PrivateFlag::Require);
+
+        Livewire::actingAs($this->uploader)
+            ->test(Upload::class)
+            ->set('torrentFile', createTestTorrentFile('Public One'))
+            ->set('name', 'Public One')
+            ->call('upload')
+            ->assertHasErrors(['torrentFile'])
+            ->assertSee('private');
+
+        expect(Torrent::count())->toBe(0);
+    });
+
+    test('a warning is passed on with the success message', function () {
+        guiseUploadPolicy(PrivateFlag::WarnIfPublic);
+
+        Livewire::actingAs($this->uploader)
+            ->test(Upload::class)
+            ->set('torrentFile', createTestTorrentFile('Warned One'))
+            ->set('name', 'Warned One')
+            ->call('upload')
+            ->assertRedirect(route('torrents.index'));
+
+        expect(session('status'))->toContain('isn\'t marked private');
+    });
 });
