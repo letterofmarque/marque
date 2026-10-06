@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Marque\Trove\Models\Torrent;
 use Marque\Trove\Tests\TestUser;
 
@@ -67,11 +68,15 @@ describe('Torrent Model', function () {
             'user_id' => $this->user->id,
         ]);
 
-        expect(fn () => Torrent::create([
+        // Inside its own transaction, which Laravel makes a savepoint: on
+        // PostgreSQL a failed statement aborts the whole enclosing transaction,
+        // and RefreshDatabase's later queries in it then fail with 25P02. Rolling
+        // back to the savepoint leaves the test's transaction usable.
+        expect(fn () => DB::transaction(fn () => Torrent::create([
             'info_hash' => str_repeat('d', 40),
             'name' => 'Second Torrent',
             'user_id' => $this->user->id,
-        ]))->toThrow(QueryException::class);
+        ])))->toThrow(QueryException::class);
     });
 
     test('hasTorrentFile returns correct value', function () {

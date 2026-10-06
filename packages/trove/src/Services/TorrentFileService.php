@@ -41,7 +41,9 @@ class TorrentFileService
             return new UploadInspection(refusals: ['This isn\'t a valid .torrent file.']);
         }
 
-        if (! is_array($info)) {
+        // A list decodes to an array too, so check the bytes: an info
+        // dictionary starts with `d`.
+        if (! is_array($info) || ! str_starts_with($raw['info'], 'd')) {
             return new UploadInspection(refusals: ['This .torrent has no info dictionary, so it isn\'t a valid torrent.']);
         }
 

@@ -35,6 +35,12 @@ return [
     | Route names stay 'tracker.announce' and 'tracker.scrape' whatever you set.
     |
     */
+
+    'routes' => [
+        'announce_path' => env('HOUND_ANNOUNCE_PATH', 'announce'),
+        'scrape_path' => env('HOUND_SCRAPE_PATH', 'scrape'),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Uploads
@@ -43,20 +49,16 @@ return [
     | 'private_flag' is what an uploaded torrent's private flag must be:
     | 'disallow' (the default: refuse a private torrent), 'require',
     | 'warn_if_private', 'warn_if_public' or 'allow'. The flag is inside the
-    | info dictionary, so Marque never changes it for the uploader. A refused
-    | upload tells them to recreate the torrent with "private" unticked. A
-    | private torrent can't use DHT or peer exchange, which a public swarm
-    | relies on. An unrecognised value is treated as 'disallow'.
+    | info dictionary, so Marque never changes it for the uploader. Under
+    | 'disallow', a refused upload tells them to recreate the torrent with
+    | "private" unticked. A private torrent can't use DHT or peer exchange,
+    | which a public swarm relies on. An unrecognised value is treated as
+    | 'disallow'.
     |
     */
 
     'uploads' => [
         'private_flag' => env('HOUND_PRIVATE_FLAG', 'disallow'),
-    ],
-
-    'routes' => [
-        'announce_path' => env('HOUND_ANNOUNCE_PATH', 'announce'),
-        'scrape_path' => env('HOUND_SCRAPE_PATH', 'scrape'),
     ],
 
     /*

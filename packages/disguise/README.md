@@ -115,8 +115,11 @@ be used to land an edit.
 
 ### Torrent Download
 
-Streams the .torrent from trove's configured storage disk under a sanitised filename.
-404s when `allow_download` is off or the torrent has no stored file.
+Builds the viewer's `.torrent` under a sanitised filename: the stored info dictionary,
+untouched, with `announce` set to the installed tracker's URL (hound's open URL for
+everyone) and `comment` linking the torrent's page. 404s when `allow_download` is off or the
+torrent has no stored file, and 403s with the reason when the tracker has no announce URL
+for the viewer. With no tracker installed, the stored file is served as it is.
 
 ## Configuration
 

@@ -100,6 +100,14 @@ describe('inspecting an upload against the private-flag policy', function () {
         expect($this->files->inspect('not bencode')->refused())->toBeTrue()
             ->and($this->files->inspect('li1ee')->refused())->toBeTrue();
     });
+
+    test('refuses an info that is a list, string or integer rather than a dictionary', function (string $bytes) {
+        expect($this->files->inspect($bytes)->refused())->toBeTrue();
+    })->with([
+        'list' => 'd4:infoli1eee',
+        'string' => 'd4:info1:xe',
+        'integer' => 'd4:infoi1ee',
+    ]);
 });
 
 describe('uploading', function () {
