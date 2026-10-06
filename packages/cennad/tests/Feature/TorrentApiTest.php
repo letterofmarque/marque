@@ -2,7 +2,13 @@
 
 declare(strict_types=1);
 
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Marque\Cennad\Tests\TestUser;
+use Marque\Threepio\Support\Bencode;
+use Marque\Trove\Contracts\TorrentFilePolicyInterface;
+use Marque\Trove\Contracts\UserInterface;
+use Marque\Trove\Enums\PrivateFlag;
 use Marque\Trove\Models\Torrent;
 
 beforeEach(function () {
@@ -273,5 +279,64 @@ describe('DELETE /api/torrents/{torrent}', function () {
             ->assertNoContent();
 
         expect(Torrent::find($torrent->id))->toBeNull();
+    });
+});
+
+// #10947: API uploads meet the same tracker rules as the web forms.
+describe('POST /api/torrents and the tracker\'s rules', function () {
+    function apiTorrent(bool $private): UploadedFile
+    {
+        $info = ['length' => 5, 'name' => 'api', 'piece length' => 16384, 'pieces' => str_repeat('a', 20)] + ($private ? ['private' => 1] : []);
+
+        return UploadedFile::fake()->createWithContent('api.torrent', Bencode::encode(['announce' => 'http://x/a', 'info' => $info]));
+    }
+
+    function apiPolicy(PrivateFlag $flag): void
+    {
+        app()->instance(TorrentFilePolicyInterface::class, new class($flag) implements TorrentFilePolicyInterface
+        {
+            public function __construct(private PrivateFlag $flag) {}
+
+            public function privateFlag(): PrivateFlag
+            {
+                return $this->flag;
+            }
+
+            public function announceUrlFor(?UserInterface $user): ?string
+            {
+                return 'https://tracker.example/announce';
+            }
+        });
+    }
+
+    beforeEach(function () {
+        Storage::fake(config('trove.storage_disk', 'local'));
+        $this->actingAs(TestUser::factory()->uploader()->create());
+    });
+
+    test('a refused torrent is a 422 on torrent_file, saying what to change, and nothing is stored', function () {
+        apiPolicy(PrivateFlag::Require);
+
+        $this->postJson('/api/torrents', ['torrent_file' => apiTorrent(false), 'name' => 'Public'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['torrent_file' => 'private']);
+
+        expect(Torrent::count())->toBe(0);
+    });
+
+    test('an accepted torrent is created, with any warnings in meta', function () {
+        apiPolicy(PrivateFlag::WarnIfPublic);
+
+        $this->postJson('/api/torrents', ['torrent_file' => apiTorrent(false), 'name' => 'Warned'])
+            ->assertCreated()
+            ->assertJsonPath('data.name', 'Warned')
+            ->assertJsonPath('meta.warnings.0', fn ($w) => str_contains($w, 'isn\'t marked private'));
+    });
+
+    test('a file that is not a torrent is a 422, not a server error', function () {
+        $this->postJson('/api/torrents', [
+            'torrent_file' => UploadedFile::fake()->createWithContent('junk.torrent', 'not bencode'),
+            'name' => 'Junk',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['torrent_file']);
     });
 });

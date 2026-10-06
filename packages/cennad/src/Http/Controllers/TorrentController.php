@@ -8,9 +8,11 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Validation\ValidationException;
 use Marque\Cennad\Http\Resources\TorrentCollection;
 use Marque\Cennad\Http\Resources\TorrentResource;
 use Marque\Trove\Models\Torrent;
+use Marque\Trove\Services\TorrentFileService;
 use Marque\Trove\Services\TorrentService;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -19,7 +21,8 @@ class TorrentController extends Controller
     use AuthorizesRequests;
 
     public function __construct(
-        private TorrentService $service
+        private TorrentService $service,
+        private TorrentFileService $files,
     ) {}
 
     /**
@@ -51,6 +54,15 @@ class TorrentController extends Controller
             'description' => 'nullable|string|max:10000',
         ]);
 
+        // The tracker's rules (private flag, v1) are checked before anything
+        // is stored. A refusal is a validation error on the file, saying what
+        // to change; warnings come back in meta (#10947).
+        $inspection = $this->files->inspect((string) file_get_contents($request->file('torrent_file')->getRealPath()));
+
+        if ($inspection->refused()) {
+            throw ValidationException::withMessages(['torrent_file' => $inspection->refusals]);
+        }
+
         $torrent = $this->service->createFromUpload(
             file: $request->file('torrent_file'),
             user: $request->user(),
@@ -59,6 +71,7 @@ class TorrentController extends Controller
         );
 
         return (new TorrentResource($torrent->load('user')))
+            ->additional(['meta' => ['warnings' => $inspection->warnings]])
             ->response()
             ->setStatusCode(Response::HTTP_CREATED);
     }
