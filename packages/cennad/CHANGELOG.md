@@ -7,7 +7,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [Unreleased]
+## [4.3.0] — 2026-10-06
 
 > API uploads meet the installed tracker's rules: a refused torrent is a 422 saying what to change, and warnings come back in `meta.warnings`.
 

@@ -10,8 +10,14 @@ changelogs — edit those, not this.*
 
 ## 2026-10-06
 
+- **[bloodhound 7.0.0](packages/bloodhound/CHANGELOG.md)** — Downloads carry each member's own announce URL, and uploads must be private torrents by default.
+- **[cennad 4.3.0](packages/cennad/CHANGELOG.md)** — API uploads meet the installed tracker's rules: a refused torrent is a 422 saying what to change, and warnings come back in `meta.warnings`.
+- **[disguise 5.1.0](packages/disguise/CHANGELOG.md)** — Downloads carry the installed tracker's announce URL and a link back to the torrent, and uploads meet the tracker's rules before anything is stored.
+- **[guise 5.1.0](packages/guise/CHANGELOG.md)** — Downloads are built for the member (their announce URL, a link back to the torrent) and uploads meet the installed tracker's rules before anything is stored.
+- **[hound 4.0.0](packages/hound/CHANGELOG.md)** — Downloads carry hound's open announce URL, and uploads must be public torrents by default.
 - **[threepio 3.3.0](packages/threepio/CHANGELOG.md)** — Adds `Bencode::rawDictionary()`, the original bytes of each top-level value, so an info_hash can be computed the way clients compute it.
 - **[trove 4.4.0](packages/trove/CHANGELOG.md)** — Uploads are hashed the way clients hash them, so a torrent whose info dictionary isn't canonical bencode gets the info_hash it's announced under, and `trove:check-info-hashes` finds the ones stored wrongly before.
+- **[trove 4.5.0](packages/trove/CHANGELOG.md)** — Lets the installed tracker decide what an uploaded .torrent must be and what goes into a download: `TorrentFilePolicyInterface`, a `PrivateFlag` rule, and `TorrentFileService`, which refuses an upload that breaks the rule and builds each member's download around the untouched info dictionary.
 
 ## 2026-10-05
 

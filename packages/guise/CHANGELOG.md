@@ -7,7 +7,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [Unreleased]
+## [5.1.0] — 2026-10-06
 
 > Downloads are built for the member (their announce URL, a link back to the torrent) and uploads meet the installed tracker's rules before anything is stored.
 
