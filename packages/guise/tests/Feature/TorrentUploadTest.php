@@ -239,9 +239,9 @@ describe('the private-flag rule, mode by mode', function () {
     })->with([
         'allow, public' => [PrivateFlag::Allow, false, null, null],
         'allow, private' => [PrivateFlag::Allow, true, null, null],
-        'require, public' => [PrivateFlag::Require, false, 'ticked', null],
+        'require, public' => [PrivateFlag::Require, false, '"private" option ticked', null],
         'require, private' => [PrivateFlag::Require, true, null, null],
-        'disallow, private' => [PrivateFlag::Disallow, true, 'unticked', null],
+        'disallow, private' => [PrivateFlag::Disallow, true, '"private" option unticked', null],
         'disallow, public' => [PrivateFlag::Disallow, false, null, null],
         'warn_if_public, public' => [PrivateFlag::WarnIfPublic, false, null, 'isn\'t marked private'],
         'warn_if_public, private' => [PrivateFlag::WarnIfPublic, true, null, null],
