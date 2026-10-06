@@ -72,6 +72,21 @@ Response:
 }
 ```
 
+### Upload Torrent
+
+```
+POST /api/torrents
+Content-Type: multipart/form-data
+
+torrent_file=<file>, name=..., description=...
+```
+
+Returns `201` with the torrent, plus `meta.warnings` (any warnings from the tracker's rules,
+e.g. a public torrent on a tracker that warns about them). The installed tracker's rules are
+checked before anything is stored. A refused torrent is a `422` validation error on
+`torrent_file` that says what to change: a public torrent on a private tracker, a v2-only
+torrent, or a file that isn't a torrent at all.
+
 ### Update Torrent
 
 ```

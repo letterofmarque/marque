@@ -139,6 +139,53 @@ $service->update($torrent, ['name' => 'New Name']);
 $service->delete($torrent);
 ```
 
+### Uploads and downloads: what the tracker decides
+
+trove stores the uploader's original `.torrent`, and **never modifies its info
+dictionary**: the info_hash is sha1 of those raw bytes, and every member's download carries
+them unchanged, so everyone shares one hash. What the file must be, and what goes into a
+download, is the installed tracker's call. It binds `TorrentFilePolicyInterface`:
+bloodhound and hound both do. `TorrentFileService` applies it:
+
+```php
+use Marque\Trove\Services\TorrentFileService;
+
+$files = app(TorrentFileService::class);
+
+// Before storing: refusals (each naming the fix) and warnings.
+$inspection = $files->inspect($content);
+$inspection->refused();     // bool
+$inspection->refusals;      // list<string>
+$inspection->warnings;      // list<string>
+
+// For a download: this user's .torrent, with a link back to the torrent's page.
+$body = $files->forDownload($torrent, $user, route('torrents.show', $torrent));
+```
+
+**On upload**, `inspect()` refuses a file that isn't a valid torrent and a BitTorrent
+v2-only torrent (it has no v1 info_hash), warns about a hybrid, and applies the tracker's
+`PrivateFlag` rule. `createFromUpload()` runs the same check and throws `TorrentRefused`
+before storing anything. A refused upload is never rewritten: the flag is inside the info
+dictionary, so changing it would change the hash under the uploader. The refusal tells
+them to recreate the torrent with "private" ticked or unticked.
+
+| `PrivateFlag` | Effect |
+|---|---|
+| `Allow` | Accept either, silently |
+| `WarnIfPublic` | Accept either; warn when the torrent isn't private |
+| `WarnIfPrivate` | Accept either; warn when it is private |
+| `Require` | Refuse a torrent that isn't private (bloodhound's default) |
+| `Disallow` | Refuse a private torrent (hound's default) |
+
+**On download**, `forDownload()` keeps only `info` (and `encoding`) from the stored file,
+byte for byte. It sets `announce` to the tracker's URL for this user, and `comment` to the
+page you pass. Everything else the uploader's client wrote is dropped. That includes
+`announce-list`: clients prefer it over `announce`, and an uploader's list can carry their
+personal announce URL for another site. Cross-seeding is a separate package (#10950). When
+the tracker has no URL for this user (a private tracker's member with no key yet),
+`forDownload()` throws `NoAnnounceUrl`; never serve a file without one. With no tracker
+installed, the stored file is served as it is.
+
 ### Checking stored info hashes
 
 Before trove 4.4, uploads were hashed from the decoded-and-re-encoded info dictionary. A
@@ -281,8 +328,8 @@ the torrent's `min_role` loses access to it.
 Enforcement happens in two places, and both matter:
 
 - `TorrentPolicy::view()` covers detail pages and `.torrent` downloads. The
-  download is gated exactly as tightly as viewing, because the `.torrent`
-  carries the announce key.
+  download is gated exactly as tightly as viewing, because on a private tracker
+  it carries the member's announce key (see "Uploads and downloads" above).
 - `Torrent::scopeVisibleTo($user)` covers listings. A policy guards a single
   record; without the scope, restricted torrents would still appear in every
   index, API collection and count. `TorrentService`'s `list()` and `find()` apply it for

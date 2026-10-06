@@ -172,6 +172,30 @@ scheduler running. Torrent listings are unaffected unless you also set
 
 Published to `config/bloodhound.php`:
 
+### Uploads: the private flag
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `uploads.private_flag` | `require` | `require`, `disallow`, `warn_if_public`, `warn_if_private` or `allow` |
+
+Bloodhound binds trove's `TorrentFilePolicyInterface`, so every upload (guise, disguise or
+cennad) is checked against this. With `require`, a torrent without the `private` flag is
+refused, and the uploader is told to recreate it with "private" ticked. Without the flag,
+clients share the swarm over DHT and peer exchange, outside the tracker's accounting. The
+flag is inside the info dictionary, so Marque never sets it for them: that would change the
+info_hash. An unrecognised value is treated as `require`. See
+[trove's README](../trove/README.md) for the modes.
+
+### Downloads carry the member's announce URL
+
+When a member downloads a torrent, the `.torrent` they get has `announce` set to their own
+URL: this tracker's announce route with their key, in the path or the query exactly as
+[Announce URL shape](#announce-url-shape) configures it. Its `comment` links back to the
+torrent's page. Everything else the uploader's client wrote, `announce-list` included, is
+dropped. The info dictionary is untouched, so the info_hash is the same for everyone. A
+member with no key yet (for example, before verifying their address) is refused with that
+reason rather than given a file their client can't announce with.
+
 ### Routing
 
 Covered in full under [Announce URL shape](#announce-url-shape) above.

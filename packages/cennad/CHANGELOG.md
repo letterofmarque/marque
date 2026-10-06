@@ -7,6 +7,18 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+> API uploads meet the installed tracker's rules: a refused torrent is a 422 saying what to change, and warnings come back in `meta.warnings`.
+
+### Changed
+
+- **`POST /api/torrents` checks the tracker's rules before storing.** A refused torrent (the
+  private-flag rule, v2-only) is a `422` validation error on `torrent_file` with the reason,
+  and so is a file that isn't a torrent, which used to be a `500`. A created torrent's
+  response carries `meta.warnings` (#10947).
+- Requires `marque/trove` ^4.5 (trove 3 is no longer accepted).
+
 ## [4.2.0] — 2026-10-05
 
 > The API is rate limited, as `rate_limit` always said it was: 60 requests a minute per

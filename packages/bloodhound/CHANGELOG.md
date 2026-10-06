@@ -7,6 +7,39 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+> Downloads carry each member's own announce URL, and uploads must be private torrents by default.
+
+### Changed (breaking)
+
+- **Uploads must carry the `private` flag by default.** Bloodhound binds trove's new
+  `TorrentFilePolicyInterface` with `uploads.private_flag` = `require`, so guise, disguise
+  and cennad refuse a torrent without the flag. The uploader is told to recreate it with
+  "private" ticked. Without the flag, clients share the swarm over DHT and peer exchange,
+  outside the tracker. Marque never sets the flag for them, because it's inside the info
+  dictionary and setting it would change the info_hash (#10947).
+
+### Added
+
+- **Each member's download carries their own announce URL**: the tracker's announce route
+  with their key, in the path or query as `routes.*` configures it, plus a `comment`
+  linking the torrent's page. Before this, downloads were the uploader's file unchanged,
+  and members had to paste their tracker URL in by hand. A member with no key yet is refused
+  with that reason (#10947).
+- **`uploads.private_flag`** config (`BLOODHOUND_PRIVATE_FLAG`): `require`, `disallow`,
+  `warn_if_public`, `warn_if_private` or `allow`. An unrecognised value is treated as
+  `require`.
+- Requires `marque/trove` ^4.5.
+
+### Upgrading
+
+- **To keep accepting non-private torrents**, set `BLOODHOUND_PRIVATE_FLAG=allow` (or
+  `warn_if_public` to accept them with a warning) before upgrading.
+- **Torrents already stored are not re-checked.** A non-private torrent uploaded before
+  stays as it is, and its swarm can still leak over DHT. Re-upload it privately if that
+  matters.
+
 ## [6.1.1] — 2026-10-03
 
 > Ships the README corrections 6.1.0 should have contained; no code changes (comments only in the config).

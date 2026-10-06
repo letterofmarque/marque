@@ -151,6 +151,21 @@ expiry, Redis, port blacklist, response format) live in
 
 Published to `config/hound.php`:
 
+### Uploads: the private flag
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `uploads.private_flag` | `disallow` | `disallow`, `require`, `warn_if_private`, `warn_if_public` or `allow` |
+
+Hound binds trove's `TorrentFilePolicyInterface`. With `disallow`, a torrent carrying the
+`private` flag is refused, and the uploader is told to recreate it with "private"
+unticked: the flag stops clients using DHT and peer exchange, which a public swarm relies
+on. An unrecognised value is treated as `disallow`.
+
+Downloads, for guests and members alike, get hound's own announce URL and a `comment`
+linking the torrent's page, around the untouched info dictionary. Everything else the
+uploader's client wrote, `announce-list` included, is dropped.
+
 ### IP limiting
 
 The primary abuse prevention for a public tracker, and with no accounts it is close to the

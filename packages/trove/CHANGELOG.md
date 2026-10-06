@@ -9,7 +9,24 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [Unreleased]
 
-> `trove:check-info-hashes` also skips a .torrent whose `info` isn't a dictionary.
+> Lets the installed tracker decide what an uploaded .torrent must be and what goes into a download: `TorrentFilePolicyInterface`, a `PrivateFlag` rule, and `TorrentFileService`, which refuses an upload that breaks the rule and builds each member's download around the untouched info dictionary.
+
+### Added
+
+- **`TorrentFilePolicyInterface`**, which a tracker package binds: `privateFlag()` (a
+  `PrivateFlag`: allow, warn_if_public, warn_if_private, require, disallow) and
+  `announceUrlFor(?UserInterface)`. bloodhound and hound bind it (#10947).
+- **`TorrentFileService`**:
+  - `inspect($content)` returns an `UploadInspection` with refusals (not a torrent,
+    v2-only, or the private-flag rule broken), each naming the fix, plus warnings (a
+    hybrid torrent, or a warn_* rule).
+  - `forDownload($torrent, $user, $commentUrl)` keeps only `info` and `encoding` from the
+    stored file, byte for byte, and sets `announce` to the tracker's URL for that user and
+    `comment` to the page given. `announce-list` and every other top-level key are dropped
+    (cross-seeding is #10950). With no tracker bound, it returns the stored file as is.
+  - Throws `NoAnnounceUrl` when the tracker has no URL for the user.
+- **`TorrentRefused`**: `createFromUpload()` throws it, carrying the reasons, before
+  storing a torrent the tracker refuses.
 
 ### Fixed
 

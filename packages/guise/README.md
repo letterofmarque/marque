@@ -56,7 +56,7 @@ Detailed view with torrent metadata (size, file count, info hash, uploader, uplo
 
 ### Torrent Upload
 
-Upload form with file input (.torrent), name, and optional description. Validates file size (max 2MB) and name length (max 255 chars). Requires Uploader role or above.
+Upload form with file input (.torrent), name, and optional description. Validates file size (max 2MB) and name length (max 255 chars). Requires Uploader role or above. The installed tracker's rules are checked before anything is stored (see trove's README, "Uploads and downloads"). A refusal, such as a public torrent on a private tracker or a file that isn't a torrent, shows on the file field and says what to change. Warnings are passed on with the success message.
 
 ### Torrent Edit
 
@@ -64,7 +64,7 @@ Edit form for name and description. Info hash, size, and file count are immutabl
 
 ### Torrent Download
 
-Streams the .torrent file from storage with a sanitised filename. Returns 404 if no file is stored.
+Builds the member's `.torrent` with a sanitised filename: the stored info dictionary, untouched, with `announce` set to the installed tracker's URL for them (their own key on bloodhound) and `comment` linking the torrent's page. Gated by the `view` policy. Returns 404 if no file is stored, and 403 with the reason if the tracker has no announce URL for the member (no key yet). With no tracker installed, the stored file is served as it is.
 
 ## Configuration
 

@@ -7,6 +7,22 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+> Downloads are built for the member (their announce URL, a link back to the torrent) and uploads meet the installed tracker's rules before anything is stored.
+
+### Changed
+
+- **Downloads go through trove's `TorrentFileService`**: the stored info dictionary,
+  untouched, with `announce` set to the installed tracker's URL for the member (their own key
+  on bloodhound) and `comment` linking the torrent's page. A member with no announce key yet
+  gets a 403 that says why. With no tracker installed, the stored file is served as before
+  (#10947).
+- **Uploads check the tracker's rules first.** A refusal (the private-flag rule, a v2-only
+  torrent, or a file that isn't a torrent, which used to be a server error) shows on the file
+  field, and nothing is stored. Warnings are passed on with the success message.
+- Requires `marque/trove` ^4.5 (trove 3 is no longer accepted).
+
 ## [5.0.0] — 2026-09-11
 
 > Requires `marque/deck` in place of `marque/ise`, and registers its own navigation entry instead of being detected by the shell.

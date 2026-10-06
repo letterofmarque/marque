@@ -7,6 +7,32 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+> Downloads carry hound's open announce URL, and uploads must be public torrents by default.
+
+### Changed (breaking)
+
+- **Private torrents are refused by default.** Hound binds trove's new
+  `TorrentFilePolicyInterface` with `uploads.private_flag` = `disallow`. A torrent carrying
+  the flag is refused, and the uploader is told to recreate it with "private" unticked. The
+  flag stops clients using DHT and peer exchange, which a public swarm relies on (#10947).
+- Requires `marque/trove` ^4.5 (trove 3 is no longer accepted).
+
+### Added
+
+- **Downloads carry hound's own announce URL**, for guests and members alike, plus a
+  `comment` linking the torrent's page, around the untouched info dictionary. The
+  uploader's `announce-list` and other top-level keys are dropped (#10947).
+- **`uploads.private_flag`** config (`HOUND_PRIVATE_FLAG`): `disallow`, `require`,
+  `warn_if_private`, `warn_if_public` or `allow`. An unrecognised value is treated as
+  `disallow`.
+
+### Upgrading
+
+- **To keep accepting private torrents**, set `HOUND_PRIVATE_FLAG=allow` (or
+  `warn_if_private`) before upgrading.
+
 ## [3.3.1] — 2026-10-05
 
 > Anonymous peers no longer pile into one ever-growing Redis set.
