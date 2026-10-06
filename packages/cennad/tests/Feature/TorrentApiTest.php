@@ -339,4 +339,40 @@ describe('POST /api/torrents and the tracker\'s rules', function () {
             'name' => 'Junk',
         ])->assertUnprocessable()->assertJsonValidationErrors(['torrent_file']);
     });
+
+    // Job #158 criterion 375: every mode, at this entry point, for both kinds of torrent.
+    test('refuses or accepts per mode, never altering an accepted file', function (PrivateFlag $flag, bool $private, ?string $refusalSays, ?string $warningSays) {
+        apiPolicy($flag);
+        $file = apiTorrent($private);
+        $bytes = file_get_contents($file->getRealPath());
+
+        $response = $this->postJson('/api/torrents', ['torrent_file' => $file, 'name' => 'Mode Test']);
+
+        if ($refusalSays !== null) {
+            $response->assertUnprocessable()->assertJsonValidationErrors(['torrent_file' => $refusalSays]);
+            expect(Torrent::count())->toBe(0);
+
+            return;
+        }
+
+        $response->assertCreated();
+        $torrent = Torrent::sole();
+        expect(Storage::disk(config('trove.storage_disk', 'local'))->get($torrent->torrent_file))->toBe($bytes)
+            ->and($torrent->info_hash)->toBe(sha1(Bencode::rawDictionary($bytes)['info']));
+
+        $warningSays === null
+            ? $response->assertJsonPath('meta.warnings', [])
+            : $response->assertJsonPath('meta.warnings.0', fn ($w) => str_contains($w, $warningSays));
+    })->with([
+        'allow, public' => [PrivateFlag::Allow, false, null, null],
+        'allow, private' => [PrivateFlag::Allow, true, null, null],
+        'require, public' => [PrivateFlag::Require, false, 'ticked', null],
+        'require, private' => [PrivateFlag::Require, true, null, null],
+        'disallow, private' => [PrivateFlag::Disallow, true, 'unticked', null],
+        'disallow, public' => [PrivateFlag::Disallow, false, null, null],
+        'warn_if_public, public' => [PrivateFlag::WarnIfPublic, false, null, 'isn\'t marked private'],
+        'warn_if_public, private' => [PrivateFlag::WarnIfPublic, true, null, null],
+        'warn_if_private, private' => [PrivateFlag::WarnIfPrivate, true, null, 'is marked private'],
+        'warn_if_private, public' => [PrivateFlag::WarnIfPrivate, false, null, null],
+    ]);
 });

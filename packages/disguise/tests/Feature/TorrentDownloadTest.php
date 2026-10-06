@@ -78,3 +78,43 @@ test('an upload that breaks the private-flag rule is refused on the file field a
 
     expect(Torrent::where('name', 'Private One')->exists())->toBeFalse();
 });
+
+// Job #158 criterion 375: every mode, at this entry point, for both kinds of torrent.
+test('the upload private-flag rule refuses or accepts per mode, never altering an accepted file', function (PrivateFlag $flag, bool $private, ?string $refusalSays, ?string $warningSays) {
+    disguisePolicy($flag);
+    $info = ['length' => 5, 'name' => 'm', 'piece length' => 16384, 'pieces' => str_repeat('a', 20)] + ($private ? ['private' => 1] : []);
+    $bytes = Bencode::encode(['announce' => 'http://x/a', 'info' => $info]);
+
+    $component = Livewire::actingAs(TestUser::factory()->admin()->create())
+        ->test(Upload::class)
+        ->set('torrentFile', UploadedFile::fake()->createWithContent('m.torrent', $bytes))
+        ->set('name', 'Mode Test')
+        ->call('upload');
+
+    if ($refusalSays !== null) {
+        $component->assertHasErrors(['torrentFile'])->assertSee($refusalSays);
+        expect(Torrent::where('name', 'Mode Test')->exists())->toBeFalse();
+
+        return;
+    }
+
+    $component->assertHasNoErrors()->assertRedirect(route('torrents.index'));
+    $torrent = Torrent::where('name', 'Mode Test')->sole();
+    expect(Storage::disk('local')->get($torrent->torrent_file))->toBe($bytes)
+        ->and($torrent->info_hash)->toBe(sha1(Bencode::rawDictionary($bytes)['info']));
+
+    $warningSays === null
+        ? expect(session('status'))->toBe('Torrent uploaded successfully.')
+        : expect(session('status'))->toContain($warningSays);
+})->with([
+    'allow, public' => [PrivateFlag::Allow, false, null, null],
+    'allow, private' => [PrivateFlag::Allow, true, null, null],
+    'require, public' => [PrivateFlag::Require, false, 'ticked', null],
+    'require, private' => [PrivateFlag::Require, true, null, null],
+    'disallow, private' => [PrivateFlag::Disallow, true, 'unticked', null],
+    'disallow, public' => [PrivateFlag::Disallow, false, null, null],
+    'warn_if_public, public' => [PrivateFlag::WarnIfPublic, false, null, 'isn\'t marked private'],
+    'warn_if_public, private' => [PrivateFlag::WarnIfPublic, true, null, null],
+    'warn_if_private, private' => [PrivateFlag::WarnIfPrivate, true, null, 'is marked private'],
+    'warn_if_private, public' => [PrivateFlag::WarnIfPrivate, false, null, null],
+]);

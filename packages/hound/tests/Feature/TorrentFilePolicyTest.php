@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Marque\Trove\Contracts\TorrentFilePolicyInterface;
+use Marque\Trove\Contracts\UserInterface;
 use Marque\Trove\Enums\PrivateFlag;
 
 // #10947: a public tracker's downloads point at its own open announce URL, for
@@ -13,10 +14,11 @@ it('binds the torrent file policy', function () {
     expect(app()->bound(TorrentFilePolicyInterface::class))->toBeTrue();
 });
 
-it('gives everyone the open announce URL, guests included', function () {
+it('gives everyone the open announce URL, guests and members alike', function () {
     $policy = app(TorrentFilePolicyInterface::class);
 
-    expect($policy->announceUrlFor(null))->toBe(url('/announce'));
+    expect($policy->announceUrlFor(null))->toBe(url('/announce'))
+        ->and($policy->announceUrlFor(Mockery::mock(UserInterface::class)))->toBe(url('/announce'));
 });
 
 it('disallows private torrents by default, overridable, with a typo falling back to disallow', function (?string $value, PrivateFlag $expected) {
