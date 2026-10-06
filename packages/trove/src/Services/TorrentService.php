@@ -10,6 +10,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Storage;
 use Marque\Threepio\Support\Bencode;
 use Marque\Trove\Contracts\TorrentServiceInterface;
+use Marque\Trove\Exceptions\TorrentRefused;
 use Marque\Trove\Models\Torrent;
 use Marque\Trove\Support\ViewerScope;
 
@@ -81,6 +82,13 @@ class TorrentService implements TorrentServiceInterface
         string $name,
         ?string $description = null
     ): Torrent {
+        // The tracker's rules first: a refused torrent is never stored (#10947).
+        $inspection = app(TorrentFileService::class)->inspect((string) file_get_contents($file->getRealPath()));
+
+        if ($inspection->refused()) {
+            throw new TorrentRefused($inspection->refusals);
+        }
+
         $torrentData = $this->parseTorrentFile($file);
 
         // Store the .torrent file
