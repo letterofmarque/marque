@@ -32,9 +32,9 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 - **`trove:check-info-hashes` hashed an `info` that wasn't a dictionary** (a string or an
   integer) and reported it as a mismatch. It now warns and skips it, like a missing one.
-  Uploads can't create such a file: `inspect()` now refuses any info that isn't a
-  dictionary (a list used to get through), so only a row pointed at a hand-made file was
-  affected. Found by the 4.4.0 read-through.
+  Uploads never accepted such a file (they refused a non-array info), so only a row
+  pointed at a hand-made file was affected. `inspect()` also refuses an info that is a list,
+  which uploads used to accept. Found by the 4.4.0 read-through.
 
 ## [4.4.0] — 2026-10-06
 

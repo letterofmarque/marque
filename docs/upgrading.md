@@ -36,6 +36,7 @@ Newest first. Each links to the full write-up.
 
 | Release | Date | Summary | Who's affected |
 |---|---|---|---|
+| [8.0](releases/8.0.md) | 2026-10-06 | Downloads carry each member's own announce URL around the untouched info dictionary; uploads must match the tracker's private-flag rule (bloodhound requires private, hound disallows it) | anyone running bloodhound or hound |
 | [7.0](releases/7.0.md) | 2026-09-25 | Tracker data gets an owner: packages ask a declared contract instead of probing your User model; announce keys move to a bloodhound-owned table; tracker columns no longer mass-assignable | anyone running bloodhound; anyone reading `$user->announce_key` |
 | [6.0](releases/6.0.md) | 2026-09-11 | Marque gets an admin panel (`marque/skipper`); `marque/ise` renamed to `marque/deck`; packages now declare their own nav entries and admin screens | anyone using guise, disguise, usarrs or parley |
 | [5.2](releases/5.2.md) | 2026-09-09 | `marque/taxonomy` added — declare your catalogue's structure in YAML instead of hardcoding it | nobody negatively; optional new package |
@@ -82,6 +83,7 @@ release each guide belongs to.
 | 13 | Release | [Marque 6.0](releases/6.0.md) | 6.0 | The admin panel arrives; the shell rename ripples through every frontend package |
 | 14 | Release | [Marque 7.0](releases/7.0.md) | 7.0 | The tracker stats contract; announce keys move to `announce_keys`; mass-assignment hole closed |
 | 15 | Guide | [bloodhound v6 / usarrs v8](upgrade-guide-bloodhound-v6-usarrs-v8.md) | 7.0 | Technical checklist: stop reading `$user->announce_key`, removed trait methods, published usarrs views |
+| 16 | Release | [Marque 8.0](releases/8.0.md) | 8.0 | Personalised downloads; private-flag rules on upload (set `*_PRIVATE_FLAG=allow` to keep the old behaviour) |
 
 ## Currently at 2.x or earlier?
 
