@@ -32,6 +32,7 @@ trait HasTrackerStats
             'uploaded' => 'integer',
             'downloaded' => 'integer',
             'seedtime' => 'integer',
+            'leechtime' => 'integer',
         ]);
     }
 

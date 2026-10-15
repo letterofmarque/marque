@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Marque\Bloodhound\Support;
 
+use Illuminate\Database\Connection;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -41,6 +42,12 @@ use Marque\Bloodhound\Models\AnnounceLog;
 final class SessionTime
 {
     private const DRIVERS = ['sqlite', 'mysql', 'mariadb', 'pgsql'];
+
+    /**
+     * Previous-announce lookups per UNION ALL statement. Five bindings each,
+     * well inside every engine's placeholder limit (SQLite's is the lowest).
+     */
+    private const LOOKUPS_PER_STATEMENT = 200;
 
     public function __construct(
         private readonly string $driver,
@@ -108,18 +115,24 @@ final class SessionTime
     }
 
     /**
-     * One row per ledger row: id, user_id, torrent_id, and the seed_seconds /
-     * leech_seconds credited for the interval that row closes.
+     * One row per ledger row with id in ($after, $through]: id, user_id,
+     * torrent_id, and the seed_seconds / leech_seconds credited for the
+     * interval that row closes.
      *
-     * `$scope` narrows the rows the pairing sees. Constrain only on what the
-     * pairing partitions by (user_id, torrent_id, peer_id) or by an UPPER
-     * bound on id. A lower bound on id would cut a peer's earlier announce
-     * out of the window, and the first row above it would pair with nothing.
-     * To fold a range of ids, filter the returned query instead.
+     * Each interval is credited by the row that closes it, so folding
+     * consecutive id ranges credits every interval exactly once. A row's
+     * opening partner may sit at or below $after, folded long ago. It is
+     * reached back for, one index seek per peer (openingIds()), rather than by
+     * windowing the peer's whole history. Windowing it would give the same
+     * answer, but a seeder of a year's standing has 17,000 announces behind it.
+     *
+     * `$scope` narrows which peers are credited (a user, for a scoped
+     * rebuild). Constrain only on what the pairing partitions by: user_id,
+     * torrent_id, peer_id. Anything else can cut a row out of its own pair.
      *
      * @param  (callable(Builder): mixed)|null  $scope
      */
-    public function intervals(?callable $scope = null): Builder
+    public function intervals(int $after = 0, ?int $through = null, ?callable $scope = null): Builder
     {
         $connection = DB::connection((new AnnounceLog)->getConnectionName());
         $grammar = $connection->getQueryGrammar();
@@ -128,15 +141,38 @@ final class SessionTime
         $left = $grammar->wrap('left');
         $over = 'OVER (PARTITION BY user_id, torrent_id, peer_id ORDER BY id)';
 
-        $pairs = $connection->table('announce_log')
-            ->select(['id', 'user_id', 'torrent_id', 'created_at'])
-            ->selectRaw("LAG(created_at) {$over} as prev_at")
-            ->selectRaw("LAG({$left}) {$over} as prev_left")
-            ->selectRaw("LAG(event) {$over} as prev_event")
+        $inRange = fn (Builder $query, string $column) => $query
+            ->where($column, '>', $after)
+            ->when($through !== null, fn (Builder $query) => $query->where($column, '<=', $through));
+
+        $rows = fn () => $connection->table('announce_log')
+            ->select(['id', 'user_id', 'torrent_id', 'peer_id', 'event', 'left', 'created_at'])
             // A carried-forward balance, not an announce: it says nothing
             // about when anyone was connected.
             ->where('event', '!=', AnnounceLog::EVENT_OPENING_BALANCE)
             ->when($scope !== null, fn (Builder $query) => $scope($query));
+
+        $source = $rows()->where(fn (Builder $query) => $inRange($query, 'id'));
+
+        // UNION ALL, not `id in range OR id IN (...)`. Measured on 200k rows:
+        // with the OR, MySQL and PostgreSQL abandoned the primary key and
+        // scanned the whole ledger for every batch. Each branch alone is an
+        // index lookup. The branches cannot overlap, since every opening row
+        // is at or below $after and every in-range row above it.
+        if ($after > 0) {
+            $openings = $this->openingIds($connection, $source->clone(), $after);
+
+            if ($openings !== []) {
+                $source->unionAll($rows()->whereIn('id', $openings));
+            }
+        }
+
+        $pairs = $connection->query()
+            ->fromSub($source, 'ledger')
+            ->select(['id', 'user_id', 'torrent_id', 'created_at'])
+            ->selectRaw("LAG(created_at) {$over} as prev_at")
+            ->selectRaw("LAG({$left}) {$over} as prev_left")
+            ->selectRaw("LAG(event) {$over} as prev_event");
 
         $credited = $this->credited('prev_at', 'created_at');
         $open = "prev_at IS NOT NULL AND prev_event <> 'stopped'";
@@ -149,7 +185,62 @@ final class SessionTime
 
         // Wrapped once more so a consumer can filter, group and SUM on
         // seed_seconds / leech_seconds — a column alias is not visible to the
-        // WHERE or aggregate of the query that defines it.
-        return $connection->query()->fromSub($intervals, 'intervals');
+        // WHERE or aggregate of the query that defines it. The opening rows
+        // reached back for are in the window only to be paired with; they
+        // were credited when they were folded, so they are filtered out here.
+        return $connection->query()
+            ->fromSub($intervals, 'intervals')
+            ->where(fn (Builder $query) => $inRange($query, 'id'));
+    }
+
+    /**
+     * For each peer announcing in range, the id of its last announce at or
+     * below $after: the row that opens the interval its first in-range row
+     * closes.
+     *
+     * Deliberately not a correlated subquery. Written as one, MySQL 8.0.44
+     * returned each peer's FIRST announce rather than its latest at scale, a
+     * wrong answer that depended on the plan and passed on small fixtures;
+     * MariaDB, PostgreSQL and SQLite were right. So the peers are read first
+     * (at most one batch of keys, never ledger history), and each is looked up
+     * with the query the announce path already runs on every Redis miss
+     * (BloodhoundServiceProvider::recoverBaselineFromLedger): literal values,
+     * ORDER BY id DESC LIMIT 1, one seek on announce_log_peer_baseline_index.
+     * Chunked into UNION ALL statements so a batch is a few round trips.
+     *
+     * @return list<int>
+     */
+    private function openingIds(Connection $connection, Builder $batch, int $after): array
+    {
+        $peers = $batch
+            ->select(['user_id', 'torrent_id', 'peer_id'])
+            ->distinct()
+            ->get();
+
+        $ids = [];
+
+        foreach ($peers->chunk(self::LOOKUPS_PER_STATEMENT) as $chunk) {
+            $union = null;
+
+            foreach ($chunk as $peer) {
+                $lookup = $connection->table('announce_log')
+                    ->select('id')
+                    ->where('torrent_id', $peer->torrent_id)
+                    ->where('peer_id', $peer->peer_id)
+                    ->where('user_id', $peer->user_id)
+                    ->where('id', '<=', $after)
+                    ->where('event', '!=', AnnounceLog::EVENT_OPENING_BALANCE)
+                    ->orderByDesc('id')
+                    ->limit(1);
+
+                $union = $union === null ? $lookup : $union->unionAll($lookup);
+            }
+
+            foreach ($union?->pluck('id') ?? [] as $id) {
+                $ids[] = (int) $id;
+            }
+        }
+
+        return $ids;
     }
 }

@@ -30,6 +30,7 @@ use Marque\Trove\Models\Torrent;
  * @property int $uploaded
  * @property int $downloaded
  * @property int $seedtime
+ * @property int $leechtime
  * @property Carbon|null $first_completed_at
  * @property Carbon|null $last_completed_at
  * @property int $times_completed
@@ -44,6 +45,7 @@ class TorrentUser extends Model
         'uploaded',
         'downloaded',
         'seedtime',
+        'leechtime',
         'first_completed_at',
         'last_completed_at',
         'times_completed',
@@ -55,6 +57,7 @@ class TorrentUser extends Model
             'uploaded' => 'integer',
             'downloaded' => 'integer',
             'seedtime' => 'integer',
+            'leechtime' => 'integer',
             'times_completed' => 'integer',
             'first_completed_at' => 'datetime',
             'last_completed_at' => 'datetime',
