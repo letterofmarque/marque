@@ -7,6 +7,7 @@ namespace Marque\Bloodhound\Services;
 use Illuminate\Support\Facades\DB;
 use Marque\Bloodhound\Models\AnnounceLog;
 use Marque\Bloodhound\Models\LedgerCursor;
+use Marque\Bloodhound\Support\SessionTime;
 
 /**
  * Recomputes every derived total from the ledger.
@@ -51,13 +52,18 @@ class LedgerRebuilder
         $userModel = config('trove.user_model', 'App\\Models\\User');
         $table = (new $userModel)->getTable();
 
+        // Time with the bytes, all four or the rebuild is half done: a user or
+        // torrent with no ledger rows left would keep whatever time it had,
+        // while its bytes were correctly zeroed beside it.
+        $zero = ['uploaded' => 0, 'downloaded' => 0, 'seedtime' => 0, 'leechtime' => 0];
+
         DB::table($table)
             ->when($userId !== null, fn ($q) => $q->where('id', $userId))
-            ->update(['uploaded' => 0, 'downloaded' => 0]);
+            ->update($zero);
 
         DB::table('torrent_user')
             ->when($userId !== null, fn ($q) => $q->where('user_id', $userId))
-            ->update(['uploaded' => 0, 'downloaded' => 0]);
+            ->update($zero);
     }
 
     protected function replayLedger(?int $userId): void
@@ -74,13 +80,24 @@ class LedgerRebuilder
             ->selectRaw('user_id, torrent_id, SUM(upload_delta) as up, SUM(download_delta) as down')
             ->get();
 
+        $times = $this->sessionTimes($watermark, $userId);
+        $timePerUser = [];
+
         foreach ($perTorrent as $row) {
+            $time = $times[$row->user_id.':'.$row->torrent_id] ?? ['seedtime' => 0, 'leechtime' => 0];
+
             $this->writeTorrentUser(
                 (int) $row->user_id,
                 (int) $row->torrent_id,
                 (int) $row->up,
                 (int) $row->down,
+                $time['seedtime'],
+                $time['leechtime'],
             );
+
+            $timePerUser[$row->user_id] ??= ['seedtime' => 0, 'leechtime' => 0];
+            $timePerUser[$row->user_id]['seedtime'] += $time['seedtime'];
+            $timePerUser[$row->user_id]['leechtime'] += $time['leechtime'];
         }
 
         $perUser = AnnounceLog::query()
@@ -99,11 +116,49 @@ class LedgerRebuilder
                 ->update([
                     'uploaded' => (int) $row->up,
                     'downloaded' => (int) $row->down,
+                    'seedtime' => $timePerUser[$row->user_id]['seedtime'] ?? 0,
+                    'leechtime' => $timePerUser[$row->user_id]['leechtime'] ?? 0,
                 ]);
         }
     }
 
-    protected function writeTorrentUser(int $userId, int $torrentId, int $uploaded, int $downloaded): void
+    /**
+     * Seconds seeded and leeched per (user, torrent), derived from every
+     * ledger row up to the watermark (Spec #121).
+     *
+     * Through the same SessionTime the aggregator uses, so live and rebuilt
+     * seedtime cannot be computed two ways. Set-based like the byte sums
+     * above: the pairing is a window function in the database, and only the
+     * per-(user, torrent) sums come back to PHP.
+     *
+     * This is also the backfill. Rows the aggregator folded before Spec #121
+     * sit below the cursor with seedtime never derived from them; a full
+     * rebuild derives it from the rows themselves, as far back as retention
+     * has kept them.
+     *
+     * @return array<string, array{seedtime: int, leechtime: int}>
+     */
+    protected function sessionTimes(int $watermark, ?int $userId): array
+    {
+        $sums = SessionTime::forLedger()
+            ->intervals(0, $watermark, fn ($q) => $q->when($userId !== null, fn ($q) => $q->where('user_id', $userId)))
+            ->groupBy('user_id', 'torrent_id')
+            ->selectRaw('user_id, torrent_id, SUM(seed_seconds) as seed, SUM(leech_seconds) as leech')
+            ->get();
+
+        $times = [];
+
+        foreach ($sums as $sum) {
+            $times[$sum->user_id.':'.$sum->torrent_id] = [
+                'seedtime' => (int) $sum->seed,
+                'leechtime' => (int) $sum->leech,
+            ];
+        }
+
+        return $times;
+    }
+
+    protected function writeTorrentUser(int $userId, int $torrentId, int $uploaded, int $downloaded, int $seedtime, int $leechtime): void
     {
         $existing = DB::table('torrent_user')
             ->where('user_id', $userId)
@@ -116,7 +171,8 @@ class LedgerRebuilder
                 'torrent_id' => $torrentId,
                 'uploaded' => $uploaded,
                 'downloaded' => $downloaded,
-                'seedtime' => 0,
+                'seedtime' => $seedtime,
+                'leechtime' => $leechtime,
                 'times_completed' => 0,
                 'created_at' => now(),
                 'updated_at' => now(),
@@ -125,15 +181,17 @@ class LedgerRebuilder
             return;
         }
 
-        // Only the byte columns are rebuilt. Completion dates and counts are
-        // not derivable from deltas, and a pre-ledger opening balance has no
-        // completion history behind it at all — overwriting those would
-        // destroy real data to fix a cache.
+        // Bytes and time are rebuilt; completions are not. Completion dates
+        // and counts are not derivable from deltas, and a pre-ledger opening
+        // balance has no completion history behind it at all — overwriting
+        // those would destroy real data to fix a cache.
         DB::table('torrent_user')
             ->where('id', $existing->id)
             ->update([
                 'uploaded' => $uploaded,
                 'downloaded' => $downloaded,
+                'seedtime' => $seedtime,
+                'leechtime' => $leechtime,
                 'updated_at' => now(),
             ]);
     }
