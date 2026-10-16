@@ -330,7 +330,10 @@ return [
     | Pruning carries forward what it deletes: the credit the pruned rows
     | produced moves into ledger_carry in the same transaction, so reconcile
     | and rebuild-totals stay exact after a prune. Rows the aggregator has not
-    | consumed yet are never pruned, whatever their age.
+    | consumed yet are never pruned, whatever their age, and neither is each
+    | peer's latest aggregated announce unless it was a stop: a later announce
+    | is measured from it. So the table stops at your retention window plus
+    | about one row per session that ended without a stop.
     |
     */
 

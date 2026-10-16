@@ -20,12 +20,12 @@ use Marque\Bloodhound\Support\SessionTime;
  * meant to settle a disputed ratio was the thing that broke it.
  *
  * Now the credit moves into ledger_carry in the same transaction as the
- * delete. Bytes carry as the deleted rows' own deltas. Time cannot: an
- * interval is credited on the row that CLOSES it, so a survivor whose opening
- * partner is pruned would lose its credit, and the deleted rows' own credits
- * would miss it. So time is derived for the affected users before the delete
- * and again after, and the difference is carried. That is exact by
- * construction, whatever shape the deletion takes.
+ * delete. What the affected users' rows produce (bytes, and the seedtime and
+ * leechtime derived from them) is worked out before the delete and again
+ * after, and the difference is carried. For time it has to be the difference:
+ * an interval is credited on the row that CLOSES it, so the deleted rows' own
+ * credits would miss a survivor whose opening partner was pruned. Doing bytes
+ * the same way means no query ever needs "these rows except the kept ones".
  *
  * See Job #187.
  */
@@ -37,6 +37,16 @@ class LedgerPruner
      * holds the ledger for the whole run.
      */
     public const USERS_PER_SLICE = 200;
+
+    /**
+     * Ids per delete statement, and per keep-set lookup.
+     */
+    private const IDS_PER_DELETE = 1000;
+
+    /**
+     * The four totals a prune carries forward.
+     */
+    private const TOTALS = ['uploaded', 'downloaded', 'seedtime', 'leechtime'];
 
     /**
      * Prune rows created before $cutoff that the aggregator has consumed.
@@ -70,56 +80,93 @@ class LedgerPruner
      * Runs inside the caller's transaction. If any part fails, the delete
      * rolls back with the carry: neither lands alone.
      *
+     * Bytes and time are both carried as before − after, so no query needs
+     * "these rows except the kept ones". And the delete is by primary key, in
+     * id-paged chunks, of ids read and filtered in PHP. Nothing here depends
+     * on a planner judging a subquery well: an earlier form put the kept set
+     * in a NOT IN subquery, and PostgreSQL, with statistics that read the
+     * full table as empty, re-ran it per row (past a 120s timeout where this
+     * takes seconds).
+     *
      * @param  list<int>  $users
      */
     protected function pruneSlice(array $users, Carbon $cutoff, int $watermark): int
     {
-        $prunable = fn () => AnnounceLog::query()
+        $before = $this->derivedTotals($users, $watermark);
+        $keep = $this->latestOpenings($users, $watermark);
+
+        $deleted = 0;
+
+        AnnounceLog::query()
+            ->toBase()
+            ->select('id')
             ->whereIn('user_id', $users)
             ->where('created_at', '<', $cutoff)
             ->where('id', '<=', $watermark)
-            ->whereNotIn('id', $this->latestOpenings($users, $watermark));
+            ->chunkById(self::IDS_PER_DELETE, function ($rows) use ($keep, &$deleted) {
+                $ids = [];
 
-        $carry = [];
+                foreach ($rows as $row) {
+                    if (! isset($keep[(int) $row->id])) {
+                        $ids[] = (int) $row->id;
+                    }
+                }
 
-        $add = function (int $user, int $torrent, array $amounts) use (&$carry): void {
-            $key = $user.':'.$torrent;
-            $carry[$key] ??= ['user_id' => $user, 'torrent_id' => $torrent, 'uploaded' => 0, 'downloaded' => 0, 'seedtime' => 0, 'leechtime' => 0];
+                if ($ids !== []) {
+                    $deleted += AnnounceLog::query()->whereIn('id', $ids)->delete();
+                }
+            });
 
-            foreach ($amounts as $column => $amount) {
-                $carry[$key][$column] += $amount;
+        $after = $this->derivedTotals($users, $watermark);
+
+        foreach (array_keys($before + $after) as $key) {
+            [$user, $torrent] = array_map('intval', explode(':', $key));
+            $amounts = ['user_id' => $user, 'torrent_id' => $torrent];
+
+            foreach (self::TOTALS as $column) {
+                $amounts[$column] = ($before[$key][$column] ?? 0) - ($after[$key][$column] ?? 0);
             }
-        };
 
-        $bytes = $prunable()
+            $this->addToCarry($amounts);
+        }
+
+        return $deleted;
+    }
+
+    /**
+     * Bytes and seconds per (user, torrent) these users' rows up to the
+     * watermark produce: the same sums rebuild replays.
+     *
+     * @param  list<int>  $users
+     * @return array<string, array{uploaded: int, downloaded: int, seedtime: int, leechtime: int}>
+     */
+    protected function derivedTotals(array $users, int $watermark): array
+    {
+        $totals = [];
+
+        $bytes = AnnounceLog::query()
+            ->whereIn('user_id', $users)
+            ->where('id', '<=', $watermark)
             ->groupBy('user_id', 'torrent_id')
             ->selectRaw('user_id, torrent_id, SUM(upload_delta) as up, SUM(download_delta) as down')
             ->get();
 
         foreach ($bytes as $row) {
-            $add((int) $row->user_id, (int) $row->torrent_id, ['uploaded' => (int) $row->up, 'downloaded' => (int) $row->down]);
+            $totals[$row->user_id.':'.$row->torrent_id] = [
+                'uploaded' => (int) $row->up,
+                'downloaded' => (int) $row->down,
+                'seedtime' => 0,
+                'leechtime' => 0,
+            ];
         }
 
-        $before = $this->sessionTimes($users, $watermark);
-
-        $deleted = $prunable()->delete();
-
-        $after = $this->sessionTimes($users, $watermark);
-
-        foreach (array_keys($before + $after) as $key) {
-            [$user, $torrent] = array_map('intval', explode(':', $key));
-
-            $add($user, $torrent, [
-                'seedtime' => ($before[$key]['seedtime'] ?? 0) - ($after[$key]['seedtime'] ?? 0),
-                'leechtime' => ($before[$key]['leechtime'] ?? 0) - ($after[$key]['leechtime'] ?? 0),
-            ]);
+        foreach ($this->sessionTimes($users, $watermark) as $key => $time) {
+            $totals[$key] ??= ['uploaded' => 0, 'downloaded' => 0, 'seedtime' => 0, 'leechtime' => 0];
+            $totals[$key]['seedtime'] = $time['seedtime'];
+            $totals[$key]['leechtime'] = $time['leechtime'];
         }
 
-        foreach ($carry as $amounts) {
-            $this->addToCarry($amounts);
-        }
-
-        return $deleted;
+        return $totals;
     }
 
     /**
@@ -137,30 +184,39 @@ class LedgerPruner
      * nothing. So a peer whose session ended cleanly still prunes to nothing,
      * and what stays is one row per session that ended without a stop.
      *
-     * Wrapped as a derived table: MySQL refuses a DELETE whose subquery reads
-     * the table being deleted from, unless the subquery is materialised.
+     * Two plain queries, returning literal ids: the latest id per peer, then
+     * the event of each.
      *
      * @param  list<int>  $users
+     * @return array<int, true>
      */
-    protected function latestOpenings(array $users, int $watermark): \Closure
+    protected function latestOpenings(array $users, int $watermark): array
     {
-        return function ($query) use ($users, $watermark) {
-            $latest = AnnounceLog::query()
-                ->toBase()
-                ->selectRaw('MAX(id) as id')
-                ->whereIn('user_id', $users)
-                ->where('id', '<=', $watermark)
-                ->groupBy('user_id', 'torrent_id', 'peer_id');
+        $latest = AnnounceLog::query()
+            ->toBase()
+            ->selectRaw('MAX(id) as id')
+            ->whereIn('user_id', $users)
+            ->where('id', '<=', $watermark)
+            ->groupBy('user_id', 'torrent_id', 'peer_id')
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
 
+        $keep = [];
+
+        foreach (array_chunk($latest, self::IDS_PER_DELETE) as $chunk) {
             $rows = AnnounceLog::query()
                 ->toBase()
-                ->joinSub($latest, 'latest', 'announce_log.id', '=', 'latest.id')
-                ->select(['announce_log.id', 'announce_log.event']);
+                ->whereIn('id', $chunk)
+                ->whereNotIn('event', ['stopped', AnnounceLog::EVENT_OPENING_BALANCE])
+                ->pluck('id');
 
-            $query->fromSub($rows, 'keep')
-                ->select('keep.id')
-                ->whereNotIn('keep.event', ['stopped', AnnounceLog::EVENT_OPENING_BALANCE]);
-        };
+            foreach ($rows as $id) {
+                $keep[(int) $id] = true;
+            }
+        }
+
+        return $keep;
     }
 
     /**
