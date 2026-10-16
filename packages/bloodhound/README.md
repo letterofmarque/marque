@@ -503,12 +503,12 @@ their age, because nothing has credited them yet. The command says so when it wi
 rows.
 
 **What it deletes, it carries forward.** In one transaction per slice of users, the prune
-adds the deleted rows' bytes to `ledger_carry`, works out what those users' rows derive in
-seedtime and leechtime before and after the delete, and carries the difference. Carrying
-the difference, not just the deleted rows' own share, is what keeps time exact: an
-interval is credited on the announce that closes it, so a surviving announce whose
-earlier partner is pruned would otherwise lose its interval. If anything fails, the
-delete rolls back with the carry; neither lands alone.
+works out what those users' rows produce (bytes, and the seedtime and leechtime derived
+from them) before the delete and again after, and adds the difference to `ledger_carry`.
+It has to be the difference, not the deleted rows' own share: an interval is credited on
+the announce that closes it, so a surviving announce whose earlier partner is pruned would
+otherwise lose its interval. If anything fails, the delete rolls back with the carry;
+neither lands alone.
 
 **Each peer's latest aggregated announce is kept**, whatever its age, unless it is a
 `stopped`. Time is credited on the announce that closes an interval, so deleting a peer's
