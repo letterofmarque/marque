@@ -7,7 +7,18 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [Unreleased]
+## [8.0.0] — 2026-10-16
+
+> Seedtime and leechtime are measured for real, and pruning the announce log no longer costs members their credit; needs MySQL 8.0, MariaDB 10.3, PostgreSQL 10 or SQLite 3.33.
+
+### Changed (breaking)
+
+- **Database minimums: MySQL 8.0, MariaDB 10.3, PostgreSQL 10, SQLite 3.33.** Seedtime is
+  measured with window functions, and the aggregator's batched writes use
+  `UPDATE ... FROM` on SQLite. Below these you get a SQL error from the aggregator, not a
+  clear refusal.
+- **Existing history needs a one-off `bloodhound:rebuild-totals`** to get its seedtime (see
+  Upgrading).
 
 ### Added
 
@@ -19,6 +30,10 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 - **`leechtime`** columns on the users table and `torrent_user` (new migration; the shipped
   users-table migrations are unchanged).
 - **Reconciliation checks seedtime and leechtime**, and `rebuild-totals` recomputes them.
+- **`ledger_carry`**: credit whose ledger rows were pruned, per user and torrent, on the
+  same connection as `announce_log`.
+- **`bloodhound:record-pruned-history`**: records credit an earlier prune deleted without
+  carrying it, for installs that pruned in the past and have since turned retention off.
 
 ### Changed
 
@@ -27,17 +42,16 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   announces that moved no bytes cost nothing. Batches are folded in a fixed handful of
   statements. Measured throughput and what to watch are in the README under "Aggregation
   throughput, and its limits".
-- **Database minimums:** MySQL 8.0, MariaDB 10.3, PostgreSQL 10, SQLite 3.33.
 
 ### Fixed
 
-- **Pruning no longer costs users their credit.** `bloodhound:prune-announce-log` deleted
-  aggregated ledger rows and kept nothing. Reconciliation then reported every pruned user
+- **Pruning no longer costs members their credit.** `bloodhound:prune-announce-log` deleted
+  aggregated ledger rows and kept nothing. Reconciliation then reported every pruned member
   as drift, and the `rebuild-totals` it recommends replayed only the surviving rows,
-  cutting real users' ratios. Every install with `retention_days` set was affected. A
-  prune now carries what it deletes into the new `ledger_carry` table in the same
-  transaction (bytes, and the difference it makes to seedtime and leechtime), and
-  reconciliation and rebuild read the ledger as its rows plus its carry (#11021).
+  cutting real members' ratios. Every install with `retention_days` set was affected. A
+  prune now carries what it deletes into `ledger_carry` in the same transaction (bytes, and
+  the difference it makes to seedtime and leechtime), and reconciliation and rebuild read
+  the ledger as its rows plus its carry (#11021).
 - **A prune keeps each peer's latest aggregated announce** (unless it is a `stopped`), so an
   announce still waiting to be aggregated, or sent after the retention window, keeps the
   interval it closes. Without it that time was lost and nothing reported it. The table now
@@ -46,28 +60,20 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   nothing, which the aggregator never writes, so a rebuilt projection matches the one it
   replaces.
 
-### Added
-
-- **`ledger_carry`**: credit whose ledger rows were pruned, per user and torrent, on the
-  same connection as `announce_log`.
-- **`bloodhound:record-pruned-history`**: records credit an earlier prune deleted without
-  carrying it, for installs that pruned in the past and have since turned retention off.
-
 ### Upgrading
 
-- **Check your database version** against the minimums above before upgrading.
-- **Run `php artisan bloodhound:rebuild-totals` once after upgrading** (after the
-  migrations). Announces folded before this version credited no time; the rebuild derives
-  it from the announce log, as far back as your retention has kept it. Until you do,
-  `reconcile-ledger` reports every member's seedtime as drift and says to run it. It is
-  safe even if you have pruned: the migrations below run first.
-- **If you have pruned on an earlier version, don't run `rebuild-totals` before
-  upgrading.** It would cut ratios.
-- With `retention_days` set, the upgrade migration records your earlier prunes' lost
-  credit as carry and says how many users it covered. If you pruned in the past but
-  retention is now off, run `php artisan bloodhound:record-pruned-history` once. It
-  records only gaps pruning could have caused (per user and torrent, stored total above
-  the ledger, bytes only), so real drift stays reported.
+1. **Check your database version** against the minimums above.
+2. **If you have pruned on an earlier version, don't run `rebuild-totals` before
+   upgrading.** On the old version it would cut ratios.
+3. **Upgrade and migrate.** With `retention_days` set, a migration records your earlier
+   prunes' lost credit as carry and says how many members it covered. If you pruned in the
+   past but retention is now off, run `php artisan bloodhound:record-pruned-history` once.
+   It records only gaps pruning could have caused (per member and torrent, stored total
+   above the ledger, bytes only), so real drift stays reported.
+4. **Run `php artisan bloodhound:rebuild-totals` once.** Announces folded before this
+   version credited no time; the rebuild derives it from the announce log, as far back as
+   your retention has kept it. Until you do, `reconcile-ledger` reports every member's
+   seedtime as drift and says to run it.
 
 ## [7.0.0] — 2026-10-06
 
