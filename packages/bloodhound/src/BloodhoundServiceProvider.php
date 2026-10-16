@@ -13,6 +13,7 @@ use Marque\Bloodhound\Console\Commands\AuditLedger;
 use Marque\Bloodhound\Console\Commands\PruneAnnounceLog;
 use Marque\Bloodhound\Console\Commands\RebuildTotals;
 use Marque\Bloodhound\Console\Commands\ReconcileLedger;
+use Marque\Bloodhound\Console\Commands\RecordPrunedHistory;
 use Marque\Bloodhound\Console\Commands\SyncSwarmCounts;
 use Marque\Bloodhound\Contracts\AnnounceLogServiceInterface;
 use Marque\Bloodhound\Events\TorrentCompleted;
@@ -153,6 +154,7 @@ class BloodhoundServiceProvider extends ServiceProvider
             AuditLedger::class,
             PruneAnnounceLog::class,
             RebuildTotals::class,
+            RecordPrunedHistory::class,
             ReconcileLedger::class,
             SyncSwarmCounts::class,
         ]);
