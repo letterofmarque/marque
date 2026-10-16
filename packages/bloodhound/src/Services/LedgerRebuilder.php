@@ -189,6 +189,13 @@ class LedgerRebuilder
             ->first();
 
         if ($existing === null) {
+            // The aggregator writes no row for activity that moved nothing,
+            // so neither does a rebuild: a rebuilt projection has to match
+            // the one it replaces, row for row, or a rebuild reads as change.
+            if ($uploaded === 0 && $downloaded === 0 && $seedtime === 0 && $leechtime === 0) {
+                return;
+            }
+
             DB::table('torrent_user')->insert([
                 'user_id' => $userId,
                 'torrent_id' => $torrentId,

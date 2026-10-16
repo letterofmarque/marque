@@ -34,10 +34,13 @@ return new class extends Migration
             $table->foreignId('user_id');
             $table->foreignId('torrent_id');
 
-            $table->unsignedBigInteger('uploaded')->default(0);
-            $table->unsignedBigInteger('downloaded')->default(0);
-            $table->unsignedBigInteger('seedtime')->default(0);
-            $table->unsignedBigInteger('leechtime')->default(0);
+            // Signed. A carry is an adjustment, not a balance: if a clock
+            // stepped back, deleting a row can pair the survivors around it
+            // into MORE time than before, and the carry for that is negative.
+            $table->bigInteger('uploaded')->default(0);
+            $table->bigInteger('downloaded')->default(0);
+            $table->bigInteger('seedtime')->default(0);
+            $table->bigInteger('leechtime')->default(0);
 
             $table->timestamps();
 

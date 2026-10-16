@@ -9,6 +9,7 @@ use Illuminate\Support\Carbon;
 use Marque\Bloodhound\Models\AnnounceLog;
 use Marque\Bloodhound\Models\LedgerCursor;
 use Marque\Bloodhound\Services\LedgerAggregator;
+use Marque\Bloodhound\Services\LedgerPruner;
 
 /**
  * Enforces config('bloodhound.announce_log.retention_days') (Spec #98).
@@ -25,7 +26,7 @@ class PruneAnnounceLog extends Command
 
     protected $description = 'Delete announce_log rows older than the configured retention window';
 
-    public function handle(): int
+    public function handle(LedgerPruner $pruner): int
     {
         $days = config('bloodhound.announce_log.retention_days');
 
@@ -49,11 +50,13 @@ class PruneAnnounceLog extends Command
         // sufficient grounds for deletion.
         $watermark = LedgerCursor::positionFor(LedgerAggregator::STREAM);
 
-        $aged = AnnounceLog::where('created_at', '<', $cutoff);
+        $withheld = AnnounceLog::where('created_at', '<', $cutoff)->where('id', '>', $watermark)->count();
 
-        $withheld = (clone $aged)->where('id', '>', $watermark)->count();
-
-        $deleted = $aged->where('id', '<=', $watermark)->delete();
+        // What the deleted rows credited is carried forward in the same
+        // transaction as the delete (#11021). Deleting it outright left the
+        // ledger unable to explain the totals it had produced: reconcile
+        // reported drift, and the rebuild it recommended erased the credit.
+        $deleted = $pruner->prune($cutoff, $watermark);
 
         $this->info("Pruned {$deleted} announce log row(s) older than {$cutoff->toDateTimeString()}.");
 
