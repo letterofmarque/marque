@@ -7,6 +7,38 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+### Fixed
+
+- **Pruning no longer costs users their credit.** `bloodhound:prune-announce-log` deleted
+  aggregated ledger rows and kept nothing. Reconciliation then reported every pruned user
+  as drift, and the `rebuild-totals` it recommends replayed only the surviving rows,
+  cutting real users' ratios. Every install with `retention_days` set was affected. A
+  prune now carries what it deletes into the new `ledger_carry` table in the same
+  transaction (bytes, and the difference it makes to seedtime and leechtime), and
+  reconciliation and rebuild read the ledger as its rows plus its carry (#11021).
+- **A rebuild no longer creates all-zero per-torrent rows** for activity that moved
+  nothing, which the aggregator never writes, so a rebuilt projection matches the one it
+  replaces.
+
+### Added
+
+- **`ledger_carry`**: credit whose ledger rows were pruned, per user and torrent, on the
+  same connection as `announce_log`.
+- **`bloodhound:record-pruned-history`**: records credit an earlier prune deleted without
+  carrying it, for installs that pruned in the past and have since turned retention off.
+
+### Upgrading
+
+- **If you have pruned on an earlier version, don't run `rebuild-totals` before
+  upgrading.** It would cut ratios.
+- With `retention_days` set, the upgrade migration records your earlier prunes' lost
+  credit as carry and says how many users it covered. If you pruned in the past but
+  retention is now off, run `php artisan bloodhound:record-pruned-history` once. It
+  records only gaps pruning could have caused (per user and torrent, stored total above
+  the ledger, bytes only), so real drift stays reported.
+
 ## [7.0.0] — 2026-10-06
 
 > Downloads carry each member's own announce URL, and uploads must be private torrents by default.

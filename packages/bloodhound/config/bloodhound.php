@@ -327,9 +327,10 @@ return [
     | everything stays the default because retention is an operator judgement
     | about storage, not something to guess on their behalf.
     |
-    | Note that pruning below the reconciliation watermark destroys the ability
-    | to rebuild the totals derived from those rows — the prune command will
-    | refuse to do that.
+    | Pruning carries forward what it deletes: the credit the pruned rows
+    | produced moves into ledger_carry in the same transaction, so reconcile
+    | and rebuild-totals stay exact after a prune. Rows the aggregator has not
+    | consumed yet are never pruned, whatever their age.
     |
     */
 

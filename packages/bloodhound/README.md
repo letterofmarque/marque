@@ -361,6 +361,12 @@ php artisan bloodhound:prune-announce-log
 
 It's registered on Laravel's scheduler to run daily, so it needs [the scheduler running](https://laravel.com/docs/scheduling#running-the-scheduler). It no-ops safely when no retention is configured, and reports what it did either way.
 
+**Pruning does not lose credit.** The rows it deletes produced totals people are held to,
+so before deleting them it moves what they produced into `ledger_carry`, one row per
+user and torrent, in the same transaction as the delete. The ledger is its rows plus its
+carry, and reconciliation and `rebuild-totals` read it that way, so both stay exact after
+a prune. See [Pruning and the floor](#pruning-and-the-floor).
+
 #### Private trackers only
 
 This is a Bloodhound feature and has no equivalent in [marque/hound](https://packagist.org/packages/marque/hound). Public trackers are deliberately anonymous - `hound` records no user against an announce at all - so ratio verification and cheat investigation aren't concepts that apply there.
@@ -400,16 +406,17 @@ Bloodhound ships no UI for this. Browsing the log is left to your application.
 
 ### Verifying the numbers
 
-Four commands, and the reason they exist: before the ledger, a byte count could be lost
+The commands, and the reason they exist: before the ledger, a byte count could be lost
 or corrupted and **nothing anywhere would know**. The totals were accumulators with
 nothing behind them, so a wrong number stayed wrong forever and the first anyone heard of
 it was a user disputing a ban.
 
 ```bash
-php artisan bloodhound:aggregate-ledger    # fold pending rows into totals (scheduled, every minute)
-php artisan bloodhound:reconcile-ledger    # do the totals match the ledger? (scheduled, daily)
-php artisan bloodhound:audit-ledger        # is the ledger itself coherent?
-php artisan bloodhound:rebuild-totals      # recompute totals from the ledger
+php artisan bloodhound:aggregate-ledger        # fold pending rows into totals (scheduled, every minute)
+php artisan bloodhound:reconcile-ledger        # do the totals match the ledger? (scheduled, daily)
+php artisan bloodhound:audit-ledger            # is the ledger itself coherent?
+php artisan bloodhound:rebuild-totals          # recompute totals from the ledger
+php artisan bloodhound:record-pruned-history   # one-off: account for rows an older version pruned
 ```
 
 **Reconciliation reports; it does not repair.** You should learn a number went wrong
@@ -423,17 +430,34 @@ means a baseline went missing between two announces — which is what a Redis ou
 like after the fact. Those bytes were never credited and cannot be recovered, but you
 find out it happened instead of never knowing.
 
-**Rebuild** recomputes user and per-torrent totals by replaying the ledger, for everyone
-or `--user=`. It deliberately does not move the aggregation watermark, and it restores
-byte columns only — completion dates are not derivable from deltas.
+**Rebuild** recomputes user and per-torrent totals by replaying the ledger and its carry,
+for everyone or `--user=`: bytes, and seedtime and leechtime. It deliberately does not
+move the aggregation watermark, and it leaves completion dates and counts alone, because
+they are not derivable from the rows.
 
 ### Pruning and the floor
 
 `bloodhound:prune-announce-log` deletes rows past `retention_days`, but **only rows the
-aggregator has already consumed**. Age alone is not sufficient grounds for deletion:
-pruning below the reconciliation watermark would make the totals derived from those rows
-permanently unverifiable, which is a cleanup job quietly destroying the thing the ledger
-exists to protect. The command says so when it withholds rows.
+aggregator has already consumed**. Rows still waiting to be aggregated are kept whatever
+their age, because nothing has credited them yet. The command says so when it withholds
+rows.
+
+**What it deletes, it carries forward.** In one transaction per slice of users, the prune
+adds the deleted rows' bytes to `ledger_carry`, works out what those users' rows derive in
+seedtime and leechtime before and after the delete, and carries the difference. Carrying
+the difference, not just the deleted rows' own share, is what keeps time exact: an
+interval is credited on the announce that closes it, so a surviving announce whose
+earlier partner is pruned would otherwise lose its interval. If anything fails, the
+delete rolls back with the carry; neither lands alone.
+
+Carry values are signed. If a clock ever stepped back, a pruned row can sit between two
+surviving rows in id order while being older than both. Deleting it pairs the survivors
+directly, which can credit more than before, and the carry for that is negative.
+
+Before this, a prune kept nothing. Reconciliation then reported every pruned user as
+drift, and the `rebuild-totals` it recommended replayed only the surviving rows,
+**cutting real users' ratios**. If you pruned on an earlier version, see
+[Upgrading an existing install](#upgrading-an-existing-install).
 
 ### Upgrading an existing install
 
@@ -445,6 +469,33 @@ That row asserts the old total was correct **as of migration**. It is not eviden
 it ever was — the per-announce history was never kept, which is exactly why the ledger now
 exists. Per-torrent history likewise starts empty, so hit-and-run enforcement is only
 meaningful for torrents grabbed after the upgrade.
+
+#### If you pruned on an earlier version
+
+Before pruning carried forward, every prune deleted credited rows and kept nothing. Those
+users' totals are still right, but the ledger no longer explains them: reconciliation
+reports them as drift, and **running `rebuild-totals` would cut their ratios.** Don't run
+a rebuild until this is done.
+
+The upgrade migration fixes it if `retention_days` is set: it records each gap as carry
+and reports how many users and per-torrent totals it covered. If you pruned in the past
+but have since turned retention off, run it yourself:
+
+```bash
+php artisan bloodhound:record-pruned-history
+```
+
+It records only what pruning could have caused, so real drift stays visible:
+
+- **per user and torrent**, because every pair that moved bytes has its own total, and
+  pruned credit always leaves a gap there. A gap only on a user's own total means the
+  two totals disagree with each other, which pruning can't cause.
+- **only where the stored total is above the ledger**, because pruning removes credit and
+  never adds it.
+- **bytes only**, because seedtime was never recorded before this version.
+
+Like the opening balance, what it records asserts the totals were correct as of the
+upgrade, not that they were ever right. Running it again changes nothing.
 
 ### Port Blacklist
 
