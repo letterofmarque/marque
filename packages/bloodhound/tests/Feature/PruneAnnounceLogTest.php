@@ -73,10 +73,13 @@ describe('retention_days set', function () {
     it('deletes only rows older than the cutoff', function () {
         config(['bloodhound.announce_log.retention_days' => 30]);
 
-        $keep = seedLogRow(1);
-        $keepEdge = seedLogRow(29);
-        $dropEdge = seedLogRow(31);
+        // Oldest first, as a ledger grows: ids follow time. (A peer's latest
+        // aggregated announce is never pruned (Job #187), so seeding newest
+        // first would make the 365-day row this peer's "latest".)
         $drop = seedLogRow(365);
+        $dropEdge = seedLogRow(31);
+        $keepEdge = seedLogRow(29);
+        $keep = seedLogRow(1);
 
         markLedgerFullyAggregated();
 
@@ -183,9 +186,14 @@ describe('the reconciliation floor', function () {
 
         $old = seedLogRow(daysAgo: 30);
 
+        // The peer announced again since, and that is aggregated too: a
+        // peer's latest aggregated announce is kept (Job #187), its older
+        // ones are not.
+        $newer = seedLogRow(daysAgo: 0);
+
         LedgerCursor::create([
             'stream' => LedgerAggregator::STREAM,
-            'position' => $old->id,
+            'position' => $newer->id,
         ]);
 
         test()->artisan('bloodhound:prune-announce-log')->assertSuccessful();

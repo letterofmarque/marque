@@ -38,6 +38,10 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   prune now carries what it deletes into the new `ledger_carry` table in the same
   transaction (bytes, and the difference it makes to seedtime and leechtime), and
   reconciliation and rebuild read the ledger as its rows plus its carry (#11021).
+- **A prune keeps each peer's latest aggregated announce** (unless it is a `stopped`), so an
+  announce still waiting to be aggregated, or sent after the retention window, keeps the
+  interval it closes. Without it that time was lost and nothing reported it. The table now
+  stops shrinking at about one row per session that ended without a stop.
 - **A rebuild no longer creates all-zero per-torrent rows** for activity that moved
   nothing, which the aggregator never writes, so a rebuilt projection matches the one it
   replaces.

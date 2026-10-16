@@ -510,6 +510,14 @@ interval is credited on the announce that closes it, so a surviving announce who
 earlier partner is pruned would otherwise lose its interval. If anything fails, the
 delete rolls back with the carry; neither lands alone.
 
+**Each peer's latest aggregated announce is kept**, whatever its age, unless it is a
+`stopped`. Time is credited on the announce that closes an interval, so deleting a peer's
+last announce would leave its next one, still waiting to be aggregated or sent weeks
+later, with nothing to pair with, and that time would be lost without anything reporting
+it. Peers whose session ended with a stop keep nothing, which is most of them. So
+retention bounds the table to your retention window plus about one row per session that
+ended without a stop (a crash, a lost connection, a laptop shut), not to zero.
+
 Carry values are signed. If a clock ever stepped back, a pruned row can sit between two
 surviving rows in id order while being older than both. Deleting it pairs the survivors
 directly, which can credit more than before, and the carry for that is negative.

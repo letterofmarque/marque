@@ -273,3 +273,71 @@ test('a prune that pairs the survivors differently carries a negative adjustment
 
     expect(pruneSnapshot($this))->toBe($before);
 });
+
+// Correction to CP #1021, found by the independent check. Time is credited on
+// the announce that CLOSES an interval. If a prune deletes a peer's last
+// aggregated announce while its next one is still waiting to be aggregated,
+// or before it arrives at all, that next announce has nothing to pair with and
+// its interval is never credited, and reconcile and rebuild agree on the loss,
+// so nothing reports it. So a peer's latest aggregated announce is kept.
+describe('each peer\'s latest aggregated announce', function () {
+    test('is kept, so an announce still in the backlog keeps its interval', function () {
+        pruneRow($this, $this->user, $this->torrent, 'regular', 0, -10);
+        app(LedgerAggregator::class)->run();
+        pruneRow($this, $this->user, $this->torrent, 'regular', 0, 20);
+
+        prune($this);
+        app(LedgerAggregator::class)->run();
+
+        expect(pruneSnapshot($this)["user:{$this->user->id}"])->toBe([0, 0, 1800, 0])
+            ->and(app(LedgerAuditor::class)->reconcile()->hasDrift())->toBeFalse();
+
+        $before = pruneSnapshot($this);
+        app(LedgerRebuilder::class)->rebuild();
+
+        expect(pruneSnapshot($this))->toBe($before);
+    });
+
+    // The cap applies to a gap of any length (Spec #121): a peer that went
+    // quiet without stopping and comes back is credited up to peer_expiry.
+    test('is kept, so a peer returning after the retention window is credited the capped gap', function () {
+        pruneRow($this, $this->user, $this->torrent, 'regular', 0, -60 * 24 * 10);
+        app(LedgerAggregator::class)->run();
+
+        prune($this);
+        pruneRow($this, $this->user, $this->torrent, 'regular', 0, 60 * 24 * 29);
+        app(LedgerAggregator::class)->run();
+
+        expect(pruneSnapshot($this)["user:{$this->user->id}"])->toBe([0, 0, 3600, 0]);
+    });
+
+    test('is the only row of that peer kept; the older ones are pruned and carried', function () {
+        pruneRow($this, $this->user, $this->torrent, 'regular', 0, -90, up: 100);
+        pruneRow($this, $this->user, $this->torrent, 'regular', 0, -60, up: 200);
+        pruneRow($this, $this->user, $this->torrent, 'regular', 0, -30, up: 300);
+        app(LedgerAggregator::class)->run();
+        $before = pruneSnapshot($this);
+
+        prune($this);
+
+        expect(AnnounceLog::query()->pluck('upload_delta')->all())->toBe([300])
+            ->and(app(LedgerAuditor::class)->reconcile()->hasDrift())->toBeFalse();
+
+        app(LedgerRebuilder::class)->rebuild();
+
+        expect(pruneSnapshot($this))->toBe($before);
+    });
+
+    // Nothing is ever credited from a `stopped` row, so keeping one would
+    // protect nothing. Most sessions end with a stop, so most peers still
+    // prune to nothing.
+    test('is not kept when it is a stop', function () {
+        pruneRow($this, $this->user, $this->torrent, 'regular', 0, -60);
+        pruneRow($this, $this->user, $this->torrent, 'stopped', 0, -30);
+        app(LedgerAggregator::class)->run();
+
+        prune($this);
+
+        expect(AnnounceLog::query()->count())->toBe(0);
+    });
+});

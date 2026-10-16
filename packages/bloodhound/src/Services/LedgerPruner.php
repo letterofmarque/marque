@@ -77,7 +77,8 @@ class LedgerPruner
         $prunable = fn () => AnnounceLog::query()
             ->whereIn('user_id', $users)
             ->where('created_at', '<', $cutoff)
-            ->where('id', '<=', $watermark);
+            ->where('id', '<=', $watermark)
+            ->whereNotIn('id', $this->latestOpenings($users, $watermark));
 
         $carry = [];
 
@@ -119,6 +120,47 @@ class LedgerPruner
         }
 
         return $deleted;
+    }
+
+    /**
+     * Each peer's latest aggregated announce, which is never pruned.
+     *
+     * Time is credited on the announce that CLOSES an interval. Delete a
+     * peer's last aggregated announce and its next one, still waiting to be
+     * aggregated or not yet sent, has nothing to pair with: that interval is
+     * never credited, and since reconcile and rebuild then agree on the loss,
+     * nothing would ever report it. Found by the independent check of Job
+     * #187.
+     *
+     * Not kept when it is a `stopped` (nothing is credited from a stop) or an
+     * opening balance (never paired at all): keeping those would protect
+     * nothing. So a peer whose session ended cleanly still prunes to nothing,
+     * and what stays is one row per session that ended without a stop.
+     *
+     * Wrapped as a derived table: MySQL refuses a DELETE whose subquery reads
+     * the table being deleted from, unless the subquery is materialised.
+     *
+     * @param  list<int>  $users
+     */
+    protected function latestOpenings(array $users, int $watermark): \Closure
+    {
+        return function ($query) use ($users, $watermark) {
+            $latest = AnnounceLog::query()
+                ->toBase()
+                ->selectRaw('MAX(id) as id')
+                ->whereIn('user_id', $users)
+                ->where('id', '<=', $watermark)
+                ->groupBy('user_id', 'torrent_id', 'peer_id');
+
+            $rows = AnnounceLog::query()
+                ->toBase()
+                ->joinSub($latest, 'latest', 'announce_log.id', '=', 'latest.id')
+                ->select(['announce_log.id', 'announce_log.event']);
+
+            $query->fromSub($rows, 'keep')
+                ->select('keep.id')
+                ->whereNotIn('keep.event', ['stopped', AnnounceLog::EVENT_OPENING_BALANCE]);
+        };
     }
 
     /**
