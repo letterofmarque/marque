@@ -6,6 +6,7 @@ namespace Marque\Bloodhound\Services;
 
 use Illuminate\Support\Facades\DB;
 use Marque\Bloodhound\Models\AnnounceLog;
+use Marque\Bloodhound\Models\LedgerCarry;
 use Marque\Bloodhound\Models\LedgerCursor;
 
 /**
@@ -73,13 +74,22 @@ class LedgerAuditor
             ->get()
             ->keyBy('user_id');
 
+        // Pruned rows' credit (#11021). Expected is the ledger's rows plus
+        // its carry; without the carry, every pruned user reads as drift.
+        $carried = LedgerCarry::query()
+            ->groupBy('user_id')
+            ->selectRaw('user_id, SUM(uploaded) as up, SUM(downloaded) as down')
+            ->get()
+            ->keyBy('user_id');
+
         $drift = [];
 
         foreach (DB::table($table)->select(['id', 'uploaded', 'downloaded'])->get() as $user) {
             $row = $expected->get($user->id);
+            $carry = $carried->get($user->id);
 
-            $expectedUp = (int) ($row->up ?? 0);
-            $expectedDown = (int) ($row->down ?? 0);
+            $expectedUp = (int) ($row->up ?? 0) + (int) ($carry->up ?? 0);
+            $expectedDown = (int) ($row->down ?? 0) + (int) ($carry->down ?? 0);
 
             if ((int) $user->uploaded !== $expectedUp) {
                 $drift[] = [
@@ -115,14 +125,19 @@ class LedgerAuditor
             ->get()
             ->keyBy(fn ($row) => $row->user_id.':'.$row->torrent_id);
 
+        $carried = LedgerCarry::query()
+            ->get()
+            ->keyBy(fn (LedgerCarry $carry) => $carry->user_id.':'.$carry->torrent_id);
+
         $drift = [];
 
         foreach (DB::table('torrent_user')->get() as $row) {
             $key = $row->user_id.':'.$row->torrent_id;
             $sums = $expected->get($key);
+            $carry = $carried->get($key);
 
-            $expectedUp = (int) ($sums->up ?? 0);
-            $expectedDown = (int) ($sums->down ?? 0);
+            $expectedUp = (int) ($sums->up ?? 0) + ($carry->uploaded ?? 0);
+            $expectedDown = (int) ($sums->down ?? 0) + ($carry->downloaded ?? 0);
 
             if ((int) $row->uploaded !== $expectedUp) {
                 $drift[] = [

@@ -6,6 +6,7 @@ namespace Marque\Bloodhound\Services;
 
 use Illuminate\Support\Facades\DB;
 use Marque\Bloodhound\Models\AnnounceLog;
+use Marque\Bloodhound\Models\LedgerCarry;
 use Marque\Bloodhound\Models\LedgerCursor;
 use Marque\Bloodhound\Support\SessionTime;
 
@@ -80,45 +81,67 @@ class LedgerRebuilder
             ->selectRaw('user_id, torrent_id, SUM(upload_delta) as up, SUM(download_delta) as down')
             ->get();
 
-        $times = $this->sessionTimes($watermark, $userId);
-        $timePerUser = [];
+        /** @var array<string, array{user_id: int, torrent_id: int, uploaded: int, downloaded: int, seedtime: int, leechtime: int}> $totals */
+        $totals = [];
+
+        $add = function (int $user, int $torrent, array $amounts) use (&$totals): void {
+            $key = $user.':'.$torrent;
+            $totals[$key] ??= ['user_id' => $user, 'torrent_id' => $torrent, 'uploaded' => 0, 'downloaded' => 0, 'seedtime' => 0, 'leechtime' => 0];
+
+            foreach ($amounts as $column => $amount) {
+                $totals[$key][$column] += $amount;
+            }
+        };
 
         foreach ($perTorrent as $row) {
-            $time = $times[$row->user_id.':'.$row->torrent_id] ?? ['seedtime' => 0, 'leechtime' => 0];
-
-            $this->writeTorrentUser(
-                (int) $row->user_id,
-                (int) $row->torrent_id,
-                (int) $row->up,
-                (int) $row->down,
-                $time['seedtime'],
-                $time['leechtime'],
-            );
-
-            $timePerUser[$row->user_id] ??= ['seedtime' => 0, 'leechtime' => 0];
-            $timePerUser[$row->user_id]['seedtime'] += $time['seedtime'];
-            $timePerUser[$row->user_id]['leechtime'] += $time['leechtime'];
+            $add((int) $row->user_id, (int) $row->torrent_id, ['uploaded' => (int) $row->up, 'downloaded' => (int) $row->down]);
         }
 
-        $perUser = AnnounceLog::query()
-            ->where('id', '<=', $watermark)
+        foreach ($this->sessionTimes($watermark, $userId) as $key => $time) {
+            [$user, $torrent] = array_map('intval', explode(':', $key));
+            $add($user, $torrent, $time);
+        }
+
+        // Credit whose rows were pruned (#11021). Without it a rebuild after
+        // a prune would replay only what survived, and cut the ratio of
+        // everyone whose history had aged out.
+        $carried = LedgerCarry::query()
             ->when($userId !== null, fn ($q) => $q->where('user_id', $userId))
-            ->groupBy('user_id')
-            ->selectRaw('user_id, SUM(upload_delta) as up, SUM(download_delta) as down')
             ->get();
+
+        foreach ($carried as $carry) {
+            $add($carry->user_id, $carry->torrent_id, [
+                'uploaded' => $carry->uploaded,
+                'downloaded' => $carry->downloaded,
+                'seedtime' => $carry->seedtime,
+                'leechtime' => $carry->leechtime,
+            ]);
+        }
+
+        $perUser = [];
+
+        foreach ($totals as $total) {
+            $this->writeTorrentUser(
+                $total['user_id'],
+                $total['torrent_id'],
+                $total['uploaded'],
+                $total['downloaded'],
+                $total['seedtime'],
+                $total['leechtime'],
+            );
+
+            $perUser[$total['user_id']] ??= ['uploaded' => 0, 'downloaded' => 0, 'seedtime' => 0, 'leechtime' => 0];
+
+            foreach (['uploaded', 'downloaded', 'seedtime', 'leechtime'] as $column) {
+                $perUser[$total['user_id']][$column] += $total[$column];
+            }
+        }
 
         $userModel = config('trove.user_model', 'App\\Models\\User');
         $table = (new $userModel)->getTable();
 
-        foreach ($perUser as $row) {
-            DB::table($table)
-                ->where('id', $row->user_id)
-                ->update([
-                    'uploaded' => (int) $row->up,
-                    'downloaded' => (int) $row->down,
-                    'seedtime' => $timePerUser[$row->user_id]['seedtime'] ?? 0,
-                    'leechtime' => $timePerUser[$row->user_id]['leechtime'] ?? 0,
-                ]);
+        foreach ($perUser as $id => $sums) {
+            DB::table($table)->where('id', $id)->update($sums);
         }
     }
 
