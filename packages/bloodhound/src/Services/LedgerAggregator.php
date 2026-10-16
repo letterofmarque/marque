@@ -8,6 +8,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Marque\Bloodhound\Models\AnnounceLog;
 use Marque\Bloodhound\Models\LedgerCursor;
+use Marque\Bloodhound\Support\BatchIncrement;
 use Marque\Bloodhound\Support\SessionTime;
 
 /**
@@ -39,6 +40,20 @@ class LedgerAggregator
      * cursor without interfering.
      */
     public const STREAM = 'user_totals';
+
+    /**
+     * The four totals a fold adds to, on torrent_user and on the user.
+     */
+    private const TOTALS = ['uploaded', 'downloaded', 'seedtime', 'leechtime'];
+
+    /**
+     * Rows per write statement. An insert binds 9 values per row and an
+     * increment 5, so 1,000 rows stays under 9,001 placeholders: inside
+     * SQLite's 32,766 and MySQL's and PostgreSQL's 65,535. (SQLite before
+     * 3.32 allowed 999; bloodhound's README states the floor, which UPDATE
+     * ... FROM raises to 3.33 anyway.)
+     */
+    private const ROWS_PER_STATEMENT = 1000;
 
     /**
      * Fold everything the ledger has that this stream has not yet counted.
@@ -166,18 +181,15 @@ class LedgerAggregator
         $perUser = [];
 
         foreach ($perTorrent as $entry) {
-            $this->addToTorrentUser($entry);
-
             $perUser[$entry['user_id']] ??= ['uploaded' => 0, 'downloaded' => 0, 'seedtime' => 0, 'leechtime' => 0];
 
-            foreach (['uploaded', 'downloaded', 'seedtime', 'leechtime'] as $column) {
+            foreach (self::TOTALS as $column) {
                 $perUser[$entry['user_id']][$column] += $entry[$column];
             }
         }
 
-        foreach ($perUser as $userId => $totals) {
-            $this->addToUser((int) $userId, $totals);
-        }
+        $this->addToTorrentUsers($perTorrent);
+        $this->addToUsers($perUser);
     }
 
     /**
@@ -196,40 +208,60 @@ class LedgerAggregator
     }
 
     /**
-     * @param  array{user_id: int, torrent_id: int, uploaded: int, downloaded: int, seedtime: int, leechtime: int}  $entry
+     * Write a batch's per-torrent totals: one select, one insert, one update.
+     *
+     * Not a SELECT and an UPDATE per (user, torrent). Once every announce
+     * earned time (Spec #121), that pattern cost 498k queries to fold 200k
+     * rows. A batch now costs the same handful of statements whatever it
+     * touches (chunked under every engine's placeholder limit).
+     *
+     * @param  array<string, array{user_id: int, torrent_id: int, uploaded: int, downloaded: int, seedtime: int, leechtime: int}>  $perTorrent
      */
-    protected function addToTorrentUser(array $entry): void
+    protected function addToTorrentUsers(array $perTorrent): void
     {
-        $existing = DB::table('torrent_user')
-            ->where('user_id', $entry['user_id'])
-            ->where('torrent_id', $entry['torrent_id'])
-            ->first();
-
-        if ($existing === null) {
-            DB::table('torrent_user')->insert([
-                'user_id' => $entry['user_id'],
-                'torrent_id' => $entry['torrent_id'],
-                'uploaded' => $entry['uploaded'],
-                'downloaded' => $entry['downloaded'],
-                'seedtime' => $entry['seedtime'],
-                'leechtime' => $entry['leechtime'],
-                'times_completed' => 0,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
+        if ($perTorrent === []) {
             return;
         }
 
-        DB::table('torrent_user')
-            ->where('id', $existing->id)
-            ->update([
-                'uploaded' => $existing->uploaded + $entry['uploaded'],
-                'downloaded' => $existing->downloaded + $entry['downloaded'],
-                'seedtime' => $existing->seedtime + $entry['seedtime'],
-                'leechtime' => $existing->leechtime + $entry['leechtime'],
-                'updated_at' => now(),
-            ]);
+        // A superset (every user in the batch on every torrent in it),
+        // narrowed to the exact pairs in PHP: two plain IN lists rather than
+        // a tuple comparison not every engine supports.
+        $existing = DB::table('torrent_user')
+            ->whereIn('user_id', array_unique(array_column($perTorrent, 'user_id')))
+            ->whereIn('torrent_id', array_unique(array_column($perTorrent, 'torrent_id')))
+            ->get(['id', 'user_id', 'torrent_id'])
+            ->keyBy(fn ($row) => $row->user_id.':'.$row->torrent_id);
+
+        $inserts = [];
+        $increments = [];
+
+        foreach ($perTorrent as $key => $entry) {
+            $row = $existing->get($key);
+
+            if ($row === null) {
+                $inserts[] = [
+                    'user_id' => $entry['user_id'],
+                    'torrent_id' => $entry['torrent_id'],
+                    'uploaded' => $entry['uploaded'],
+                    'downloaded' => $entry['downloaded'],
+                    'seedtime' => $entry['seedtime'],
+                    'leechtime' => $entry['leechtime'],
+                    'times_completed' => 0,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+
+                continue;
+            }
+
+            $increments[(int) $row->id] = $entry;
+        }
+
+        foreach (array_chunk($inserts, self::ROWS_PER_STATEMENT) as $chunk) {
+            DB::table('torrent_user')->insert($chunk);
+        }
+
+        $this->incrementByKey('torrent_user', $increments, touch: true);
     }
 
     /**
@@ -238,19 +270,41 @@ class LedgerAggregator
      * reconcilable against SUM(torrent_user) and the ledger itself — which is
      * what it never was as a bare accumulator.
      *
-     * @param  array{uploaded: int, downloaded: int, seedtime: int, leechtime: int}  $totals
+     * @param  array<int, array{uploaded: int, downloaded: int, seedtime: int, leechtime: int}>  $perUser
      */
-    protected function addToUser(int $userId, array $totals): void
+    protected function addToUsers(array $perUser): void
     {
         $userModel = config('trove.user_model', 'App\\Models\\User');
-        $table = (new $userModel)->getTable();
 
-        // incrementEach() rather than DB::raw("uploaded + {$delta}") as the old
-        // job did — atomic, no string interpolation into SQL, and portable
-        // across the engines Marque supports.
-        DB::table($table)
-            ->where('id', $userId)
-            ->incrementEach($totals);
+        $this->incrementByKey((new $userModel)->getTable(), $perUser, touch: false);
+    }
+
+    /**
+     * Add each id's amounts to its stored totals, one statement per chunk.
+     *
+     * See BatchIncrement for why it is a join against an inline table, and
+     * for the two ways the engines spell that.
+     *
+     * @param  array<int, array{uploaded: int, downloaded: int, seedtime: int, leechtime: int}>  $amountsById
+     */
+    protected function incrementByKey(string $table, array $amountsById, bool $touch): void
+    {
+        $connection = DB::connection();
+        $grammar = $connection->getQueryGrammar();
+        $increment = new BatchIncrement($connection->getDriverName());
+
+        foreach (array_chunk($amountsById, self::ROWS_PER_STATEMENT, preserve_keys: true) as $chunk) {
+            [$sql, $bindings] = $increment->statement(
+                $grammar->wrapTable($table),
+                $grammar->wrap('id'),
+                array_map(fn ($column) => $grammar->wrap($column), self::TOTALS),
+                self::TOTALS,
+                $chunk,
+                $touch ? [$grammar->wrap('updated_at'), now()] : null,
+            );
+
+            $connection->update($sql, $bindings);
+        }
     }
 
     protected function advanceCursor(int $position): void

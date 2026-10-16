@@ -217,27 +217,34 @@ final class SessionTime
             ->distinct()
             ->get();
 
+        $grammar = $connection->getQueryGrammar();
+        $table = $grammar->wrapTable('announce_log');
+        [$id, $torrent, $peer, $user, $event] = array_map(
+            fn ($column) => $grammar->wrap($column),
+            ['id', 'torrent_id', 'peer_id', 'user_id', 'event'],
+        );
+
+        // Built as a string, not a query builder per lookup: a builder per
+        // peer, compiled, was most of a batch's cost in PHP (22s of 34s on a
+        // 200k-row SQLite run). Each member is wrapped as a derived table,
+        // the one form all four engines accept for ORDER BY ... LIMIT inside
+        // a UNION; SQLite's limit of 500 compound terms is well above a chunk.
+        $lookup = "SELECT {$id} FROM (SELECT {$id} FROM {$table} WHERE {$torrent} = ? AND {$peer} = ? AND {$user} = ?"
+            ." AND {$id} <= ? AND {$event} <> ? ORDER BY {$id} DESC LIMIT 1) AS ";
+
         $ids = [];
 
         foreach ($peers->chunk(self::LOOKUPS_PER_STATEMENT) as $chunk) {
-            $union = null;
+            $members = [];
+            $bindings = [];
 
-            foreach ($chunk as $peer) {
-                $lookup = $connection->table('announce_log')
-                    ->select('id')
-                    ->where('torrent_id', $peer->torrent_id)
-                    ->where('peer_id', $peer->peer_id)
-                    ->where('user_id', $peer->user_id)
-                    ->where('id', '<=', $after)
-                    ->where('event', '!=', AnnounceLog::EVENT_OPENING_BALANCE)
-                    ->orderByDesc('id')
-                    ->limit(1);
-
-                $union = $union === null ? $lookup : $union->unionAll($lookup);
+            foreach ($chunk->values() as $n => $peerRow) {
+                $members[] = $lookup.$grammar->wrap("opening_{$n}");
+                array_push($bindings, $peerRow->torrent_id, $peerRow->peer_id, $peerRow->user_id, $after, AnnounceLog::EVENT_OPENING_BALANCE);
             }
 
-            foreach ($union?->pluck('id') ?? [] as $id) {
-                $ids[] = (int) $id;
+            foreach ($connection->select(implode(' UNION ALL ', $members), $bindings) as $row) {
+                $ids[] = (int) $row->id;
             }
         }
 
