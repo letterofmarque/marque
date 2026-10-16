@@ -85,6 +85,12 @@ function prunedTheOldWay($test): array
     historyRow($test->other, $test->torrent, 2, up: 50, peer: '-TR3000-bbbbbbbbbbbb');
     app(LedgerAggregator::class)->run();
 
+    // A prune of this kind happened before seedtime was derived (Job #112),
+    // when nothing credited time: model that, or the fixture tests a state
+    // no install is in.
+    DB::table($test->user->getTable())->update(['seedtime' => 0, 'leechtime' => 0]);
+    TorrentUser::query()->update(['seedtime' => 0, 'leechtime' => 0]);
+
     $before = byteSnapshot($test->user, $test->other);
     oldStylePrune(30);
 

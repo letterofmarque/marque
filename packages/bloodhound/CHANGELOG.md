@@ -9,6 +9,26 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [Unreleased]
 
+### Added
+
+- **Seedtime and leechtime, derived from the announce log.** `seedtime` had always been
+  written as 0. Both are now measured per member and per torrent, from the gaps between
+  each peer's announces: attributed by the peer's state at the start of the gap (the gap in
+  which it finishes is leech time), capped at `threepio.peer_expiry`, and never counted
+  across a `stopped` announce. Counted in every `ratio_mode` (Spec #121, #10613).
+- **`leechtime`** columns on the users table and `torrent_user` (new migration; the shipped
+  users-table migrations are unchanged).
+- **Reconciliation checks seedtime and leechtime**, and `rebuild-totals` recomputes them.
+
+### Changed
+
+- **The aggregator does more work per announce.** Every announce now earns time, so every
+  batch looks up each peer's previous announce and writes every total it touched; before,
+  announces that moved no bytes cost nothing. Batches are folded in a fixed handful of
+  statements. Measured throughput and what to watch are in the README under "Aggregation
+  throughput, and its limits".
+- **Database minimums:** MySQL 8.0, MariaDB 10.3, PostgreSQL 10, SQLite 3.33.
+
 ### Fixed
 
 - **Pruning no longer costs users their credit.** `bloodhound:prune-announce-log` deleted
@@ -31,6 +51,12 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ### Upgrading
 
+- **Check your database version** against the minimums above before upgrading.
+- **Run `php artisan bloodhound:rebuild-totals` once after upgrading** (after the
+  migrations). Announces folded before this version credited no time; the rebuild derives
+  it from the announce log, as far back as your retention has kept it. Until you do,
+  `reconcile-ledger` reports every member's seedtime as drift and says to run it. It is
+  safe even if you have pruned: the migrations below run first.
 - **If you have pruned on an earlier version, don't run `rebuild-totals` before
   upgrading.** It would cut ratios.
 - With `retention_days` set, the upgrade migration records your earlier prunes' lost

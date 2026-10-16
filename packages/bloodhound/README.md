@@ -404,6 +404,66 @@ Results aren't paginated. The log is queried deliberately - an investigation, a 
 
 Bloodhound ships no UI for this. Browsing the log is left to your application.
 
+### Seedtime and leechtime
+
+Bloodhound measures how long each member spent seeding and leeching every torrent, on the
+member (`seedtime`, `leechtime`) and per torrent (`torrent_user.seedtime`,
+`torrent_user.leechtime`), in seconds. Both are derived from the announce log, so they are
+checked by reconciliation and recomputed by `rebuild-totals` like the byte totals.
+
+How a peer's time is counted, from the gap between two of its consecutive announces:
+
+- **The peer's state at the start of the gap decides which it was.** Bytes left to
+  download means leeching; nothing left means seeding. The gap in which a peer finishes
+  downloading counts as leeching, all of it, because that is what it was doing.
+- **A gap counts up to `threepio.peer_expiry` (an hour by default), no more.** A client
+  that goes quiet without saying so gets the hour, the point at which the swarm already
+  treats it as gone, rather than the whole night its laptop was shut.
+- **A `stopped` announce ends the session.** The peer said it was leaving, so nothing is
+  counted from it to the peer's next announce.
+- **Time is counted in every `ratio_mode`.** It is a record of what happened, not a
+  policy; switching mode later finds the history already there.
+- **hound counts nothing.** A public tracker has no members to credit.
+
+**Expect lower figures than some other trackers report.** Trackers that credit a fixed
+announce interval per announce, or the whole gap however long, count time a client
+wasn't there. Bloodhound counts only time it can stand behind: real elapsed time between
+announces, capped, and never across a stop.
+
+### Aggregation throughput, and its limits
+
+Every announce now changes a total. Before seedtime, an announce that moved no bytes (most
+of them: idle seeders reporting in) changed nothing and cost the aggregator nothing. Now
+every announce earns seeding or leeching time, so for every batch the aggregator:
+
+- looks up each peer's previous announce (one index seek per peer), to measure the gap;
+- writes every member and every member-and-torrent total the batch touched.
+
+Each batch of 1,000 announces is folded in a fixed handful of statements, but the database
+still does that work per announce. Measured on a development machine, aggregating 200,000
+announces (500 members, 300 torrents, 2,000 peers):
+
+| Engine | Seconds | Announces per second | Before seedtime |
+|---|---|---|---|
+| SQLite | 15.5 | ~12,900 | 10.9s |
+| MariaDB | 25.3 | ~7,900 | 23.4s |
+| MySQL | 39.5 | ~5,100 | 27.1s |
+| PostgreSQL | 51.3 | ~3,900 | 30.5s |
+
+On PostgreSQL most of the time is writing the updated rows; on MySQL, the look-ups. Your
+hardware will give different numbers; the shape will hold.
+
+**What this means for you:** the aggregator runs every minute and must keep up with your
+peak announce rate, not your average. If it falls behind, ratios and seedtime update late
+but nothing is lost: the announce log is the record and the aggregator catches up.
+`bloodhound:reconcile-ledger` reports how many announces are waiting, so watch that number
+at your busiest hour.
+
+**An alternative design is being considered** that would cut the per-announce cost,
+probably by keeping a small record of each peer's last announce or by folding time on its
+own, slower schedule. Neither is decided or promised; this section will say when that
+changes.
+
 ### Verifying the numbers
 
 The commands, and the reason they exist: before the ledger, a byte count could be lost
@@ -470,6 +530,20 @@ it ever was — the per-announce history was never kept, which is exactly why th
 exists. Per-torrent history likewise starts empty, so hit-and-run enforcement is only
 meaningful for torrents grabbed after the upgrade.
 
+#### Upgrading to seedtime
+
+Announces folded before seedtime was derived credited no time. Run this once after the
+upgrade's migrations:
+
+```bash
+php artisan bloodhound:rebuild-totals
+```
+
+It derives every member's seedtime and leechtime from the announce log, as far back as
+your retention has kept it. Until you run it, `reconcile-ledger` reports each member's
+seedtime as drift and tells you to. It is safe after pruning, because the migrations
+record earlier prunes first (below).
+
 #### If you pruned on an earlier version
 
 Before pruning carried forward, every prune deleted credited rows and kept nothing. Those
@@ -530,6 +604,17 @@ Bloodhound applies `BlockBrowsers` middleware to tracker endpoints. This rejects
 - Laravel 13+
 - Redis
 - [marque/trove](https://packagist.org/packages/marque/trove)
+- A database at or above:
+
+| Engine | Minimum | Why |
+|---|---|---|
+| MySQL | 8.0 | window functions (seedtime is measured with `LAG()`) |
+| MariaDB | 10.3 | Laravel 13's own minimum |
+| PostgreSQL | 10 | Laravel 13's own minimum |
+| SQLite | 3.33 | `UPDATE ... FROM` (the aggregator's batched writes) |
+
+Below these you get a SQL syntax error from the aggregator, not a clear refusal. Check
+`SELECT VERSION()` (or `sqlite3 --version`) before upgrading.
 
 ## License
 

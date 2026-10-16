@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Marque\Bloodhound\Models\AnnounceLog;
 use Marque\Bloodhound\Models\LedgerCarry;
 use Marque\Bloodhound\Models\LedgerCursor;
+use Marque\Bloodhound\Support\SessionTime;
 
 /**
  * Answers the question the whole Spec exists for: is any of this wrong?
@@ -31,6 +32,11 @@ use Marque\Bloodhound\Models\LedgerCursor;
 class LedgerAuditor
 {
     /**
+     * The totals reconciliation checks, on users and on torrent_user.
+     */
+    private const TOTALS = ['uploaded', 'downloaded', 'seedtime', 'leechtime'];
+
+    /**
      * Compare the projections against the ledger they are derived from.
      *
      * Only rows the aggregator has actually consumed are counted as expected:
@@ -40,10 +46,11 @@ class LedgerAuditor
     public function reconcile(): LedgerReport
     {
         $watermark = LedgerCursor::positionFor(LedgerAggregator::STREAM);
+        $expected = $this->expectedTotals($watermark);
 
         return new LedgerReport(
-            userDrift: $this->userDrift($watermark),
-            torrentUserDrift: $this->torrentUserDrift($watermark),
+            userDrift: $this->userDrift($expected),
+            torrentUserDrift: $this->torrentUserDrift($expected),
             pending: AnnounceLog::query()->where('id', '>', $watermark)->count(),
         );
     }
@@ -60,53 +67,90 @@ class LedgerAuditor
     }
 
     /**
+     * What every (user, torrent) total should be: the ledger's bytes up to the
+     * watermark, the seedtime and leechtime its rows derive (the same
+     * SessionTime derivation the aggregator credits and rebuild replays), and
+     * whatever pruning carried forward (#11021).
+     *
+     * @return array<string, array{user_id: int, torrent_id: int, uploaded: int, downloaded: int, seedtime: int, leechtime: int}>
+     */
+    protected function expectedTotals(int $watermark): array
+    {
+        $expected = [];
+
+        $add = function (int $user, int $torrent, array $amounts) use (&$expected): void {
+            $key = $user.':'.$torrent;
+            $expected[$key] ??= ['user_id' => $user, 'torrent_id' => $torrent, 'uploaded' => 0, 'downloaded' => 0, 'seedtime' => 0, 'leechtime' => 0];
+
+            foreach ($amounts as $column => $amount) {
+                $expected[$key][$column] += $amount;
+            }
+        };
+
+        $bytes = AnnounceLog::query()
+            ->where('id', '<=', $watermark)
+            ->groupBy('user_id', 'torrent_id')
+            ->selectRaw('user_id, torrent_id, SUM(upload_delta) as up, SUM(download_delta) as down')
+            ->get();
+
+        foreach ($bytes as $row) {
+            $add((int) $row->user_id, (int) $row->torrent_id, ['uploaded' => (int) $row->up, 'downloaded' => (int) $row->down]);
+        }
+
+        $times = SessionTime::forLedger()
+            ->intervals(0, $watermark)
+            ->groupBy('user_id', 'torrent_id')
+            ->selectRaw('user_id, torrent_id, SUM(seed_seconds) as seed, SUM(leech_seconds) as leech')
+            ->get();
+
+        foreach ($times as $row) {
+            $add((int) $row->user_id, (int) $row->torrent_id, ['seedtime' => (int) $row->seed, 'leechtime' => (int) $row->leech]);
+        }
+
+        foreach (LedgerCarry::query()->get() as $carry) {
+            $add($carry->user_id, $carry->torrent_id, [
+                'uploaded' => $carry->uploaded,
+                'downloaded' => $carry->downloaded,
+                'seedtime' => $carry->seedtime,
+                'leechtime' => $carry->leechtime,
+            ]);
+        }
+
+        return $expected;
+    }
+
+    /**
+     * @param  array<string, array{user_id: int, torrent_id: int, uploaded: int, downloaded: int, seedtime: int, leechtime: int}>  $expected
      * @return array<int, array{user_id: int, column: string, recorded: int, expected: int}>
      */
-    protected function userDrift(int $watermark): array
+    protected function userDrift(array $expected): array
     {
         $userModel = config('trove.user_model', 'App\\Models\\User');
         $table = (new $userModel)->getTable();
 
-        $expected = AnnounceLog::query()
-            ->where('id', '<=', $watermark)
-            ->groupBy('user_id')
-            ->selectRaw('user_id, SUM(upload_delta) as up, SUM(download_delta) as down')
-            ->get()
-            ->keyBy('user_id');
+        $perUser = [];
 
-        // Pruned rows' credit (#11021). Expected is the ledger's rows plus
-        // its carry; without the carry, every pruned user reads as drift.
-        $carried = LedgerCarry::query()
-            ->groupBy('user_id')
-            ->selectRaw('user_id, SUM(uploaded) as up, SUM(downloaded) as down')
-            ->get()
-            ->keyBy('user_id');
+        foreach ($expected as $totals) {
+            foreach (self::TOTALS as $column) {
+                $perUser[$totals['user_id']][$column] = ($perUser[$totals['user_id']][$column] ?? 0) + $totals[$column];
+            }
+        }
 
         $drift = [];
 
-        foreach (DB::table($table)->select(['id', 'uploaded', 'downloaded'])->get() as $user) {
-            $row = $expected->get($user->id);
-            $carry = $carried->get($user->id);
+        foreach (DB::table($table)->select(array_merge(['id'], self::TOTALS))->get() as $user) {
+            foreach (self::TOTALS as $column) {
+                $recorded = (int) $user->{$column};
+                $should = $perUser[(int) $user->id][$column] ?? 0;
 
-            $expectedUp = (int) ($row->up ?? 0) + (int) ($carry->up ?? 0);
-            $expectedDown = (int) ($row->down ?? 0) + (int) ($carry->down ?? 0);
-
-            if ((int) $user->uploaded !== $expectedUp) {
-                $drift[] = [
-                    'user_id' => (int) $user->id,
-                    'column' => 'uploaded',
-                    'recorded' => (int) $user->uploaded,
-                    'expected' => $expectedUp,
-                ];
-            }
-
-            if ((int) $user->downloaded !== $expectedDown) {
-                $drift[] = [
-                    'user_id' => (int) $user->id,
-                    'column' => 'downloaded',
-                    'recorded' => (int) $user->downloaded,
-                    'expected' => $expectedDown,
-                ];
+                if ($recorded !== $should) {
+                    $drift[] = [
+                        'user_id' => (int) $user->id,
+                        'column' => $column,
+                        'recorded' => $recorded,
+                        'expected' => $should,
+                    ];
+                }
             }
         }
 
@@ -114,49 +158,29 @@ class LedgerAuditor
     }
 
     /**
+     * @param  array<string, array{user_id: int, torrent_id: int, uploaded: int, downloaded: int, seedtime: int, leechtime: int}>  $expected
      * @return array<int, array{user_id: int, torrent_id: int, column: string, recorded: int, expected: int}>
      */
-    protected function torrentUserDrift(int $watermark): array
+    protected function torrentUserDrift(array $expected): array
     {
-        $expected = AnnounceLog::query()
-            ->where('id', '<=', $watermark)
-            ->groupBy('user_id', 'torrent_id')
-            ->selectRaw('user_id, torrent_id, SUM(upload_delta) as up, SUM(download_delta) as down')
-            ->get()
-            ->keyBy(fn ($row) => $row->user_id.':'.$row->torrent_id);
-
-        $carried = LedgerCarry::query()
-            ->get()
-            ->keyBy(fn (LedgerCarry $carry) => $carry->user_id.':'.$carry->torrent_id);
-
         $drift = [];
 
         foreach (DB::table('torrent_user')->get() as $row) {
-            $key = $row->user_id.':'.$row->torrent_id;
-            $sums = $expected->get($key);
-            $carry = $carried->get($key);
+            $totals = $expected[$row->user_id.':'.$row->torrent_id] ?? null;
 
-            $expectedUp = (int) ($sums->up ?? 0) + ($carry->uploaded ?? 0);
-            $expectedDown = (int) ($sums->down ?? 0) + ($carry->downloaded ?? 0);
+            foreach (self::TOTALS as $column) {
+                $recorded = (int) $row->{$column};
+                $should = $totals[$column] ?? 0;
 
-            if ((int) $row->uploaded !== $expectedUp) {
-                $drift[] = [
-                    'user_id' => (int) $row->user_id,
-                    'torrent_id' => (int) $row->torrent_id,
-                    'column' => 'uploaded',
-                    'recorded' => (int) $row->uploaded,
-                    'expected' => $expectedUp,
-                ];
-            }
-
-            if ((int) $row->downloaded !== $expectedDown) {
-                $drift[] = [
-                    'user_id' => (int) $row->user_id,
-                    'torrent_id' => (int) $row->torrent_id,
-                    'column' => 'downloaded',
-                    'recorded' => (int) $row->downloaded,
-                    'expected' => $expectedDown,
-                ];
+                if ($recorded !== $should) {
+                    $drift[] = [
+                        'user_id' => (int) $row->user_id,
+                        'torrent_id' => (int) $row->torrent_id,
+                        'column' => $column,
+                        'recorded' => $recorded,
+                        'expected' => $should,
+                    ];
+                }
             }
         }
 
