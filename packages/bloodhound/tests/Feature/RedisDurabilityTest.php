@@ -118,6 +118,12 @@ describe('bloodhound:check-redis', function () {
 });
 
 describe('when Redis is not durable', function () {
+    // Back to testing before teardown: Testbench rolls the fixture migrations
+    // back then, and in production a rollback asks for confirmation.
+    afterEach(function () {
+        $this->app['env'] = 'testing';
+    });
+
     test('production refuses announces, writes nothing, and says why once', function () {
         Log::spy();
         $this->app['env'] = 'production';
