@@ -430,6 +430,19 @@ named route — a major version for usarrs and a broken deep link for anyone who
 it — so in this version the two coexist. Whether it goes is a decision for later, once the
 dashboard has proven itself.
 
+### Seedboxes
+
+When a tracker keeps seedboxes (bloodhound binds trove's `SeedboxesInterface`), members
+manage theirs at **`/profile/seedboxes`**, linked from `/profile/stats`. They register an
+address or a range, see whether it is approved, and remove it. Admins approve and revoke
+at **`/admin/seedboxes`**, which is advertised to the admin panel. Both are admin-only on
+the approving side, because an approved seedbox raises the speed limit its member's
+announces are held to.
+
+The tracker decides what a valid range is and what approval means. usarrs shows its
+answers, including its reason when it refuses a range. With no such tracker, both routes
+still exist (a link to them is never fatal) and answer 404, and nothing links to them.
+
 ## Requirements
 
 - PHP 8.3+

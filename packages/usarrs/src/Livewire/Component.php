@@ -6,6 +6,7 @@ namespace Marque\Usarrs\Livewire;
 
 use Illuminate\Contracts\View\View;
 use Livewire\Component as LivewireComponent;
+use Marque\Trove\Contracts\SeedboxesInterface;
 use Marque\Trove\Contracts\TrackerStatsInterface;
 
 abstract class Component extends LivewireComponent
@@ -22,6 +23,19 @@ abstract class Component extends LivewireComponent
     {
         return app()->bound(TrackerStatsInterface::class)
             ? app(TrackerStatsInterface::class)
+            : null;
+    }
+
+    /**
+     * The tracker's seedbox store, or null if there is none.
+     *
+     * Bound only by a tracker that measures announce speeds (bloodhound);
+     * asked for, never assumed, as tracker() is.
+     */
+    protected function seedboxes(): ?SeedboxesInterface
+    {
+        return app()->bound(SeedboxesInterface::class)
+            ? app(SeedboxesInterface::class)
             : null;
     }
 

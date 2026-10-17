@@ -18,6 +18,7 @@ use Livewire\Livewire;
 use Marque\Trove\Contracts\TrackerStatsInterface;
 use Marque\Trove\Contracts\UserInterface;
 use Marque\Trove\Enums\Role;
+use Marque\Trove\Contracts\SeedboxesInterface;
 use Marque\Trove\Registry\AdminScreen;
 use Marque\Trove\Registry\AdminScreenRegistry;
 use Marque\Trove\Registry\DashboardPanel;
@@ -31,6 +32,7 @@ use Marque\Usarrs\Enums\UserStatus;
 use Marque\Usarrs\Http\Middleware\EnsureUserIsActive;
 use Marque\Usarrs\Listeners\RefuseInactiveLogin;
 use Marque\Usarrs\Listeners\StampSessionPasswordHash;
+use Marque\Usarrs\Livewire\Admin\SeedboxIndex;
 use Marque\Usarrs\Livewire\Admin\UserIndex;
 use Marque\Usarrs\Livewire\Admin\UserShow;
 use Marque\Usarrs\Livewire\Auth\ConfirmOAuthLink;
@@ -48,6 +50,7 @@ use Marque\Usarrs\Livewire\Invite\InviteIndex;
 use Marque\Usarrs\Livewire\Profile\AnnounceKeyManagement;
 use Marque\Usarrs\Livewire\Profile\Edit;
 use Marque\Usarrs\Livewire\Profile\PasskeyManagement;
+use Marque\Usarrs\Livewire\Profile\SeedboxManagement;
 use Marque\Usarrs\Livewire\Profile\Show;
 use Marque\Usarrs\Livewire\Profile\TwoFactorSetup;
 use Marque\Usarrs\Models\Invite;
@@ -221,6 +224,22 @@ class UsarrsServiceProvider extends ServiceProvider
             group: 'Users',
             position: 10,
         ));
+
+        // Only where a tracker keeps seedboxes: the screen 404s otherwise. The
+        // tracker binds in its register(), which has run by now (boot).
+        if ($this->app->bound(SeedboxesInterface::class)) {
+            $registry->register(new AdminScreen(
+                identifier: 'usarrs-seedboxes',
+                label: 'Seedboxes',
+                component: 'usarrs-admin-seedbox-index',
+                path: 'admin/seedboxes',
+                // SeedboxIndex refuses anyone below admin.
+                minimumRole: Role::Admin,
+                icon: 'server',
+                group: 'Users',
+                position: 20,
+            ));
+        }
     }
 
     /**
@@ -381,6 +400,8 @@ class UsarrsServiceProvider extends ServiceProvider
         Livewire::component('usarrs-announce-key-management', AnnounceKeyManagement::class);
         Livewire::component('usarrs-admin-user-index', UserIndex::class);
         Livewire::component('usarrs-admin-user-show', UserShow::class);
+        Livewire::component('usarrs-admin-seedbox-index', SeedboxIndex::class);
+        Livewire::component('usarrs-seedbox-management', SeedboxManagement::class);
         Livewire::component('usarrs-invite-index', InviteIndex::class);
         Livewire::component('usarrs-invite-create', InviteCreate::class);
     }

@@ -7,6 +7,16 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+### Added
+
+- **Seedbox screens.** When a tracker binds trove's `SeedboxesInterface` (bloodhound 8.0),
+  members register, view and remove their seedboxes at `/profile/seedboxes`, linked from
+  `/profile/stats`, and admins approve or revoke them at `/admin/seedboxes`, advertised to
+  the admin panel. Without such a tracker, both routes answer 404 and nothing links to
+  them. Requires the trove release that adds the contract.
+
 ## [8.2.1] — 2026-10-03
 
 > Ships what 8.2.0 should have contained: 8.2.0 reached Packagist without its last fix (manage_auth off no longer errors for unverified members) and its README corrections.

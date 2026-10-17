@@ -8,6 +8,7 @@ use Marque\Usarrs\Tests\PrefixedTestCase;
 use Marque\Usarrs\Tests\SocialiteDriverTestCase;
 use Marque\Usarrs\Tests\TestCase;
 use Marque\Usarrs\Tests\ThirdPartyPanelTestCase;
+use Marque\Usarrs\Tests\SeedboxesBoundTestCase;
 use Marque\Usarrs\Tests\TrackerBoundTestCase;
 
 // manage_auth=false flips route/component registration at boot, so it needs
@@ -21,7 +22,7 @@ pest()->extend(TestCase::class)->in(
     'Unit',
     ...array_filter(
         glob(__DIR__.'/Feature/*'),
-        fn (string $path) => ! in_array(basename($path), ['ManageAuthDisabled', 'TrackerBound', 'ThirdParty', 'SocialiteDriver', 'PasskeysEnabled', 'Prefixed'], true),
+        fn (string $path) => ! in_array(basename($path), ['ManageAuthDisabled', 'TrackerBound', 'SeedboxesBound', 'ThirdParty', 'SocialiteDriver', 'PasskeysEnabled', 'Prefixed'], true),
     ),
 );
 
@@ -30,6 +31,10 @@ pest()->extend(ManageAuthDisabledTestCase::class)->in('Feature/ManageAuthDisable
 // A tracker bound before boot, so the panels usarrs registers on that
 // capability are decided the way they would be on a real install.
 pest()->extend(TrackerBoundTestCase::class)->in('Feature/TrackerBound');
+
+// Job #193: the seedbox screens with a tracker's SeedboxesInterface bound,
+// for the same reason as TrackerBound: it has to be bound before boot().
+pest()->extend(SeedboxesBoundTestCase::class)->in('Feature/SeedboxesBound');
 
 // A third-party provider booted after usarrs, contributing a dashboard panel
 // from its own boot() (Spec #118 criterion 5).
