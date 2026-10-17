@@ -227,19 +227,35 @@ return [
     'anti_cheat' => [
         'enabled' => env('BLOODHOUND_ANTICHEAT', true),
 
-        // Maximum upload speed in bytes/second (default 100 MB/s - generous for seedboxes)
+        // The speed cap for ordinary peers, in bytes/second, per direction.
+        // Bytes claimed over it in one interval are forfeited: not credited,
+        // and the baseline moves on so they never land later. Lower it to
+        // what your members' connections actually do; seedboxes have their
+        // own cap below. (100 MB/s is about 800 Mbit/s.)
         'max_upload_speed' => env('BLOODHOUND_MAX_UPLOAD_SPEED', 100 * 1024 * 1024),
-
-        // Maximum download speed in bytes/second (default 100 MB/s)
         'max_download_speed' => env('BLOODHOUND_MAX_DOWNLOAD_SPEED', 100 * 1024 * 1024),
 
-        // Minimum time between announces in seconds (prevent hammering)
+        // The cap for announces from a member's approved seedbox.
+        // 1,250,000,000 bytes/second is 10 Gbit/s.
+        'seedbox' => [
+            'max_upload_speed' => env('BLOODHOUND_SEEDBOX_MAX_UPLOAD_SPEED', 1_250_000_000),
+            'max_download_speed' => env('BLOODHOUND_SEEDBOX_MAX_DOWNLOAD_SPEED', 1_250_000_000),
+        ],
+
+        // Minimum seconds between two regular announces from one peer (a
+        // hammer guard). started, completed and stopped are never refused for
+        // timing.
         'min_announce_gap' => env('BLOODHOUND_MIN_ANNOUNCE_GAP', 60),
 
-        // Maximum simultaneous connections per user per torrent
-        'max_connections_per_torrent' => env('BLOODHOUND_MAX_CONN_TORRENT', 3),
+        // Locations a member may seed and leech one torrent from at once. A
+        // location is an IP address (an IPv6 /64). Only a NEW location is
+        // refused: a client already in the swarm is never cut off by a count.
+        // Leeching from more than one place is how one account is shared.
+        'max_seeding_locations_per_torrent' => env('BLOODHOUND_MAX_SEEDING_LOCATIONS', 3),
+        'max_leeching_locations_per_torrent' => env('BLOODHOUND_MAX_LEECHING_LOCATIONS', 1),
 
-        // Maximum simultaneous connections per IP
+        // Live sessions (one torrent, one peer ID) from one IP. A seedbox
+        // running hundreds of torrents from one address needs this raised.
         'max_connections_per_ip' => env('BLOODHOUND_MAX_CONN_IP', 10),
 
         // Block announces from known datacenter/proxy IPs (requires external list)

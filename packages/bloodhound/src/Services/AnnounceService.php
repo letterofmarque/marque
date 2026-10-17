@@ -10,7 +10,6 @@ use Marque\Bloodhound\Events\TorrentCompleted;
 use Marque\Bloodhound\Models\AnnounceLog;
 use Marque\Threepio\Enums\AnnounceEvent;
 use Marque\Threepio\Services\PeerService;
-use Marque\Threepio\Support\PeerLookup;
 use Marque\Threepio\Support\TrackerResponse;
 use Marque\Trove\Contracts\UserInterface;
 use Marque\Trove\Models\Torrent;
@@ -63,6 +62,13 @@ final class AnnounceService
             return TrackerResponse::error($reason);
         }
 
+        // One read of the peer, for anti-cheat and the credit alike, and one
+        // of the torrent's live peers, for the location limits and the
+        // response's peer list.
+        $lookup = $this->peerService->lookup($torrent->id, $peerId, $user->getAuthIdentifier());
+        $eventEnum = AnnounceEvent::tryFrom($event ?? '');
+        $livePeers = $eventEnum === AnnounceEvent::Stopped ? [] : $this->peerService->livePeers($torrent->id);
+
         $antiCheatCheck = $this->antiCheat->check(
             torrentId: $torrent->id,
             userId: $user->getAuthIdentifier(),
@@ -73,6 +79,9 @@ final class AnnounceService
             downloaded: $downloaded,
             left: $left,
             torrentSize: $torrent->size,
+            event: $eventEnum?->value,
+            lookup: $lookup,
+            livePeers: $livePeers,
         );
 
         if (! $antiCheatCheck['passed']) {
@@ -85,12 +94,12 @@ final class AnnounceService
             return TrackerResponse::error($reason);
         }
 
-        $lookup = $this->peerService->lookup($torrent->id, $peerId, $user->getAuthIdentifier());
+        $credit = new AnnounceCredit($lookup, $antiCheatCheck);
 
-        return match (AnnounceEvent::tryFrom($event ?? '')) {
-            AnnounceEvent::Stopped => $this->handleStopped($announce, $lookup),
-            AnnounceEvent::Completed => $this->handleCompleted($announce, $lookup, $compact, $numWant),
-            default => $this->handleRegular($announce, $lookup, $compact, $numWant),
+        return match ($eventEnum) {
+            AnnounceEvent::Stopped => $this->handleStopped($announce, $credit),
+            AnnounceEvent::Completed => $this->handleCompleted($announce, $credit, $livePeers, $compact, $numWant),
+            default => $this->handleRegular($announce, $credit, $livePeers, $compact, $numWant),
         };
     }
 
@@ -101,9 +110,9 @@ final class AnnounceService
      * since its last announce is credited here, bytes and time, against the
      * record about to be removed. The session ends: the record is not kept.
      */
-    private function handleStopped(AnnounceRequest $announce, PeerLookup $lookup): Response
+    private function handleStopped(AnnounceRequest $announce, AnnounceCredit $credit): Response
     {
-        $this->writeCredit($announce, $lookup->credit($announce->uploaded, $announce->downloaded));
+        $this->writeCredit($announce, $credit);
 
         $this->peerService->removePeer($announce->torrent->id, $announce->peerId);
 
@@ -129,7 +138,10 @@ final class AnnounceService
     /**
      * Handle completed event - peer finished downloading.
      */
-    private function handleCompleted(AnnounceRequest $announce, PeerLookup $lookup, bool $compact, int $numWant): Response
+    /**
+     * @param  array<string, array<string, mixed>>  $livePeers
+     */
+    private function handleCompleted(AnnounceRequest $announce, AnnounceCredit $credit, array $livePeers, bool $compact, int $numWant): Response
     {
         event(new TorrentCompleted(
             userId: $announce->user->getAuthIdentifier(),
@@ -144,14 +156,17 @@ final class AnnounceService
         //
         // Credited as a regular announce; the row says 'completed' because the
         // request label does.
-        return $this->handleRegular($announce, $lookup, $compact, $numWant);
+        return $this->handleRegular($announce, $credit, $livePeers, $compact, $numWant);
     }
 
     /**
      * Handle regular announce (started or interval) — also the shared tail
      * end of handleCompleted().
      */
-    private function handleRegular(AnnounceRequest $announce, PeerLookup $lookup, bool $compact, int $numWant): Response
+    /**
+     * @param  array<string, array<string, mixed>>  $livePeers
+     */
+    private function handleRegular(AnnounceRequest $announce, AnnounceCredit $credit, array $livePeers, bool $compact, int $numWant): Response
     {
         $isSeeder = $announce->left === 0;
         $torrentId = $announce->torrent->id;
@@ -159,7 +174,7 @@ final class AnnounceService
         // The ledger row first, then Redis. No stats dispatch: the aggregator
         // folds this row into the totals, and sending the same number through a
         // queue as well would put a second, losable copy in flight (Spec #99).
-        $this->writeCredit($announce, $lookup->credit($announce->uploaded, $announce->downloaded));
+        $this->writeCredit($announce, $credit);
 
         $this->peerService->upsertPeer(
             torrentId: $torrentId,
@@ -172,7 +187,7 @@ final class AnnounceService
             left: $announce->left,
             userAgent: $announce->userAgent,
             isSeeder: $isSeeder,
-            lookup: $lookup,
+            lookup: $credit->lookup,
         );
 
         $maxPeers = min($numWant, (int) config('threepio.max_peers_per_announce', 50));
@@ -181,6 +196,7 @@ final class AnnounceService
             excludePeerId: $announce->peerId,
             isSeeder: $isSeeder,
             limit: $maxPeers,
+            livePeers: $livePeers,
         );
 
         $useCompact = $this->shouldUseCompact($compact);
@@ -257,27 +273,30 @@ final class AnnounceService
      *
      * The interval goes to the state the peer was in when it began (Spec
      * #121): the announce that reports completion closes a leeching interval.
+     * A direction anti-cheat forfeited is recorded as 0, with the row flagged
+     * and the reason saying how much went uncredited.
      *
      * Stamped with the moment the credit was measured, which is also the
      * peer's new last announce in Redis: the next row's prior_at is then this
      * row's created_at exactly, and the audit can check every interval.
-     *
-     * @param  array{upload_delta: int, download_delta: int, prior_up: ?int, prior_down: ?int, prior_at: ?int, prior_left: ?int, interval_seconds: int, measured_at: int}  $credit
      */
-    private function writeCredit(AnnounceRequest $announce, array $credit): void
+    private function writeCredit(AnnounceRequest $announce, AnnounceCredit $announceCredit): void
     {
+        $credit = $announceCredit->lookup->credit($announce->uploaded, $announce->downloaded);
+        $check = $announceCredit->check;
         $seeding = ($credit['prior_left'] ?? $announce->left) === 0;
+        $forfeited = $check['forfeit_upload'] || $check['forfeit_download'];
 
         $this->writeRow($announce, [
-            'upload_delta' => $credit['upload_delta'],
-            'download_delta' => $credit['download_delta'],
+            'upload_delta' => $check['forfeit_upload'] ? 0 : $credit['upload_delta'],
+            'download_delta' => $check['forfeit_download'] ? 0 : $credit['download_delta'],
             'seed_seconds' => $seeding ? $credit['interval_seconds'] : 0,
             'leech_seconds' => $seeding ? 0 : $credit['interval_seconds'],
             'prior_up' => $credit['prior_up'],
             'prior_down' => $credit['prior_down'],
             'prior_at' => $credit['prior_at'] !== null ? $this->at($credit['prior_at']) : null,
-            'anti_cheat_flagged' => false,
-            'anti_cheat_reason' => null,
+            'anti_cheat_flagged' => $forfeited,
+            'anti_cheat_reason' => $forfeited ? $check['reason'] : null,
             'created_at' => $this->at($credit['measured_at']),
         ]);
     }

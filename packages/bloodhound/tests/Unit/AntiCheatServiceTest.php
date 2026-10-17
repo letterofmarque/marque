@@ -48,45 +48,4 @@ describe('AntiCheatService', function () {
             expect($service->checkPort(65535)['passed'])->toBeTrue();
         });
     });
-
-    describe('data sanity', function () {
-        it('allows valid data', function () {
-            $service = $this->app->make(AntiCheatService::class);
-
-            // uploaded, downloaded, left, torrentSize
-            // downloaded + left should roughly equal torrentSize
-            $result = $service->checkDataSanity(500000, 500000, 500000, 1000000);
-
-            expect($result['passed'])->toBeTrue();
-        });
-
-        it('allows completed download', function () {
-            $service = $this->app->make(AntiCheatService::class);
-
-            // Fully downloaded (left = 0)
-            $result = $service->checkDataSanity(1000000, 1000000, 0, 1000000);
-
-            expect($result['passed'])->toBeTrue();
-        });
-
-        it('rejects data inconsistency', function () {
-            $service = $this->app->make(AntiCheatService::class);
-
-            // downloaded + left != torrent size (way off)
-            $result = $service->checkDataSanity(0, 100000, 100000, 1000000);
-
-            expect($result['passed'])->toBeFalse();
-            expect($result['reason'])->toContain('inconsistency');
-        });
-
-        it('rejects download exceeding torrent size', function () {
-            $service = $this->app->make(AntiCheatService::class);
-
-            // downloaded > torrent size * 1.1
-            $result = $service->checkDataSanity(0, 2000000, 0, 1000000);
-
-            expect($result['passed'])->toBeFalse();
-            expect($result['reason'])->toContain('more than torrent size');
-        });
-    });
 });

@@ -188,15 +188,14 @@ describe('the existing Redis suspicious list', function () {
         // hasn't opted into announce_log at all. checkPort() rejects before
         // ever calling dispatchCheatEvent()/flagSuspicious() (confirmed by
         // reading AntiCheatService::check()), so this needs a violation that
-        // actually reaches that call — data sanity (downloaded > torrent
-        // size) does.
+        // actually reaches that call: more left than the torrent holds, which
+        // is reported (and, since Job #193, not refused).
         config(['bloodhound.announce_log.enabled' => false]);
         config(['bloodhound.anti_cheat.enabled' => true]);
 
         announceGet($this, announceUrl($this->user, $this->torrent, [
             'event' => 'started',
-            'downloaded' => $this->torrent->size * 2, // impossible — data sanity violation
-            'left' => 0,
+            'left' => $this->torrent->size * 2, // impossible: a data anomaly
         ]));
 
         $antiCheat = app(AntiCheatService::class);

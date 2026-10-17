@@ -19,7 +19,9 @@ use Marque\Bloodhound\Contracts\AnnounceLogServiceInterface;
 use Marque\Bloodhound\Events\TorrentCompleted;
 use Marque\Bloodhound\Listeners\IssueAnnounceKeyOnVerification;
 use Marque\Bloodhound\Listeners\RecordCompletion;
+use Marque\Bloodhound\Contracts\SeedboxRegistry;
 use Marque\Bloodhound\Models\AnnounceLog;
+use Marque\Bloodhound\Support\NoSeedboxes;
 use Marque\Bloodhound\Services\AnnounceLogService;
 use Marque\Bloodhound\Services\AnnounceService;
 use Marque\Bloodhound\Services\AntiCheatService;
@@ -55,6 +57,10 @@ class BloodhoundServiceProvider extends ServiceProvider
         // What downloads and uploads need from this tracker (#10947): the
         // member's keyed announce URL, and private torrents by default.
         $this->app->singleton(TorrentFilePolicyInterface::class, TorrentFilePolicy::class);
+
+        // Which announces are held to the seedbox speed cap. The default knows
+        // no seedboxes; bloodhound's registered-seedbox store replaces it.
+        $this->app->singletonIf(SeedboxRegistry::class, NoSeedboxes::class);
 
         // Teach threepio's peer store to recover a lost baseline from the
         // ledger (Spec #99 CP3).
