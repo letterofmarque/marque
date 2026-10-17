@@ -87,7 +87,6 @@ abstract class TestCase extends BaseTestCase
         $app['config']->set('threepio.announce_interval', 1800);
         $app['config']->set('threepio.min_announce_interval', 300);
         $app['config']->set('threepio.peer_expiry', 3600);
-        $app['config']->set('bloodhound.queue.enabled', false);
 
         $app['config']->set('trove.user_model', TestUser::class);
     }

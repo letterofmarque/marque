@@ -7,6 +7,8 @@ namespace Marque\Bloodhound;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schedule;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 use Marque\Bloodhound\Console\Commands\AggregateLedger;
 use Marque\Bloodhound\Console\Commands\AuditLedger;
@@ -22,6 +24,7 @@ use Marque\Bloodhound\Events\TorrentCompleted;
 use Marque\Bloodhound\Listeners\IssueAnnounceKeyOnVerification;
 use Marque\Bloodhound\Listeners\RecordCompletion;
 use Marque\Bloodhound\Contracts\SeedboxRegistry;
+use Marque\Bloodhound\Exceptions\RemovedConfiguration;
 use Marque\Bloodhound\Models\AnnounceLog;
 use Marque\Bloodhound\Services\RedisDurability;
 use Marque\Bloodhound\Services\Seedboxes;
@@ -115,10 +118,6 @@ class BloodhoundServiceProvider extends ServiceProvider
      */
     protected function recoverBaselineFromLedger(int $torrentId, string $peerId, ?int $userId = null): ?array
     {
-        if (! config('bloodhound.announce_log.enabled', true)) {
-            return null;
-        }
-
         $last = AnnounceLog::query()
             ->where('torrent_id', $torrentId)
             ->where('peer_id', $peerId)
@@ -142,6 +141,8 @@ class BloodhoundServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->refuseRemovedConfiguration();
+
         $this->loadRoutesFrom(__DIR__.'/../routes/tracker.php');
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
 
@@ -166,6 +167,36 @@ class BloodhoundServiceProvider extends ServiceProvider
     {
         Event::listen(TorrentCompleted::class, RecordCompletion::class);
         Event::listen(Verified::class, IssueAnnounceKeyOnVerification::class);
+    }
+
+    /**
+     * Stop a stale published config from silently changing what the tracker does.
+     *
+     * announce_log.enabled was removed in 8.0.0: credit is written only to
+     * the ledger, so a tracker without it credits nobody anything (F4). A
+     * config that still turns it off is refused outright. One that says true
+     * is the old default and harmless.
+     *
+     * max_connections_per_torrent was replaced by location limits. Ignoring it
+     * changes nothing dangerous, so it is reported once a day, not refused.
+     * The retired queue keys are ignored: nothing ever read them in 7.x either.
+     */
+    public function refuseRemovedConfiguration(): void
+    {
+        if (config('bloodhound.announce_log.enabled') === false) {
+            throw new RemovedConfiguration(
+                'bloodhound.announce_log.enabled was removed in 8.0.0: the ledger is always on, because every credit '
+                .'is written to it and nowhere else. Delete the key (or BLOODHOUND_ANNOUNCE_LOG) from your config.'
+            );
+        }
+
+        if (array_key_exists('max_connections_per_torrent', (array) config('bloodhound.anti_cheat'))
+            && Cache::add('bloodhound:removed-config-reported', true, 86_400)) {
+            Log::warning(
+                'bloodhound.anti_cheat.max_connections_per_torrent was removed in 8.0.0 and is ignored. '
+                .'Use max_seeding_locations_per_torrent and max_leeching_locations_per_torrent instead.'
+            );
+        }
     }
 
     /**

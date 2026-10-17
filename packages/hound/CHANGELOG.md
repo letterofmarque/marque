@@ -17,6 +17,12 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   `stopped`; it now counts once per torrent. A client with a peer ID per torrent counts
   as before. Raise the cap if your users run many torrents from one address.
 
+### Fixed
+
+- **An IP at its cap was refused on its own next announce.** The count included the
+  announcing session, so an address at `max_per_ip` could neither keep seeding nor send
+  `stopped`, and its peers aged out of the swarm. Only a new session is refused now.
+
 ## [4.0.0] — 2026-10-06
 
 > Downloads carry hound's open announce URL, and uploads must be public torrents by default.

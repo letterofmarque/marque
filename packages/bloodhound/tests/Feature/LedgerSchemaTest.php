@@ -128,11 +128,11 @@ describe('opening_balance event', function () {
 });
 
 describe('logging default', function () {
-    // Inverted from Spec #98. #98 shipped this off because it was an optional
-    // investigative extra; Spec #99 makes it the source of truth for ratio, and
-    // a source of truth cannot be optional.
-    test('announce_log is enabled by default', function () {
-        expect(config('bloodhound.announce_log.enabled'))->toBeTrue();
+    // Inverted from Spec #98, then made permanent: Spec #99 made it the source
+    // of truth for ratio, and since Job #193 every credit is written to it and
+    // nowhere else. There is no switch (see RemovedConfigTest).
+    test('announce_log has no off switch', function () {
+        expect(config('bloodhound.announce_log'))->not->toHaveKey('enabled');
     });
 
     test('retention still defaults to keeping everything', function () {

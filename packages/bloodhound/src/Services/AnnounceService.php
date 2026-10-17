@@ -327,10 +327,6 @@ final class AnnounceService
      */
     private function writeRow(AnnounceRequest $announce, array $outcome): void
     {
-        if (! config('bloodhound.announce_log.enabled', true)) {
-            return;
-        }
-
         // Written synchronously, before Redis and before the response.
         //
         // This row is the durable record of what the tracker credited, and

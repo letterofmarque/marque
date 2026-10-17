@@ -42,8 +42,10 @@ final class AnnounceService
             return TrackerResponse::error("Port {$port} is blacklisted");
         }
 
-        // IP limiting
-        if (config('hound.ip_limiting.enabled', true)) {
+        // IP limiting: a new session past the cap is refused. One already in
+        // the swarm never is, or an IP at its cap could neither keep seeding
+        // nor say it was leaving (the count included the announcer itself).
+        if (config('hound.ip_limiting.enabled', true) && $this->peerService->getPeer($torrent->id, $peerId) === null) {
             $maxPerIp = (int) config('hound.ip_limiting.max_per_ip', 50);
             $ipCount = $this->peerService->getIpSessionCount($ip);
 

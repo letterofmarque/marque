@@ -82,15 +82,6 @@ describe('the write is synchronous', function () {
 
         Queue::assertNothingPushed();
     });
-
-    test('disabling the queue changes nothing about the ledger', function () {
-        config(['bloodhound.queue.enabled' => false]);
-
-        ledgerAnnounce($this, ledgerUrl($this->user, $this->torrent, ['event' => 'started']))
-            ->assertOk();
-
-        expect(AnnounceLog::count())->toBe(1);
-    });
 });
 
 describe('prior counters are recorded', function () {

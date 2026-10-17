@@ -296,30 +296,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Stats Queue — DEPRECATED, no longer read
-    |--------------------------------------------------------------------------
-    |
-    | Stats no longer travel through a queue. Byte counts are written to the
-    | ledger on the announce path and folded into totals by
-    | bloodhound:aggregate-ledger, so nothing in this package reads these keys
-    | any more (Spec #99).
-    |
-    | Kept for one release so an existing published config does not break, and
-    | removed in the next major.
-    |
-    */
-
-    'queue' => [
-        // check-docs: ignore — retired by the ledger, removed at the next major (#10816)
-        'enabled' => env('BLOODHOUND_QUEUE_STATS', true),
-        // check-docs: ignore — retired by the ledger, removed at the next major (#10816)
-        'connection' => env('BLOODHOUND_QUEUE_CONNECTION', null), // null = default
-        // check-docs: ignore — retired by the ledger, removed at the next major (#10816)
-        'queue' => env('BLOODHOUND_QUEUE_NAME', 'tracker'),
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
     | Completion Cooldown
     |--------------------------------------------------------------------------
     |
@@ -357,9 +333,9 @@ return [
     | cannot be opt-in: an install running without it has no way to know its
     | ratios are wrong, and ratio is what gets people banned.
     |
-    | Turning it off is supported, but it disables reconciliation, the rebuild
-    | command, and the arithmetic audit along with it. You are choosing to
-    | accumulate numbers nothing can verify.
+    | It cannot be turned off. Every credit is written here and nowhere else,
+    | so a tracker without it would credit nobody anything. (The `enabled` key
+    | was removed in 8.0.0; a config still setting it false is refused.)
     |
     | 'connection' lets you write this table to a SEPARATE database from the
     | rest of the app — set it to any connection name defined in
@@ -374,18 +350,16 @@ return [
     | everything stays the default because retention is an operator judgement
     | about storage, not something to guess on their behalf.
     |
-    | Pruning carries forward what it deletes: the credit the pruned rows
-    | produced moves into ledger_carry in the same transaction, so reconcile
-    | and rebuild-totals stay exact after a prune. Rows the aggregator has not
-    | consumed yet are never pruned, whatever their age, and neither is each
-    | peer's latest aggregated announce unless it was a stop: a later announce
-    | is measured from it. So the table stops at your retention window plus
-    | about one row per session that ended without a stop.
+    | Pruning carries forward what it deletes: each row carries its own credit
+    | (bytes and seconds), and what the pruned rows credited moves into
+    | ledger_carry in the same transaction, so reconcile and rebuild-totals
+    | stay exact after a prune. Rows the aggregator has not consumed yet are
+    | never pruned, whatever their age. So the table stops at your retention
+    | window.
     |
     */
 
     'announce_log' => [
-        'enabled' => env('BLOODHOUND_ANNOUNCE_LOG', true),
         'connection' => env('BLOODHOUND_ANNOUNCE_LOG_CONNECTION'),
         'retention_days' => env('BLOODHOUND_ANNOUNCE_LOG_RETENTION_DAYS'),
     ],
