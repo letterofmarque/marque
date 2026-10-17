@@ -7,6 +7,16 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+### Added
+
+- **`Contracts\SeedboxesInterface`** and **`Support\Seedbox`**: members' registered
+  seedboxes, for a frontend to manage without knowing the tracker. A member registers an
+  address or range, an admin approves or revokes it, and an approved seedbox's announces
+  are held to the tracker's seedbox speed cap. Implemented by bloodhound 8.0. As with
+  `TrackerStatsInterface`, check `app()->bound(SeedboxesInterface::class)` before using it.
+
 ## [4.5.0] — 2026-10-06
 
 > Lets the installed tracker decide what an uploaded .torrent must be and what goes into a download: `TorrentFilePolicyInterface`, a `PrivateFlag` rule, and `TorrentFileService`, which refuses an upload that breaks the rule and builds each member's download around the untouched info dictionary.

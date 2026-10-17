@@ -237,9 +237,16 @@ return [
 
         // The cap for announces from a member's approved seedbox.
         // 1,250,000,000 bytes/second is 10 Gbit/s.
+        // Members register seedboxes (an address, or a provider's range);
+        // with require_approval an admin approves each one before its cap
+        // applies. A range may be at most a /24 (IPv4) or a /48 (IPv6), so it
+        // cannot take in other customers of the same provider.
         'seedbox' => [
             'max_upload_speed' => env('BLOODHOUND_SEEDBOX_MAX_UPLOAD_SPEED', 1_250_000_000),
             'max_download_speed' => env('BLOODHOUND_SEEDBOX_MAX_DOWNLOAD_SPEED', 1_250_000_000),
+            'require_approval' => env('BLOODHOUND_SEEDBOX_REQUIRE_APPROVAL', true),
+            'min_prefix_v4' => 24,
+            'min_prefix_v6' => 48,
         ],
 
         // Minimum seconds between two regular announces from one peer (a

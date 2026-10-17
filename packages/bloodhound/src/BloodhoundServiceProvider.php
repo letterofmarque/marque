@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\ServiceProvider;
 use Marque\Bloodhound\Console\Commands\AggregateLedger;
 use Marque\Bloodhound\Console\Commands\AuditLedger;
+use Marque\Bloodhound\Console\Commands\ManageSeedboxes;
 use Marque\Bloodhound\Console\Commands\PruneAnnounceLog;
 use Marque\Bloodhound\Console\Commands\RebuildTotals;
 use Marque\Bloodhound\Console\Commands\ReconcileLedger;
@@ -21,7 +22,7 @@ use Marque\Bloodhound\Listeners\IssueAnnounceKeyOnVerification;
 use Marque\Bloodhound\Listeners\RecordCompletion;
 use Marque\Bloodhound\Contracts\SeedboxRegistry;
 use Marque\Bloodhound\Models\AnnounceLog;
-use Marque\Bloodhound\Support\NoSeedboxes;
+use Marque\Bloodhound\Services\Seedboxes;
 use Marque\Bloodhound\Services\AnnounceLogService;
 use Marque\Bloodhound\Services\AnnounceService;
 use Marque\Bloodhound\Services\AntiCheatService;
@@ -30,6 +31,7 @@ use Marque\Bloodhound\Services\TorrentFilePolicy;
 use Marque\Bloodhound\Services\TrackerStatsService;
 use Marque\Threepio\Services\PeerService;
 use Marque\Trove\Contracts\TorrentFilePolicyInterface;
+use Marque\Trove\Contracts\SeedboxesInterface;
 use Marque\Trove\Contracts\TrackerStatsInterface;
 
 class BloodhoundServiceProvider extends ServiceProvider
@@ -58,9 +60,12 @@ class BloodhoundServiceProvider extends ServiceProvider
         // member's keyed announce URL, and private torrents by default.
         $this->app->singleton(TorrentFilePolicyInterface::class, TorrentFilePolicy::class);
 
-        // Which announces are held to the seedbox speed cap. The default knows
-        // no seedboxes; bloodhound's registered-seedbox store replaces it.
-        $this->app->singletonIf(SeedboxRegistry::class, NoSeedboxes::class);
+        // Members' seedboxes (Job #193): one store, two faces. trove's
+        // SeedboxesInterface is what a frontend manages them through;
+        // SeedboxRegistry is the question the announce path asks.
+        $this->app->singleton(Seedboxes::class);
+        $this->app->singleton(SeedboxesInterface::class, fn ($app) => $app->make(Seedboxes::class));
+        $this->app->singleton(SeedboxRegistry::class, fn ($app) => $app->make(Seedboxes::class));
 
         // Teach threepio's peer store to recover a lost baseline from the
         // ledger (Spec #99 CP3).
@@ -168,6 +173,7 @@ class BloodhoundServiceProvider extends ServiceProvider
         $this->commands([
             AggregateLedger::class,
             AuditLedger::class,
+            ManageSeedboxes::class,
             PruneAnnounceLog::class,
             RebuildTotals::class,
             RecordPrunedHistory::class,
