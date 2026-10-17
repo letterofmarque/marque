@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 use Marque\Bloodhound\Console\Commands\AggregateLedger;
 use Marque\Bloodhound\Console\Commands\AuditLedger;
+use Marque\Bloodhound\Console\Commands\BackfillLedger;
 use Marque\Bloodhound\Console\Commands\CheckRedis;
 use Marque\Bloodhound\Console\Commands\ManageSeedboxes;
 use Marque\Bloodhound\Console\Commands\PruneAnnounceLog;
@@ -218,6 +219,7 @@ class BloodhoundServiceProvider extends ServiceProvider
         $this->commands([
             AggregateLedger::class,
             AuditLedger::class,
+            BackfillLedger::class,
             CheckRedis::class,
             ManageSeedboxes::class,
             PruneAnnounceLog::class,

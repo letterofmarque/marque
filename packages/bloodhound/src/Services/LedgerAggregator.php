@@ -232,6 +232,29 @@ class LedgerAggregator
     }
 
     /**
+     * Add amounts to the totals directly: credit that is not a ledger row's
+     * (carry recorded by an upgrade step), written the way a fold writes.
+     * The caller holds the cursor lock.
+     *
+     * @param  array<string, array{user_id: int, torrent_id: int, uploaded: int, downloaded: int, seedtime: int, leechtime: int}>  $perTorrent
+     */
+    public function addToTotals(array $perTorrent): void
+    {
+        $perUser = [];
+
+        foreach ($perTorrent as $entry) {
+            $perUser[$entry['user_id']] ??= ['uploaded' => 0, 'downloaded' => 0, 'seedtime' => 0, 'leechtime' => 0];
+
+            foreach (self::TOTALS as $column) {
+                $perUser[$entry['user_id']][$column] += $entry[$column];
+            }
+        }
+
+        $this->addToTorrentUsers($perTorrent);
+        $this->addToUsers($perUser);
+    }
+
+    /**
      * @return array{user_id: int, torrent_id: int, uploaded: int, downloaded: int, seedtime: int, leechtime: int}
      */
     protected function emptyEntry(int $userId, int $torrentId): array
