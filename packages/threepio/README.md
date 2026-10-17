@@ -65,15 +65,18 @@ catalogue-only or API-only deployment with no tracker package. If you have `bloo
 #### What happens if Redis loses state
 
 Worth knowing before you decide where to run it. Redis holds the baseline that announce
-deltas are diffed against. If it restarts and comes back empty, the next announce has
-nothing to compare against and credits **zero** — silently — for everything that peer
-transferred across the gap.
+deltas are diffed against. If it restarts and comes back empty, or evicts a peer's record,
+the next announce has nothing to compare against and credits **zero** — silently — for
+everything that peer transferred across the gap.
 
 On a public tracker that costs nothing, because nobody is credited anyway. On a private
-tracker it is ratio data quietly going wrong, which is what gets people banned.
-`bloodhound` closes this with the [baseline resolver](#the-baseline-resolver) wired to its
-announce ledger, so the durable record supplies the baseline Redis lost. That mechanism is
-the reason the ledger exists.
+tracker it is ratio data quietly going wrong, which is what gets people banned. So
+`bloodhound` requires a Redis that persists (`appendonly yes`) and never evicts
+(`maxmemory-policy noeviction`), and refuses announces in production until it does. If
+Redis is lost anyway, bloodhound opens a recovery window in which the
+[resolver](#retained-baselines-and-the-resolver) reads a missing baseline from its
+announce ledger. See
+[bloodhound's README](../bloodhound/README.md#redis).
 
 ## What's in it
 

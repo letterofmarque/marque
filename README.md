@@ -25,18 +25,35 @@ Built by [Letter Of Marque Software](https://lom.software).
 
 ## Requirements
 
+- **A Redis server, plus `ext-redis` or `predis/predis`** — required by any deployment
+  serving announces, i.e. anything with `bloodhound` or `hound` installed. **For a private
+  tracker (bloodhound) it must persist and never evict:**
+
+  ```conf
+  appendonly yes
+  appendfsync everysec
+  maxmemory-policy noeviction
+  ```
+
+  on a database of its own (`THREEPIO_REDIS_CONNECTION`). Check it with
+  `php artisan bloodhound:check-redis`.
 - PHP 8.3+
 - Laravel 13+
-- A database — PostgreSQL, MySQL, MariaDB or SQLite
-- **A Redis server, plus `ext-redis` or `predis/predis`** — required by any deployment
-  serving announces, i.e. anything with `bloodhound` or `hound` installed
+- A database — PostgreSQL, MySQL, MariaDB or SQLite (3.33+ for bloodhound)
 
 Redis is not optional and not a cache you can swap out. Peer storage uses Redis sets,
 hashes and atomic counters directly; pointing `CACHE_STORE` elsewhere does not degrade
 the tracker, it fatals on the first announce. A catalogue-only or API-only install with
 no tracker package genuinely does not need it. See
 [`packages/threepio/README.md`](packages/threepio/README.md#redis-is-required-and-it-is-a-real-redis)
-for the detail, including what happens if Redis restarts empty.
+for the detail.
+
+A private tracker credits every announce against peer state held in Redis, so there Redis
+holds what your members' ratio is measured from. In production bloodhound refuses
+announces on a Redis without AOF or with an evicting policy, and `marque:install` won't
+install a private tracker on one. If your provider makes the data durable another way and
+offers no AOF, set `BLOODHOUND_REDIS_DURABILITY=attested`; the eviction policy is still
+checked. See [bloodhound's README](packages/bloodhound/README.md#redis).
 
 ## Start here
 
@@ -65,7 +82,9 @@ account you could never sign in as. The installer refuses to start while
 setting, not that mail actually arrives.
 
 **You will need Redis running.** Every tracker keeps its peers in Redis, so the
-installer refuses to continue if it can't reach the connection threepio uses.
+installer refuses to continue if it can't reach the connection threepio uses. For a
+private tracker it also refuses, before installing anything, until that Redis persists
+and never evicts (see [Requirements](#requirements)).
 
 **Build your assets before you run it, and again after** — `npm install && npm run
 build`. Laravel doesn't ship compiled assets, and until they're built every page fails
@@ -144,9 +163,10 @@ composer require marque/skipper
 - Configurable policies for torrent management
 
 ### Bloodhound (Tracker)
-- Redis-backed peer storage for high performance
+- Redis-backed peer storage, credited against at announce time
+- Ratio and seedtime summed from an append-only ledger that can be reconciled, audited and rebuilt
 - Version-based client whitelist/blacklist
-- Anti-cheat detection (speed limits, swarm consistency, connection limits)
+- Anti-cheat (speed caps that forfeit, location and per-IP limits, swarm consistency), with registered seedboxes on their own speed cap
 - Ratio tracking modes (full, off, seedtime) — planned, not yet enforced (#10732)
 - Support for compact and dictionary peer formats
 

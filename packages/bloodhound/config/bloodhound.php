@@ -11,15 +11,16 @@ return [
     | Settings specific to the private tracker. Shared protocol settings
     | (announce intervals, peer storage, ports) live in threepio config.
     |
-    | REQUIRES REDIS. Peer storage is a real Redis server, not Laravel's cache
-    | pointed at one — PeerService uses sets, hashes and atomic counters, none
-    | of which the cache abstraction offers. Without a working connection the
-    | announce path fatals on the first request. You need ext-redis or
-    | predis/predis installed; see packages/threepio/README.md.
+    | REQUIRES REDIS, AND A REDIS THAT KEEPS WHAT IT HOLDS. Peer storage is a
+    | real Redis server, not Laravel's cache pointed at one — PeerService uses
+    | sets, hashes and atomic counters, none of which the cache abstraction
+    | offers. You need ext-redis or predis/predis installed; see
+    | packages/threepio/README.md.
     |
-    | Note the failure mode if Redis restarts empty: it holds the baseline
-    | announce deltas are diffed against, so the next announce credits zero
-    | silently. The announce ledger below is what recovers from that.
+    | Every announce is credited against the peer's last counters, held in
+    | Redis, so Redis is a store here, not a cache: run it with appendonly yes
+    | and maxmemory-policy noeviction, on a database of its own. See 'redis'
+    | below for what happens when it isn't.
     |
     */
 
@@ -220,22 +221,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Anti-Cheat Configuration
-    |--------------------------------------------------------------------------
-    */
-
-    /*
-    |--------------------------------------------------------------------------
     | Redis
     |--------------------------------------------------------------------------
     |
     | Every announce is credited against the peer's last counters, kept in
-    | Redis, so Redis must keep what it holds: appendonly yes and
-    | maxmemory-policy noeviction, on a database of its own. In production
-    | announces are refused until it does; `php artisan bloodhound:check-redis`
-    | says what to change. If your provider makes the data durable another
-    | way (replication, snapshots) and offers no AOF, set durability to
-    | 'attested'; the eviction policy is still checked.
+    | Redis, so Redis must keep what it holds: appendonly yes (appendfsync
+    | everysec) and maxmemory-policy noeviction, on a database of its own
+    | (THREEPIO_REDIS_CONNECTION). In production, announces are refused
+    | until it does; elsewhere a warning is logged. The check is cached for
+    | five minutes, and `php artisan bloodhound:check-redis` says what to
+    | change. If your provider makes the data durable another way
+    | (replication, snapshots) and offers no AOF, set durability to
+    | 'attested': that covers persistence, and the eviction policy is still
+    | checked whenever Redis answers INFO.
+    |
+    | If Redis loses its data anyway, bloodhound notices and, for twice
+    | threepio.peer_expiry, reads a missing peer's baseline from the ledger
+    | (recovery mode; `bloodhound:check-redis --recover` opens it by hand).
     |
     */
 
@@ -244,27 +246,52 @@ return [
     ],
 
     // Seconds an expired peer's record is kept as its baseline after its last
-    // announce, so a member back from a crash without having sent `stopped`
-    // is credited what they moved in between.
+    // announce (7 days), so a member whose client comes back under the same
+    // peer ID without having sent `stopped` is credited what it moved in
+    // between. The hourly sweep moves expired records aside; a stopped peer
+    // is never kept.
     'baseline_retention' => env('BLOODHOUND_BASELINE_RETENTION', 7 * 86_400),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Anti-Cheat
+    |--------------------------------------------------------------------------
+    |
+    | Refuses only what a legitimate client never does, and never refuses a
+    | peer already in the swarm on a count: a bad port, a regular announce
+    | inside the minimum gap, a new location past the member's limit, a new
+    | session past the IP's. A refusal is a flagged ledger row that credits
+    | nothing and changes nothing in Redis; it fires no event. A speed over
+    | the cap is forfeited, not refused; it, a data anomaly and a sampled
+    | swarm anomaly fire CheatDetected.
+    |
+    | Removed in 8.0.0: max_connections_per_torrent, replaced by the two
+    | location limits below. If it is still set it is ignored, and a warning
+    | is logged once a day.
+    |
+    */
 
     'anti_cheat' => [
         'enabled' => env('BLOODHOUND_ANTICHEAT', true),
 
         // The speed cap for ordinary peers, in bytes/second, per direction.
         // Bytes claimed over it in one interval are forfeited: not credited,
-        // and the baseline moves on so they never land later. Lower it to
-        // what your members' connections actually do; seedboxes have their
-        // own cap below. (100 MB/s is about 800 Mbit/s.)
+        // and the baseline moves on so they never land later. The other
+        // direction and the time are still credited. Lower it to what your
+        // members' connections actually do; seedboxes have their own cap
+        // below. (100 MiB/s is about 840 Mbit/s.)
         'max_upload_speed' => env('BLOODHOUND_MAX_UPLOAD_SPEED', 100 * 1024 * 1024),
         'max_download_speed' => env('BLOODHOUND_MAX_DOWNLOAD_SPEED', 100 * 1024 * 1024),
 
-        // The cap for announces from a member's approved seedbox.
-        // 1,250,000,000 bytes/second is 10 Gbit/s.
+        // The cap for announces from inside one of the member's approved
+        // seedboxes. 1,250,000,000 bytes/second is 10 Gbit/s.
         // Members register seedboxes (an address, or a provider's range);
         // with require_approval an admin approves each one before its cap
-        // applies. A range may be at most a /24 (IPv4) or a /48 (IPv6), so it
-        // cannot take in other customers of the same provider.
+        // applies, and without it registering approves it. min_prefix_v4/v6
+        // are the widest range allowed: a /24 (IPv4) or a /48 (IPv6), so a
+        // range cannot take in other customers of the same provider. Only
+        // the speed cap changes for a seedbox; the location and per-IP
+        // limits still apply.
         'seedbox' => [
             'max_upload_speed' => env('BLOODHOUND_SEEDBOX_MAX_UPLOAD_SPEED', 1_250_000_000),
             'max_download_speed' => env('BLOODHOUND_SEEDBOX_MAX_DOWNLOAD_SPEED', 1_250_000_000),
@@ -274,19 +301,25 @@ return [
         ],
 
         // Minimum seconds between two regular announces from one peer (a
-        // hammer guard). started, completed and stopped are never refused for
-        // timing.
+        // hammer guard), measured from its last accepted announce. started,
+        // completed and stopped are never refused for timing, and a refusal
+        // moves nothing, so a client retrying early is accepted once the gap
+        // has passed.
         'min_announce_gap' => env('BLOODHOUND_MIN_ANNOUNCE_GAP', 60),
 
         // Locations a member may seed and leech one torrent from at once. A
         // location is an IP address (an IPv6 /64). Only a NEW location is
-        // refused: a client already in the swarm is never cut off by a count.
+        // refused: a client already in the swarm is never cut off by a count,
+        // so a leecher that finishes becomes a seeder without being refused,
+        // and a second client at a location already in use is not new.
         // Leeching from more than one place is how one account is shared.
+        // These replace max_connections_per_torrent.
         'max_seeding_locations_per_torrent' => env('BLOODHOUND_MAX_SEEDING_LOCATIONS', 3),
         'max_leeching_locations_per_torrent' => env('BLOODHOUND_MAX_LEECHING_LOCATIONS', 1),
 
-        // Live sessions (one torrent, one peer ID) from one IP. A seedbox
-        // running hundreds of torrents from one address needs this raised.
+        // Live sessions (one torrent, one peer ID) from one IP; only a new
+        // session is refused. A seedbox running hundreds of torrents from one
+        // address needs this raised.
         'max_connections_per_ip' => env('BLOODHOUND_MAX_CONN_IP', 10),
 
         // Block announces from known datacenter/proxy IPs (requires external list)
@@ -322,20 +355,20 @@ return [
     |--------------------------------------------------------------------------
     |
     | The ledger. Full-detail history of every announce — every started,
-    | regular-interval, completed, and stopped request, with the cumulative
-    | totals the client reported, the delta we credited, and the baseline that
-    | delta was computed against.
+    | regular-interval, completed, and stopped request, accepted or refused,
+    | with the cumulative totals the client reported, the bytes and seconds
+    | credited, and the baseline they were measured against. Each row carries
+    | its own credit, and every total is a sum of rows plus ledger_carry.
     |
-    | ON by default, and this is deliberate (Spec #99, inverting Spec #98).
-    | This table is the source of truth for ratio. User and per-torrent totals
-    | are projections rebuilt from it, and a wrong number can only be detected
-    | — let alone corrected — by comparing it against this. A source of truth
-    | cannot be opt-in: an install running without it has no way to know its
-    | ratios are wrong, and ratio is what gets people banned.
+    | This table is the source of truth for ratio and seedtime. User and
+    | per-torrent totals are projections summed from it, and a wrong number
+    | can only be detected — let alone corrected — by comparing it against
+    | this. Ratio is what gets people banned.
     |
     | It cannot be turned off. Every credit is written here and nowhere else,
     | so a tracker without it would credit nobody anything. (The `enabled` key
-    | was removed in 8.0.0; a config still setting it false is refused.)
+    | was removed in 8.0.0; a config still setting it false is refused at
+    | boot. The `queue` keys were removed too; nothing read them.)
     |
     | 'connection' lets you write this table to a SEPARATE database from the
     | rest of the app — set it to any connection name defined in

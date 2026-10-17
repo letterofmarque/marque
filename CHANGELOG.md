@@ -10,7 +10,7 @@ changelogs — edit those, not this.*
 
 ## 2026-10-16
 
-- **[bloodhound 8.0.0](packages/bloodhound/CHANGELOG.md)** — Seedtime and leechtime are measured for real, and pruning the announce log no longer costs members their credit; needs MySQL 8.0, MariaDB 10.3, PostgreSQL 10 or SQLite 3.33.
+- **[bloodhound 8.0.0](packages/bloodhound/CHANGELOG.md)** — Every announce is credited when it arrives, bytes and seedtime alike, against a Redis that must persist and never evict; anti-cheat stops refusing legitimate clients, and seedboxes get their own speed cap.
 
 ## 2026-10-06
 

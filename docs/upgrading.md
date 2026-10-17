@@ -30,12 +30,29 @@ the short version is that an old Marque package's own constraints block the new
 Laravel version just as much as the new Marque version needs it, so there is no
 working order to do it in two steps once anything is installed.
 
+**A private tracker (bloodhound 8.0, Marque 9.0) also needs two things Composer can't
+check:**
+
+- **A Redis that persists and never evicts**: `appendonly yes` (with `appendfsync
+  everysec`) and `maxmemory-policy noeviction`, on a database of its own. Bloodhound
+  credits every announce against peer state held in Redis, so a Redis that restarts empty
+  or evicts a key silently costs members their credit. In production bloodhound refuses
+  announces until this is right, and `marque:install` refuses to install a private tracker
+  without it. `php artisan bloodhound:check-redis` says what to set; a provider that makes
+  the data durable without AOF can set `BLOODHOUND_REDIS_DURABILITY=attested` (the
+  eviction policy is still checked). A public tracker (hound) is not held to this.
+- **SQLite 3.33 or later**, if you run on SQLite: the aggregator's batched writes use
+  `UPDATE ... FROM`, and an older SQLite fails with a syntax error rather than a clear
+  refusal. On MySQL, MariaDB and PostgreSQL bloodhound needs nothing beyond Laravel 13's
+  own minimums.
+
 ## Releases
 
 Newest first. Each links to the full write-up.
 
 | Release | Date | Summary | Who's affected |
 |---|---|---|---|
+| 9.0 ([upgrade steps](../packages/bloodhound/README.md#upgrading-from-7x-to-80)) | unreleased | Bloodhound credits every announce when it arrives, bytes and seedtime alike, against a Redis that must persist and never evict; anti-cheat stops refusing legitimate clients; members can register seedboxes (screens in usarrs) | anyone running bloodhound, who must configure Redis before upgrading; hound users (the per-IP cap counts sessions) |
 | [8.0](releases/8.0.md) | 2026-10-06 | Downloads carry each member's own announce URL around the untouched info dictionary; uploads must match the tracker's private-flag rule (bloodhound requires private, hound disallows it) | anyone running bloodhound or hound |
 | [7.0](releases/7.0.md) | 2026-09-25 | Tracker data gets an owner: packages ask a declared contract instead of probing your User model; announce keys move to a bloodhound-owned table; tracker columns no longer mass-assignable | anyone running bloodhound; anyone reading `$user->announce_key` |
 | [6.0](releases/6.0.md) | 2026-09-11 | Marque gets an admin panel (`marque/skipper`); `marque/ise` renamed to `marque/deck`; packages now declare their own nav entries and admin screens | anyone using guise, disguise, usarrs or parley |
@@ -84,6 +101,7 @@ release each guide belongs to.
 | 14 | Release | [Marque 7.0](releases/7.0.md) | 7.0 | The tracker stats contract; announce keys move to `announce_keys`; mass-assignment hole closed |
 | 15 | Guide | [bloodhound v6 / usarrs v8](upgrade-guide-bloodhound-v6-usarrs-v8.md) | 7.0 | Technical checklist: stop reading `$user->announce_key`, removed trait methods, published usarrs views |
 | 16 | Release | [Marque 8.0](releases/8.0.md) | 8.0 | Personalised downloads; private-flag rules on upload (set `*_PRIVATE_FLAG=allow` to keep the old behaviour) |
+| 17 | Guide | [bloodhound 7.x → 8.0](../packages/bloodhound/README.md#upgrading-from-7x-to-80) | 9.0 | Durable Redis first (production refuses announces without it), then config, migrate, the old Redis keys, and the optional history backfill |
 
 ## Currently at 2.x or earlier?
 

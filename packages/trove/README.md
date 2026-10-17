@@ -40,6 +40,7 @@ php artisan migrate
 - **TorrentService** - CRUD, .torrent file upload/parsing, search
 - **Role system** - User, Uploader, Moderator, Admin hierarchy
 - **Tracker stats contract** - `TrackerStatsInterface` and the `TrackerStats` / `TorrentStats` value objects; a tracker package (bloodhound) implements it, issuing keys and tracking bytes
+- **Seedboxes contract** - `SeedboxesInterface` and the `Seedbox` value object: members' registered seedboxes, for a frontend (usarrs) to manage without knowing the tracker. Bloodhound implements it; check `app()->bound(SeedboxesInterface::class)` first
 - **Authorization** - Policies for create, update, delete operations
 
 ## User Model Setup

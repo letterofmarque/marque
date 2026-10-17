@@ -1,6 +1,6 @@
 # Marque Bloodhound
 
-BitTorrent tracker for the [Marque](https://github.com/letterofmarque/marque) platform. Handles announce/scrape with Redis-backed peer storage, client validation, and anti-cheat detection.
+BitTorrent tracker for the [Marque](https://github.com/letterofmarque/marque) platform. Handles announce/scrape with Redis-backed peer storage, client validation, anti-cheat, and a ledger that every member's ratio and seedtime is summed from.
 
 ## Starting from scratch?
 
@@ -11,16 +11,95 @@ complete private tracker, install the set:
 composer require marque/trove marque/bloodhound marque/guise marque/usarrs marque/cennad
 ```
 
-That resolves `marque/threepio` and `marque/deck` for you. Verified working as a set,
-2026-09-10.
+That resolves `marque/threepio` and `marque/deck` for you.
 
 Prefer a public, no-login tracker? Use [marque/hound](https://packagist.org/packages/marque/hound)
 and [marque/disguise](https://packagist.org/packages/marque/disguise) instead of
 bloodhound and guise.
 
-## Installation
+## Requirements
 
-Requires [marque/trove](https://packagist.org/packages/marque/trove).
+- **Redis, configured to keep what it holds**: `appendonly yes` and
+  `maxmemory-policy noeviction`, on a database of its own. See below; in production
+  bloodhound refuses announces until it is.
+- PHP 8.3+
+- Laravel 13+
+- [marque/trove](https://packagist.org/packages/marque/trove)
+- A database Laravel 13 supports. On SQLite, 3.33 or later.
+
+### Redis
+
+Bloodhound keeps every peer's last reported counters in Redis and credits each announce
+against them. Redis is therefore not a cache here: it holds the baseline your members'
+ratio and seedtime are measured from. A Redis that restarts empty, or evicts a key when
+memory runs out, silently costs whichever members' records it dropped.
+
+So run the tracker's Redis with:
+
+```conf
+appendonly yes
+appendfsync everysec
+maxmemory-policy noeviction
+```
+
+and give it a database (or an instance) of its own: point `THREEPIO_REDIS_CONNECTION` at a
+connection in `config/database.php` that the cache, queue and sessions don't use. A
+`FLUSHDB` aimed at your cache would otherwise take the swarm with it. On a managed service,
+set the same in its parameter group.
+
+Then check it:
+
+```bash
+php artisan bloodhound:check-redis
+```
+
+It reads `aof_enabled` from `INFO persistence` and `maxmemory_policy` from `INFO memory`,
+and prints what it found, what is needed and the lines to set. It exits 1 when the check
+fails. It reads `INFO` rather than `CONFIG GET` because managed services generally allow
+`INFO` where they disable or rename `CONFIG`. It also warns, without failing, when the
+tracker's Redis connection points at the same host, port and database as the cache, queue
+or session store.
+
+**In production, announces are refused until the check passes.** Each one is answered
+`Tracker storage is not configured for durability; the operator has been notified`, and
+the failure is logged at `critical`. No ledger row is written for these, since the refusal
+is the tracker's, not the member's. The verdict is cached in your application cache for
+five minutes, so a fix takes effect within five minutes, and the log is written once per
+window. This is deliberately a hard stop: a tracker that credits ratio against a store
+that can forget is worse than one that is briefly down, and putting it right is a
+two-line change. In any other environment (`APP_ENV` other than `production`) a warning is
+logged instead and announces go ahead, so development machines and CI need nothing.
+
+`bloodhound:aggregate-ledger`, scheduled every minute, runs the same check and logs a
+failure (`critical` in production, `warning` elsewhere), so a tracker nobody is announcing
+to still reports it.
+
+**If your provider makes the data durable another way** (replication, snapshots) and
+offers no AOF, set `BLOODHOUND_REDIS_DURABILITY=attested`. That satisfies the persistence
+check. It covers the eviction policy only when the server refuses `INFO` altogether: when
+`INFO` reports a policy other than `noeviction`, the check fails whatever you attest,
+because every provider lets you set the policy and an evicted peer record is a lost
+baseline.
+
+`marque:install` runs the same check when it installs a private tracker, and stops before
+installing anything until it passes or `BLOODHOUND_REDIS_DURABILITY=attested` is in `.env`.
+
+If Redis is lost anyway, bloodhound notices and reads baselines from the ledger for a
+while: see [Recovery mode](#recovery-mode). The audit then names every peer whose session
+the loss cut.
+
+You also need `ext-redis` or `predis/predis`; see
+[threepio's README](../threepio/README.md#redis-is-required-and-it-is-a-real-redis).
+
+### Database
+
+Bloodhound's SQL needs nothing beyond Laravel 13's own database minimums, with one
+exception: SQLite 3.33, for `UPDATE ... FROM` in the aggregator's batched writes. Below it
+you get a SQL syntax error from the aggregator, not a clear refusal; check
+`sqlite3 --version` before upgrading. The suite is tested on MySQL 8.0, MariaDB 11,
+PostgreSQL 17 and SQLite.
+
+## Installation
 
 ```bash
 composer require marque/bloodhound
@@ -32,6 +111,9 @@ Publish the config and run migrations:
 php artisan vendor:publish --tag=bloodhound-config
 php artisan migrate
 ```
+
+Bloodhound schedules its own commands (see [Commands](#commands)), so it needs
+[Laravel's scheduler running](https://laravel.com/docs/scheduling#running-the-scheduler).
 
 ## How It Works
 
@@ -109,10 +191,12 @@ Laravel route constraint and anchored for you when matching.
 
 **`key_source` changes where errors come from.** With the key in the path, a malformed
 key is a **404 from the router** and no application code runs. As a query parameter every
-request reaches the controller, which answers a malformed or missing key with a bencoded
+request reaches the controller, which answers a malformed key with a bencoded
 `failure reason` at **HTTP 200** — the same shape as every other tracker error, because a
 4xx reads to a BitTorrent client as an unreachable tracker rather than a message worth
-showing the user. Trackers get probed constantly; know which of the two you are running.
+showing the user. On announce a missing key is refused the same way. Scrape accepts a
+missing key, since a public scrape is legitimate, and refuses only a malformed one.
+Trackers get probed constantly; know which of the two you are running.
 
 #### An nginx rewrite is the right fix for an outage, not for a migration
 
@@ -132,17 +216,63 @@ key formats are disjoint first.
 
 ### Announce Flow
 
-1. Announce key validated, user looked up
-2. Torrent identified by info_hash
-3. Client validated against whitelist
-4. Anti-cheat checks run
-5. Peer upserted in Redis, stats calculated
-6. Upload/download deltas written to the announce ledger; totals are folded in by `bloodhound:aggregate-ledger`
-7. Bencoded peer list returned to client
+1. Announce key validated, user looked up (a disabled account is refused); torrent
+   identified by info_hash; parameters and IP validated.
+2. The tracker's Redis checked for durability (cached; see [Redis](#redis)). In
+   production a failing check refuses the announce here.
+3. Client validated against the whitelist or blacklist.
+4. The peer's record read from Redis, once, along with the torrent's live peers.
+5. Anti-cheat judges the announce against that record.
+6. The credit computed from the same record, and the ledger row written.
+7. Only then Redis updated: the peer's record, the swarm counters and sets.
+8. Bencoded peer list returned to the client. Within a minute or two
+   `bloodhound:aggregate-ledger` adds the row to the member's totals.
+
+A refusal at step 3 or 5 writes a flagged ledger row and stops: nothing is credited and
+Redis is not touched.
 
 ### Peer Storage
 
-All peer data lives in Redis with configurable key prefix. Peers auto-expire after the configured TTL (default: 1 hour). Seeder/leecher counts are maintained as atomic counters.
+Peers live in Redis, under threepio's key prefix (`threepio.redis.prefix`, `marque:` by
+default): a hash of peers per torrent, seeder and leecher counters, per-member and per-IP
+sets, and swarm byte totals. [threepio's README](../threepio/README.md#redis) lists the
+keys. Bloodhound adds a `suspicious` list (the last 1,000 anti-cheat events), a
+`durability_sentinel` key and, while one is open, `recovery_until`.
+
+A peer that has not announced for `threepio.peer_expiry` (an hour by default) is treated
+as gone: it is left out of peer lists and counts as a new peer if it comes back. Its
+record stays in Redis until the hourly sweep (`bloodhound:sync-swarm-counts`) removes it.
+That sweep is the only way an expired peer leaves. A `stopped` announce removes its peer
+at once.
+
+#### Retained baselines
+
+When the sweep removes an expired peer, it keeps the record for
+`baseline_retention` (7 days by default) after its last announce, in a separate
+`gone:{torrent}` hash. A member whose client comes back under the same peer ID without
+having sent `stopped` (network lost, machine asleep, client killed) is then credited what
+it moved in between, measured against that record, instead of nothing. The record is
+used once and deleted. A `stopped` peer is never retained, because `stopped` closes the
+session.
+
+#### Recovery mode
+
+If Redis does lose its data, the next peer it has no record of finds bloodhound's
+`durability_sentinel` key gone while the ledger shows announces from the last
+`peer_expiry`. That means the swarm those announces built is not there. Bloodhound logs a
+warning and opens a recovery window for twice `peer_expiry` (two hours by default): long
+enough for every peer that was in the swarm to announce again. During it, a peer that
+Redis has no record of is looked up in the ledger instead: the last accepted announce from
+that member, on that torrent, under that peer ID, and no older than `baseline_retention`.
+A refused announce is never a baseline, and if the last row is a `stopped` the session is
+over and there is none.
+
+Outside the window the announce path never reads the ledger.
+`php artisan bloodhound:check-redis --recover` opens a window by hand.
+
+An install upgrading from 7.x has no sentinel yet; the upgrade's migrations set it while
+the swarm is known to be in Redis, so the first announces after upgrading do not read as a
+lost Redis.
 
 ### Swarm Counts
 
@@ -156,8 +286,8 @@ That projection alone is not enough. A peer that vanishes without sending
 and nothing announces afterwards to correct the row, which would sit there
 advertising a swarm that no longer exists.
 
-`bloodhound:sync-swarm-counts` closes that gap. It sweeps expired peers and
-writes the settled counts back, and is scheduled hourly:
+`bloodhound:sync-swarm-counts` closes that gap. It sweeps expired peers (keeping their
+records as baselines, above) and writes the settled counts back, and is scheduled hourly:
 
 ```bash
 php artisan bloodhound:sync-swarm-counts
@@ -168,9 +298,172 @@ It is registered on the scheduler automatically; you only need Laravel's
 scheduler running. Torrent listings are unaffected unless you also set
 `trove.hide_dead_torrents`.
 
+## How an announce is credited
+
+Every announce bloodhound accepts is credited once, at the moment it arrives, against the
+peer's record in Redis: the counters and time of that peer's last accepted announce (its
+baseline). The bytes and the seconds are both written on the announce's ledger row, and
+every total is a sum of those rows. Nothing pairs one announce with another afterwards.
+
+**Bytes** are the reported `uploaded` and `downloaded` minus the baseline's. A counter
+that has gone backwards means the client restarted under the same peer ID and is counting
+from zero again, so that direction is credited the reported figure.
+
+**Seconds** are the time since the baseline's announce, capped at `threepio.peer_expiry`
+(an hour by default). A client that goes quiet without saying so gets the hour, the point
+at which the swarm already treats it as gone, rather than the whole night its laptop was
+shut. The interval goes to **the state the peer was in when it began**: nothing left to
+download means seeding, otherwise leeching. The interval in which a peer finishes
+downloading is leech time, all of it, because that is what it was doing.
+
+Each kind of announce:
+
+- **First announce of a session** (no baseline: a new peer ID, the first after a stop, or
+  a peer ID another member's record holds): credits nothing. The row has no priors.
+- **Regular, `started` and `completed`**: credited as above. `started` does not close a
+  session: a client that restarts quickly under the same peer ID carries on from its
+  baseline. `completed` also records the completion.
+- **`stopped`**: credits the bytes and seconds since the previous announce, against the
+  record it removes. The protocol sends final counters on a stop, so they count. The
+  session then ends; nothing is kept for it.
+- **A refused announce** (client validation or anti-cheat): credits nothing and changes
+  nothing in Redis. The next accepted announce is measured from the last accepted one, so
+  its bytes are credited in full; its seconds are capped as usual.
+- **A speed forfeit**: the direction over the cap credits 0, the other direction and the
+  seconds are credited, and the baseline moves on (see [Anti-Cheat](#anti-cheat)).
+
+**The ledger row is written first, then Redis.** If the insert fails, the client gets a
+tracker error and retries against an untouched baseline, so nothing is lost. If Redis
+fails after the insert, the next announce is measured against the same baseline and one
+interval is credited twice; the audit names that row.
+
+### Seedtime and leechtime
+
+Bloodhound records how long each member spent seeding and leeching every torrent, on the
+member (`seedtime`, `leechtime`) and per torrent (`torrent_user.seedtime`,
+`torrent_user.leechtime`), in seconds, summed from the ledger like the byte totals.
+
+**A member's time is the sum over their clients:** two clients seeding one torrent for an
+hour earn two hours.
+
+- **Time is counted in every `ratio_mode`.** It is a record of what happened, not a
+  policy; switching mode later finds the history already there.
+- **hound counts nothing.** A public tracker has no members to credit.
+
+**Expect lower figures than some other trackers report.** Trackers that credit a fixed
+announce interval per announce, or the whole gap however long, count time a client
+wasn't there. Bloodhound counts only time it can stand behind: real elapsed time between
+accepted announces, capped, never across a stop, and none for a refused announce.
+
+## Anti-Cheat
+
+Anti-cheat judges an announce against the same peer record the credit uses, so nothing is
+checked against one baseline and credited against another. It refuses only what a
+legitimate client doesn't do, and never refuses a client that is already in the swarm on
+a count.
+
+| Check | Applies to | Outcome |
+|---|---|---|
+| Port | Every announce | Refused: a port in `threepio.blacklisted_ports`, or outside 1–65535 |
+| Minimum gap | Regular announces (no `event`) from a peer in the swarm | Refused when sooner than `min_announce_gap` after its last accepted announce |
+| Location limits | A peer not in the swarm, other than `stopped` | Refused at a new location past the seeding or leeching limit |
+| Sessions per IP | A peer not in the swarm, other than `stopped` | Refused when the IP already has `max_connections_per_ip` sessions |
+| Speed | Every announce with a baseline | The direction over the cap is forfeited; the announce is accepted |
+| Data anomaly | Every announce | More `left` than the torrent's size: reported, never refused |
+| Swarm consistency | A 5% sample of announces | Swarm downloads well beyond uploads plus seeders' copies: reported, never refused |
+
+**Minimum gap.** A hammer guard, 60 seconds by default, below
+`threepio.min_announce_interval` (300, what clients are told) so a client that
+re-announces early is not refused. `started`, `completed` and `stopped` are never refused
+for timing: they report something that happened, and refusing them loses a completion or
+leaves a ghost peer in the swarm. The gap is measured from the peer's record and a refusal
+changes nothing, so a client retrying every 30 seconds is accepted every minute rather
+than locked out.
+
+**Location limits.** A location is an IP address; for IPv6 it is the /64, because a
+connection is usually handed a whole /64 and clients pick addresses from it freely.
+Seeding and leeching are limited separately:
+`max_seeding_locations_per_torrent` (3) and `max_leeching_locations_per_torrent` (1). The
+leeching limit is what stops one account being shared to download. Only a **new**
+location is counted against a limit:
+
+- a peer already in the swarm is never refused by a count, so a leecher that finishes
+  becomes a seeder without being refused;
+- a new client at a location the member already uses on that torrent is not a new
+  location;
+- a new peer is classed as seeding or leeching by the `left` it reports, and counted
+  against the member's live peers in the same state.
+
+The counts come from the torrent's live peers, which the response reads anyway.
+
+**Sessions per IP.** A session is one peer ID on one torrent, so a client running 40
+torrents from one address is 40 sessions. Only a new session is refused. The default, 10,
+is low for a seedbox: raise `max_connections_per_ip` if your members run many torrents
+from one address. An approved seedbox is not exempt from this or the location limits.
+
+**Speed.** The bytes since the baseline over the real time elapsed, per direction,
+against `max_upload_speed` / `max_download_speed` (100 MiB/s each), or the seedbox caps
+(1,250,000,000 bytes/s, 10 Gbit/s) when the announce comes from one of the member's
+approved [seedboxes](#seedboxes). A direction over its cap is **forfeited**: credited 0,
+and the baseline moves on, so those bytes never land later. The other direction and the
+seconds are still credited, and the row is flagged with a reason that names the
+direction, the claimed rate, the cap and the bytes not credited. Refusing instead would
+leave the baseline where it was, and the next announce would credit the same bytes over a
+longer window. Lower the ordinary caps to what your members' home connections actually
+do. A forfeit is not re-credited automatically, so a cap set too low costs honest members
+their bytes.
+
+**Events.** Only the checks that accept the announce fire `CheatDetected`, with `type`
+`speed_violation`, `data_anomaly` or `swarm_anomaly` (the last with no user), and add an
+entry to the Redis `suspicious` list. Refusals (port, gap, location, sessions per IP, and
+client validation) fire nothing: each is a flagged ledger row with its reason, which
+`AnnounceLogServiceInterface::flagged()` returns along with forfeits.
+
+`anti_cheat.enabled = false` turns off every check above: nothing is refused, forfeited
+or reported. Client validation has its own switch.
+
+### Port Blacklist
+
+Default blocked ports include Direct Connect (411-413), Kazaa (1214), eMule (4662), Gnutella (6346-6347), and legacy BitTorrent defaults (6881-6889).
+
+## Seedboxes
+
+A seedbox is an address or range a member registers as theirs. Announces from inside one
+of a member's **approved** seedboxes are held to the seedbox speed caps instead of the
+ordinary ones; that is all a seedbox changes. The point is to let you set the ordinary
+caps to what home connections do without forfeiting a gigabit seedbox's bytes.
+
+- **Registering.** A member registers an IPv4 or IPv6 address (stored as a /32 or /128)
+  or a CIDR range, with an optional label. A range may be at most a /24 for IPv4 or a /48
+  for IPv6 (`seedbox.min_prefix_v4`, `seedbox.min_prefix_v6`), so it can't take in other
+  customers of the same provider. Each network is registered once per member.
+- **Approval.** With `seedbox.require_approval` (the default) a new seedbox is pending
+  until an admin approves it. Without it, registering approves it. Approving and revoking
+  record who did it and when. A revoked seedbox's announces go back to the ordinary cap.
+  A member can remove their own.
+- **On the announce path** a member's approved networks come from the cache (five
+  minutes) and are matched in PHP, so an announce costs no query. Every change made
+  through bloodhound clears that member's cache, so it applies to their next announce.
+- **Events:** `SeedboxRegistered`, `SeedboxApproved` and `SeedboxRevoked`, each with the
+  `seedbox` (a trove `Seedbox`) and `by`, the deciding admin's user id (null on
+  registration). Removing one fires nothing.
+
+Bloodhound has no screens. It implements trove's `SeedboxesInterface`, and
+[usarrs](../usarrs/README.md#seedboxes) renders the member screen (`/profile/seedboxes`)
+and the admin screen (`/admin/seedboxes`) through it. Without usarrs, use the command:
+
+```bash
+php artisan bloodhound:seedbox list --status=pending
+php artisan bloodhound:seedbox approve 12 --by=1    # --by: the admin's user id
+php artisan bloodhound:seedbox revoke 12 --by=1
+```
+
 ## Configuration
 
-Published to `config/bloodhound.php`:
+Published to `config/bloodhound.php`. Bloodhound's config is merged with the published
+file at the top level only, so a published `anti_cheat` block replaces the shipped one
+whole. A key missing from it falls back to the default in code, which is the same as the
+shipped default; but its environment variable does nothing until the key is in your file.
 
 ### Uploads: the private flag
 
@@ -191,10 +484,11 @@ info_hash. An unrecognised value is treated as `require`. See
 When a member downloads a torrent, the `.torrent` they get has `announce` set to their own
 URL: this tracker's announce route with their key, in the path or the query exactly as
 [Announce URL shape](#announce-url-shape) configures it. Its `comment` links back to the
-torrent's page. Everything else the uploader's client wrote, `announce-list` included, is
-dropped. The info dictionary is untouched, so the info_hash is the same for everyone. A
-member with no key yet (for example, before verifying their address) is refused with that
-reason rather than given a file their client can't announce with.
+torrent's page. Of the rest of the top level, only `encoding` is kept; everything else the
+uploader's client wrote, `announce-list` included, is dropped. The info dictionary is
+untouched, so the info_hash is the same for everyone. A member with no key yet (for
+example, before verifying their address) is refused with that reason rather than given a
+file their client can't announce with.
 
 ### Routing
 
@@ -208,6 +502,15 @@ Covered in full under [Announce URL shape](#announce-url-shape) above.
 | `routes.key_parameter` | `announce_key` | Route segment or query parameter name |
 | `routes.key_pattern` | `[0-9a-zA-Z]{32}` | Regex the key must match — no delimiters, no anchors |
 
+### Redis and baselines
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `redis.durability` | `required` | `attested` when your provider makes Redis durable without AOF (`BLOODHOUND_REDIS_DURABILITY`); the eviction policy is still checked |
+| `baseline_retention` | `604800` | Seconds an expired peer's record is kept as its baseline (7 days) |
+
+See [Redis](#redis) and [Retained baselines](#retained-baselines).
+
 ### Timing
 
 Timing, Redis and the peer response are threepio's settings, in `config/threepio.php`
@@ -217,16 +520,16 @@ publish threepio's config to change them.
 | Key | Default | Description |
 |-----|---------|-------------|
 | `announce_interval` | `1800` | Seconds between announces (sent to clients) |
-| `min_announce_interval` | `300` | Minimum allowed interval |
-| `peer_expiry` | `3600` | Seconds before inactive peers are removed |
+| `min_announce_interval` | `300` | Minimum interval clients are told to respect |
+| `peer_expiry` | `3600` | Seconds before an inactive peer is treated as gone; also the cap on one announce's credited interval |
 
-### Redis
+### Threepio's Redis settings
 
 From `config/threepio.php`, as above.
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `redis.connection` | `default` | Laravel Redis connection name |
+| `redis.connection` | `default` | Laravel Redis connection name: give the tracker its own |
 | `redis.prefix` | `marque:` | Key namespace |
 
 ### Peer Response
@@ -240,7 +543,7 @@ From `config/threepio.php`, as above.
 
 ### Client Validation
 
-Bloodhound validates BitTorrent clients by peer ID. Default mode is `whitelist` with 9 pre-configured clients: qBittorrent, Deluge, Transmission, libtorrent, rTorrent, uTorrent, BitTorrent, Vuze and BiglyBT.
+Bloodhound validates BitTorrent clients by peer ID. Default mode is `whitelist` with 9 pre-configured clients: qBittorrent, Deluge, Transmission, libtorrent, rTorrent, uTorrent, BitTorrent, Vuze and BiglyBT. A refused client gets a bencoded failure and a flagged ledger row.
 
 | Key | Default | Description |
 |-----|---------|-------------|
@@ -253,127 +556,232 @@ Each whitelist entry specifies a peer ID pattern, version format, and allowed ve
 
 ### Anti-Cheat
 
+Described under [Anti-Cheat](#anti-cheat) and [Seedboxes](#seedboxes). Speeds are bytes
+per second.
+
 | Key | Default | Description |
 |-----|---------|-------------|
 | `anti_cheat.enabled` | `true` | Master switch |
-| `anti_cheat.max_upload_speed` | `104857600` | 100 MB/s cap |
-| `anti_cheat.max_download_speed` | `104857600` | 100 MB/s cap |
-| `anti_cheat.min_announce_gap` | `60` | Min seconds between announces |
-| `anti_cheat.max_connections_per_torrent` | `3` | Per user, per torrent |
-| `anti_cheat.max_connections_per_ip` | `10` | Per IP address |
+| `anti_cheat.max_upload_speed` | `104857600` | Ordinary cap, 100 MiB/s; over it is forfeited |
+| `anti_cheat.max_download_speed` | `104857600` | Ordinary cap, 100 MiB/s |
+| `anti_cheat.seedbox.max_upload_speed` | `1250000000` | Cap for an approved seedbox, 10 Gbit/s |
+| `anti_cheat.seedbox.max_download_speed` | `1250000000` | Cap for an approved seedbox, 10 Gbit/s |
+| `anti_cheat.seedbox.require_approval` | `true` | A new seedbox waits for an admin |
+| `anti_cheat.seedbox.min_prefix_v4` | `24` | Widest IPv4 range a seedbox may be |
+| `anti_cheat.seedbox.min_prefix_v6` | `48` | Widest IPv6 range a seedbox may be |
+| `anti_cheat.min_announce_gap` | `60` | Min seconds between two regular announces from one peer |
+| `anti_cheat.max_seeding_locations_per_torrent` | `3` | Locations a member may seed one torrent from |
+| `anti_cheat.max_leeching_locations_per_torrent` | `1` | Locations a member may leech one torrent from |
+| `anti_cheat.max_connections_per_ip` | `10` | Live sessions (torrent, peer ID) from one IP |
+| `anti_cheat.block_datacenter_ips` | `false` | Not built yet; setting it does nothing <!-- check-docs: ignore — never built, needs a design decision first (#10813) --> |
 
-Anti-cheat runs these checks on every announce:
-
-1. **Port blacklist** - Blocks known P2P/ISP-blocked ports
-2. **Announce frequency** - Prevents tracker hammering
-3. **Connection limits** - Per user and per IP
-4. **Speed checks** - Flags impossibly fast transfers
-5. **Data consistency** - Validates reported download vs torrent size
-6. **Swarm consistency** - Samples 5% of announces for coordinated inflation
-
-Violations fire a `CheatDetected` event and are logged to Redis for admin review.
-
-### Stats Queue — deprecated
+### Completions
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `queue.enabled` | `true` | **No longer read** <!-- check-docs: ignore — retired by the ledger, removed at the next major (#10816) --> |
-| `queue.connection` | `null` | **No longer read** <!-- check-docs: ignore — retired by the ledger, removed at the next major (#10816) --> |
-| `queue.queue` | `tracker` | **No longer read** <!-- check-docs: ignore — retired by the ledger, removed at the next major (#10816) --> |
+| `completion_cooldown` | `86400` | Seconds after a completion before another `completed` from the same member on the same torrent counts as new |
 
-Byte counts no longer travel through a queue. They are written to the ledger on the
-announce path and folded into totals by `bloodhound:aggregate-ledger`. These keys are
-kept for one release so an existing published config does not break, and are removed in
-the next major.
+`event=completed` is client-supplied, and a client restart or a second machine reports
+it again for the same download, so time decides what counts as a new completion.
 
-> **A note on your queue connection.** Bloodhound requires Redis for peer storage, so
-> most deployments have one, and Laravel's path of least resistance is to point
-> `QUEUE_CONNECTION` at the same instance. That used to couple two failure modes into
-> one: a Redis restart lost both the pending byte count and the baseline it was derived
-> from. That is no longer possible — the queue carries no data — but pointing your queue
-> at a separate backend is still the safer arrangement.
-
-### Announce Log — the ledger
-
-**On by default, and this is deliberate.** A full-detail, permanent history of every
-announce — each started, regular-interval, completed, and stopped request, with the
-cumulative totals the client reported, the delta credited, and the baseline that delta
-was computed against.
-
-This table is the **source of truth for ratio**. User totals and per-torrent totals are
-projections rebuilt from it, and a wrong number can only be detected — let alone
-corrected — by comparing it against this. A source of truth cannot be opt-in: an install
-running without one has no way to know its ratios are wrong, and ratio is what gets
-people banned.
-
-Turning it off is supported, but it disables reconciliation, the rebuild command, and the
-arithmetic audit along with it. You are choosing to accumulate numbers nothing can verify.
+### Ratio — planned, not yet enforced
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `announce_log.enabled` | `true` | Master switch |
+| `ratio_mode` | `full` | `full`, `off` or `seedtime`. Read by nothing yet <!-- check-docs: ignore — documented but not yet enforced, read by nothing until #10732 --> |
+| `min_ratio` | `0.5` | Read by nothing yet <!-- check-docs: ignore — not yet enforced, read by nothing until #10732 --> |
+| `min_seedtime` | `86400` | Read by nothing yet <!-- check-docs: ignore — not yet enforced, read by nothing until #10732 --> |
+
+Bytes and time are recorded in every mode; these keys will decide what is enforced (#10732).
+
+### Announce Log
+
+| Key | Default | Description |
+|-----|---------|-------------|
 | `announce_log.connection` | `null` | Database connection (null = app default) |
 | `announce_log.retention_days` | `null` | Days to keep rows (null = forever) |
 
 ```env
-BLOODHOUND_ANNOUNCE_LOG=true
 BLOODHOUND_ANNOUNCE_LOG_CONNECTION=announce_log
 BLOODHOUND_ANNOUNCE_LOG_RETENTION_DAYS=90
 ```
 
-The row is written **synchronously**, before the announce response goes back to the
-client. This is deliberate: the ledger is the durable record everything else is
-rebuilt from, so it has to exist the moment the announce completes. Putting it behind
-a queue would mean the only copy of a byte count lived in a job payload, and a lost
-job would be a lost credit with nothing left to re-derive it from.
+See [The ledger](#the-ledger).
 
-#### What gets logged
+### Removed in 8.0
 
-One row per announce: user, torrent, peer ID, event, IP, port, user agent, the cumulative `uploaded`/`downloaded`/`left` the client reported, the calculated `upload_delta`/`download_delta` since that peer's last announce, the
-`prior_up`/`prior_down` baseline those deltas were computed against, and whether
-anti-cheat flagged it (with the reason when it did).
+| Removed key | What happens if your config still has it | Use instead |
+|---|---|---|
+| `announce_log.enabled` | Set to `false`, bloodhound refuses to boot, naming the key. `true` is harmless | Nothing: the ledger is always on |
+| `queue.enabled`, `queue.connection`, `queue.queue` | Ignored, as they already were in 7.x (#10816) | Nothing: byte counts never travel through a queue |
+| `anti_cheat.max_connections_per_torrent` | Ignored; a warning is logged once a day naming the replacements | `max_seeding_locations_per_torrent` and `max_leeching_locations_per_torrent` |
 
-Storing the baseline alongside the delta is what lets a row be checked on its own:
-`delta == reported - prior` holds per row, and each row's `prior` should equal the
-previous row's reported value for that peer. A break in that chain is the signature of
-a lost baseline — which is how a Redis outage becomes visible after the fact instead
-of silently costing users their credit.
+The ledger can't be turned off because every credit is written to it and nowhere else: a
+tracker without it would credit nobody anything.
 
-Both the cumulative totals and the deltas are kept deliberately. The delta is what actually happened this announce; the cumulative is the client's own claim. Storing both lets you cross-check a client's arithmetic against its own delta history - a client whose claimed total doesn't match the sum of its reported deltas is lying about something.
+## The ledger
 
-The table is append-only. Rows are never modified after they're written, so there is no `updated_at`.
+`announce_log` is a full-detail, permanent history of every announce from a known member
+on a known torrent: each started, regular, completed and stopped request, accepted or
+refused. It is the **source of truth for ratio and seedtime**. User totals and per-torrent
+totals are projections summed from it, and a wrong number can only be detected — let
+alone corrected — by comparing it against this. Ratio is what gets people banned.
 
-#### Isolating it on a separate database
+The row is written **synchronously**, before Redis and before the response. A queue would
+mean the only copy of a credit lived in a job payload, and a lost job would be a lost
+credit with nothing left to re-derive it from.
 
-`announce_log.connection` takes any connection name from `config/database.php`. Point it at a second database - same engine or not - and all reads and writes for this one table go there, with no other change. Migrations follow it too.
+### What a row holds
+
+| Column | Meaning |
+|---|---|
+| `user_id`, `torrent_id`, `peer_id` | Who, on what, from which client session |
+| `event` | `started`, `regular`, `completed`, `stopped`, or `opening_balance` for a migration's carried total |
+| `ip`, `port`, `user_agent` | Where from |
+| `uploaded`, `downloaded`, `left` | The cumulative counters the client reported |
+| `upload_delta`, `download_delta` | Bytes this row credits |
+| `seed_seconds`, `leech_seconds` | Seconds this row credits (at most `peer_expiry`, and only one of the two) |
+| `prior_up`, `prior_down`, `prior_at` | The baseline those were measured against: its counters and the time of its announce. Null when there was none |
+| `anti_cheat_flagged`, `anti_cheat_reason` | A refusal or a forfeit, and why |
+| `created_at` | When the credit was measured, which is also the peer's new last announce |
+
+**Every row carries its own credit.** A refusal or a first announce credits 0 bytes and 0
+seconds, so it adds nothing to any sum by construction. Storing the baseline beside the
+credit is what lets each row be checked on its own, and each peer's rows checked as a
+chain (see [Audit](#audit)). Both the client's cumulative claim and the credited delta
+are kept: a client whose claimed totals don't match its own delta history is lying about
+something.
+
+The table is append-only. Rows are never modified after they're written, so there is no
+`updated_at`. Credit that is not a row of its own (what pruning removed, and what the
+upgrade carried over) lives in `ledger_carry`: one row per member and torrent, with
+`uploaded`, `downloaded`, `seedtime` and `leechtime`, on the same connection as
+`announce_log`. **The ledger is its rows plus its carry**, and everything below reads it
+that way.
+
+### Isolating it on a separate database
+
+`announce_log.connection` takes any connection name from `config/database.php`. Point it at a second database - same engine or not - and all reads and writes for `announce_log` and `ledger_carry` go there, with no other change. Migrations follow it too.
 
 This is the mechanism for keeping a high-write-volume table off your main database. Note that `user_id` and `torrent_id` carry no foreign key constraints precisely so this works: a real FK would require those tables to live on the same connection, which is the thing you're trying to avoid.
 
-#### Retention and pruning
+### Aggregation
 
-`retention_days` is `null` by default, which means **keep everything forever**. With logging on (the default) and no retention set, this table grows without bound on a busy tracker. That default is deliberate - how long to keep the source of truth for ratio is your call, not ours - but it is your job to make it.
+`bloodhound:aggregate-ledger` runs every minute and folds new rows into `torrent_user` and
+the users table: per batch of 1,000 rows, the sums of each member-and-torrent's bytes and
+seconds, written in a fixed handful of statements. A row that credits nothing writes
+nothing. A fold is a sum, so a batch boundary splits nothing.
 
-Set `retention_days` and the scheduled `bloodhound:prune-announce-log` command keeps the table bounded:
+- **Totals trail the ledger by a run or two.** A scheduled run folds only up to the
+  highest id the previous run saw (the horizon, on `ledger_cursors`). An id is handed out
+  when an insert starts, not when it commits, so a later id can become visible first;
+  folding to the head could step over a row still committing, and it would never be
+  counted. Everything below the horizon has had a whole minute to commit. A backlog after
+  an outage drains in two runs.
+- **Two folds can't count a batch twice.** Each batch locks the cursor row first and
+  reads its position under the lock, so a second fold (a manual run beside the scheduler,
+  two hosts without a shared cache lock) waits, then starts from where the first left
+  off. The advance is a compare-and-swap on the position read: if the cursor moved
+  anyway, the batch rolls back and is redone. `withoutOverlapping()` on the schedule is a
+  courtesy, not the control.
+- **Crash-safety is the transaction.** The totals and the cursor advance commit together
+  or not at all, so a redone batch is idempotent.
+
+Measured on a development machine across the four engines, folding 200,000 rows took 26
+to 37 seconds, depending on the engine. `bloodhound:reconcile-ledger` reports how many rows
+are waiting; watch that number at your busiest hour.
+
+### Verifying the numbers
+
+The commands, and the reason they exist: before the ledger, a byte count could be lost
+or corrupted and **nothing anywhere would know**. The totals were accumulators with
+nothing behind them, so a wrong number stayed wrong forever and the first anyone heard of
+it was a user disputing a ban.
+
+#### Reconcile
+
+`bloodhound:reconcile-ledger` (scheduled daily) compares every member's and every
+member-and-torrent's bytes, seedtime and leechtime against the ledger: the sum of the rows
+the aggregator has folded, plus carry. **It reports; it does not repair.** You should learn
+a number went wrong before anything changes it back. Rows not yet folded are reported as a
+backlog rather than as drift — an alert that cries wolf is an alert nobody reads. Drift is
+logged as a warning and the command exits 1.
+
+#### Audit
+
+`bloodhound:audit-ledger` checks the ledger against itself.
+
+**Arithmetic, per row.** Bytes: each direction is the reported counter minus the prior, or
+the reported counter when it went backwards. A forfeit may have zeroed a direction, so a
+flagged row may show 0 instead. Seconds: `seed_seconds + leech_seconds` equals
+`created_at - prior_at`, capped at `peer_expiry`, all in one of the two. A row with no
+baseline credits nothing. The cap is today's `peer_expiry`, so if you change it, rows
+written under the old one report as differences.
+
+**The chain, per member, torrent and peer ID, in order.** Each row's baseline should be
+what the previous row reported, and its `prior_at` the previous row's `created_at`. After
+a `stopped`, the next row starts a new session with no baseline. Refusals and opening
+balances are not part of the chain, and stops end it cleanly, so neither is ever reported
+as a break. What is reported, with the reason:
+
+- **Redis lost this peer:** a row with no baseline that should have had one. Not reported
+  when the gap is longer than `baseline_retention`, since no baseline is kept that long.
+- **Duplicate interval:** two rows measured against the same baseline: one interval
+  credited twice (a Redis write that failed after its row, or two announces from one peer
+  at once).
+- **The baseline does not continue the previous announce**, and **a baseline after the
+  session stopped**.
+
+With a persistent Redis a break should not happen; when one does, you learn which row.
+
+Rows written by 7.x, before rows carried their own time, are held to the rules they were
+written under: bytes only, with a counter that went backwards credited 0, and they are not
+checked as a chain. The upgrade records where they end.
+
+#### Rebuild
+
+`bloodhound:rebuild-totals` recomputes user and per-torrent totals from the ledger and its
+carry, for everyone or `--user=`: bytes, seedtime and leechtime. It takes the aggregator's
+cursor lock first, so a fold can't commit between its reset and its write; a fold that was
+waiting carries on from the same position afterwards. On MySQL a fold waiting through a
+long rebuild may hit `innodb_lock_wait_timeout` and fail; the next run retries. A rebuild
+leaves the cursor where it is, and leaves completion dates and counts alone, because they
+are not derivable from the rows.
+
+On a development machine, rebuilding from 200,000 rows took 29 to 95 seconds depending on
+the engine.
+
+### Retention, pruning and carry
+
+`retention_days` is `null` by default, which means **keep everything forever**, and the
+table grows without bound on a busy tracker. That default is deliberate - how long to keep
+the source of truth for ratio is your call, not ours - but it is your job to make it.
+
+Set `retention_days` and the scheduled `bloodhound:prune-announce-log` command (daily)
+keeps the table bounded:
 
 ```bash
 php artisan bloodhound:prune-announce-log
 ```
 
-It's registered on Laravel's scheduler to run daily, so it needs [the scheduler running](https://laravel.com/docs/scheduling#running-the-scheduler). It no-ops safely when no retention is configured, and reports what it did either way.
+It no-ops when no retention is configured, and reports what it did either way.
 
-**Pruning does not lose credit.** The rows it deletes produced totals people are held to,
-so before deleting them it moves what they produced into `ledger_carry`, one row per
-user and torrent, in the same transaction as the delete. The ledger is its rows plus its
-carry, and reconciliation and `rebuild-totals` read it that way, so both stay exact after
-a prune. See [Pruning and the floor](#pruning-and-the-floor).
+**Only rows the aggregator has folded are pruned.** A row still waiting is credit not yet
+in the totals, so it is kept whatever its age, and the command says how many it withheld.
 
-#### Private trackers only
+**What it deletes, it carries.** Each row carries its own credit, so what a deleted row
+contributed is exactly its own bytes and seconds. The prune works in chunks of 1,000 rows
+by id; each chunk's bytes and seconds are added to `ledger_carry` per member and torrent,
+and the rows deleted, in one transaction. If anything fails, the delete rolls back with
+the carry. No row is kept to protect another, so the table stops at your retention window,
+and reconcile and rebuild stay exact: a prune followed by a rebuild reproduces the
+pre-prune totals, which was measured on all four engines with 200,000 rows. That prune took
+34 to 69 seconds, depending on the engine.
 
-This is a Bloodhound feature and has no equivalent in [marque/hound](https://packagist.org/packages/marque/hound). Public trackers are deliberately anonymous - `hound` records no user against an announce at all - so ratio verification and cheat investigation aren't concepts that apply there.
+Carry is signed, so that a future correction can be recorded as an adjustment. Neither a
+prune nor the upgrade ever writes a negative.
 
-The existing anti-cheat Redis `suspicious` list keeps working exactly as before whether or not you enable this, since it has no toggle of its own and operators who turn the log off still need it.
-
-#### Querying the log
+### Querying the log
 
 `AnnounceLogServiceInterface` is the read side. Resolve it from the container:
 
@@ -390,7 +798,7 @@ public function __construct(
 | `forUser(int $userId, ?Carbon $since = null)` | What has this user been doing? |
 | `forTorrent(int $torrentId, ?Carbon $since = null)` | What happened on this torrent? |
 | `forUserAndTorrent(int $userId, int $torrentId)` | This user's session history on one torrent - the ratio-dispute query |
-| `flagged(?Carbon $since = null)` | Everything anti-cheat rejected |
+| `flagged(?Carbon $since = null)` | Every refusal and forfeit |
 | `byIp(string $ip, ?Carbon $since = null)` | Multi-account / IP correlation |
 
 All return a `Collection` of `AnnounceLog` models, newest first.
@@ -404,191 +812,150 @@ Results aren't paginated. The log is queried deliberately - an investigation, a 
 
 Bloodhound ships no UI for this. Browsing the log is left to your application.
 
-### Seedtime and leechtime
+### Private trackers only
 
-Bloodhound measures how long each member spent seeding and leeching every torrent, on the
-member (`seedtime`, `leechtime`) and per torrent (`torrent_user.seedtime`,
-`torrent_user.leechtime`), in seconds. Both are derived from the announce log, so they are
-checked by reconciliation and recomputed by `rebuild-totals` like the byte totals.
+This is a Bloodhound feature and has no equivalent in [marque/hound](https://packagist.org/packages/marque/hound). Public trackers are deliberately anonymous - `hound` records no user against an announce at all - so ratio verification and cheat investigation aren't concepts that apply there.
 
-How a peer's time is counted, from the gap between two of its consecutive announces:
+## Commands
 
-- **The peer's state at the start of the gap decides which it was.** Bytes left to
-  download means leeching; nothing left means seeding. The gap in which a peer finishes
-  downloading counts as leeching, all of it, because that is what it was doing.
-- **A gap counts up to `threepio.peer_expiry` (an hour by default), no more.** A client
-  that goes quiet without saying so gets the hour, the point at which the swarm already
-  treats it as gone, rather than the whole night its laptop was shut.
-- **A `stopped` announce ends the session.** The peer said it was leaving, so nothing is
-  counted from it to the peer's next announce.
-- **Time is counted in every `ratio_mode`.** It is a record of what happened, not a
-  policy; switching mode later finds the history already there.
-- **hound counts nothing.** A public tracker has no members to credit.
+| Command | Scheduled | Does |
+|---|---|---|
+| `bloodhound:aggregate-ledger` | Every minute | Folds new ledger rows into the totals (up to the horizon), and checks Redis durability |
+| `bloodhound:reconcile-ledger` | Daily | Reports totals that disagree with the ledger |
+| `bloodhound:prune-announce-log` | Daily | Deletes rows past `retention_days`, carrying what they credited |
+| `bloodhound:sync-swarm-counts` | Hourly | Sweeps expired peers, keeping their baselines; settles swarm counts |
+| `bloodhound:check-redis` | — | Checks AOF and the eviction policy; `--recover` opens a recovery window |
+| `bloodhound:audit-ledger` | — | Checks every row's arithmetic and every peer's chain |
+| `bloodhound:rebuild-totals` | — | Recomputes totals from the ledger and carry; `--user=` for one member |
+| `bloodhound:seedbox` | — | `list` (`--status=`), `approve` or `revoke` a seedbox (`--by=`) |
+| `bloodhound:backfill-ledger` | — | Once, after upgrading from 7.x: credits pre-8.0 history its time and stopped bytes |
+| `bloodhound:record-pruned-history` | — | Once, if needed: accounts for rows a pre-8.0 prune deleted without carrying them |
 
-**Expect lower figures than some other trackers report.** Trackers that credit a fixed
-announce interval per announce, or the whole gap however long, count time a client
-wasn't there. Bloodhound counts only time it can stand behind: real elapsed time between
-announces, capped, and never across a stop.
+## Upgrading from 7.x to 8.0
 
-### Aggregation throughput, and its limits
+**Before upgrading:**
 
-Every announce now changes a total. Before seedtime, an announce that moved no bytes (most
-of them: idle seeders reporting in) changed nothing and cost the aggregator nothing. Now
-every announce earns seeding or leeching time, so for every batch the aggregator:
+1. **Make Redis durable.** Point `THREEPIO_REDIS_CONNECTION` at a database or instance of
+   its own and set `appendonly yes`, `appendfsync everysec` and
+   `maxmemory-policy noeviction` (see [Redis](#redis)). You can confirm it on 7.x with
+   `redis-cli INFO persistence` (look for `aof_enabled:1`) and `redis-cli INFO memory`
+   (`maxmemory_policy:noeviction`), with your tracker's connection flags. If your provider
+   offers no AOF and makes the data durable another way, set
+   `BLOODHOUND_REDIS_DURABILITY=attested`. **In production, 8.0 refuses announces until
+   this is right.**
+2. **If you have ever pruned the announce log, don't run `rebuild-totals` on 7.x.** 7.x's
+   prune kept nothing of what it deleted, and a rebuild there would cut those members'
+   ratios.
+3. **Update a published `config/bloodhound.php`.** Delete `announce_log.enabled` (with
+   it set to false, 8.0 won't boot) and the `queue` block. Replace
+   `anti_cheat.max_connections_per_torrent` with `max_seeding_locations_per_torrent` and
+   `max_leeching_locations_per_torrent`. Add the new keys you want to set by environment:
+   `redis.durability`, `baseline_retention` and the `anti_cheat.seedbox` block. Simplest
+   is to re-publish and re-apply your changes.
+4. **Check `max_connections_per_ip`** against members who seed many torrents from one
+   address: it now counts sessions (one per torrent), not peer IDs.
+5. **Review the speed caps.** Over the cap now forfeits the bytes instead of refusing the
+   announce. Lower the ordinary caps to suit your members, and have seedbox users register
+   their seedboxes (and approve them) so they are held to the seedbox cap.
 
-- looks up each peer's previous announce (one index seek per peer), to measure the gap;
-- writes every member and every member-and-torrent total the batch touched.
+**Upgrade** bloodhound to ^8.0 and threepio to ^4.0 in one `composer require` (with hound's
+matching release, if a hound site shares the install), then `php artisan migrate`. The
+migrations:
 
-Each batch of 1,000 announces is folded in a fixed handful of statements, but the database
-still does that work per announce. Measured on a development machine, aggregating 200,000
-announces (500 members, 300 torrents, 2,000 peers):
+- add `seed_seconds`, `leech_seconds` and `prior_at` to `announce_log`, and `leechtime` to
+  the users table and `torrent_user`;
+- create `ledger_carry` and `seedboxes`, and add the horizon to `ledger_cursors`, set to
+  the head of the ledger so folding carries on;
+- record the last id written by 7.x, so the audit holds earlier rows to 7.x's rules;
+- record **time opening balances**: stored seedtime and leechtime that no ledger row
+  explains (7.x always wrote seedtime as 0, so this is imported or hand-entered time) as
+  carry, per torrent, then the rest of each member's total on torrent 0. Without it
+  reconcile would report that time as drift and a rebuild would erase it. Running it again
+  records nothing;
+- if `retention_days` is set, record **pruned history** (below), and say how much it
+  covered.
 
-| Engine | Seconds | Announces per second | Before seedtime |
-|---|---|---|---|
-| SQLite | 15.5 | ~12,900 | 10.9s |
-| MariaDB | 25.3 | ~7,900 | 23.4s |
-| MySQL | 39.5 | ~5,100 | 27.1s |
-| PostgreSQL | 51.3 | ~3,900 | 30.5s |
+Nothing rewrites an existing row, and no rebuild is needed. Reconcile is clean afterwards,
+unless you pruned in the past and retention is now off (step 9).
 
-On PostgreSQL most of the time is writing the updated rows; on MySQL, the look-ups. Your
-hardware will give different numbers; the shape will hold.
+**After upgrading:**
 
-**What this means for you:** the aggregator runs every minute and must keep up with your
-peak announce rate, not your average. If it falls behind, ratios and seedtime update late
-but nothing is lost: the announce log is the record and the aggregator catches up.
-`bloodhound:reconcile-ledger` reports how many announces are waiting, so watch that number
-at your busiest hour.
+6. **Run `php artisan bloodhound:check-redis`.** The aggregator also runs the check every
+   minute.
+7. **Delete the old Redis keys once**, with your tracker's connection flags (`-h`, `-p`,
+   `-n`) on both `redis-cli` calls, and your `redis.prefix` in place of `marque:`:
 
-**An alternative design is being considered** that would cut the per-announce cost,
-probably by keeping a small record of each peer's last announce or by folding time on its
-own, slower schedule. Neither is decided or promised; this section will say when that
-changes.
+   ```bash
+   redis-cli --scan --pattern '*marque:ip:*:peers' | xargs -r redis-cli del
+   redis-cli --scan --pattern '*marque:announce_time:*' | xargs -r redis-cli del
+   ```
 
-### Verifying the numbers
+   The per-IP sets are replaced by `ip:{ip}:sessions`. The `announce_time` keys expire on
+   their own within two minutes; the gap is now read from the peer's record. The leading
+   `*` matches the prefix Laravel adds to Redis keys.
+8. **Optional, recommended: `php artisan bloodhound:backfill-ledger`.** 7.x credited no
+   time, and credited nothing for the bytes a `stopped` announce reported. The ledger
+   proves both, and this credits them: each 7.x session's seconds between consecutive
+   accepted announces (capped, attributed by state, never across a stop), and each stop's
+   bytes against the announce before it. It writes the result to `ledger_carry` and adds
+   it to the totals in one transaction under the aggregator's lock, so no rebuild is
+   needed. It rewrites no row, runs once (a second run does nothing), and refuses until the
+   aggregator has folded all of 7.x history, which the first scheduled run after
+   migrating normally does.
+   Members' seedtime and ratio move when you run it. Without it, time starts at the
+   upgrade and nothing is wrong.
+9. **If you pruned in the past but retention is now off**, run
+   `php artisan bloodhound:record-pruned-history` (below).
 
-The commands, and the reason they exist: before the ledger, a byte count could be lost
-or corrupted and **nothing anywhere would know**. The totals were accumulators with
-nothing behind them, so a wrong number stayed wrong forever and the first anyone heard of
-it was a user disputing a ban.
+### If you pruned on an earlier version
+
+Before 8.0, every prune deleted credited rows and kept nothing. Those members' totals are
+still right, but the ledger no longer explains them: reconciliation reports them as
+drift, and **running `rebuild-totals` would cut their ratios.** Don't run a rebuild until
+this is done.
+
+The upgrade migration does it if `retention_days` is set. If you pruned in the past but
+have since turned retention off, run it yourself:
 
 ```bash
-php artisan bloodhound:aggregate-ledger        # fold pending rows into totals (scheduled, every minute)
-php artisan bloodhound:reconcile-ledger        # do the totals match the ledger? (scheduled, daily)
-php artisan bloodhound:audit-ledger            # is the ledger itself coherent?
-php artisan bloodhound:rebuild-totals          # recompute totals from the ledger
-php artisan bloodhound:record-pruned-history   # one-off: account for rows an older version pruned
+php artisan bloodhound:record-pruned-history
 ```
 
-**Reconciliation reports; it does not repair.** You should learn a number went wrong
-before anything changes it back. Rows not yet aggregated are reported as a backlog rather
-than as drift — an alert that cries wolf is an alert nobody reads.
+It records each gap as carry, and only what pruning could have caused, so real drift stays
+visible:
 
-**The audit is the interesting one.** Every ledger row stores the baseline its delta was
-computed against, so two things are checkable that were not before: that each row's
-arithmetic holds, and that each peer's chain of baselines runs unbroken. A chain break
-means a baseline went missing between two announces — which is what a Redis outage looks
-like after the fact. Those bytes were never credited and cannot be recovered, but you
-find out it happened instead of never knowing.
+- **per member and torrent**, because every pair that moved bytes has its own total, and
+  pruned credit always leaves a gap there. A gap only on a member's own total means the
+  two totals disagree with each other, which pruning can't cause.
+- **only where the stored total is above the ledger**, because pruning removes credit and
+  never adds it.
+- **bytes only**, because 7.x recorded no time.
 
-**Rebuild** recomputes user and per-torrent totals by replaying the ledger and its carry,
-for everyone or `--user=`: bytes, and seedtime and leechtime. It deliberately does not
-move the aggregation watermark, and it leaves completion dates and counts alone, because
-they are not derivable from the rows.
+Like the opening balance, what it records asserts the totals were correct as of the
+upgrade, not that they were ever right. Running it again changes nothing.
 
-### Pruning and the floor
+### Upgrading from before the ledger (bloodhound before 5.0)
 
-`bloodhound:prune-announce-log` deletes rows past `retention_days`, but **only rows the
-aggregator has already consumed**. Rows still waiting to be aggregated are kept whatever
-their age, because nothing has credited them yet. The command says so when it withholds
-rows.
-
-**What it deletes, it carries forward.** In one transaction per slice of users, the prune
-works out what those users' rows produce (bytes, and the seedtime and leechtime derived
-from them) before the delete and again after, and adds the difference to `ledger_carry`.
-It has to be the difference, not the deleted rows' own share: an interval is credited on
-the announce that closes it, so a surviving announce whose earlier partner is pruned would
-otherwise lose its interval. If anything fails, the delete rolls back with the carry;
-neither lands alone.
-
-**Each peer's latest aggregated announce is kept**, whatever its age, unless it is a
-`stopped`. Time is credited on the announce that closes an interval, so deleting a peer's
-last announce would leave its next one, still waiting to be aggregated or sent weeks
-later, with nothing to pair with, and that time would be lost without anything reporting
-it. Peers whose session ended with a stop keep nothing, which is most of them. So
-retention bounds the table to your retention window plus about one row per session that
-ended without a stop (a crash, a lost connection, a laptop shut), not to zero.
-
-Carry values are signed. If a clock ever stepped back, a pruned row can sit between two
-surviving rows in id order while being older than both. Deleting it pairs the survivors
-directly, which can credit more than before, and the carry for that is negative.
-
-Before this, a prune kept nothing. Reconciliation then reported every pruned user as
-drift, and the `rebuild-totals` it recommended replayed only the surviving rows,
-**cutting real users' ratios**. If you pruned on an earlier version, see
-[Upgrading an existing install](#upgrading-an-existing-install).
-
-### Upgrading an existing install
-
-The migration writes one `opening_balance` ledger row per user, carrying their pre-ledger
-`uploaded`/`downloaded` forward, then folds it immediately so nobody reads as having zero
-ratio.
+The migration writes one `opening_balance` ledger row per member, carrying their
+pre-ledger `uploaded`/`downloaded` forward, then folds it immediately so nobody reads as
+having zero ratio. An install migrating from before 5.0 straight to 8.0 has the fold done
+by the 8.0 migration that adds the time columns, once the columns the aggregator needs
+exist.
 
 That row asserts the old total was correct **as of migration**. It is not evidence that
 it ever was — the per-announce history was never kept, which is exactly why the ledger now
 exists. Per-torrent history likewise starts empty, so hit-and-run enforcement is only
 meaningful for torrents grabbed after the upgrade.
 
-#### Upgrading to seedtime
-
-Announces folded before seedtime was derived credited no time. Run this once after the
-upgrade's migrations:
-
-```bash
-php artisan bloodhound:rebuild-totals
-```
-
-It derives every member's seedtime and leechtime from the announce log, as far back as
-your retention has kept it. Until you run it, `reconcile-ledger` reports each member's
-seedtime as drift and tells you to. It is safe after pruning, because the migrations
-record earlier prunes first (below).
-
-#### If you pruned on an earlier version
-
-Before pruning carried forward, every prune deleted credited rows and kept nothing. Those
-users' totals are still right, but the ledger no longer explains them: reconciliation
-reports them as drift, and **running `rebuild-totals` would cut their ratios.** Don't run
-a rebuild until this is done.
-
-The upgrade migration fixes it if `retention_days` is set: it records each gap as carry
-and reports how many users and per-torrent totals it covered. If you pruned in the past
-but have since turned retention off, run it yourself:
-
-```bash
-php artisan bloodhound:record-pruned-history
-```
-
-It records only what pruning could have caused, so real drift stays visible:
-
-- **per user and torrent**, because every pair that moved bytes has its own total, and
-  pruned credit always leaves a gap there. A gap only on a user's own total means the
-  two totals disagree with each other, which pruning can't cause.
-- **only where the stored total is above the ledger**, because pruning removes credit and
-  never adds it.
-- **bytes only**, because seedtime was never recorded before this version.
-
-Like the opening balance, what it records asserts the totals were correct as of the
-upgrade, not that they were ever right. Running it again changes nothing.
-
-### Port Blacklist
-
-Default blocked ports include Direct Connect (411-413), Kazaa (1214), eMule (4662), Gnutella (6346-6347), and legacy BitTorrent defaults (6881-6889).
-
 ## Events
 
 | Event | Fired When | Properties |
 |-------|------------|------------|
 | `TorrentCompleted` | Peer finishes download | userId, torrentId, ip, userAgent |
-| `CheatDetected` | Anti-cheat violation | type, userId, torrentId, reason |
+| `CheatDetected` | A speed forfeit, data anomaly or swarm anomaly (not a refusal) | type, userId, torrentId, reason |
+| `SeedboxRegistered` | A member registers a seedbox | seedbox, by (null) |
+| `SeedboxApproved` | An admin approves one | seedbox, by |
+| `SeedboxRevoked` | An admin revokes one | seedbox, by |
 
 `TorrentCompleted` automatically records a snatch (completion record) via the built-in listener.
 
@@ -605,24 +972,6 @@ Event::listen(CheatDetected::class, function ($event) {
 ## Middleware
 
 Bloodhound applies `BlockBrowsers` middleware to tracker endpoints. This rejects requests from web browsers (detected by cookies, Accept-Language headers, and user agent strings) - only BitTorrent clients should hit these endpoints.
-
-## Requirements
-
-- PHP 8.3+
-- Laravel 13+
-- Redis
-- [marque/trove](https://packagist.org/packages/marque/trove)
-- A database at or above:
-
-| Engine | Minimum | Why |
-|---|---|---|
-| MySQL | 8.0 | window functions (seedtime is measured with `LAG()`) |
-| MariaDB | 10.3 | Laravel 13's own minimum |
-| PostgreSQL | 10 | Laravel 13's own minimum |
-| SQLite | 3.33 | `UPDATE ... FROM` (the aggregator's batched writes) |
-
-Below these you get a SQL syntax error from the aggregator, not a clear refusal. Check
-`SELECT VERSION()` (or `sqlite3 --version`) before upgrading.
 
 ## License
 

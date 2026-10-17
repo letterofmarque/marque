@@ -435,9 +435,9 @@ dashboard has proven itself.
 When a tracker keeps seedboxes (bloodhound binds trove's `SeedboxesInterface`), members
 manage theirs at **`/profile/seedboxes`**, linked from `/profile/stats`. They register an
 address or a range, see whether it is approved, and remove it. Admins approve and revoke
-at **`/admin/seedboxes`**, which is advertised to the admin panel. Both are admin-only on
-the approving side, because an approved seedbox raises the speed limit its member's
-announces are held to.
+at **`/admin/seedboxes`**, which is advertised to the admin panel. Approving is for
+admins only, not moderators, because an approved seedbox raises the speed limit its
+member's announces are held to.
 
 The tracker decides what a valid range is and what approval means. usarrs shows its
 answers, including its reason when it refuses a range. With no such tracker, both routes
