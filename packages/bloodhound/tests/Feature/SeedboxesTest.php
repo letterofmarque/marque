@@ -80,8 +80,8 @@ describe('approval decides the cap', function () {
         $approved = $this->seedboxes->approve($seedbox->id, $this->admin);
 
         expect($approved->isApproved())->toBeTrue()
-            ->and($approved->decidedBy)->toBe($this->admin->id)
-            ->and($approved->decidedAt)->not->toBeNull()
+            ->and($approved->approvedBy)->toBe($this->admin->id)
+            ->and($approved->approvedAt)->not->toBeNull()
             ->and($this->registry->isSeedbox($this->member->id, '203.0.113.50'))->toBeTrue()
             ->and($this->registry->isSeedbox($this->member->id, '203.0.114.50'))->toBeFalse()
             ->and($this->registry->isSeedbox($this->admin->id, '203.0.113.50'))->toBeFalse();
@@ -93,6 +93,26 @@ describe('approval decides the cap', function () {
         expect($this->registry->isSeedbox($this->member->id, '2001:db8:aa:bb:1:2:3:4'))->toBeTrue()
             ->and($this->registry->isSeedbox($this->member->id, '2001:db8:aa:bc::1'))->toBeFalse()
             ->and($this->registry->isSeedbox($this->member->id, '203.0.113.7'))->toBeFalse();
+    });
+
+    // From the independent check: one decided_by/decided_at pair meant a
+    // revocation erased who had approved the seedbox and when.
+    test('revoking keeps who approved it, and records who revoked it', function () {
+        $second = TestUser::create(['name' => 'Admin 2', 'email' => 'seedbox-admin2@example.com', 'password' => 'p']);
+        $seedbox = $this->seedboxes->register($this->member, '203.0.113.7');
+        $this->seedboxes->approve($seedbox->id, $this->admin);
+
+        $revoked = $this->seedboxes->revoke($seedbox->id, $second);
+
+        expect($revoked->approvedBy)->toBe($this->admin->id)
+            ->and($revoked->approvedAt)->not->toBeNull()
+            ->and($revoked->revokedBy)->toBe($second->id)
+            ->and($revoked->revokedAt)->not->toBeNull();
+
+        $again = $this->seedboxes->approve($seedbox->id, $this->admin);
+
+        expect($again->isApproved())->toBeTrue()
+            ->and($again->revokedBy)->toBeNull();
     });
 
     test('revoking takes effect at once, despite the cache', function () {
@@ -171,7 +191,7 @@ describe('the commands', function () {
 
         $this->artisan('bloodhound:seedbox', ['action' => 'approve', 'id' => $seedbox->id, '--by' => $this->admin->id])->assertSuccessful();
 
-        expect($this->seedboxes->forUser($this->member)[0]->decidedBy)->toBe($this->admin->id);
+        expect($this->seedboxes->forUser($this->member)[0]->approvedBy)->toBe($this->admin->id);
 
         $this->artisan('bloodhound:seedbox', ['action' => 'revoke', 'id' => $seedbox->id, '--by' => $this->admin->id])->assertSuccessful();
 

@@ -81,7 +81,19 @@ class RedisDurability
     {
         $production = app()->environment('production');
 
-        return Cache::remember('bloodhound:redis-durability', self::CACHE_SECONDS, function () use ($production) {
+        // Cached so INFO is not asked on every announce. If the cache store
+        // is down, it is asked anyway: a cache outage must not become a
+        // tracker outage.
+        try {
+            return Cache::remember('bloodhound:redis-durability', self::CACHE_SECONDS, fn () => $this->judge($production));
+        } catch (Throwable) {
+            return $this->judge($production);
+        }
+    }
+
+    private function judge(bool $production): bool
+    {
+        return (function () use ($production) {
             $verdict = $this->verify();
 
             if ($verdict->ok()) {
@@ -100,7 +112,7 @@ class RedisDurability
             Log::warning($message);
 
             return true;
-        });
+        })();
     }
 
     /**

@@ -34,6 +34,20 @@ class TimeOpeningBalance
      */
     public function record(): int
     {
+        $aggregator = app(LedgerAggregator::class);
+        $aggregator->ensureCursor();
+
+        // Under the aggregator's lock: a fold landing between reading what
+        // the ledger explains and writing the gap would be carried twice.
+        return DB::transaction(function () use ($aggregator) {
+            $aggregator->lockCursor();
+
+            return $this->recordLocked();
+        });
+    }
+
+    private function recordLocked(): int
+    {
         $expected = $this->expected();
         $written = 0;
         $perUser = [];

@@ -77,6 +77,20 @@ final class AnnounceService
         $eventEnum = AnnounceEvent::tryFrom($event ?? '');
         $livePeers = $eventEnum === AnnounceEvent::Stopped ? [] : $this->peerService->livePeers($torrent->id);
 
+        // A peer_id is the client's choice, not an identity, but two members
+        // cannot both be in one swarm under one. Letting the second through
+        // would overwrite the first's record, or with `stopped` remove it,
+        // and the first member's next announce would be credited nothing.
+        $stored = $lookup->stored;
+
+        if ($stored !== null
+            && ($stored['user_id'] ?? null) !== $user->getAuthIdentifier()
+            && $lookup->readAt - (int) $stored['last_action'] <= (int) config('threepio.peer_expiry', 3600)) {
+            $this->writeRefusal($announce, 'Peer ID is in use by another member; restart your client');
+
+            return TrackerResponse::error('Peer ID is in use by another member; restart your client');
+        }
+
         $antiCheatCheck = $this->antiCheat->check(
             torrentId: $torrent->id,
             userId: $user->getAuthIdentifier(),

@@ -25,6 +25,8 @@ final class Seedbox
     /**
      * @param  string  $network  CIDR notation, e.g. 203.0.113.7/32 or 2001:db8::/64
      * @param  string  $status  self::PENDING, self::APPROVED or self::REVOKED
+     * @param  int|null  $approvedBy  the approving admin's user id; null when approval is not required
+     * @param  int|null  $revokedBy  the revoking admin's user id, while revoked
      */
     public function __construct(
         public readonly int $id,
@@ -33,8 +35,10 @@ final class Seedbox
         public readonly ?string $label,
         public readonly string $status,
         public readonly DateTimeInterface $registeredAt,
-        public readonly ?DateTimeInterface $decidedAt = null,
-        public readonly ?int $decidedBy = null,
+        public readonly ?DateTimeInterface $approvedAt = null,
+        public readonly ?int $approvedBy = null,
+        public readonly ?DateTimeInterface $revokedAt = null,
+        public readonly ?int $revokedBy = null,
     ) {
         if (! in_array($status, [self::PENDING, self::APPROVED, self::REVOKED], true)) {
             throw new InvalidArgumentException("Unknown seedbox status: {$status}.");

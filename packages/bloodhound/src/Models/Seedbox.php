@@ -16,8 +16,10 @@ use Marque\Trove\Support\Seedbox as SeedboxData;
  * @property string $network
  * @property string|null $label
  * @property string $status
- * @property Carbon|null $decided_at
- * @property int|null $decided_by
+ * @property Carbon|null $approved_at
+ * @property int|null $approved_by
+ * @property Carbon|null $revoked_at
+ * @property int|null $revoked_by
  * @property Carbon $created_at
  */
 class Seedbox extends Model
@@ -27,16 +29,20 @@ class Seedbox extends Model
         'network',
         'label',
         'status',
-        'decided_at',
-        'decided_by',
+        'approved_at',
+        'approved_by',
+        'revoked_at',
+        'revoked_by',
     ];
 
     protected function casts(): array
     {
         return [
             'user_id' => 'integer',
-            'decided_at' => 'datetime',
-            'decided_by' => 'integer',
+            'approved_at' => 'datetime',
+            'approved_by' => 'integer',
+            'revoked_at' => 'datetime',
+            'revoked_by' => 'integer',
         ];
     }
 
@@ -49,8 +55,10 @@ class Seedbox extends Model
             label: $this->label,
             status: $this->status,
             registeredAt: $this->created_at,
-            decidedAt: $this->decided_at,
-            decidedBy: $this->decided_by,
+            approvedAt: $this->approved_at,
+            approvedBy: $this->approved_by,
+            revokedAt: $this->revoked_at,
+            revokedBy: $this->revoked_by,
         );
     }
 }

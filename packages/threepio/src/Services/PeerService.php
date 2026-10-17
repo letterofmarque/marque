@@ -280,6 +280,11 @@ final class PeerService
         $redis = $this->redis();
         $existingPeer = $this->find($torrentId, $peerId);
 
+        // A retained baseline goes too, whether or not the peer is live:
+        // `stopped` closes the session, and a stop credited against a
+        // retained record must not leave it to be credited again.
+        $redis->hdel($this->prefix."gone:{$torrentId}", $peerId);
+
         if (! $existingPeer) {
             return null;
         }
@@ -499,14 +504,16 @@ final class PeerService
             $peer = json_decode($data, true);
 
             if ($now - $peer['last_action'] > $this->peerExpiry) {
+                // Removed first: removal also clears any retained record,
+                // which is right for a stop and wrong for the one kept here.
+                $this->removePeer($torrentId, (string) $peerId);
+                $removed++;
+
                 if ($this->baselineRetention > 0
                     && $now - $peer['last_action'] <= $this->baselineRetention) {
                     $redis->hset($goneKey, $peerId, $data);
                     $redis->expire($goneKey, $this->baselineRetention);
                 }
-
-                $this->removePeer($torrentId, (string) $peerId);
-                $removed++;
 
                 continue;
             }

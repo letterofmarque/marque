@@ -24,8 +24,10 @@ return new class extends Migration
             $table->string('network', 43);
             $table->string('label', 100)->nullable();
             $table->string('status', 16)->default('pending')->index();
-            $table->timestamp('decided_at')->nullable();
-            $table->unsignedBigInteger('decided_by')->nullable();
+            $table->timestamp('approved_at')->nullable();
+            $table->unsignedBigInteger('approved_by')->nullable();
+            $table->timestamp('revoked_at')->nullable();
+            $table->unsignedBigInteger('revoked_by')->nullable();
             $table->timestamps();
 
             $table->unique(['user_id', 'network']);

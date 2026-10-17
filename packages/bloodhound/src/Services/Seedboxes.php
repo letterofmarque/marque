@@ -78,7 +78,7 @@ final class Seedboxes implements SeedboxesInterface, SeedboxRegistry
                 'network' => $parsed->cidr(),
                 'label' => $label !== null && trim($label) !== '' ? trim($label) : null,
                 'status' => $approved ? SeedboxData::APPROVED : SeedboxData::PENDING,
-                'decided_at' => $approved ? now() : null,
+                'approved_at' => $approved ? now() : null,
             ]);
         } catch (QueryException) {
             throw new InvalidArgumentException("{$parsed->cidr()} is already registered.");
@@ -157,11 +157,11 @@ final class Seedboxes implements SeedboxesInterface, SeedboxRegistry
     {
         $seedbox = Seedbox::query()->findOrFail($seedboxId);
 
-        $seedbox->forceFill([
-            'status' => $status,
-            'decided_at' => now(),
-            'decided_by' => $admin->getAuthIdentifier(),
-        ])->save();
+        // Approving records who and when, and clears a past revocation;
+        // revoking records who and when, and keeps who approved it.
+        $seedbox->forceFill($status === SeedboxData::APPROVED
+            ? ['status' => $status, 'approved_at' => now(), 'approved_by' => $admin->getAuthIdentifier(), 'revoked_at' => null, 'revoked_by' => null]
+            : ['status' => $status, 'revoked_at' => now(), 'revoked_by' => $admin->getAuthIdentifier()])->save();
 
         $this->forget($seedbox->user_id);
 

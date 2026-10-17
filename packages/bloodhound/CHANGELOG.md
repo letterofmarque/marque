@@ -20,9 +20,9 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   `php artisan bloodhound:check-redis` reads both settings from `INFO` and says what to
   set. `BLOODHOUND_REDIS_DURABILITY=attested` covers a provider that makes the data
   durable without AOF; the eviction policy is checked regardless.
-- **SQLite 3.33 or later**, for `UPDATE ... FROM` in the aggregator's batched writes. Below
-  it the aggregator fails with a SQL syntax error. Other engines need nothing beyond
-  Laravel 13's own minimums.
+- **MySQL, MariaDB, PostgreSQL, or SQLite 3.33 or later.** The aggregator's batched writes
+  are spelled for those four and refuse any other driver; SQLite needs 3.33 for
+  `UPDATE ... FROM`, and below it the aggregator fails with a SQL syntax error.
 - **Requires `marque/threepio` ^4.0 and `marque/trove` ^4.6** (for `SeedboxesInterface`).
 - **A speed over the cap forfeits the bytes instead of refusing the announce.** The
   direction over the cap is credited 0 and the baseline moves on, so those bytes never
@@ -79,6 +79,10 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   durability check every minute, so a tracker nobody is announcing to still reports it.
 
 ### Fixed
+
+- **A member's record could be overwritten, or removed, by another member using the same
+  peer ID**, and their next announce was credited nothing. A peer ID live in the swarm for
+  another member is now refused.
 
 - **Pruning no longer costs members their credit.** `bloodhound:prune-announce-log`
   deleted aggregated ledger rows and kept nothing. Reconciliation then reported every

@@ -39,6 +39,7 @@ use Marque\Threepio\Services\PeerService;
 use Marque\Trove\Contracts\TorrentFilePolicyInterface;
 use Marque\Trove\Contracts\SeedboxesInterface;
 use Marque\Trove\Contracts\TrackerStatsInterface;
+use Throwable;
 
 class BloodhoundServiceProvider extends ServiceProvider
 {
@@ -195,11 +196,24 @@ class BloodhoundServiceProvider extends ServiceProvider
         }
 
         if (array_key_exists('max_connections_per_torrent', (array) config('bloodhound.anti_cheat'))
-            && Cache::add('bloodhound:removed-config-reported', true, 86_400)) {
+            && $this->firstToday('bloodhound:removed-config-reported')) {
             Log::warning(
                 'bloodhound.anti_cheat.max_connections_per_torrent was removed in 8.0.0 and is ignored. '
                 .'Use max_seeding_locations_per_torrent and max_leeching_locations_per_torrent instead.'
             );
+        }
+    }
+
+    /**
+     * Whether this is the first time today, by the cache. With the cache down,
+     * yes: an extra log line beats a boot that fails on a cache outage.
+     */
+    private function firstToday(string $key): bool
+    {
+        try {
+            return Cache::add($key, true, 86_400);
+        } catch (Throwable) {
+            return true;
         }
     }
 

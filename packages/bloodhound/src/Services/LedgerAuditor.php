@@ -347,6 +347,8 @@ class LedgerAuditor
                         'downloaded' => $row->downloaded,
                         'created_at' => $row->created_at->getTimestamp(),
                         'prior_at' => $row->prior_at?->getTimestamp(),
+                        'prior_up' => $row->prior_up,
+                        'prior_down' => $row->prior_down,
                         'legacy' => $row->id <= $boundary,
                     ];
                 }
@@ -356,7 +358,7 @@ class LedgerAuditor
     }
 
     /**
-     * @param  array{id: int, event: string, uploaded: int, downloaded: int, created_at: int, prior_at: ?int, legacy: bool}  $last
+     * @param  array{id: int, event: string, uploaded: int, downloaded: int, created_at: int, prior_at: ?int, prior_up: ?int, prior_down: ?int, legacy: bool}  $last
      */
     protected function chainReason(AnnounceLog $row, array $last, int $retention): ?string
     {
@@ -372,18 +374,24 @@ class LedgerAuditor
 
         $priorAt = $row->prior_at?->getTimestamp();
 
-        if ($priorAt !== null && $last['prior_at'] !== null && $priorAt === $last['prior_at']) {
-            return 'duplicate interval: two rows diffed against the same baseline';
-        }
-
         // A 7.x row's Redis timestamp and created_at were taken apart, so only
         // the bytes are compared across the boundary. A baseline with no time
         // (a recovered one that carried none) credited no seconds, which the
         // arithmetic check holds it to; there is no time to continue.
         $timesMatch = $last['legacy'] || $priorAt === null || $priorAt === $last['created_at'];
 
-        return $row->prior_up === $last['uploaded'] && $row->prior_down === $last['downloaded'] && $timesMatch
-            ? null
-            : 'the baseline does not continue the previous announce';
+        // Continuing the previous row is checked first: announces inside one
+        // second share a timestamp, so a matching prior_at alone proves
+        // nothing.
+        if ($row->prior_up === $last['uploaded'] && $row->prior_down === $last['downloaded'] && $timesMatch) {
+            return null;
+        }
+
+        if ($priorAt !== null && $last['prior_at'] !== null && $priorAt === $last['prior_at']
+            && $row->prior_up === $last['prior_up'] && $row->prior_down === $last['prior_down']) {
+            return 'duplicate interval: two rows diffed against the same baseline';
+        }
+
+        return 'the baseline does not continue the previous announce';
     }
 }

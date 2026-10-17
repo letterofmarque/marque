@@ -82,9 +82,14 @@ class FakeSeedboxes implements SeedboxesInterface
     {
         $old = $this->seedboxes[$seedboxId] ?? throw new ModelNotFoundException;
 
+        $approving = $status === Seedbox::APPROVED;
+
         return $this->seedboxes[$seedboxId] = new Seedbox(
-            $old->id, $old->userId, $old->network, $old->label, $status,
-            $old->registeredAt, CarbonImmutable::now(), $admin->getAuthIdentifier(),
+            $old->id, $old->userId, $old->network, $old->label, $status, $old->registeredAt,
+            approvedAt: $approving ? CarbonImmutable::now() : $old->approvedAt,
+            approvedBy: $approving ? $admin->getAuthIdentifier() : $old->approvedBy,
+            revokedAt: $approving ? null : CarbonImmutable::now(),
+            revokedBy: $approving ? null : $admin->getAuthIdentifier(),
         );
     }
 }

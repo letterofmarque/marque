@@ -322,3 +322,18 @@ describe('the resolver, after retention', function () {
         expect($calls)->toHaveCount(1);
     });
 });
+
+// From the independent check: a stop credited against a retained baseline
+// left it in place, so every later stop or restart credited the same
+// interval again.
+test('removing a peer consumes its retained baseline too', function () {
+    $this->peers->retainBaselinesFor(7 * 86_400);
+    announce($this->peers, uploaded: 1_000);
+    rewindPeer($this->prefix, 1, '-qB4210-aaaaaaaaaaaa', 7_200);
+    $this->peers->cleanupExpiredPeers(1);
+
+    $this->peers->removePeer(1, '-qB4210-aaaaaaaaaaaa');
+
+    expect($this->redis->hexists($this->prefix.'gone:1', '-qB4210-aaaaaaaaaaaa'))->toBeFalse()
+        ->and($this->peers->lookup(1, '-qB4210-aaaaaaaaaaaa', 1)->baseline)->toBeNull();
+});

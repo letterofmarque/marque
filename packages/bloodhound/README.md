@@ -25,7 +25,7 @@ bloodhound and guise.
 - PHP 8.3+
 - Laravel 13+
 - [marque/trove](https://packagist.org/packages/marque/trove)
-- A database Laravel 13 supports. On SQLite, 3.33 or later.
+- MySQL, MariaDB, PostgreSQL, or SQLite 3.33 or later.
 
 ### Redis
 
@@ -82,7 +82,8 @@ because every provider lets you set the policy and an evicted peer record is a l
 baseline.
 
 `marque:install` runs the same check when it installs a private tracker, and stops before
-installing anything until it passes or `BLOODHOUND_REDIS_DURABILITY=attested` is in `.env`.
+installing anything until it passes. `BLOODHOUND_REDIS_DURABILITY=attested` in `.env`
+covers persistence there too; the eviction policy still has to be `noeviction`.
 
 If Redis is lost anyway, bloodhound notices and reads baselines from the ledger for a
 while: see [Recovery mode](#recovery-mode). The audit then names every peer whose session
@@ -93,10 +94,11 @@ You also need `ext-redis` or `predis/predis`; see
 
 ### Database
 
-Bloodhound's SQL needs nothing beyond Laravel 13's own database minimums, with one
-exception: SQLite 3.33, for `UPDATE ... FROM` in the aggregator's batched writes. Below it
-you get a SQL syntax error from the aggregator, not a clear refusal; check
-`sqlite3 --version` before upgrading. The suite is tested on MySQL 8.0, MariaDB 11,
+Bloodhound runs on MySQL, MariaDB, PostgreSQL and SQLite. The aggregator's batched
+writes are spelled for those four (`UPDATE ... JOIN` on MySQL and MariaDB,
+`UPDATE ... FROM` on the others) and refuse any other driver. SQLite needs 3.33 or later
+for `UPDATE ... FROM`; below it you get a SQL syntax error from the aggregator, not a
+clear refusal, so check `sqlite3 --version` before upgrading. The suite is tested on MySQL 8.0, MariaDB 11,
 PostgreSQL 17 and SQLite.
 
 ## Installation
@@ -221,15 +223,19 @@ key formats are disjoint first.
 2. The tracker's Redis checked for durability (cached; see [Redis](#redis)). In
    production a failing check refuses the announce here.
 3. Client validated against the whitelist or blacklist.
-4. The peer's record read from Redis, once, along with the torrent's live peers.
+4. The peer's record read from Redis, once, along with the torrent's live peers. A peer ID
+   live in the swarm for another member is refused here: two members cannot share one,
+   and letting the second through would overwrite or remove the first's record.
 5. Anti-cheat judges the announce against that record.
 6. The credit computed from the same record, and the ledger row written.
 7. Only then Redis updated: the peer's record, the swarm counters and sets.
 8. Bencoded peer list returned to the client. Within a minute or two
    `bloodhound:aggregate-ledger` adds the row to the member's totals.
 
-A refusal at step 3 or 5 writes a flagged ledger row and stops: nothing is credited and
-Redis is not touched.
+A refusal at step 3, 4 or 5 writes a flagged ledger row and stops: nothing is credited
+and Redis is not touched. A refusal at step 1 (a bad announce key, an unknown torrent,
+missing or invalid parameters, an out-of-range port) or step 2 writes no row: there is no
+member and torrent to record it against, or the tracker itself is refusing.
 
 ### Peer Storage
 
@@ -387,10 +393,13 @@ Seeding and leeching are limited separately:
 leeching limit is what stops one account being shared to download. Only a **new**
 location is counted against a limit:
 
-- a peer already in the swarm is never refused by a count, so a leecher that finishes
-  becomes a seeder without being refused;
-- a new client at a location the member already uses on that torrent is not a new
-  location;
+- a peer already in the swarm, announcing from where it was, is never refused by a
+  count, so a leecher that finishes becomes a seeder without being refused;
+- a peer is counted again (not against itself) when it moves to another location, or
+  turns from seeding to leeching, so starting as a seeder and then reporting bytes left
+  does not get round the leeching limit;
+- a client at a location the member already uses on that torrent, in the same state, is
+  not a new location;
 - a new peer is classed as seeding or leeching by the `left` it reports, and counted
   against the member's live peers in the same state.
 
@@ -461,9 +470,11 @@ php artisan bloodhound:seedbox revoke 12 --by=1
 ## Configuration
 
 Published to `config/bloodhound.php`. Bloodhound's config is merged with the published
-file at the top level only, so a published `anti_cheat` block replaces the shipped one
-whole. A key missing from it falls back to the default in code, which is the same as the
-shipped default; but its environment variable does nothing until the key is in your file.
+file at the top level only. A top-level key missing from your file comes from the shipped
+config, environment variable and all. A published block, such as `anti_cheat`, replaces
+the shipped one whole: a key missing from it falls back to the default in code, which is
+the same as the shipped default, but its environment variable does nothing until the key
+is in your file.
 
 ### Uploads: the private flag
 

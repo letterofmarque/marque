@@ -100,7 +100,7 @@ describe('the admin page', function () {
 
         Livewire::actingAs($this->admin)->test(SeedboxIndex::class)->call('approve', $seedbox->id);
 
-        expect($this->seedboxes->all(Seedbox::APPROVED)[0]->decidedBy)->toBe($this->admin->id);
+        expect($this->seedboxes->all(Seedbox::APPROVED)[0]->approvedBy)->toBe($this->admin->id);
 
         Livewire::actingAs($this->admin)->test(SeedboxIndex::class)->set('status', 'approved')->call('revoke', $seedbox->id);
 

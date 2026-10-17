@@ -167,10 +167,7 @@ test('a scoped rebuild recomputes one user and leaves the rest alone', function 
 // right from the rows.
 test('rebuild sums time from rows the aggregator has already passed', function () {
     seedHistory($this);
-    LedgerCursor::create([
-        'stream' => LedgerAggregator::STREAM,
-        'position' => (int) AnnounceLog::query()->max('id'),
-    ]);
+    LedgerCursor::query()->updateOrCreate(['stream' => LedgerAggregator::STREAM], ['position' => (int) AnnounceLog::query()->max('id')]);
 
     app(LedgerRebuilder::class)->rebuild();
 

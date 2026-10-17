@@ -97,22 +97,21 @@ return [
     | Ratio Tracking
     |--------------------------------------------------------------------------
     |
-    | Controls how user ratios are tracked.
-    |
-    | 'full' - Track upload/download bytes, enforce ratio requirements
-    | 'off' - No tracking at all
-    | 'seedtime' - Track seeding time instead (ratioless)
+    | Not yet read by anything: bytes, seedtime and leechtime are recorded the
+    | same way in every mode, and no minimum is enforced. These keys reserve
+    | the settings enforcement will read: 'full' (a minimum ratio), 'seedtime'
+    | (a minimum seedtime instead) and 'off' (no minimum). See #10732.
     |
     */
 
     // check-docs: ignore — documented but not yet enforced, read by nothing until #10732
     'ratio_mode' => env('BLOODHOUND_RATIO_MODE', 'full'),
 
-    // Minimum ratio required (only applies when ratio_mode = 'full')
+    // The minimum ratio 'full' will enforce
     // check-docs: ignore — not yet enforced, read by nothing until #10732
     'min_ratio' => env('BLOODHOUND_MIN_RATIO', 0.5),
 
-    // Minimum seed time in seconds (only applies when ratio_mode = 'seedtime')
+    // The minimum seedtime, in seconds, 'seedtime' will enforce
     // check-docs: ignore — not yet enforced, read by nothing until #10732
     'min_seedtime' => env('BLOODHOUND_MIN_SEEDTIME', 86400), // 24 hours
 
@@ -131,8 +130,9 @@ return [
         'mode' => env('BLOODHOUND_CLIENT_MODE', 'whitelist'), // 'whitelist' or 'blacklist'
     ],
 
-    // Whitelisted clients (used when mode = 'whitelist')
-    // Format: peer_id_prefix => [min_version, max_version, blocked_versions]
+    // Clients allowed when mode = 'whitelist'. Each entry: a peer_id_pattern
+    // whose captures are the version digits, the version_format they make,
+    // and min_version, max_version (null for none) and blocked_versions.
     'whitelist' => [
         // qBittorrent: -qB4210- = version 4.2.1.0
         'qBittorrent' => [

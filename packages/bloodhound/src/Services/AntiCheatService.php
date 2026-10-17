@@ -76,7 +76,7 @@ final class AntiCheatService
             return $gapCheck + $pass;
         }
 
-        $limitCheck = $this->checkLocationLimits($userId, $ip, $left, $event, $lookup, $livePeers);
+        $limitCheck = $this->checkLocationLimits($userId, $peerId, $ip, $left, $event, $lookup, $livePeers);
         if (! $limitCheck['passed']) {
             return $limitCheck + $pass;
         }
@@ -161,42 +161,57 @@ final class AntiCheatService
      * Refuse a new location past the member's limit on this torrent, or a
      * new session past the IP's.
      *
-     * Only a peer that is not already in the swarm is counted against a
-     * limit: the count used to include the announcing peer, so a member at
-     * the limit was refused on every announce from every client (F6). A
-     * location is an IP (an IPv6 /64), so a second client at a location the
-     * member already uses is not a new one. Seeding and leeching locations
-     * are limited separately: the leeching limit is what stops one account
-     * being shared to download.
+     * A peer already in the swarm, announcing from where it was in the state
+     * it was in, is never refused by a count: the count used to include the
+     * announcing peer, so a member at the limit was refused on every announce
+     * from every client (F6). It is counted again, without itself, when it
+     * moves: to another location, or from seeding to leeching (starting as a
+     * seeder and then reporting bytes left was a way round the leeching
+     * limit). A location is an IP (an IPv6 /64), so a second client at a
+     * location the member already uses is not a new one. Seeding and
+     * leeching are limited separately: the leeching limit is what stops one
+     * account being shared to download.
      *
      * @param  array<string, array<string, mixed>>  $livePeers
      */
-    public function checkLocationLimits(int $userId, string $ip, int $left, ?string $event, PeerLookup $lookup, array $livePeers): array
+    public function checkLocationLimits(int $userId, string $peerId, string $ip, int $left, ?string $event, PeerLookup $lookup, array $livePeers): array
     {
-        if ($event === 'stopped' || $lookup->isLive()) {
+        if ($event === 'stopped') {
             return ['passed' => true, 'reason' => null];
         }
 
         $location = Location::of($ip);
         $seeding = $left === 0;
+        $record = $lookup->isLive() ? $lookup->baseline : null;
+
+        $moved = $record !== null && Location::of((string) $record['ip']) !== $location;
+        $startedLeeching = $record !== null && (int) $record['left'] === 0 && ! $seeding;
+
+        if ($record !== null && ! $moved && ! $startedLeeching) {
+            return ['passed' => true, 'reason' => null];
+        }
+
         $locations = [];
 
-        foreach ($livePeers as $peer) {
-            if (($peer['user_id'] ?? null) !== $userId) {
+        foreach ($livePeers as $otherPeerId => $peer) {
+            if ((string) $otherPeerId === $peerId || ($peer['user_id'] ?? null) !== $userId) {
+                continue;
+            }
+
+            if ((((int) $peer['left']) === 0) !== $seeding) {
                 continue;
             }
 
             $peerLocation = Location::of((string) $peer['ip']);
 
+            // Another client of the member, in the same state, already here.
             if ($peerLocation === $location) {
                 $locations = null;
 
                 break;
             }
 
-            if ((((int) $peer['left']) === 0) === $seeding) {
-                $locations[$peerLocation] = true;
-            }
+            $locations[$peerLocation] = true;
         }
 
         if ($locations !== null) {
@@ -211,13 +226,16 @@ final class AntiCheatService
             }
         }
 
-        $maxPerIp = (int) config('bloodhound.anti_cheat.max_connections_per_ip', 10);
+        // A session new to this IP: a new peer, or one that moved here.
+        if ($record === null || (string) $record['ip'] !== $ip) {
+            $maxPerIp = (int) config('bloodhound.anti_cheat.max_connections_per_ip', 10);
 
-        if ($this->peerService->getIpSessionCount($ip) >= $maxPerIp) {
-            return [
-                'passed' => false,
-                'reason' => "Connection limit exceeded ({$maxPerIp} per IP)",
-            ];
+            if ($this->peerService->getIpSessionCount($ip) >= $maxPerIp) {
+                return [
+                    'passed' => false,
+                    'reason' => "Connection limit exceeded ({$maxPerIp} per IP)",
+                ];
+            }
         }
 
         return ['passed' => true, 'reason' => null];

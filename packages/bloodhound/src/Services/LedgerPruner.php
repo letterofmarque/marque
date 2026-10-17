@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Marque\Bloodhound\Services;
 
+use Illuminate\Database\Connection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Marque\Bloodhound\Models\AnnounceLog;
@@ -48,8 +49,34 @@ class LedgerPruner
         $deleted = 0;
         $after = 0;
 
+        $aggregator = app(LedgerAggregator::class);
+        $aggregator->ensureCursor();
+
         while (true) {
-            $count = $connection->transaction(function () use ($cutoff, $watermark, $rowsPerChunk, &$after) {
+            // The aggregator's lock, as a rebuild takes it: a rebuild reading
+            // the ledger and the carry while a chunk moves rows from one to
+            // the other could count them twice, or not at all.
+            $count = DB::transaction(function () use ($aggregator, $connection, $cutoff, $watermark, $rowsPerChunk, &$after) {
+                return $this->lockedChunk($aggregator, $connection, $cutoff, $watermark, $rowsPerChunk, $after);
+            });
+
+            if ($count === 0) {
+                return $deleted;
+            }
+
+            $deleted += $count;
+        }
+    }
+
+    /**
+     * Sum, carry and delete one chunk, under the cursor lock the caller's
+     * transaction holds.
+     */
+    private function lockedChunk(LedgerAggregator $aggregator, Connection $connection, Carbon $cutoff, int $watermark, int $rowsPerChunk, int &$after): int
+    {
+        $aggregator->lockCursor();
+
+        return $connection->transaction(function () use ($cutoff, $watermark, $rowsPerChunk, &$after) {
                 $rows = AnnounceLog::query()
                     ->toBase()
                     ->select(['id', 'user_id', 'torrent_id', 'upload_delta', 'download_delta', 'seed_seconds', 'leech_seconds'])
@@ -83,14 +110,7 @@ class LedgerPruner
                 $after = max($ids);
 
                 return AnnounceLog::query()->whereIn('id', $ids)->delete();
-            });
-
-            if ($count === 0) {
-                return $deleted;
-            }
-
-            $deleted += $count;
-        }
+        });
     }
 
     /**

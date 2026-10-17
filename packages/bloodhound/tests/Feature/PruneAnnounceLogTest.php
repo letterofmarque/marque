@@ -186,15 +186,11 @@ describe('the reconciliation floor', function () {
 
         $old = seedLogRow(daysAgo: 30);
 
-        // The peer announced again since, and that is aggregated too: a
-        // peer's latest aggregated announce is kept (Job #187), its older
-        // ones are not.
+        // The peer announced again since, and that is aggregated too. Only
+        // the aged row goes; its credit moves into carry.
         $newer = seedLogRow(daysAgo: 0);
 
-        LedgerCursor::create([
-            'stream' => LedgerAggregator::STREAM,
-            'position' => $newer->id,
-        ]);
+        LedgerCursor::query()->updateOrCreate(['stream' => LedgerAggregator::STREAM], ['position' => $newer->id]);
 
         test()->artisan('bloodhound:prune-announce-log')->assertSuccessful();
 
