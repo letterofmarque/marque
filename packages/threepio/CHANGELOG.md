@@ -39,6 +39,9 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 - **`lookup($torrentId, $peerId, $userId): PeerLookup`**, one read of a peer for
   everything that judges or credits its announce. `upsertPeer(..., lookup:)` takes it,
   so anti-cheat and the credit see the same baseline and the peer is not read twice.
+- **`PeerLookup::credit($uploaded, $downloaded)`**, the credit an announce earns against
+  the lookup's baseline, computed without touching Redis. A tracker can record it
+  durably before writing the swarm; `upsertPeer()` arrives at the same figures.
 - **`upsertPeer()` returns `prior_at`, `prior_left`, `interval_seconds` and
   `baseline_source`**: when the interval the announce closes began, the peer's state
   then, the interval capped at `peer_expiry`, and where the baseline came from.

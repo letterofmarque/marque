@@ -45,4 +45,55 @@ final readonly class PeerLookup
         return $this->source === BaselineSource::Swarm
             && $this->readAt - (int) ($this->baseline['last_action'] ?? 0) <= $this->peerExpiry;
     }
+
+    /**
+     * What an announce reporting these counters is credited, against this baseline.
+     *
+     * Pure: it reads nothing and writes nothing, so a tracker can write its
+     * durable record of the credit before it touches Redis, and upsertPeer()
+     * arrives at the same figures.
+     *
+     * @return array{upload_delta: int, download_delta: int, prior_up: ?int, prior_down: ?int, prior_at: ?int, prior_left: ?int, interval_seconds: int}
+     */
+    public function credit(int $uploaded, int $downloaded): array
+    {
+        $baseline = $this->baseline;
+
+        if ($baseline === null) {
+            return [
+                'upload_delta' => 0,
+                'download_delta' => 0,
+                'prior_up' => null,
+                'prior_down' => null,
+                'prior_at' => null,
+                'prior_left' => null,
+                'interval_seconds' => 0,
+            ];
+        }
+
+        $priorAt = isset($baseline['last_action']) ? (int) $baseline['last_action'] : null;
+
+        return [
+            'upload_delta' => self::delta($uploaded, (int) $baseline['uploaded']),
+            'download_delta' => self::delta($downloaded, (int) $baseline['downloaded']),
+            'prior_up' => (int) $baseline['uploaded'],
+            'prior_down' => (int) $baseline['downloaded'],
+            'prior_at' => $priorAt,
+            'prior_left' => isset($baseline['left']) ? (int) $baseline['left'] : null,
+            'interval_seconds' => $priorAt !== null ? min(max(0, $this->readAt - $priorAt), $this->peerExpiry) : 0,
+        ];
+    }
+
+    /**
+     * Diff a cumulative counter against its baseline.
+     *
+     * A counter below its baseline means the client restarted under the same
+     * peer_id and is counting from zero again, so what it reports is what this
+     * session moved. Crediting 0 (the old clamp) lost everything between the
+     * restart and this announce.
+     */
+    private static function delta(int $reported, int $prior): int
+    {
+        return $reported >= $prior ? $reported - $prior : $reported;
+    }
 }

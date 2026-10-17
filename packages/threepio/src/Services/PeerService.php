@@ -163,7 +163,7 @@ final class PeerService
         $redis = $this->redis();
         $peerKey = $this->prefix."peers:{$torrentId}";
         $lookup ??= $this->lookup($torrentId, $peerId, $userId);
-        $now = time();
+        $now = $lookup->readAt;
 
         // Swarm bookkeeping follows what is in the hash, whoever owns it: a
         // record there is already in the counters and sets. The baseline is a
@@ -186,11 +186,9 @@ final class PeerService
             'started' => $baseline['started'] ?? $now,
         ];
 
-        $uploadDelta = $baseline !== null ? $this->delta($uploaded, (int) $baseline['uploaded']) : 0;
-        $downloadDelta = $baseline !== null ? $this->delta($downloaded, (int) $baseline['downloaded']) : 0;
-
-        $priorAt = isset($baseline['last_action']) ? (int) $baseline['last_action'] : null;
-        $interval = $priorAt !== null ? min(max(0, $now - $priorAt), $this->peerExpiry) : 0;
+        $credit = $lookup->credit($uploaded, $downloaded);
+        $uploadDelta = $credit['upload_delta'];
+        $downloadDelta = $credit['download_delta'];
 
         if ($stored !== null) {
             if ((bool) $stored['is_seeder'] !== $isSeeder) {
@@ -256,24 +254,13 @@ final class PeerService
             $redis->incrby($this->prefix."swarm:{$torrentId}:downloaded", $downloadDelta);
         }
 
-        return [
-            'upload_delta' => $uploadDelta,
-            'download_delta' => $downloadDelta,
-            // The baseline the deltas were diffed against. Null for a peer with
-            // no baseline — that is a real state, not missing data, and
-            // recording it as 0 would claim a baseline nobody observed.
-            //
-            // Returned so the caller can persist it: a stored delta cannot be
-            // checked without the value it was derived from, so a wrong
-            // baseline would otherwise leave no trace anywhere.
-            'prior_up' => $baseline !== null ? (int) $baseline['uploaded'] : null,
-            'prior_down' => $baseline !== null ? (int) $baseline['downloaded'] : null,
-            // When the interval this announce closes began, the peer's state
-            // then (a seeder when 0), and its length capped at peer_expiry. A
-            // tracker crediting time attributes the interval by its start.
-            'prior_at' => $priorAt,
-            'prior_left' => isset($baseline['left']) ? (int) $baseline['left'] : null,
-            'interval_seconds' => $interval,
+        // The baseline the deltas were diffed against (null for a peer with no
+        // baseline, a real state rather than missing data), when the interval
+        // this announce closes began, the peer's state then (a seeder when 0),
+        // and the interval capped at peer_expiry. Returned so the caller can
+        // persist them: a stored delta cannot be checked without the value it
+        // was derived from.
+        return $credit + [
             'baseline_source' => $lookup->source->value,
             'was_existing' => $stored !== null,
             'baseline_recovered' => $lookup->source === BaselineSource::Recovered,
@@ -364,19 +351,6 @@ final class PeerService
         }
 
         return $live;
-    }
-
-    /**
-     * Diff a cumulative counter against its baseline.
-     *
-     * A counter below its baseline means the client restarted under the same
-     * peer_id and is counting from zero again, so what it reports is what this
-     * session moved. Crediting 0 (the old clamp) lost everything between the
-     * restart and this announce.
-     */
-    private function delta(int $reported, int $prior): int
-    {
-        return $reported >= $prior ? $reported - $prior : $reported;
     }
 
     /**

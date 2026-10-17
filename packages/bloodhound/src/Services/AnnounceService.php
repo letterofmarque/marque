@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Marque\Bloodhound\Services;
 
+use Carbon\Carbon;
 use Illuminate\Http\Response;
 use Marque\Bloodhound\Events\TorrentCompleted;
 use Marque\Bloodhound\Models\AnnounceLog;
 use Marque\Threepio\Enums\AnnounceEvent;
 use Marque\Threepio\Services\PeerService;
+use Marque\Threepio\Support\PeerLookup;
 use Marque\Threepio\Support\TrackerResponse;
 use Marque\Trove\Contracts\UserInterface;
 use Marque\Trove\Models\Torrent;
@@ -26,6 +28,13 @@ final class AnnounceService
 
     /**
      * Handle an announce request.
+     *
+     * Every outcome writes one ledger row, and the row comes first: a refusal
+     * (client validation or anti-cheat) is recorded and touches nothing in
+     * Redis; an accepted announce is credited against the peer's baseline,
+     * recorded, and only then written to the swarm. A failed insert therefore
+     * leaves the baseline where it was, and the client's retry is credited in
+     * full.
      */
     public function handle(
         UserInterface $user,
@@ -42,13 +51,18 @@ final class AnnounceService
         bool $compact,
         int $numWant,
     ): Response {
-        // Validate client
+        $announce = new AnnounceRequest($user, $torrent, $peerId, $ip, $port, $uploaded, $downloaded, $left, $userAgent, $this->eventLabel($event));
+
+        // A refused client is still an announce from a known member on a known
+        // torrent, so it is recorded like any other refusal.
         $clientCheck = $this->clientValidation->validate($peerId);
         if (! $clientCheck['valid']) {
-            return TrackerResponse::error($clientCheck['reason'] ?? 'Client not allowed');
+            $reason = $clientCheck['reason'] ?? 'Client not allowed';
+            $this->writeRefusal($announce, $reason);
+
+            return TrackerResponse::error($reason);
         }
 
-        // Run anti-cheat checks
         $antiCheatCheck = $this->antiCheat->check(
             torrentId: $torrent->id,
             userId: $user->getAuthIdentifier(),
@@ -62,96 +76,44 @@ final class AnnounceService
         );
 
         if (! $antiCheatCheck['passed']) {
-            // Still logged (Spec #98) — a rejected announce is itself part
-            // of the history worth keeping, not just the ones that passed.
-            // No PeerService::upsertPeer() ran, so there's no real delta to
-            // report here; the point of this row is that the announce
-            // happened and was rejected, and why.
-            $this->logAnnounce(
-                user: $user,
-                torrent: $torrent,
-                peerId: $peerId,
-                eventLabel: $this->eventLabel($event),
-                ip: $ip,
-                port: $port,
-                userAgent: $userAgent,
-                uploaded: $uploaded,
-                downloaded: $downloaded,
-                left: $left,
-                uploadDelta: 0,
-                downloadDelta: 0,
-                antiCheatCheck: $antiCheatCheck,
-            );
+            // Recorded (Spec #98): a rejected announce is part of the history
+            // worth keeping. It credits nothing, and Redis is untouched, so the
+            // next accepted announce is measured from the last accepted one.
+            $reason = $antiCheatCheck['reason'] ?? 'Request rejected';
+            $this->writeRefusal($announce, $reason);
 
-            return TrackerResponse::error($antiCheatCheck['reason'] ?? 'Request rejected');
+            return TrackerResponse::error($reason);
         }
 
-        // Determine if this is a seeder
-        $isSeeder = $left === 0;
+        $lookup = $this->peerService->lookup($torrent->id, $peerId, $user->getAuthIdentifier());
 
-        // Parse event
-        $eventEnum = AnnounceEvent::tryFrom($event ?? '');
-
-        // Handle the event
-        return match ($eventEnum) {
-            AnnounceEvent::Stopped => $this->handleStopped(
-                $user, $torrent, $peerId, $ip, $port, $uploaded, $downloaded, $left, $userAgent, $antiCheatCheck
-            ),
-            AnnounceEvent::Completed => $this->handleCompleted(
-                $user, $torrent, $peerId, $ip, $port,
-                $uploaded, $downloaded, $left, $userAgent, $isSeeder, $compact, $numWant, $antiCheatCheck
-            ),
-            default => $this->handleRegular(
-                $user, $torrent, $peerId, $ip, $port,
-                $uploaded, $downloaded, $left, $userAgent, $isSeeder, $compact, $numWant, $antiCheatCheck,
-                eventLabel: $eventEnum?->value ?? 'regular',
-            ),
+        return match (AnnounceEvent::tryFrom($event ?? '')) {
+            AnnounceEvent::Stopped => $this->handleStopped($announce, $lookup),
+            AnnounceEvent::Completed => $this->handleCompleted($announce, $lookup, $compact, $numWant),
+            default => $this->handleRegular($announce, $lookup, $compact, $numWant),
         };
     }
 
     /**
      * Handle stopped event - peer is leaving the swarm.
+     *
+     * BEP 3's `stopped` carries the client's final counters, so whatever moved
+     * since its last announce is credited here, bytes and time, against the
+     * record about to be removed. The session ends: the record is not kept.
      */
-    private function handleStopped(
-        UserInterface $user,
-        Torrent $torrent,
-        string $peerId,
-        string $ip,
-        int $port,
-        int $uploaded,
-        int $downloaded,
-        int $left,
-        string $userAgent,
-        array $antiCheatCheck,
-    ): Response {
-        $this->peerService->removePeer($torrent->id, $peerId);
+    private function handleStopped(AnnounceRequest $announce, PeerLookup $lookup): Response
+    {
+        $this->writeCredit($announce, $lookup->credit($announce->uploaded, $announce->downloaded));
 
-        // No further delta to report — the peer's last known upload/download
-        // was already captured on its prior announce. This row's value is
-        // recording that the peer left, and when.
-        $this->logAnnounce(
-            user: $user,
-            torrent: $torrent,
-            peerId: $peerId,
-            eventLabel: 'stopped',
-            ip: $ip,
-            port: $port,
-            userAgent: $userAgent,
-            uploaded: $uploaded,
-            downloaded: $downloaded,
-            left: $left,
-            uploadDelta: 0,
-            downloadDelta: 0,
-            antiCheatCheck: $antiCheatCheck,
-        );
+        $this->peerService->removePeer($announce->torrent->id, $announce->peerId);
 
         // The stopped path is where a torrent actually goes dead, so the
         // projection matters most here — this is the decrement the old
         // `visible` flag never had.
-        $seeders = $this->peerService->getSeeders($torrent->id);
-        $leechers = $this->peerService->getLeechers($torrent->id);
+        $seeders = $this->peerService->getSeeders($announce->torrent->id);
+        $leechers = $this->peerService->getLeechers($announce->torrent->id);
 
-        $this->syncSwarmCounts($torrent, $seeders, $leechers);
+        $this->syncSwarmCounts($announce->torrent, $seeders, $leechers);
 
         // Even on stopped, return a valid response
         return TrackerResponse::announce(
@@ -167,121 +129,70 @@ final class AnnounceService
     /**
      * Handle completed event - peer finished downloading.
      */
-    private function handleCompleted(
-        UserInterface $user,
-        Torrent $torrent,
-        string $peerId,
-        string $ip,
-        int $port,
-        int $uploaded,
-        int $downloaded,
-        int $left,
-        string $userAgent,
-        bool $isSeeder,
-        bool $compact,
-        int $numWant,
-        array $antiCheatCheck,
-    ): Response {
-        // Record the snatch/completion
+    private function handleCompleted(AnnounceRequest $announce, PeerLookup $lookup, bool $compact, int $numWant): Response
+    {
         event(new TorrentCompleted(
-            userId: $user->getAuthIdentifier(),
-            torrentId: $torrent->id,
-            ip: $ip,
-            userAgent: $userAgent,
+            userId: $announce->user->getAuthIdentifier(),
+            torrentId: $announce->torrent->id,
+            ip: $announce->ip,
+            userAgent: $announce->userAgent,
         ));
 
         // The torrent's completion count is bumped by RecordCompletion,
         // which only counts a completion the user's own row counted — so a
         // client restarting mid-download no longer inflates it. See Spec #99.
-
-        // Process as a regular announce, but logged as 'completed' — not
-        // delegated silently, or the announce_log row would say 'regular'
-        // for what a client and the operator both consider a completion.
-        return $this->handleRegular(
-            $user, $torrent, $peerId, $ip, $port,
-            $uploaded, $downloaded, $left, $userAgent, $isSeeder, $compact, $numWant, $antiCheatCheck,
-            eventLabel: 'completed',
-        );
+        //
+        // Credited as a regular announce; the row says 'completed' because the
+        // request label does.
+        return $this->handleRegular($announce, $lookup, $compact, $numWant);
     }
 
     /**
      * Handle regular announce (started or interval) — also the shared tail
-     * end of handleCompleted(), distinguished by $eventLabel.
+     * end of handleCompleted().
      */
-    private function handleRegular(
-        UserInterface $user,
-        Torrent $torrent,
-        string $peerId,
-        string $ip,
-        int $port,
-        int $uploaded,
-        int $downloaded,
-        int $left,
-        string $userAgent,
-        bool $isSeeder,
-        bool $compact,
-        int $numWant,
-        array $antiCheatCheck,
-        string $eventLabel = 'regular',
-    ): Response {
-        // Upsert peer and get stats deltas
-        $result = $this->peerService->upsertPeer(
-            torrentId: $torrent->id,
-            peerId: $peerId,
-            userId: $user->getAuthIdentifier(),
-            ip: $ip,
-            port: $port,
-            uploaded: $uploaded,
-            downloaded: $downloaded,
-            left: $left,
-            userAgent: $userAgent,
+    private function handleRegular(AnnounceRequest $announce, PeerLookup $lookup, bool $compact, int $numWant): Response
+    {
+        $isSeeder = $announce->left === 0;
+        $torrentId = $announce->torrent->id;
+
+        // The ledger row first, then Redis. No stats dispatch: the aggregator
+        // folds this row into the totals, and sending the same number through a
+        // queue as well would put a second, losable copy in flight (Spec #99).
+        $this->writeCredit($announce, $lookup->credit($announce->uploaded, $announce->downloaded));
+
+        $this->peerService->upsertPeer(
+            torrentId: $torrentId,
+            peerId: $announce->peerId,
+            userId: $announce->user->getAuthIdentifier(),
+            ip: $announce->ip,
+            port: $announce->port,
+            uploaded: $announce->uploaded,
+            downloaded: $announce->downloaded,
+            left: $announce->left,
+            userAgent: $announce->userAgent,
             isSeeder: $isSeeder,
+            lookup: $lookup,
         );
 
-        $this->logAnnounce(
-            user: $user,
-            torrent: $torrent,
-            peerId: $peerId,
-            eventLabel: $eventLabel,
-            ip: $ip,
-            port: $port,
-            userAgent: $userAgent,
-            uploaded: $uploaded,
-            downloaded: $downloaded,
-            left: $left,
-            uploadDelta: $result['upload_delta'],
-            downloadDelta: $result['download_delta'],
-            antiCheatCheck: $antiCheatCheck,
-            priorUp: $result['prior_up'],
-            priorDown: $result['prior_down'],
-        );
-
-        // No stats dispatch here any more. The deltas were just written to
-        // the ledger above, and bloodhound:aggregate-ledger folds them into
-        // user and per-torrent totals from there. Sending them through a queue
-        // as well would put a second, losable copy of the same number in
-        // flight — which is the failure this design removes. See Spec #99.
-
-        // Get peers for response
         $maxPeers = min($numWant, (int) config('threepio.max_peers_per_announce', 50));
         $peers = $this->peerService->getPeersForAnnounce(
-            torrentId: $torrent->id,
-            excludePeerId: $peerId,
+            torrentId: $torrentId,
+            excludePeerId: $announce->peerId,
             isSeeder: $isSeeder,
             limit: $maxPeers,
         );
 
-        // Determine response format
         $useCompact = $this->shouldUseCompact($compact);
 
         // The response needs these anyway, so projecting them onto the torrent
         // costs nothing extra. Redis stays the source of truth for live peers;
         // the columns exist so the catalogue can filter and sort on swarm
         // state, which it cannot do against Redis.
-        $seeders = $this->peerService->getSeeders($torrent->id);
-        $leechers = $this->peerService->getLeechers($torrent->id);
+        $seeders = $this->peerService->getSeeders($torrentId);
+        $leechers = $this->peerService->getLeechers($torrentId);
 
-        $this->syncSwarmCounts($torrent, $seeders, $leechers);
+        $this->syncSwarmCounts($announce->torrent, $seeders, $leechers);
 
         return TrackerResponse::announce(
             peers: $peers,
@@ -324,63 +235,82 @@ final class AnnounceService
     }
 
     /**
+     * Record a refused announce: no credit, no baseline, flagged with why.
+     */
+    private function writeRefusal(AnnounceRequest $announce, string $reason): void
+    {
+        $this->writeRow($announce, [
+            'upload_delta' => 0,
+            'download_delta' => 0,
+            'seed_seconds' => 0,
+            'leech_seconds' => 0,
+            'prior_up' => null,
+            'prior_down' => null,
+            'prior_at' => null,
+            'anti_cheat_flagged' => true,
+            'anti_cheat_reason' => $reason,
+        ]);
+    }
+
+    /**
+     * Record an accepted announce and what it is credited.
+     *
+     * The interval goes to the state the peer was in when it began (Spec
+     * #121): the announce that reports completion closes a leeching interval.
+     *
+     * @param  array{upload_delta: int, download_delta: int, prior_up: ?int, prior_down: ?int, prior_at: ?int, prior_left: ?int, interval_seconds: int}  $credit
+     */
+    private function writeCredit(AnnounceRequest $announce, array $credit): void
+    {
+        $seeding = ($credit['prior_left'] ?? $announce->left) === 0;
+
+        $this->writeRow($announce, [
+            'upload_delta' => $credit['upload_delta'],
+            'download_delta' => $credit['download_delta'],
+            'seed_seconds' => $seeding ? $credit['interval_seconds'] : 0,
+            'leech_seconds' => $seeding ? 0 : $credit['interval_seconds'],
+            'prior_up' => $credit['prior_up'],
+            'prior_down' => $credit['prior_down'],
+            'prior_at' => $credit['prior_at'] !== null ? Carbon::createFromTimestamp($credit['prior_at']) : null,
+            'anti_cheat_flagged' => false,
+            'anti_cheat_reason' => null,
+        ]);
+    }
+
+    /**
      * Write the ledger row for this announce (Spec #99).
      *
      * Synchronous and inline: this is the durable record the tracker's whole
-     * accounting is rebuilt from, so it must exist before the response does.
-     * Was a queued job under Spec #98, when the table was an optional
-     * investigative log rather than the source of truth.
+     * accounting is summed from, so it must exist before the response does.
+     *
+     * @param  array<string, mixed>  $outcome
      */
-    private function logAnnounce(
-        UserInterface $user,
-        Torrent $torrent,
-        string $peerId,
-        string $eventLabel,
-        string $ip,
-        int $port,
-        string $userAgent,
-        int $uploaded,
-        int $downloaded,
-        int $left,
-        int $uploadDelta,
-        int $downloadDelta,
-        array $antiCheatCheck,
-        ?int $priorUp = null,
-        ?int $priorDown = null,
-    ): void {
+    private function writeRow(AnnounceRequest $announce, array $outcome): void
+    {
         if (! config('bloodhound.announce_log.enabled', true)) {
             return;
         }
 
-        // Written synchronously, before the response goes back to the client.
+        // Written synchronously, before Redis and before the response.
         //
         // This row is the durable record of what the tracker credited, and
         // everything else — user totals, per-torrent totals, the reconciliation
-        // that proves them right — is a projection rebuilt from it. Dispatching
+        // that proves them right — is a projection summed from it. Dispatching
         // it to a queue would mean the only copy of a byte count lived in a job
         // payload, and a lost job would be a lost credit with nothing left to
         // re-derive it from. See Spec #99.
-        //
-        // The cost is one insert on the announce path, which at tracker volumes
-        // is a fraction of the request. That is the trade, made deliberately.
         AnnounceLog::create([
-            'user_id' => $user->getAuthIdentifier(),
-            'torrent_id' => $torrent->id,
-            'peer_id' => $peerId,
-            'event' => $eventLabel,
-            'ip' => $ip,
-            'port' => $port,
-            'user_agent' => $userAgent,
-            'uploaded' => $uploaded,
-            'downloaded' => $downloaded,
-            'left' => $left,
-            'upload_delta' => $uploadDelta,
-            'download_delta' => $downloadDelta,
-            'prior_up' => $priorUp,
-            'prior_down' => $priorDown,
-            'anti_cheat_flagged' => ! $antiCheatCheck['passed'],
-            'anti_cheat_reason' => $antiCheatCheck['reason'] ?? null,
-        ]);
+            'user_id' => $announce->user->getAuthIdentifier(),
+            'torrent_id' => $announce->torrent->id,
+            'peer_id' => $announce->peerId,
+            'event' => $announce->eventLabel,
+            'ip' => $announce->ip,
+            'port' => $announce->port,
+            'user_agent' => $announce->userAgent,
+            'uploaded' => $announce->uploaded,
+            'downloaded' => $announce->downloaded,
+            'left' => $announce->left,
+        ] + $outcome);
     }
 
     /**

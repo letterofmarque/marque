@@ -11,10 +11,10 @@ use Marque\Trove\Models\Torrent;
 
 /**
  * A single announce, in full — every started, regular-interval, completed,
- * and stopped request, with deltas, cumulative totals, client fingerprint,
- * and the anti-cheat verdict. Off by default (config('bloodhound.announce_log')),
- * for operators who want to investigate cheating or verify a disputed ratio
- * after the fact. See Spec #98.
+ * and stopped request, refused ones included — with what it credited (bytes
+ * and seconds), the baseline that was measured from, the cumulative totals
+ * the client reported, its fingerprint, and the verdict. The ledger: user and
+ * per-torrent totals are sums of these rows. See Spec #99 and Job #193.
  *
  * Append-only — no updated_at, a row is never modified after it's written.
  *
@@ -31,8 +31,11 @@ use Marque\Trove\Models\Torrent;
  * @property int $left
  * @property int $upload_delta
  * @property int $download_delta
+ * @property int $seed_seconds
+ * @property int $leech_seconds
  * @property int|null $prior_up
  * @property int|null $prior_down
+ * @property Carbon|null $prior_at
  * @property bool $anti_cheat_flagged
  * @property string|null $anti_cheat_reason
  * @property Carbon $created_at
@@ -67,8 +70,11 @@ class AnnounceLog extends Model
         'left',
         'upload_delta',
         'download_delta',
+        'seed_seconds',
+        'leech_seconds',
         'prior_up',
         'prior_down',
+        'prior_at',
         'anti_cheat_flagged',
         'anti_cheat_reason',
     ];
@@ -92,9 +98,12 @@ class AnnounceLog extends Model
             'left' => 'integer',
             'upload_delta' => 'integer',
             'download_delta' => 'integer',
+            'seed_seconds' => 'integer',
+            'leech_seconds' => 'integer',
             // Nullable — a first announce has no baseline to diff against.
             'prior_up' => 'integer',
             'prior_down' => 'integer',
+            'prior_at' => 'datetime',
             'anti_cheat_flagged' => 'boolean',
             'created_at' => 'datetime',
         ];
