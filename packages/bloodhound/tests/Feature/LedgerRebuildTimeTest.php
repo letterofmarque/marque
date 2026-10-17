@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 // Job #112 CP3 (Spec #121): bloodhound:rebuild-totals recomputes seedtime and
-// leechtime from the ledger.
+// leechtime from the ledger. Since Job #193 each row carries the seconds its
+// announce was credited, so the rows below say what the announce path would
+// have written for this history, and a rebuild sums them.
 //
 // This is what makes seedtime a projection rather than an accumulator: a
-// wrong number can be thrown away and derived again. Asserted by zeroing and
+// wrong number can be thrown away and summed again. Asserted by zeroing and
 // comparing against what the aggregator produced, not by checking for
 // non-zero, which a rebuild that was consistently wrong would also pass.
 
@@ -34,7 +36,7 @@ beforeEach(function () {
     $this->t = Carbon::parse('2026-10-01 10:00:00');
 });
 
-function rebuildRow($test, TestUser $user, Torrent $torrent, string $event, int $left, int $minutes, int $up = 0, string $peer = '-qB4210-aaaaaaaaaaaa'): void
+function rebuildRow($test, TestUser $user, Torrent $torrent, string $event, int $left, int $minutes, int $up = 0, string $peer = '-qB4210-aaaaaaaaaaaa', int $seed = 0, int $leech = 0): void
 {
     $row = AnnounceLog::create([
         'user_id' => $user->id,
@@ -48,6 +50,8 @@ function rebuildRow($test, TestUser $user, Torrent $torrent, string $event, int 
         'left' => $left,
         'upload_delta' => $up,
         'download_delta' => 0,
+        'seed_seconds' => $seed,
+        'leech_seconds' => $leech,
     ]);
 
     $row->forceFill(['created_at' => $test->t->copy()->addMinutes($minutes)])->save();
@@ -55,20 +59,21 @@ function rebuildRow($test, TestUser $user, Torrent $torrent, string $event, int 
 
 /**
  * Two users, two torrents, two peers; a completion, a cap, a stop and a
- * return. Enough for a wrong pairing or a dropped row to change a total.
+ * return, each row with the seconds the announce path credits it: the
+ * interval it closes, by the state it started in, capped at peer_expiry.
  */
 function seedHistory($test): void
 {
     rebuildRow($test, $test->user, $test->torrent, 'started', 1_000, 0);
     rebuildRow($test, $test->other, $test->torrent, 'started', 0, 2, peer: '-TR3000-bbbbbbbbbbbb');
-    rebuildRow($test, $test->user, $test->torrent, 'regular', 600, 30, up: 100);
+    rebuildRow($test, $test->user, $test->torrent, 'regular', 600, 30, up: 100, leech: 1_800);
     rebuildRow($test, $test->user, $test->second, 'started', 0, 31, peer: '-qB4210-cccccccccccc');
-    rebuildRow($test, $test->other, $test->torrent, 'regular', 0, 32, up: 4_000, peer: '-TR3000-bbbbbbbbbbbb');
-    rebuildRow($test, $test->user, $test->torrent, 'completed', 0, 60);
-    rebuildRow($test, $test->user, $test->second, 'stopped', 0, 61, peer: '-qB4210-cccccccccccc');
-    rebuildRow($test, $test->user, $test->torrent, 'regular', 0, 400);
+    rebuildRow($test, $test->other, $test->torrent, 'regular', 0, 32, up: 4_000, peer: '-TR3000-bbbbbbbbbbbb', seed: 1_800);
+    rebuildRow($test, $test->user, $test->torrent, 'completed', 0, 60, leech: 1_800);
+    rebuildRow($test, $test->user, $test->second, 'stopped', 0, 61, peer: '-qB4210-cccccccccccc', seed: 1_800);
+    rebuildRow($test, $test->user, $test->torrent, 'regular', 0, 400, seed: 3_600);
     rebuildRow($test, $test->user, $test->second, 'started', 0, 500, peer: '-qB4210-cccccccccccc');
-    rebuildRow($test, $test->user, $test->second, 'regular', 0, 530, peer: '-qB4210-cccccccccccc');
+    rebuildRow($test, $test->user, $test->second, 'regular', 0, 530, peer: '-qB4210-cccccccccccc', seed: 1_800);
 }
 
 /**
@@ -157,10 +162,10 @@ test('a scoped rebuild recomputes one user and leaves the rest alone', function 
         ->and([(int) $theirs->seedtime, (int) $theirs->leechtime])->toBe([5, 5]);
 });
 
-// The upgrade path. Before Spec #121 the aggregator folded these rows and
-// wrote seedtime 0; the cursor is past them, so the aggregator will never
-// look at them again. A rebuild derives their time from the rows themselves.
-test('rebuild backfills time for rows the old aggregator already folded', function () {
+// Rows the cursor has passed are never looked at by the aggregator again; a
+// rebuild still sums them, so a projection the aggregator left wrong is put
+// right from the rows.
+test('rebuild sums time from rows the aggregator has already passed', function () {
     seedHistory($this);
     LedgerCursor::create([
         'stream' => LedgerAggregator::STREAM,
@@ -178,9 +183,9 @@ test('rebuild backfills time for rows the old aggregator already folded', functi
 // A rebuild that counted them would credit them twice.
 test('rebuild counts time only up to the watermark', function () {
     rebuildRow($this, $this->user, $this->torrent, 'started', 0, 0);
-    rebuildRow($this, $this->user, $this->torrent, 'regular', 0, 30);
+    rebuildRow($this, $this->user, $this->torrent, 'regular', 0, 30, seed: 1_800);
     app(LedgerAggregator::class)->run();
-    rebuildRow($this, $this->user, $this->torrent, 'regular', 0, 60);
+    rebuildRow($this, $this->user, $this->torrent, 'regular', 0, 60, seed: 1_800);
 
     app(LedgerRebuilder::class)->rebuild();
     $afterRebuild = (int) DB::table($this->user->getTable())->where('id', $this->user->id)->value('seedtime');
@@ -200,7 +205,7 @@ test('the rebuild issues the same queries however long the ledger is', function 
         DB::table('ledger_cursors')->delete();
 
         for ($i = 0; $i < $announces; $i++) {
-            rebuildRow($this, $this->user, $this->torrent, 'regular', 0, $i * 30);
+            rebuildRow($this, $this->user, $this->torrent, 'regular', 0, $i * 30, seed: 1_800);
         }
 
         app(LedgerAggregator::class)->run();

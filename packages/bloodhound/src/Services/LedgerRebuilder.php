@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\DB;
 use Marque\Bloodhound\Models\AnnounceLog;
 use Marque\Bloodhound\Models\LedgerCarry;
 use Marque\Bloodhound\Models\LedgerCursor;
-use Marque\Bloodhound\Support\SessionTime;
 
 /**
  * Recomputes every derived total from the ledger.
@@ -17,9 +16,10 @@ use Marque\Bloodhound\Support\SessionTime;
  * an incident needs it, not be written in a hurry during one. That is the
  * whole reason it ships with this Spec rather than being left as a follow-up.
  *
- * Everything the site reads about a user's transfer is derived from ledger
- * rows, so a corrupted projection is not a loss, it is a stale cache. This
- * throws the cache away and adds the deltas up again.
+ * Everything the site reads about a user's transfer is summed from ledger
+ * rows (bytes and seconds, each row carrying its own credit) plus what
+ * pruning carried forward, so a corrupted projection is not a loss, it is a
+ * stale cache. This throws the cache away and adds it up again.
  *
  * See Spec #99.
  */
@@ -78,7 +78,7 @@ class LedgerRebuilder
             ->where('id', '<=', $watermark)
             ->when($userId !== null, fn ($q) => $q->where('user_id', $userId))
             ->groupBy('user_id', 'torrent_id')
-            ->selectRaw('user_id, torrent_id, SUM(upload_delta) as up, SUM(download_delta) as down')
+            ->selectRaw('user_id, torrent_id, SUM(upload_delta) as up, SUM(download_delta) as down, SUM(seed_seconds) as seed, SUM(leech_seconds) as leech')
             ->get();
 
         /** @var array<string, array{user_id: int, torrent_id: int, uploaded: int, downloaded: int, seedtime: int, leechtime: int}> $totals */
@@ -94,12 +94,12 @@ class LedgerRebuilder
         };
 
         foreach ($perTorrent as $row) {
-            $add((int) $row->user_id, (int) $row->torrent_id, ['uploaded' => (int) $row->up, 'downloaded' => (int) $row->down]);
-        }
-
-        foreach ($this->sessionTimes($watermark, $userId) as $key => $time) {
-            [$user, $torrent] = array_map('intval', explode(':', $key));
-            $add($user, $torrent, $time);
+            $add((int) $row->user_id, (int) $row->torrent_id, [
+                'uploaded' => (int) $row->up,
+                'downloaded' => (int) $row->down,
+                'seedtime' => (int) $row->seed,
+                'leechtime' => (int) $row->leech,
+            ]);
         }
 
         // Credit whose rows were pruned (#11021). Without it a rebuild after
@@ -143,42 +143,6 @@ class LedgerRebuilder
         foreach ($perUser as $id => $sums) {
             DB::table($table)->where('id', $id)->update($sums);
         }
-    }
-
-    /**
-     * Seconds seeded and leeched per (user, torrent), derived from every
-     * ledger row up to the watermark (Spec #121).
-     *
-     * Through the same SessionTime the aggregator uses, so live and rebuilt
-     * seedtime cannot be computed two ways. Set-based like the byte sums
-     * above: the pairing is a window function in the database, and only the
-     * per-(user, torrent) sums come back to PHP.
-     *
-     * This is also the backfill. Rows the aggregator folded before Spec #121
-     * sit below the cursor with seedtime never derived from them; a full
-     * rebuild derives it from the rows themselves, as far back as retention
-     * has kept them.
-     *
-     * @return array<string, array{seedtime: int, leechtime: int}>
-     */
-    protected function sessionTimes(int $watermark, ?int $userId): array
-    {
-        $sums = SessionTime::forLedger()
-            ->intervals(0, $watermark, fn ($q) => $q->when($userId !== null, fn ($q) => $q->where('user_id', $userId)))
-            ->groupBy('user_id', 'torrent_id')
-            ->selectRaw('user_id, torrent_id, SUM(seed_seconds) as seed, SUM(leech_seconds) as leech')
-            ->get();
-
-        $times = [];
-
-        foreach ($sums as $sum) {
-            $times[$sum->user_id.':'.$sum->torrent_id] = [
-                'seedtime' => (int) $sum->seed,
-                'leechtime' => (int) $sum->leech,
-            ];
-        }
-
-        return $times;
     }
 
     protected function writeTorrentUser(int $userId, int $torrentId, int $uploaded, int $downloaded, int $seedtime, int $leechtime): void

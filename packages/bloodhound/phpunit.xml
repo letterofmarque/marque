@@ -30,6 +30,10 @@
             <directory>tests/StatsOff</directory>
             <directory>tests/StatsSeedtime</directory>
         </testsuite>
+        <!-- Job #193: tests that migrate the schema themselves; see tests/Pest.php. -->
+        <testsuite name="UpgradePath">
+            <directory>tests/UpgradePath</directory>
+        </testsuite>
     </testsuites>
     <source>
         <include>

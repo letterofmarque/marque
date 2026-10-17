@@ -37,7 +37,7 @@ beforeEach(function () {
     $this->t = Carbon::parse('2026-10-01 10:00:00');
 });
 
-function carryRow($test, TestUser $user, Torrent $torrent, int $minutes, int $up = 0, string $event = 'regular'): void
+function carryRow($test, TestUser $user, Torrent $torrent, int $minutes, int $up = 0, string $event = 'regular', int $seed = 0): void
 {
     $row = AnnounceLog::create([
         'user_id' => $user->id,
@@ -51,6 +51,7 @@ function carryRow($test, TestUser $user, Torrent $torrent, int $minutes, int $up
         'left' => 0,
         'upload_delta' => $up,
         'download_delta' => 0,
+        'seed_seconds' => $seed,
     ]);
 
     $row->forceFill(['created_at' => $test->t->copy()->addMinutes($minutes)])->save();
@@ -160,7 +161,7 @@ describe('reconcile', function () {
 describe('rebuild', function () {
     test('restores ledger plus carry, bytes and time', function () {
         carryRow($this, $this->user, $this->torrent, 0, up: 300);
-        carryRow($this, $this->user, $this->torrent, 30);
+        carryRow($this, $this->user, $this->torrent, 30, seed: 1_800);
         app(LedgerAggregator::class)->run();
         carried($this->user, $this->torrent, uploaded: 700, seedtime: 5_000, leechtime: 200);
         $before = projections($this->user);

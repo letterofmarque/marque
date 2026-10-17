@@ -6,9 +6,9 @@ declare(strict_types=1);
 // checks bytes.
 //
 // Seedtime was a column nothing computed, so nothing could say when it was
-// wrong. Now it is derived from the ledger, and the same derivation is what a
-// stored figure is checked against: the ledger's rows up to the watermark,
-// plus whatever pruning carried forward.
+// wrong. Now each ledger row carries the seconds it credited (Job #193), and
+// a stored figure is checked against their sum up to the watermark, plus
+// whatever pruning carried forward.
 
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -29,12 +29,16 @@ beforeEach(function () {
     ]);
 });
 
-function reconcileTimeRow($test, int $minutesAgo, int $left = 0): void
+/**
+ * A row crediting $seed or $leech seconds, as the announce path writes them.
+ */
+function reconcileTimeRow($test, int $minutesAgo, int $left = 0, int $seed = 0, int $leech = 0): void
 {
     $row = AnnounceLog::create([
         'user_id' => $test->user->id, 'torrent_id' => $test->torrent->id, 'peer_id' => '-qB4210-aaaaaaaaaaaa',
         'event' => 'regular', 'ip' => '10.0.0.1', 'port' => 51413, 'uploaded' => 0, 'downloaded' => 0,
         'left' => $left, 'upload_delta' => 0, 'download_delta' => 0,
+        'seed_seconds' => $seed, 'leech_seconds' => $leech,
     ]);
 
     $row->forceFill(['created_at' => Carbon::now()->subMinutes($minutesAgo)])->save();
@@ -42,8 +46,8 @@ function reconcileTimeRow($test, int $minutesAgo, int $left = 0): void
 
 test('aggregated time reconciles clean', function () {
     reconcileTimeRow($this, 90, left: 100);
-    reconcileTimeRow($this, 60);
-    reconcileTimeRow($this, 30);
+    reconcileTimeRow($this, 60, leech: 1_800);
+    reconcileTimeRow($this, 30, seed: 1_800);
     app(LedgerAggregator::class)->run();
 
     expect(app(LedgerAuditor::class)->reconcile()->hasDrift())->toBeFalse();
@@ -51,7 +55,7 @@ test('aggregated time reconciles clean', function () {
 
 test('a user\'s seedtime that drifted is reported, with what the ledger says', function () {
     reconcileTimeRow($this, 60);
-    reconcileTimeRow($this, 30);
+    reconcileTimeRow($this, 30, seed: 1_800);
     app(LedgerAggregator::class)->run();
     DB::table($this->user->getTable())->where('id', $this->user->id)->update(['seedtime' => 99]);
 
@@ -65,7 +69,7 @@ test('a user\'s seedtime that drifted is reported, with what the ledger says', f
 
 test('a per-torrent leechtime that drifted is reported', function () {
     reconcileTimeRow($this, 60, left: 100);
-    reconcileTimeRow($this, 30, left: 50);
+    reconcileTimeRow($this, 30, left: 50, leech: 1_800);
     app(LedgerAggregator::class)->run();
     TorrentUser::query()->update(['leechtime' => 7]);
 
@@ -83,7 +87,7 @@ test('a per-torrent leechtime that drifted is reported', function () {
 test('time the aggregator has not folded yet is backlog, not drift', function () {
     reconcileTimeRow($this, 60);
     app(LedgerAggregator::class)->run();
-    reconcileTimeRow($this, 30);
+    reconcileTimeRow($this, 30, seed: 1_800);
 
     $report = app(LedgerAuditor::class)->reconcile();
 
@@ -94,8 +98,8 @@ test('time the aggregator has not folded yet is backlog, not drift', function ()
 test('time carried forward by a prune reconciles clean', function () {
     config(['bloodhound.announce_log.retention_days' => 1]);
     reconcileTimeRow($this, 60 * 24 * 3);
-    reconcileTimeRow($this, 60 * 24 * 3 - 30);
-    reconcileTimeRow($this, 30);
+    reconcileTimeRow($this, 60 * 24 * 3 - 30, seed: 1_800);
+    reconcileTimeRow($this, 30, seed: 3_600);
     app(LedgerAggregator::class)->run();
 
     $this->artisan('bloodhound:prune-announce-log')->assertSuccessful();
@@ -104,12 +108,11 @@ test('time carried forward by a prune reconciles clean', function () {
         ->and(app(LedgerAuditor::class)->reconcile()->hasDrift())->toBeFalse();
 });
 
-// The upgrade case. Rows folded before seedtime was derived credited none; the
-// ledger now says they earned some. That is reported, and the report's fix,
-// rebuild-totals, is safe and clears it.
-test('time folded before it was derived reads as drift until a rebuild', function () {
+// Totals that lost time the ledger records (a bad write, a hand edit) read as
+// drift, and the report's fix, rebuild-totals, is safe and clears it.
+test('time missing from the totals reads as drift until a rebuild', function () {
     reconcileTimeRow($this, 60);
-    reconcileTimeRow($this, 30);
+    reconcileTimeRow($this, 30, seed: 1_800);
     app(LedgerAggregator::class)->run();
     DB::table($this->user->getTable())->update(['seedtime' => 0]);
     TorrentUser::query()->update(['seedtime' => 0]);

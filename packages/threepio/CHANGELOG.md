@@ -31,6 +31,9 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   accepts a `livePeers()` result already read this announce.
 - **A record owned by another user is never a baseline**, from the swarm hash or a
   retained record. Overwriting it moves the peer between the two users' sets.
+- **Intervals are measured on Carbon's clock**, not `time()`: the same clock a Laravel
+  app stamps its records with, so a tracker's stored timestamps and threepio's
+  intervals agree (and tests that travel in time move both).
 - **The resolver is told the announcing user**, as a third argument, and may return
   `left` and `last_action`.
 
@@ -41,7 +44,9 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   so anti-cheat and the credit see the same baseline and the peer is not read twice.
 - **`PeerLookup::credit($uploaded, $downloaded)`**, the credit an announce earns against
   the lookup's baseline, computed without touching Redis. A tracker can record it
-  durably before writing the swarm; `upsertPeer()` arrives at the same figures.
+  durably before writing the swarm; `upsertPeer()` arrives at the same figures. It
+  includes `measured_at`, the moment the interval ended, which is also the peer's new
+  last announce.
 - **`upsertPeer()` returns `prior_at`, `prior_left`, `interval_seconds` and
   `baseline_source`**: when the interval the announce closes began, the peer's state
   then, the interval capped at `peer_expiry`, and where the baseline came from.

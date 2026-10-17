@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Marque\Bloodhound\Models\AnnounceLog;
+use Marque\Bloodhound\Models\LedgerCursor;
+use Marque\Bloodhound\Services\LedgerAggregator;
 
 // bloodhound 8.0.0 (Job #193): time is credited at announce time, like bytes,
 // and written on the row that credits it. A total is then a sum of rows, so
@@ -43,6 +47,19 @@ return new class extends Migration
                 $table->timestamp('prior_at')->nullable()->after('prior_down');
             }
         });
+
+        // The opening-balance migration (5.0) defers its fold when the schema
+        // the aggregator needs is not there yet: an install migrating from
+        // before 5.0 straight to 8.0. Its members' totals were zeroed when the
+        // balance was recorded, so fold now, before anyone reads a zero ratio.
+        $unfolded = DB::connection($this->getConnection())->table('announce_log')
+            ->where('event', AnnounceLog::EVENT_OPENING_BALANCE)
+            ->where('id', '>', LedgerCursor::positionFor(LedgerAggregator::STREAM))
+            ->exists();
+
+        if ($unfolded) {
+            app(LedgerAggregator::class)->run();
+        }
     }
 
     public function down(): void

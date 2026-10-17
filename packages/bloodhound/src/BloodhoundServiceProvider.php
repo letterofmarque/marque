@@ -76,14 +76,19 @@ class BloodhoundServiceProvider extends ServiceProvider
      *
      * Called only when Redis has no record of the peer, so this is the outage
      * path, not the hot path — a warm session never reaches it. Scoped to the
-     * exact (torrent, peer) pair: a different peer_id is a different client
-     * session with its own counters starting from zero, and a different
-     * torrent is unrelated entirely. Inheriting either one's baseline would be
-     * worse than having none.
+     * exact (user, torrent, peer): a different peer_id is a different client
+     * session, a different torrent is unrelated, and another member's
+     * counters are never this member's baseline (F15).
      *
-     * @return array{uploaded: int, downloaded: int}|null
+     * The baseline is the last row that took part in the session: a refusal
+     * credited nothing and diffed against nothing, so it is skipped (F5: its
+     * counters were never accepted), and an opening balance is not an
+     * announce. If that row is a stop, the session is over and there is no
+     * baseline: the next announce starts a new one.
+     *
+     * @return array{uploaded: int, downloaded: int, left: int, last_action: int}|null
      */
-    protected function recoverBaselineFromLedger(int $torrentId, string $peerId): ?array
+    protected function recoverBaselineFromLedger(int $torrentId, string $peerId, ?int $userId = null): ?array
     {
         if (! config('bloodhound.announce_log.enabled', true)) {
             return null;
@@ -92,16 +97,21 @@ class BloodhoundServiceProvider extends ServiceProvider
         $last = AnnounceLog::query()
             ->where('torrent_id', $torrentId)
             ->where('peer_id', $peerId)
+            ->where('user_id', $userId)
+            ->where('event', '!=', AnnounceLog::EVENT_OPENING_BALANCE)
+            ->where(fn ($query) => $query->where('anti_cheat_flagged', false)->orWhereNotNull('prior_up'))
             ->orderByDesc('id')
             ->first();
 
-        if ($last === null) {
+        if ($last === null || $last->event === 'stopped') {
             return null;
         }
 
         return [
             'uploaded' => $last->uploaded,
             'downloaded' => $last->downloaded,
+            'left' => $last->left,
+            'last_action' => $last->created_at->getTimestamp(),
         ];
     }
 

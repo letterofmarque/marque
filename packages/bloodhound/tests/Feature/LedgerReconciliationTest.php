@@ -244,7 +244,7 @@ describe('per-row arithmetic audit', function () {
 
         expect($breaks)->toHaveCount(1)
             ->and($breaks[0]['upload_delta'])->toBe(9_999)
-            ->and($breaks[0]['expected_upload_delta'])->toBe(4_000);
+            ->and($breaks[0]['reason'])->toBe('upload_delta 9999, expected 4000');
     });
 
     // A null prior is a first announce, not a broken row.

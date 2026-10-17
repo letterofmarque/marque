@@ -258,7 +258,11 @@ final class AnnounceService
      * The interval goes to the state the peer was in when it began (Spec
      * #121): the announce that reports completion closes a leeching interval.
      *
-     * @param  array{upload_delta: int, download_delta: int, prior_up: ?int, prior_down: ?int, prior_at: ?int, prior_left: ?int, interval_seconds: int}  $credit
+     * Stamped with the moment the credit was measured, which is also the
+     * peer's new last announce in Redis: the next row's prior_at is then this
+     * row's created_at exactly, and the audit can check every interval.
+     *
+     * @param  array{upload_delta: int, download_delta: int, prior_up: ?int, prior_down: ?int, prior_at: ?int, prior_left: ?int, interval_seconds: int, measured_at: int}  $credit
      */
     private function writeCredit(AnnounceRequest $announce, array $credit): void
     {
@@ -271,10 +275,19 @@ final class AnnounceService
             'leech_seconds' => $seeding ? 0 : $credit['interval_seconds'],
             'prior_up' => $credit['prior_up'],
             'prior_down' => $credit['prior_down'],
-            'prior_at' => $credit['prior_at'] !== null ? Carbon::createFromTimestamp($credit['prior_at']) : null,
+            'prior_at' => $credit['prior_at'] !== null ? $this->at($credit['prior_at']) : null,
             'anti_cheat_flagged' => false,
             'anti_cheat_reason' => null,
+            'created_at' => $this->at($credit['measured_at']),
         ]);
+    }
+
+    /**
+     * A Unix timestamp in the app's timezone, the one created_at is written in.
+     */
+    private function at(int $timestamp): Carbon
+    {
+        return Carbon::now()->setTimestamp($timestamp);
     }
 
     /**
@@ -299,7 +312,7 @@ final class AnnounceService
         // it to a queue would mean the only copy of a byte count lived in a job
         // payload, and a lost job would be a lost credit with nothing left to
         // re-derive it from. See Spec #99.
-        AnnounceLog::create([
+        (new AnnounceLog)->forceFill([
             'user_id' => $announce->user->getAuthIdentifier(),
             'torrent_id' => $announce->torrent->id,
             'peer_id' => $announce->peerId,
@@ -310,7 +323,7 @@ final class AnnounceService
             'uploaded' => $announce->uploaded,
             'downloaded' => $announce->downloaded,
             'left' => $announce->left,
-        ] + $outcome);
+        ] + $outcome)->save();
     }
 
     /**

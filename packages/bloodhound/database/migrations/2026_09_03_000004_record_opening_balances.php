@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Facades\Schema;
 use Marque\Bloodhound\Models\AnnounceLog;
 use Marque\Bloodhound\Services\LedgerAggregator;
 use Marque\Bloodhound\Services\OpeningBalance;
@@ -31,7 +32,7 @@ return new class extends Migration
             return;
         }
 
-        app(OpeningBalance::class)->record();
+        $recorded = app(OpeningBalance::class)->record();
 
         // Recording a balance zeroes the column it copied, so the aggregator
         // can add it back without doubling it. Folding immediately closes that
@@ -39,7 +40,16 @@ return new class extends Migration
         // the migration finishing and the next scheduled tick — which on a
         // private tracker is the difference between "upgraded" and "everyone
         // is suddenly below the ratio threshold".
-        app(LedgerAggregator::class)->run();
+        //
+        // But the aggregator is today's code, and it reads and writes columns
+        // later migrations add (leechtime, seed_seconds). An install migrating
+        // from before 5.0 straight to a later release runs this first, before
+        // those exist. So the fold happens here only when the schema it needs
+        // is already in place; otherwise the 8.0 time-columns migration does it
+        // the moment it is (Job #193).
+        if ($recorded > 0 && Schema::connection(config('bloodhound.announce_log.connection'))->hasColumn('announce_log', 'seed_seconds')) {
+            app(LedgerAggregator::class)->run();
+        }
     }
 
     public function down(): void

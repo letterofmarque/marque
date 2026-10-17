@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\DB;
 use Marque\Bloodhound\Models\AnnounceLog;
 use Marque\Bloodhound\Models\LedgerCarry;
 use Marque\Bloodhound\Models\LedgerCursor;
-use Marque\Bloodhound\Support\SessionTime;
 
 /**
  * Answers the question the whole Spec exists for: is any of this wrong?
@@ -35,6 +34,13 @@ class LedgerAuditor
      * The totals reconciliation checks, on users and on torrent_user.
      */
     private const TOTALS = ['uploaded', 'downloaded', 'seedtime', 'leechtime'];
+
+    /**
+     * The ledger_cursors stream holding the last id written before rows carried
+     * their own time (bloodhound 8.0.0). Rows at or below it are checked by the
+     * rules they were written under.
+     */
+    public const TIME_COLUMNS_FROM = 'time_columns_from';
 
     /**
      * Compare the projections against the ledger they are derived from.
@@ -67,10 +73,9 @@ class LedgerAuditor
     }
 
     /**
-     * What every (user, torrent) total should be: the ledger's bytes up to the
-     * watermark, the seedtime and leechtime its rows derive (the same
-     * SessionTime derivation the aggregator credits and rebuild replays), and
-     * whatever pruning carried forward (#11021).
+     * What every (user, torrent) total should be: the sum of the ledger's
+     * rows up to the watermark (each row carries its own bytes and seconds),
+     * plus whatever pruning carried forward (#11021).
      *
      * @return array<string, array{user_id: int, torrent_id: int, uploaded: int, downloaded: int, seedtime: int, leechtime: int}>
      */
@@ -87,24 +92,19 @@ class LedgerAuditor
             }
         };
 
-        $bytes = AnnounceLog::query()
+        $sums = AnnounceLog::query()
             ->where('id', '<=', $watermark)
             ->groupBy('user_id', 'torrent_id')
-            ->selectRaw('user_id, torrent_id, SUM(upload_delta) as up, SUM(download_delta) as down')
+            ->selectRaw('user_id, torrent_id, SUM(upload_delta) as up, SUM(download_delta) as down, SUM(seed_seconds) as seed, SUM(leech_seconds) as leech')
             ->get();
 
-        foreach ($bytes as $row) {
-            $add((int) $row->user_id, (int) $row->torrent_id, ['uploaded' => (int) $row->up, 'downloaded' => (int) $row->down]);
-        }
-
-        $times = SessionTime::forLedger()
-            ->intervals(0, $watermark)
-            ->groupBy('user_id', 'torrent_id')
-            ->selectRaw('user_id, torrent_id, SUM(seed_seconds) as seed, SUM(leech_seconds) as leech')
-            ->get();
-
-        foreach ($times as $row) {
-            $add((int) $row->user_id, (int) $row->torrent_id, ['seedtime' => (int) $row->seed, 'leechtime' => (int) $row->leech]);
+        foreach ($sums as $row) {
+            $add((int) $row->user_id, (int) $row->torrent_id, [
+                'uploaded' => (int) $row->up,
+                'downloaded' => (int) $row->down,
+                'seedtime' => (int) $row->seed,
+                'leechtime' => (int) $row->leech,
+            ]);
         }
 
         foreach (LedgerCarry::query()->get() as $carry) {
@@ -188,26 +188,39 @@ class LedgerAuditor
     }
 
     /**
-     * Rows whose stored delta contradicts their own reported and prior values.
+     * Rows whose credit contradicts their own reported, prior and timing values.
      *
-     * A null prior is a first announce — no baseline existed, so there is no
-     * arithmetic to check and nothing to flag.
+     * For a row written by 8.0 (above the time-columns boundary):
+     *
+     * - bytes, per direction: the reported counter minus the prior, or the
+     *   reported counter itself when it went backwards (a restarted client).
+     *   A flagged row with priors is a forfeit: each direction is either that
+     *   or 0.
+     * - time: the seconds credited equal `created_at - prior_at`, capped at
+     *   peer_expiry, all in one of seed or leech.
+     * - a row without a baseline (a first announce, a refusal) credits nothing.
+     *
+     * A 7.x row is held to the rule it was written under: bytes only,
+     * backwards counters clamped to 0.
      *
      * @return array<int, array<string, mixed>>
      */
     protected function arithmeticBreaks(): array
     {
         $breaks = [];
+        $boundary = LedgerCursor::positionFor(self::TIME_COLUMNS_FROM);
+        $cap = (int) config('threepio.peer_expiry', 3600);
 
         AnnounceLog::query()
-            ->whereNotNull('prior_up')
+            ->where('event', '!=', AnnounceLog::EVENT_OPENING_BALANCE)
             ->orderBy('id')
-            ->chunk(1000, function ($rows) use (&$breaks) {
+            ->chunkById(1000, function ($rows) use (&$breaks, $boundary, $cap) {
                 foreach ($rows as $row) {
-                    $expectedUp = max(0, $row->uploaded - $row->prior_up);
-                    $expectedDown = max(0, $row->downloaded - (int) $row->prior_down);
+                    $reason = $row->id <= $boundary
+                        ? $this->legacyArithmetic($row)
+                        : $this->arithmetic($row, $cap);
 
-                    if ($row->upload_delta === $expectedUp && $row->download_delta === $expectedDown) {
+                    if ($reason === null) {
                         continue;
                     }
 
@@ -215,10 +228,126 @@ class LedgerAuditor
                         'id' => $row->id,
                         'user_id' => $row->user_id,
                         'torrent_id' => $row->torrent_id,
+                        'reason' => $reason,
                         'upload_delta' => $row->upload_delta,
-                        'expected_upload_delta' => $expectedUp,
                         'download_delta' => $row->download_delta,
-                        'expected_download_delta' => $expectedDown,
+                        'seed_seconds' => $row->seed_seconds,
+                        'leech_seconds' => $row->leech_seconds,
+                    ];
+                }
+            });
+
+        return $breaks;
+    }
+
+    protected function arithmetic(AnnounceLog $row, int $cap): ?string
+    {
+        if ($row->prior_up === null) {
+            return $row->upload_delta === 0 && $row->download_delta === 0
+                && $row->seed_seconds === 0 && $row->leech_seconds === 0
+                ? null
+                : 'credit with no baseline';
+        }
+
+        foreach ([['upload_delta', 'uploaded', 'prior_up'], ['download_delta', 'downloaded', 'prior_down']] as [$delta, $reported, $prior]) {
+            $reportedValue = (int) $row->{$reported};
+            $priorValue = (int) $row->{$prior};
+            $expected = $reportedValue >= $priorValue ? $reportedValue - $priorValue : $reportedValue;
+            $allowed = $row->anti_cheat_flagged ? [0, $expected] : [$expected];
+
+            if (! in_array($row->{$delta}, $allowed, true)) {
+                return "{$delta} {$row->{$delta}}, expected {$expected}";
+            }
+        }
+
+        $expectedSeconds = $row->prior_at !== null
+            ? min(max(0, $row->created_at->getTimestamp() - $row->prior_at->getTimestamp()), $cap)
+            : 0;
+
+        if ($row->seed_seconds + $row->leech_seconds !== $expectedSeconds
+            || ($row->seed_seconds > 0 && $row->leech_seconds > 0)) {
+            return "seconds {$row->seed_seconds} seed + {$row->leech_seconds} leech, expected {$expectedSeconds}";
+        }
+
+        return null;
+    }
+
+    protected function legacyArithmetic(AnnounceLog $row): ?string
+    {
+        if ($row->prior_up === null) {
+            return null;
+        }
+
+        $expectedUp = max(0, $row->uploaded - $row->prior_up);
+        $expectedDown = max(0, $row->downloaded - (int) $row->prior_down);
+
+        return $row->upload_delta === $expectedUp && $row->download_delta === $expectedDown
+            ? null
+            : "upload_delta {$row->upload_delta}, expected {$expectedUp}";
+    }
+
+    /**
+     * Rows whose baseline does not continue the previous row's for that peer.
+     *
+     * This is what turns a lost baseline from invisible into a reported fact.
+     * Per (user, torrent, peer), in id order, over the rows that take part in
+     * the chain (refusals and opening balances do not: they credit nothing
+     * and diff against nothing):
+     *
+     * - after a `stopped`, the next row starts a new session: no baseline;
+     * - otherwise the next row's baseline is what the previous one reported,
+     *   and its prior_at is the previous row's created_at;
+     * - a row with no baseline after one without a stop means the baseline
+     *   was lost, unless the gap is longer than baseline retention, after
+     *   which none is kept by design;
+     * - two rows diffed against the same baseline are one interval credited
+     *   twice (a Redis write that failed after its ledger row, or two
+     *   announces from one peer at once).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    protected function chainBreaks(): array
+    {
+        $breaks = [];
+        $previous = [];
+        $boundary = LedgerCursor::positionFor(self::TIME_COLUMNS_FROM);
+        $retention = (int) config('bloodhound.baseline_retention', 7 * 86_400);
+
+        AnnounceLog::query()
+            ->where('event', '!=', AnnounceLog::EVENT_OPENING_BALANCE)
+            ->where(fn ($query) => $query->where('anti_cheat_flagged', false)->orWhereNotNull('prior_up'))
+            ->orderBy('torrent_id')
+            ->orderBy('peer_id')
+            ->orderBy('id')
+            ->chunk(1000, function ($rows) use (&$breaks, &$previous, $boundary, $retention) {
+                foreach ($rows as $row) {
+                    $key = $row->user_id.':'.$row->torrent_id.':'.$row->peer_id;
+                    $last = $previous[$key] ?? null;
+
+                    $reason = $last !== null && $row->id > $boundary
+                        ? $this->chainReason($row, $last, $retention)
+                        : null;
+
+                    if ($reason !== null) {
+                        $breaks[] = [
+                            'id' => $row->id,
+                            'user_id' => $row->user_id,
+                            'torrent_id' => $row->torrent_id,
+                            'peer_id' => $row->peer_id,
+                            'reason' => $reason,
+                            'prior_up' => $row->prior_up,
+                            'previous_uploaded' => $last['uploaded'],
+                        ];
+                    }
+
+                    $previous[$key] = [
+                        'id' => $row->id,
+                        'event' => $row->event,
+                        'uploaded' => $row->uploaded,
+                        'downloaded' => $row->downloaded,
+                        'created_at' => $row->created_at->getTimestamp(),
+                        'prior_at' => $row->prior_at?->getTimestamp(),
+                        'legacy' => $row->id <= $boundary,
                     ];
                 }
             });
@@ -227,49 +356,34 @@ class LedgerAuditor
     }
 
     /**
-     * Rows whose baseline does not continue the previous row's for that peer.
-     *
-     * This is what turns a past Redis outage from invisible into a reported
-     * fact. Each announce should have diffed against what the peer last told
-     * us; when it did not, a baseline went missing in between and whatever
-     * that peer transferred across the gap was never credited.
-     *
-     * @return array<int, array<string, mixed>>
+     * @param  array{id: int, event: string, uploaded: int, downloaded: int, created_at: int, prior_at: ?int, legacy: bool}  $last
      */
-    protected function chainBreaks(): array
+    protected function chainReason(AnnounceLog $row, array $last, int $retention): ?string
     {
-        $breaks = [];
-        $previous = [];
+        if ($last['event'] === 'stopped') {
+            return $row->prior_up === null ? null : 'a baseline after the session stopped';
+        }
 
-        AnnounceLog::query()
-            ->orderBy('torrent_id')
-            ->orderBy('peer_id')
-            ->orderBy('id')
-            ->chunk(1000, function ($rows) use (&$breaks, &$previous) {
-                foreach ($rows as $row) {
-                    $key = $row->torrent_id.':'.$row->peer_id;
-                    $last = $previous[$key] ?? null;
+        if ($row->prior_up === null) {
+            return $row->created_at->getTimestamp() - $last['created_at'] > $retention
+                ? null
+                : 'Redis lost this peer: its next announce had no baseline';
+        }
 
-                    // First row for this peer — nothing to continue from, and
-                    // a null baseline there is correct rather than suspicious.
-                    if ($last !== null && $row->prior_up !== $last['uploaded']) {
-                        $breaks[] = [
-                            'id' => $row->id,
-                            'user_id' => $row->user_id,
-                            'torrent_id' => $row->torrent_id,
-                            'peer_id' => $row->peer_id,
-                            'prior_up' => $row->prior_up,
-                            'previous_uploaded' => $last['uploaded'],
-                        ];
-                    }
+        $priorAt = $row->prior_at?->getTimestamp();
 
-                    $previous[$key] = [
-                        'uploaded' => $row->uploaded,
-                        'downloaded' => $row->downloaded,
-                    ];
-                }
-            });
+        if ($priorAt !== null && $last['prior_at'] !== null && $priorAt === $last['prior_at']) {
+            return 'duplicate interval: two rows diffed against the same baseline';
+        }
 
-        return $breaks;
+        // A 7.x row's Redis timestamp and created_at were taken apart, so only
+        // the bytes are compared across the boundary. A baseline with no time
+        // (a recovered one that carried none) credited no seconds, which the
+        // arithmetic check holds it to; there is no time to continue.
+        $timesMatch = $last['legacy'] || $priorAt === null || $priorAt === $last['created_at'];
+
+        return $row->prior_up === $last['uploaded'] && $row->prior_down === $last['downloaded'] && $timesMatch
+            ? null
+            : 'the baseline does not continue the previous announce';
     }
 }

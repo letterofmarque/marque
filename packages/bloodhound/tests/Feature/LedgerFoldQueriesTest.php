@@ -19,9 +19,11 @@ use Marque\Bloodhound\Tests\TestUser;
 
 /**
  * One announce per peer for $pairs (user, torrent) pairs, at $minutes past a
- * fixed start: every pair gets bytes, so every pair is written.
+ * fixed start: every pair gets bytes, so every pair is written. Each of the
+ * $pairs credits $seed seconds; an extra user is a first announce, crediting
+ * none.
  */
-function foldRound(int $pairs, int $minutes, int $extraUser = 0): void
+function foldRound(int $pairs, int $minutes, int $extraUser = 0, int $seed = 0): void
 {
     for ($i = 1; $i <= $pairs + $extraUser; $i++) {
         $row = AnnounceLog::create([
@@ -36,6 +38,7 @@ function foldRound(int $pairs, int $minutes, int $extraUser = 0): void
             'left' => 0,
             'upload_delta' => 100,
             'download_delta' => 0,
+            'seed_seconds' => $i <= $pairs ? $seed : 0,
         ]);
 
         $row->forceFill(['created_at' => Carbon::parse('2026-10-01 10:00:00')->addMinutes($minutes)])->save();
@@ -50,7 +53,7 @@ function queriesToFold(int $pairs): int
 {
     DB::table('announce_log')->delete();
     DB::table('torrent_user')->delete();
-    DB::table('ledger_cursors')->delete();
+    DB::table('ledger_cursors')->where('stream', LedgerAggregator::STREAM)->delete();
     DB::table((new TestUser)->getTable())->delete();
 
     for ($i = 1; $i <= $pairs + 1; $i++) {
@@ -60,7 +63,7 @@ function queriesToFold(int $pairs): int
     foldRound($pairs, 0);
     app(LedgerAggregator::class)->run();
 
-    foldRound($pairs, 30, extraUser: 1);
+    foldRound($pairs, 30, extraUser: 1, seed: 1_800);
 
     DB::flushQueryLog();
     DB::enableQueryLog();

@@ -218,3 +218,68 @@ describe('the fallback is scoped correctly', function () {
         expect($queries)->toBe(0);
     });
 });
+
+// Job #193: the ledger's baseline is the last row that took part in the
+// session, for this member.
+describe('what the ledger offers as a baseline', function () {
+    // F5, the audit's C3b: a refused announce's counters were never accepted.
+    // Recovering from it lost what moved between the last accepted announce
+    // and the refusal (2000 credited where 4000 was right).
+    test('a refused announce is not a baseline', function () {
+        recoveryAnnounce($this, recoveryUrl($this->user, $this->torrent, ['event' => 'started', 'uploaded' => 0]))->assertOk();
+        recoveryAnnounce($this, recoveryUrl($this->user, $this->torrent, ['uploaded' => 1_000]))->assertOk();
+
+        config(['bloodhound.anti_cheat.enabled' => true]);
+        recoveryAnnounce($this, recoveryUrl($this->user, $this->torrent, ['uploaded' => 3_000, 'port' => 6881]))->assertOk();
+        config(['bloodhound.anti_cheat.enabled' => false]);
+
+        flushPeerState();
+        recoveryAnnounce($this, recoveryUrl($this->user, $this->torrent, ['uploaded' => 4_000]))->assertOk();
+
+        $row = AnnounceLog::orderByDesc('id')->first();
+
+        expect($row->prior_up)->toBe(1_000)
+            ->and($row->upload_delta)->toBe(3_000);
+    });
+
+    // `stopped` ends the session: the next announce starts a new one, from
+    // zero, whatever Redis has.
+    test('a stop leaves no baseline behind it', function () {
+        recoveryAnnounce($this, recoveryUrl($this->user, $this->torrent, ['event' => 'started', 'uploaded' => 0]))->assertOk();
+        recoveryAnnounce($this, recoveryUrl($this->user, $this->torrent, ['event' => 'stopped', 'uploaded' => 2_000]))->assertOk();
+
+        flushPeerState();
+        recoveryAnnounce($this, recoveryUrl($this->user, $this->torrent, ['event' => 'started', 'uploaded' => 0]))->assertOk();
+
+        expect(AnnounceLog::orderByDesc('id')->first()->prior_up)->toBeNull();
+    });
+
+    // F15: a peer_id is the client's choice. Another member's counters under
+    // the same one are not this member's baseline.
+    test('another member\'s row under the same peer_id is not a baseline', function () {
+        $other = TestUser::create(['name' => 'Other', 'email' => 'other-baseline@example.com', 'password' => 'p']);
+        issueAnnounceKey($other, 'zzzzyyyyxxxxwwwwvvvvuuuuttttssss');
+
+        recoveryAnnounce($this, recoveryUrl($other, $this->torrent, ['event' => 'started', 'uploaded' => 9_000]))->assertOk();
+        flushPeerState();
+
+        recoveryAnnounce($this, recoveryUrl($this->user, $this->torrent, ['uploaded' => 10_000]))->assertOk();
+
+        $row = AnnounceLog::orderByDesc('id')->first();
+
+        expect($row->user_id)->toBe($this->user->id)
+            ->and($row->prior_up)->toBeNull()
+            ->and($row->upload_delta)->toBe(0);
+    });
+
+    test('a recovered baseline carries its time, so the interval is credited', function () {
+        $this->travelTo(now());
+        recoveryAnnounce($this, recoveryUrl($this->user, $this->torrent, ['event' => 'started', 'uploaded' => 0]))->assertOk();
+
+        flushPeerState();
+        $this->travel(20)->minutes();
+        recoveryAnnounce($this, recoveryUrl($this->user, $this->torrent, ['uploaded' => 500]))->assertOk();
+
+        expect(AnnounceLog::orderByDesc('id')->first()->seed_seconds)->toBe(1_200);
+    });
+});

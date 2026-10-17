@@ -53,7 +53,12 @@ final readonly class PeerLookup
      * durable record of the credit before it touches Redis, and upsertPeer()
      * arrives at the same figures.
      *
-     * @return array{upload_delta: int, download_delta: int, prior_up: ?int, prior_down: ?int, prior_at: ?int, prior_left: ?int, interval_seconds: int}
+     * `measured_at` is when the lookup was read: the end of the interval, and
+     * the time upsertPeer() stamps on the record as the peer's last announce.
+     * A tracker that records the credit at that moment can later check every
+     * interval exactly (`measured_at - prior_at`, capped).
+     *
+     * @return array{upload_delta: int, download_delta: int, prior_up: ?int, prior_down: ?int, prior_at: ?int, prior_left: ?int, interval_seconds: int, measured_at: int}
      */
     public function credit(int $uploaded, int $downloaded): array
     {
@@ -68,6 +73,7 @@ final readonly class PeerLookup
                 'prior_at' => null,
                 'prior_left' => null,
                 'interval_seconds' => 0,
+                'measured_at' => $this->readAt,
             ];
         }
 
@@ -81,6 +87,7 @@ final readonly class PeerLookup
             'prior_at' => $priorAt,
             'prior_left' => isset($baseline['left']) ? (int) $baseline['left'] : null,
             'interval_seconds' => $priorAt !== null ? min(max(0, $this->readAt - $priorAt), $this->peerExpiry) : 0,
+            'measured_at' => $this->readAt,
         ];
     }
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Marque\Threepio\Services;
 
 use Illuminate\Redis\Connections\Connection;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Redis;
 use Marque\Threepio\Enums\BaselineSource;
 use Marque\Threepio\Support\PeerLookup;
@@ -112,7 +113,7 @@ final class PeerService
      */
     public function lookup(int $torrentId, string $peerId, ?int $userId): PeerLookup
     {
-        $now = time();
+        $now = $this->now();
         $stored = $this->find($torrentId, $peerId);
 
         if ($stored !== null && $this->sameOwner($stored, $userId)) {
@@ -314,7 +315,7 @@ final class PeerService
     {
         $peer = $this->find($torrentId, $peerId);
 
-        if ($peer === null || time() - $peer['last_action'] > $this->peerExpiry) {
+        if ($peer === null || $this->now() - $peer['last_action'] > $this->peerExpiry) {
             return null;
         }
 
@@ -339,7 +340,7 @@ final class PeerService
      */
     public function livePeers(int $torrentId): array
     {
-        $now = time();
+        $now = $this->now();
         $live = [];
 
         foreach ($this->redis()->hgetall($this->prefix."peers:{$torrentId}") as $peerId => $data) {
@@ -351,6 +352,17 @@ final class PeerService
         }
 
         return $live;
+    }
+
+    /**
+     * The clock every interval is measured on.
+     *
+     * Carbon's rather than time(), so it is the same clock the tracker stamps
+     * its records with, and tests that travel in time move both.
+     */
+    private function now(): int
+    {
+        return Carbon::now()->getTimestamp();
     }
 
     /**
@@ -477,7 +489,7 @@ final class PeerService
         $goneKey = $this->prefix."gone:{$torrentId}";
 
         $allPeers = $redis->hgetall($peerKey);
-        $now = time();
+        $now = $this->now();
         $removed = 0;
 
         $seeders = 0;

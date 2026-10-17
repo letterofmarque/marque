@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\DB;
 use Marque\Bloodhound\Models\AnnounceLog;
 use Marque\Bloodhound\Models\LedgerCursor;
 use Marque\Bloodhound\Support\BatchIncrement;
-use Marque\Bloodhound\Support\SessionTime;
 
 /**
  * Folds ledger rows into the totals the site reads.
@@ -87,14 +86,14 @@ class LedgerAggregator
             ->where('id', '>', $position)
             ->orderBy('id')
             ->limit($batchSize)
-            ->get(['id', 'user_id', 'torrent_id', 'upload_delta', 'download_delta']);
+            ->get(['id', 'user_id', 'torrent_id', 'upload_delta', 'download_delta', 'seed_seconds', 'leech_seconds']);
 
         if ($rows->isEmpty()) {
             return 0;
         }
 
         DB::transaction(function () use ($rows, $position) {
-            $this->applyDeltas($rows, $this->sessionTimes($position, $rows->last()->id));
+            $this->applyDeltas($rows);
 
             // Inside the transaction, deliberately. If this fails, the writes
             // above roll back with it and the batch is simply redone.
@@ -105,57 +104,26 @@ class LedgerAggregator
     }
 
     /**
-     * Seconds seeded and leeched per (user, torrent), for the intervals the
-     * rows in ($after, $through] close (Spec #121).
+     * Add each row's credit (bytes and seconds) to the totals it belongs to.
      *
-     * Summed in the database. An interval whose opening row was folded by an
-     * earlier batch or run is reached back for there, and credited here once,
-     * by the row that closes it.
-     *
-     * @return array<string, array{user_id: int, torrent_id: int, seedtime: int, leechtime: int}>
-     */
-    protected function sessionTimes(int $after, int $through): array
-    {
-        $sums = SessionTime::forLedger()->intervals($after, $through)
-            ->groupBy('user_id', 'torrent_id')
-            ->selectRaw('user_id, torrent_id, SUM(seed_seconds) as seed, SUM(leech_seconds) as leech')
-            ->get();
-
-        $times = [];
-
-        foreach ($sums as $sum) {
-            $times[$sum->user_id.':'.$sum->torrent_id] = [
-                'user_id' => (int) $sum->user_id,
-                'torrent_id' => (int) $sum->torrent_id,
-                'seedtime' => (int) $sum->seed,
-                'leechtime' => (int) $sum->leech,
-            ];
-        }
-
-        return $times;
-    }
-
-    /**
-     * Add each row's deltas, and the batch's session times, to the totals
-     * they belong to.
+     * Every row carries its own credit, written at announce time, so a fold
+     * is a sum: nothing pairs one row with another, and a batch boundary
+     * splits nothing.
      *
      * Grouped per (user, torrent) so a batch of many announces from one peer
      * is a single write rather than one per row.
      *
      * @param  Collection<int, AnnounceLog>  $rows
-     * @param  array<string, array{user_id: int, torrent_id: int, seedtime: int, leechtime: int}>  $times
      */
-    protected function applyDeltas($rows, array $times): void
+    protected function applyDeltas($rows): void
     {
         $perTorrent = [];
 
         foreach ($rows as $row) {
-            // Skipped for BYTES only. An idle seeder's announce and every
-            // `stopped` move no bytes, and are exactly what seedtime is made
-            // of, so they reach the time sums above; here they must still
-            // contribute nothing, or every announce that moved nothing would
-            // write a torrent_user row.
-            if ($row->upload_delta === 0 && $row->download_delta === 0) {
+            // A row that credits nothing (a refusal, a first announce) is not
+            // activity, and writes no torrent_user row.
+            if ($row->upload_delta === 0 && $row->download_delta === 0
+                && $row->seed_seconds === 0 && $row->leech_seconds === 0) {
                 continue;
             }
 
@@ -164,18 +132,8 @@ class LedgerAggregator
             $perTorrent[$key] ??= $this->emptyEntry($row->user_id, $row->torrent_id);
             $perTorrent[$key]['uploaded'] += $row->upload_delta;
             $perTorrent[$key]['downloaded'] += $row->download_delta;
-        }
-
-        foreach ($times as $key => $time) {
-            // A pair that closed with nothing to credit (a stopped row's
-            // successor, a first announce) is not activity either.
-            if ($time['seedtime'] === 0 && $time['leechtime'] === 0) {
-                continue;
-            }
-
-            $perTorrent[$key] ??= $this->emptyEntry($time['user_id'], $time['torrent_id']);
-            $perTorrent[$key]['seedtime'] += $time['seedtime'];
-            $perTorrent[$key]['leechtime'] += $time['leechtime'];
+            $perTorrent[$key]['seedtime'] += $row->seed_seconds;
+            $perTorrent[$key]['leechtime'] += $row->leech_seconds;
         }
 
         $perUser = [];
