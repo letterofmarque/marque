@@ -167,7 +167,7 @@ final class AntiCheatService
         }
 
         // Check IP connections
-        $ipPeerCount = $this->peerService->getIpPeerCount($ip);
+        $ipPeerCount = $this->peerService->getIpSessionCount($ip);
         if ($ipPeerCount >= $maxPerIp) {
             return [
                 'passed' => false,

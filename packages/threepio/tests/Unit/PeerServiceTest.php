@@ -228,7 +228,7 @@ describe('peer selection and expiry (#10804)', function () {
 
         $this->peers->cleanupExpiredPeers(1);
 
-        expect($this->peers->getIpPeerCount('10.0.0.1'))->toBe(0);
+        expect($this->peers->getIpSessionCount('10.0.0.1'))->toBe(0);
     });
 
     test('per-IP and per-user sets rebuild from the next announce after being cleared', function () {
@@ -236,11 +236,11 @@ describe('peer selection and expiry (#10804)', function () {
 
         $redis = Redis::connection(config('threepio.redis.connection', 'default'));
         $prefix = config('threepio.redis.prefix', 'marque:');
-        $redis->del($prefix.'ip:10.0.0.1:peers', $prefix.'user:1:peers');
+        $redis->del($prefix.'ip:10.0.0.1:sessions', $prefix.'user:1:peers');
 
         addPeer($this->peers, 1, '-qB4210-aaaaaaaaaaaa'); // its next announce
 
-        expect($this->peers->getIpPeerCount('10.0.0.1'))->toBe(1)
+        expect($this->peers->getIpSessionCount('10.0.0.1'))->toBe(1)
             ->and($this->peers->getUserPeerCountForTorrent(1, 1))->toBe(1);
     });
 
@@ -252,8 +252,8 @@ describe('peer selection and expiry (#10804)', function () {
             uploaded: 0, downloaded: 0, left: 0, userAgent: 'test', isSeeder: true,
         );
 
-        expect($this->peers->getIpPeerCount('10.0.0.1'))->toBe(0)
-            ->and($this->peers->getIpPeerCount('10.0.0.2'))->toBe(1);
+        expect($this->peers->getIpSessionCount('10.0.0.1'))->toBe(0)
+            ->and($this->peers->getIpSessionCount('10.0.0.2'))->toBe(1);
     });
 
     test('the sweep recounts counters that drifted from the peers actually present', function () {

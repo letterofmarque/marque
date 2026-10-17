@@ -45,7 +45,7 @@ final class AnnounceService
         // IP limiting
         if (config('hound.ip_limiting.enabled', true)) {
             $maxPerIp = (int) config('hound.ip_limiting.max_per_ip', 50);
-            $ipCount = $this->peerService->getIpPeerCount($ip);
+            $ipCount = $this->peerService->getIpSessionCount($ip);
 
             if ($ipCount >= $maxPerIp) {
                 return TrackerResponse::error('Too many connections from your IP');

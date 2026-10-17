@@ -6,6 +6,8 @@ namespace Marque\Threepio\Services;
 
 use Illuminate\Redis\Connections\Connection;
 use Illuminate\Support\Facades\Redis;
+use Marque\Threepio\Enums\BaselineSource;
+use Marque\Threepio\Support\PeerLookup;
 
 /**
  * Redis-backed peer storage service.
@@ -15,7 +17,9 @@ use Illuminate\Support\Facades\Redis;
  * - {prefix}torrent:{torrent_id}:seeders - Integer counter
  * - {prefix}torrent:{torrent_id}:leechers - Integer counter
  * - {prefix}user:{user_id}:peers - Set of "torrent_id:peer_id" strings (when userId provided)
- * - {prefix}ip:{ip}:peers - Set of peer_ids (for IP limiting)
+ * - {prefix}ip:{ip}:sessions - Set of "torrent_id:peer_id" strings (for IP limiting), expiring
+ * - {prefix}gone:{torrent_id} - Hash of peer_id => record kept after expiry as a baseline
+ *   (only when retainBaselinesFor() is set), expiring
  * - {prefix}swarm:{torrent_id}:uploaded - Total bytes uploaded in swarm
  * - {prefix}swarm:{torrent_id}:downloaded - Total bytes downloaded in swarm
  */
@@ -39,9 +43,15 @@ final class PeerService
      * so this is a seam rather than a lookup: a private tracker supplies a
      * resolver, a public one leaves it null and keeps today's behaviour.
      *
-     * @var null|callable(int, string): (array{uploaded: int, downloaded: int}|null)
+     * @var null|callable(int, string, ?int): (array{uploaded: int, downloaded: int, left?: int, last_action?: int}|null)
      */
     private $baselineResolver = null;
+
+    /**
+     * Seconds after its last announce that an expired peer's record is kept as
+     * a baseline. 0 deletes it on expiry.
+     */
+    private int $baselineRetention = 0;
 
     public function __construct()
     {
@@ -56,11 +66,32 @@ final class PeerService
      * peer genuinely has no history — a first announce has no baseline, and
      * inventing one would be worse than admitting there isn't one.
      *
-     * @param  callable(int, string): (array{uploaded: int, downloaded: int}|null)  $resolver
+     * Consulted after both the swarm and any retained baseline miss, with the
+     * announcing user's id: another member's counters are never a baseline.
+     * The answer may carry `left` and `last_action` (a Unix timestamp), which
+     * give the recovered interval its start; without `last_action` no time is
+     * credited for it.
+     *
+     * @param  callable(int, string, ?int): (array{uploaded: int, downloaded: int, left?: int, last_action?: int}|null)  $resolver
      */
     public function resolveBaselineUsing(callable $resolver): void
     {
         $this->baselineResolver = $resolver;
+    }
+
+    /**
+     * Keep an expired peer's record as a baseline for this long after its last
+     * announce, so a member who comes back without having sent `stopped`
+     * (client killed, machine off, network gone) is credited what it moved in
+     * between rather than nothing.
+     *
+     * Only a private tracker wants this: its credit is measured against the
+     * baseline. The sweep moves expired records into `gone:{torrent}`; a
+     * `stopped` peer is never kept, since `stopped` closes the session.
+     */
+    public function retainBaselinesFor(int $seconds): void
+    {
+        $this->baselineRetention = max(0, $seconds);
     }
 
     /**
@@ -72,7 +103,49 @@ final class PeerService
     }
 
     /**
+     * Read a peer once, for everything that judges or credits its announce.
+     *
+     * The baseline is this member's own record: from the swarm hash (live, or
+     * expired and not yet swept), else a retained one, else the resolver. A
+     * record of another member is never a baseline (#F15: a peer_id is the
+     * client's choice, not an identity).
+     */
+    public function lookup(int $torrentId, string $peerId, ?int $userId): PeerLookup
+    {
+        $now = time();
+        $stored = $this->find($torrentId, $peerId);
+
+        if ($stored !== null && $this->sameOwner($stored, $userId)) {
+            return new PeerLookup($stored, BaselineSource::Swarm, $stored, $this->peerExpiry, $now);
+        }
+
+        if ($this->baselineRetention > 0) {
+            $retained = $this->decode($this->redis()->hget($this->prefix."gone:{$torrentId}", $peerId));
+
+            if ($retained !== null
+                && $this->sameOwner($retained, $userId)
+                && $now - (int) $retained['last_action'] <= $this->baselineRetention) {
+                return new PeerLookup($retained, BaselineSource::Retained, $stored, $this->peerExpiry, $now);
+            }
+        }
+
+        if ($this->baselineResolver !== null) {
+            $recovered = ($this->baselineResolver)($torrentId, $peerId, $userId);
+
+            if ($recovered !== null) {
+                return new PeerLookup($recovered, BaselineSource::Recovered, $stored, $this->peerExpiry, $now);
+            }
+        }
+
+        return new PeerLookup(null, BaselineSource::None, $stored, $this->peerExpiry, $now);
+    }
+
+    /**
      * Add or update a peer.
+     *
+     * Pass the lookup the caller already made (anti-cheat reads the same one),
+     * so the credit is computed against exactly the baseline that was judged
+     * and the peer is not read twice.
      */
     public function upsertPeer(
         int $torrentId,
@@ -85,22 +158,19 @@ final class PeerService
         int $left,
         string $userAgent,
         bool $isSeeder,
+        ?PeerLookup $lookup = null,
     ): array {
         $redis = $this->redis();
         $peerKey = $this->prefix."peers:{$torrentId}";
-        $existingPeer = $this->getPeer($torrentId, $peerId);
+        $lookup ??= $this->lookup($torrentId, $peerId, $userId);
+        $now = time();
 
-        // Redis knows nothing about this peer. That is either a genuinely new
-        // peer, or a peer whose state Redis lost — and the two are
-        // indistinguishable from here. Ask the durable record which it is
-        // before assuming there is no baseline, because assuming wrongly
-        // means silently crediting zero for everything transferred since the
-        // peer's last announce.
-        $recoveredBaseline = null;
-
-        if ($existingPeer === null && $this->baselineResolver !== null) {
-            $recoveredBaseline = ($this->baselineResolver)($torrentId, $peerId);
-        }
+        // Swarm bookkeeping follows what is in the hash, whoever owns it: a
+        // record there is already in the counters and sets. The baseline is a
+        // separate question (see PeerLookup), so a retained or recovered peer
+        // has counters to diff against and still joins the swarm as new.
+        $stored = $lookup->stored;
+        $baseline = $lookup->baseline;
 
         $peerData = [
             'peer_id' => $peerId,
@@ -112,29 +182,18 @@ final class PeerService
             'left' => $left,
             'user_agent' => $userAgent,
             'is_seeder' => $isSeeder,
-            'last_action' => time(),
-            'started' => $existingPeer['started'] ?? time(),
+            'last_action' => $now,
+            'started' => $baseline['started'] ?? $now,
         ];
 
-        // The baseline to diff against, and where it came from. Redis first;
-        // the durable record only when Redis has nothing. Deliberately
-        // separate from the swarm-count bookkeeping below: a peer recovered
-        // from the ledger has a baseline for delta purposes but genuinely is
-        // not in Redis, so it still counts as a new peer for seeder/leecher
-        // totals and the user/IP sets.
-        $baseline = $existingPeer !== null
-            ? ['uploaded' => $existingPeer['uploaded'] ?? 0, 'downloaded' => $existingPeer['downloaded'] ?? 0]
-            : $recoveredBaseline;
+        $uploadDelta = $baseline !== null ? $this->delta($uploaded, (int) $baseline['uploaded']) : 0;
+        $downloadDelta = $baseline !== null ? $this->delta($downloaded, (int) $baseline['downloaded']) : 0;
 
-        // max(0, ...) because a client that restarts reports its cumulative
-        // counters from zero again. Under-crediting the difference is correct;
-        // a negative delta would mean handing back bytes.
-        $uploadDelta = $baseline !== null ? max(0, $uploaded - $baseline['uploaded']) : 0;
-        $downloadDelta = $baseline !== null ? max(0, $downloaded - $baseline['downloaded']) : 0;
+        $priorAt = isset($baseline['last_action']) ? (int) $baseline['last_action'] : null;
+        $interval = $priorAt !== null ? min(max(0, $now - $priorAt), $this->peerExpiry) : 0;
 
-        if ($existingPeer) {
-            // Update seeder/leecher counts if status changed
-            if ($existingPeer['is_seeder'] !== $isSeeder) {
+        if ($stored !== null) {
+            if ((bool) $stored['is_seeder'] !== $isSeeder) {
                 if ($isSeeder) {
                     $this->incrementSeeders($torrentId);
                     $this->decrementLeechers($torrentId);
@@ -143,13 +202,26 @@ final class PeerService
                     $this->incrementLeechers($torrentId);
                 }
             }
-        } else {
-            // New peer
-            if ($isSeeder) {
-                $this->incrementSeeders($torrentId);
-            } else {
-                $this->incrementLeechers($torrentId);
+
+            // Another member's record under this peer_id is replaced; it leaves
+            // that member's set.
+            if (($stored['user_id'] ?? null) !== null && $stored['user_id'] !== $userId) {
+                $redis->srem($this->prefix."user:{$stored['user_id']}:peers", "{$torrentId}:{$peerId}");
             }
+
+            // A peer that moved address leaves its old IP's sessions;
+            // removePeer() only knows the current one.
+            if (($stored['ip'] ?? $ip) !== $ip) {
+                $redis->srem($this->prefix."ip:{$stored['ip']}:sessions", "{$torrentId}:{$peerId}");
+            }
+        } else {
+            $isSeeder ? $this->incrementSeeders($torrentId) : $this->incrementLeechers($torrentId);
+        }
+
+        // A retained baseline is used once: the session it belonged to is live
+        // again, in the swarm hash.
+        if ($lookup->source === BaselineSource::Retained) {
+            $redis->hdel($this->prefix."gone:{$torrentId}", $peerId);
         }
 
         // Membership is (re)asserted on every announce, not just the first.
@@ -160,13 +232,13 @@ final class PeerService
             $redis->sadd($this->prefix."user:{$userId}:peers", "{$torrentId}:{$peerId}");
         }
 
-        // A peer that moved address leaves its old IP's count; removePeer()
-        // only knows the current one.
-        if ($existingPeer !== null && ($existingPeer['ip'] ?? $ip) !== $ip) {
-            $redis->srem($this->prefix."ip:{$existingPeer['ip']}:peers", $peerId);
-        }
-
-        $redis->sadd($this->prefix."ip:{$ip}:peers", $peerId);
+        // Sessions, not peer_ids (#F17): a client that uses one peer_id for
+        // every torrent is one session per torrent, and stopping one torrent
+        // removes only that one. The TTL, re-asserted here, lets an IP that
+        // goes quiet clean itself up; the sweep removes expired sessions.
+        $ipKey = $this->prefix."ip:{$ip}:sessions";
+        $redis->sadd($ipKey, "{$torrentId}:{$peerId}");
+        $redis->expire($ipKey, 2 * $this->peerExpiry);
 
         // No TTL on the hash, deliberately. A TTL dropped the whole hash once a
         // torrent went quiet, without touching the seeder/leecher counters or
@@ -177,7 +249,6 @@ final class PeerService
         // hash itself when its last peer is removed.
         $redis->hset($peerKey, $peerId, json_encode($peerData));
 
-        // Update swarm totals
         if ($uploadDelta > 0) {
             $redis->incrby($this->prefix."swarm:{$torrentId}:uploaded", $uploadDelta);
         }
@@ -189,54 +260,50 @@ final class PeerService
             'upload_delta' => $uploadDelta,
             'download_delta' => $downloadDelta,
             // The baseline the deltas were diffed against. Null for a peer with
-            // no prior announce — that is a real state, not missing data, and
+            // no baseline — that is a real state, not missing data, and
             // recording it as 0 would claim a baseline nobody observed.
             //
             // Returned so the caller can persist it: a stored delta cannot be
             // checked without the value it was derived from, so a wrong
             // baseline would otherwise leave no trace anywhere.
-            'prior_up' => $baseline['uploaded'] ?? null,
-            'prior_down' => $baseline['downloaded'] ?? null,
-            'was_existing' => $existingPeer !== null,
-            // True when Redis had lost this peer and the baseline came from the
-            // durable record instead. Distinguishes a real outage from a
-            // genuinely new peer, which look identical in Redis.
-            'baseline_recovered' => $existingPeer === null && $recoveredBaseline !== null,
-            'status_changed' => $existingPeer && $existingPeer['is_seeder'] !== $isSeeder,
+            'prior_up' => $baseline !== null ? (int) $baseline['uploaded'] : null,
+            'prior_down' => $baseline !== null ? (int) $baseline['downloaded'] : null,
+            // When the interval this announce closes began, the peer's state
+            // then (a seeder when 0), and its length capped at peer_expiry. A
+            // tracker crediting time attributes the interval by its start.
+            'prior_at' => $priorAt,
+            'prior_left' => isset($baseline['left']) ? (int) $baseline['left'] : null,
+            'interval_seconds' => $interval,
+            'baseline_source' => $lookup->source->value,
+            'was_existing' => $stored !== null,
+            'baseline_recovered' => $lookup->source === BaselineSource::Recovered,
+            'status_changed' => $stored !== null && (bool) $stored['is_seeder'] !== $isSeeder,
         ];
     }
 
     /**
-     * Remove a peer (on stopped event).
+     * Remove a peer (on stopped event, or from the sweep).
+     *
+     * Returns the record removed, which a `stopped` announce diffs against. The
+     * record is not retained: `stopped` closes the session.
      */
     public function removePeer(int $torrentId, string $peerId): ?array
     {
         $redis = $this->redis();
-        $peerKey = $this->prefix."peers:{$torrentId}";
-
-        // Deliberately the raw read, not getPeer(): getPeer() self-heals an
-        // expired peer by calling removePeer(), so going through it here
-        // recurses without bound the moment the peer being removed is the
-        // expired one — which is every peer this is called for from
-        // cleanupExpiredPeers(). Removal does not care whether the peer was
-        // expired, only that it was there.
-        $existingPeer = $this->readPeer($torrentId, $peerId);
+        $existingPeer = $this->find($torrentId, $peerId);
 
         if (! $existingPeer) {
             return null;
         }
 
-        // Remove from hash
-        $redis->hdel($peerKey, $peerId);
+        $redis->hdel($this->prefix."peers:{$torrentId}", $peerId);
 
-        // Update counts
         if ($existingPeer['is_seeder']) {
             $this->decrementSeeders($torrentId);
         } else {
             $this->decrementLeechers($torrentId);
         }
 
-        // Remove from user's peer set (only if user tracking was active)
         if ($existingPeer['user_id'] !== null) {
             $redis->srem(
                 $this->prefix."user:{$existingPeer['user_id']}:peers",
@@ -244,32 +311,23 @@ final class PeerService
             );
         }
 
-        // Remove from IP's peer set
-        $redis->srem($this->prefix."ip:{$existingPeer['ip']}:peers", $peerId);
+        $redis->srem($this->prefix."ip:{$existingPeer['ip']}:sessions", "{$torrentId}:{$peerId}");
 
         return $existingPeer;
     }
 
     /**
-     * Get a specific peer's data.
+     * A live peer's data, or null when absent or expired.
+     *
+     * Reads never mutate: an expired peer stays where it is until the sweep
+     * removes it. (Removing it here made a read recurse into removal and back,
+     * and made "is it live?" destroy the baseline a returning peer needed.)
      */
     public function getPeer(int $torrentId, string $peerId): ?array
     {
-        $redis = $this->redis();
-        $peerKey = $this->prefix."peers:{$torrentId}";
+        $peer = $this->find($torrentId, $peerId);
 
-        $data = $redis->hget($peerKey, $peerId);
-
-        if (! $data) {
-            return null;
-        }
-
-        $peer = json_decode($data, true);
-
-        // Check if peer has expired
-        if (time() - $peer['last_action'] > $this->peerExpiry) {
-            $this->removePeer($torrentId, $peerId);
-
+        if ($peer === null || time() - $peer['last_action'] > $this->peerExpiry) {
             return null;
         }
 
@@ -277,22 +335,69 @@ final class PeerService
     }
 
     /**
-     * Read a peer's stored data without the expiry check.
-     *
-     * getPeer() treats reading an expired peer as a cue to delete it, which is
-     * right for callers asking "is this peer live?" and wrong for removal
-     * itself — see removePeer().
+     * The stored record for a peer in the swarm hash, whatever its age or owner.
      */
-    private function readPeer(int $torrentId, string $peerId): ?array
+    public function find(int $torrentId, string $peerId): ?array
     {
-        $data = $this->redis()->hget($this->prefix."peers:{$torrentId}", $peerId);
+        return $this->decode($this->redis()->hget($this->prefix."peers:{$torrentId}", $peerId));
+    }
 
+    /**
+     * Every live peer on a torrent, decoded, keyed by peer_id.
+     *
+     * One HGETALL, which an announce reads anyway for its peer list; counts by
+     * member or by location come from this rather than another round trip.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function livePeers(int $torrentId): array
+    {
+        $now = time();
+        $live = [];
+
+        foreach ($this->redis()->hgetall($this->prefix."peers:{$torrentId}") as $peerId => $data) {
+            $peer = json_decode($data, true);
+
+            if ($now - $peer['last_action'] <= $this->peerExpiry) {
+                $live[(string) $peerId] = $peer;
+            }
+        }
+
+        return $live;
+    }
+
+    /**
+     * Diff a cumulative counter against its baseline.
+     *
+     * A counter below its baseline means the client restarted under the same
+     * peer_id and is counting from zero again, so what it reports is what this
+     * session moved. Crediting 0 (the old clamp) lost everything between the
+     * restart and this announce.
+     */
+    private function delta(int $reported, int $prior): int
+    {
+        return $reported >= $prior ? $reported - $prior : $reported;
+    }
+
+    /**
+     * @param  array<string, mixed>  $record
+     */
+    private function sameOwner(array $record, ?int $userId): bool
+    {
+        return ($record['user_id'] ?? null) === $userId;
+    }
+
+    private function decode(mixed $data): ?array
+    {
         return $data ? json_decode($data, true) : null;
     }
 
     /**
      * Get peers for announce response.
      *
+     * Pass livePeers() when the caller has already read it this announce.
+     *
+     * @param  array<string, array<string, mixed>>|null  $livePeers
      * @return array<array{ip: string, port: int, peer_id: string}>
      */
     public function getPeersForAnnounce(
@@ -300,24 +405,13 @@ final class PeerService
         string $excludePeerId,
         bool $isSeeder,
         int $limit,
+        ?array $livePeers = null,
     ): array {
-        $redis = $this->redis();
-        $peerKey = $this->prefix."peers:{$torrentId}";
-
-        $allPeers = $redis->hgetall($peerKey);
         $peers = [];
-        $now = time();
 
-        foreach ($allPeers as $peerId => $data) {
+        foreach ($livePeers ?? $this->livePeers($torrentId) as $peerId => $peer) {
             // Skip the requesting peer
-            if ($peerId === $excludePeerId) {
-                continue;
-            }
-
-            $peer = json_decode($data, true);
-
-            // Skip expired peers
-            if ($now - $peer['last_action'] > $this->peerExpiry) {
+            if ((string) $peerId === $excludePeerId) {
                 continue;
             }
 
@@ -373,38 +467,40 @@ final class PeerService
     }
 
     /**
-     * Get count of peers for a user on a specific torrent.
+     * Live peers a member has on a torrent, counted from the torrent's hash.
+     *
+     * Not from `user:{id}:peers`: that set spans every torrent the member is
+     * on, so scanning it per announce was O(a seedbox's whole library).
+     *
+     * @param  array<string, array<string, mixed>>|null  $livePeers  livePeers(), when already read
      */
-    public function getUserPeerCountForTorrent(int $userId, int $torrentId): int
+    public function getUserPeerCountForTorrent(int $userId, int $torrentId, ?array $livePeers = null): int
     {
-        $redis = $this->redis();
-        $userPeers = $redis->smembers($this->prefix."user:{$userId}:peers");
-
-        $count = 0;
-        foreach ($userPeers as $peer) {
-            if (str_starts_with($peer, "{$torrentId}:")) {
-                $count++;
-            }
-        }
-
-        return $count;
+        return count(array_filter(
+            $livePeers ?? $this->livePeers($torrentId),
+            fn (array $peer) => ($peer['user_id'] ?? null) === $userId,
+        ));
     }
 
     /**
-     * Get count of peers from a specific IP.
+     * Sessions (torrent, peer_id) announcing from an IP.
      */
-    public function getIpPeerCount(string $ip): int
+    public function getIpSessionCount(string $ip): int
     {
-        return (int) $this->redis()->scard($this->prefix."ip:{$ip}:peers");
+        return (int) $this->redis()->scard($this->prefix."ip:{$ip}:sessions");
     }
 
     /**
      * Clean up expired peers (run periodically via scheduler).
+     *
+     * The only path by which an expired peer leaves the swarm. With
+     * retainBaselinesFor() set, its record moves to `gone:{torrent}` first.
      */
     public function cleanupExpiredPeers(int $torrentId): int
     {
         $redis = $this->redis();
         $peerKey = $this->prefix."peers:{$torrentId}";
+        $goneKey = $this->prefix."gone:{$torrentId}";
 
         $allPeers = $redis->hgetall($peerKey);
         $now = time();
@@ -417,13 +513,27 @@ final class PeerService
             $peer = json_decode($data, true);
 
             if ($now - $peer['last_action'] > $this->peerExpiry) {
-                $this->removePeer($torrentId, $peerId);
+                if ($this->baselineRetention > 0
+                    && $now - $peer['last_action'] <= $this->baselineRetention) {
+                    $redis->hset($goneKey, $peerId, $data);
+                    $redis->expire($goneKey, $this->baselineRetention);
+                }
+
+                $this->removePeer($torrentId, (string) $peerId);
                 $removed++;
 
                 continue;
             }
 
             $peer['is_seeder'] ? $seeders++ : $leechers++;
+        }
+
+        // Retained baselines past the retention go; the hash's own TTL covers
+        // a torrent that falls silent and is never swept again.
+        foreach ($this->baselineRetention > 0 ? $redis->hgetall($goneKey) : [] as $peerId => $data) {
+            if ($now - json_decode($data, true)['last_action'] > $this->baselineRetention) {
+                $redis->hdel($goneKey, $peerId);
+            }
         }
 
         // Settle the counters to the peers actually present. incr/decr drift

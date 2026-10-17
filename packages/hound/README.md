@@ -174,7 +174,7 @@ only one available.
 | Key | Default | Description |
 |-----|---------|-------------|
 | `ip_limiting.enabled` | `true` | Enable the per-IP peer cap |
-| `ip_limiting.max_per_ip` | `50` | Max distinct peer IDs from one IP |
+| `ip_limiting.max_per_ip` | `50` | Max live sessions (torrent, peer ID) from one IP |
 
 ```env
 HOUND_IP_LIMITING=true

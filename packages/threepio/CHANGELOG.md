@@ -7,6 +7,47 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+### Changed
+
+- **Breaking: the per-IP count is of sessions, not peer_ids.** `getIpPeerCount()` is
+  replaced by `getIpSessionCount()`, which counts `ip:{ip}:sessions`, a set of
+  `"{torrent}:{peer_id}"`. A client using one peer_id for every torrent counts once per
+  torrent, and stopping one torrent removes only that session. Before, such a client
+  counted once in total and left the count on its first `stopped`, while a client with a
+  peer_id per torrent counted once per torrent. The set expires after twice `peer_expiry`
+  without an announce. **After upgrading**, delete the old sets once:
+  `redis-cli --scan --pattern '*marque:ip:*:peers' | xargs -r redis-cli del`, with the
+  connection flags (`-h`, `-p`, `-n`) of your tracker's Redis on both calls.
+- **Breaking: reads never mutate.** `getPeer()` answers null for an expired peer and
+  leaves it in place; only `cleanupExpiredPeers()` (and `removePeer()`) take a peer out of
+  the swarm.
+- **A counter that goes backwards is credited as a new session.** A client restarted
+  under the same peer_id reports from zero again. The delta is now what it reports,
+  where it was clamped to 0 and lost everything between the restart and the announce.
+- **`getUserPeerCountForTorrent()` counts from the torrent's peer hash** (live peers
+  whose `user_id` matches) instead of scanning every torrent in the member's set, and
+  accepts a `livePeers()` result already read this announce.
+- **A record owned by another user is never a baseline**, from the swarm hash or a
+  retained record. Overwriting it moves the peer between the two users' sets.
+- **The resolver is told the announcing user**, as a third argument, and may return
+  `left` and `last_action`.
+
+### Added
+
+- **`lookup($torrentId, $peerId, $userId): PeerLookup`**, one read of a peer for
+  everything that judges or credits its announce. `upsertPeer(..., lookup:)` takes it,
+  so anti-cheat and the credit see the same baseline and the peer is not read twice.
+- **`upsertPeer()` returns `prior_at`, `prior_left`, `interval_seconds` and
+  `baseline_source`**: when the interval the announce closes began, the peer's state
+  then, the interval capped at `peer_expiry`, and where the baseline came from.
+- **`retainBaselinesFor($seconds)`**: the sweep keeps an expired peer's record in
+  `gone:{torrent}` as a baseline for that long, used once by the peer's next announce.
+  Off by default (hound).
+- **`find()`**, the raw stored record, and **`livePeers()`**, every live peer on a
+  torrent in one `HGETALL`; `getPeersForAnnounce()` accepts it.
+
 ## [3.3.0] — 2026-10-06
 
 > Adds `Bencode::rawDictionary()`, the original bytes of each top-level value, so an info_hash can be computed the way clients compute it.

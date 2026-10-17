@@ -66,7 +66,8 @@ return [
     | IP Limiting
     |--------------------------------------------------------------------------
     |
-    | Limit the number of concurrent peers from a single IP address.
+    | Limit the number of live sessions from a single IP address. A session is
+    | one peer ID on one torrent, so a client running 40 torrents is 40.
     | This is the primary abuse prevention for a public tracker.
     |
     */

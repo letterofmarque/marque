@@ -7,6 +7,16 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+### Changed
+
+- **`ip_limiting.max_per_ip` counts sessions, not peer IDs** (threepio 4.0). A session is
+  one peer ID on one torrent. A client that uses one peer ID for every torrent used to
+  count once however many torrents it ran, and dropped out of the count on its first
+  `stopped`; it now counts once per torrent. A client with a peer ID per torrent counts
+  as before. Raise the cap if your users run many torrents from one address.
+
 ## [4.0.0] — 2026-10-06
 
 > Downloads carry hound's open announce URL, and uploads must be public torrents by default.
