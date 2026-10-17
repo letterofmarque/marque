@@ -5,15 +5,15 @@ declare(strict_types=1);
 namespace Marque\Bloodhound\Tests;
 
 /**
- * For tests that run migrations themselves: rolling the schema back to an
- * older release and migrating forward, the way an upgrading install does.
- *
- * DDL commits on MySQL and MariaDB, so these cannot sit inside the per-test
- * transaction the rest of the suite uses. Each test starts from a freshly
+ * For tests that cannot run inside the per-test transaction the rest of the
+ * suite uses: ones that migrate the schema themselves (rolling back to an
+ * older release and forward, as an upgrading install does), since DDL
+ * commits on MySQL and MariaDB; and ones that hold a lock from a second
+ * connection, which only sees committed rows. Each test starts from a freshly
  * migrated database and leaves one behind, so the suites that follow in the
  * same process find exactly what they expect.
  */
-abstract class UpgradePathTestCase extends TestCase
+abstract class OutsideTransactionTestCase extends TestCase
 {
     public function refreshDatabase(): void
     {

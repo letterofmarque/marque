@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Marque\Bloodhound\Models\AnnounceLog;
 use Marque\Bloodhound\Models\LedgerCursor;
 use Marque\Bloodhound\Support\BatchIncrement;
+use RuntimeException;
 
 /**
  * Folds ledger rows into the totals the site reads.
@@ -57,16 +58,56 @@ class LedgerAggregator
     /**
      * Fold everything the ledger has that this stream has not yet counted.
      *
-     * Loops until caught up rather than processing a single batch, so a
-     * backlog drains in one run instead of needing as many ticks as batches.
+     * To the head of the ledger: for the migrations that must leave totals
+     * folded before they finish, and for catching up by hand. The scheduler
+     * uses runScheduled(), which stops at the horizon.
      *
      * @return int rows folded
      */
     public function run(int $batchSize = 1000): int
     {
+        return $this->foldThrough(null, $batchSize);
+    }
+
+    /**
+     * The scheduled fold: only as far as the highest id the previous run saw.
+     *
+     * An id is handed out when an insert starts, not when it commits, so a
+     * row can become visible after a later id already has. Folding to the
+     * head could move the cursor past it, and it would never be counted
+     * (F12). Every row below the horizon has had a whole tick to commit. The
+     * cost is that totals trail the ledger by one to two runs, and a backlog
+     * drains in two.
+     *
+     * @return int rows folded
+     */
+    public function runScheduled(int $batchSize = 1000): int
+    {
+        $this->ensureCursor();
+
+        $horizon = (int) DB::table('ledger_cursors')->where('stream', self::STREAM)->value('horizon');
+        $folded = $this->foldThrough($horizon, $batchSize);
+
+        $head = (int) AnnounceLog::query()->max('id');
+
+        DB::table('ledger_cursors')
+            ->where('stream', self::STREAM)
+            ->where('horizon', '<', $head)
+            ->update(['horizon' => $head, 'updated_at' => now()]);
+
+        return $folded;
+    }
+
+    /**
+     * Fold batch after batch until caught up to $through (null: the head).
+     */
+    protected function foldThrough(?int $through, int $batchSize): int
+    {
+        $this->ensureCursor();
+
         $total = 0;
 
-        while (($folded = $this->foldNextBatch($batchSize)) > 0) {
+        while (($folded = $this->foldNextBatch($batchSize, $through)) > 0) {
             $total += $folded;
         }
 
@@ -76,31 +117,71 @@ class LedgerAggregator
     /**
      * Fold one batch, advancing the cursor in the same transaction.
      *
+     * The cursor row is locked first, and the position read under the lock,
+     * so a second fold (the scheduler and a manual run, two hosts without a
+     * shared cache lock, a migration) waits rather than folding the same
+     * rows. A no-op UPDATE rather than SELECT ... FOR UPDATE: it is the one
+     * spelling that takes a write lock on every engine, SQLite included,
+     * where it takes the database's.
+     *
+     * The advance is a compare-and-swap on the position just read. If
+     * anything moved the cursor in between, the batch rolls back and is
+     * redone from wherever it now is (F11).
+     *
      * @return int rows folded (0 means caught up)
      */
-    protected function foldNextBatch(int $batchSize): int
+    protected function foldNextBatch(int $batchSize, ?int $through = null): int
     {
-        $position = LedgerCursor::positionFor(self::STREAM);
+        return DB::transaction(function () use ($batchSize, $through) {
+            $this->lockCursor();
 
-        $rows = AnnounceLog::query()
-            ->where('id', '>', $position)
-            ->orderBy('id')
-            ->limit($batchSize)
-            ->get(['id', 'user_id', 'torrent_id', 'upload_delta', 'download_delta', 'seed_seconds', 'leech_seconds']);
+            $position = LedgerCursor::positionFor(self::STREAM);
 
-        if ($rows->isEmpty()) {
-            return 0;
-        }
+            $rows = AnnounceLog::query()
+                ->where('id', '>', $position)
+                ->when($through !== null, fn ($query) => $query->where('id', '<=', $through))
+                ->orderBy('id')
+                ->limit($batchSize)
+                ->get(['id', 'user_id', 'torrent_id', 'upload_delta', 'download_delta', 'seed_seconds', 'leech_seconds']);
 
-        DB::transaction(function () use ($rows, $position) {
+            if ($rows->isEmpty()) {
+                return 0;
+            }
+
             $this->applyDeltas($rows);
 
             // Inside the transaction, deliberately. If this fails, the writes
             // above roll back with it and the batch is simply redone.
-            $this->advanceCursor($rows->last()->id);
-        });
+            $this->advanceCursor($position, $rows->last()->id);
 
-        return $rows->count();
+            return $rows->count();
+        });
+    }
+
+    /**
+     * Take the cursor row's lock for the rest of the transaction.
+     *
+     * Also what a rebuild takes, so the two never interleave.
+     */
+    public function lockCursor(): void
+    {
+        DB::table('ledger_cursors')
+            ->where('stream', self::STREAM)
+            ->update(['position' => DB::raw(DB::getQueryGrammar()->wrap('position'))]);
+    }
+
+    /**
+     * The cursor row exists before anything locks it: a lock on no row
+     * protects nothing.
+     */
+    public function ensureCursor(): void
+    {
+        DB::table('ledger_cursors')->insertOrIgnore([
+            'stream' => self::STREAM,
+            'position' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     /**
@@ -265,17 +346,17 @@ class LedgerAggregator
         }
     }
 
-    protected function advanceCursor(int $position): void
+    protected function advanceCursor(int $from, int $to): void
     {
-        $cursor = LedgerCursor::query()->where('stream', self::STREAM)->first();
+        $moved = DB::table('ledger_cursors')
+            ->where('stream', self::STREAM)
+            ->where('position', $from)
+            ->update(['position' => $to, 'updated_at' => now()]);
 
-        if ($cursor === null) {
-            LedgerCursor::create(['stream' => self::STREAM, 'position' => $position]);
-
-            return;
+        if ($moved !== 1) {
+            throw new RuntimeException(
+                "The ledger cursor moved from {$from} while this batch was being folded; the batch was rolled back and will be redone."
+            );
         }
-
-        $cursor->position = $position;
-        $cursor->save();
     }
 }

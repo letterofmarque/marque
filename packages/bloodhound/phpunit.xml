@@ -30,9 +30,10 @@
             <directory>tests/StatsOff</directory>
             <directory>tests/StatsSeedtime</directory>
         </testsuite>
-        <!-- Job #193: tests that migrate the schema themselves; see tests/Pest.php. -->
-        <testsuite name="UpgradePath">
+        <!-- Job #193: tests outside the per-test transaction; see tests/Pest.php. -->
+        <testsuite name="OutsideTransaction">
             <directory>tests/UpgradePath</directory>
+            <directory>tests/Concurrency</directory>
         </testsuite>
     </testsuites>
     <source>

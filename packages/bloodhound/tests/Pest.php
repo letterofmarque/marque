@@ -16,7 +16,7 @@ use Marque\Bloodhound\Tests\RatioModeFullTestCase;
 use Marque\Bloodhound\Tests\RatioModeOffTestCase;
 use Marque\Bloodhound\Tests\RatioModeSeedtimeTestCase;
 use Marque\Bloodhound\Tests\TestCase;
-use Marque\Bloodhound\Tests\UpgradePathTestCase;
+use Marque\Bloodhound\Tests\OutsideTransactionTestCase;
 use Marque\Bloodhound\Tests\TestUser;
 use Marque\Threepio\Http\Middleware\BlockBrowsers;
 use Marque\Threepio\Support\Bencode;
@@ -45,9 +45,10 @@ pest()->extend(RatioModeFullTestCase::class)->in('StatsFull');
 pest()->extend(RatioModeOffTestCase::class)->in('StatsOff');
 pest()->extend(RatioModeSeedtimeTestCase::class)->in('StatsSeedtime');
 
-// Job #193: tests that migrate the schema themselves, as an upgrading install
-// does. Outside the per-test transaction, since DDL commits on MySQL.
-pest()->extend(UpgradePathTestCase::class)->in('UpgradePath');
+// Job #193: tests outside the per-test transaction: ones that migrate the
+// schema themselves (DDL commits on MySQL), and ones that hold a lock from a
+// second connection (which sees only committed rows).
+pest()->extend(OutsideTransactionTestCase::class)->in('UpgradePath', 'Concurrency');
 
 /**
  * Spec #119: the tracker stats contract reports what is stored, in every

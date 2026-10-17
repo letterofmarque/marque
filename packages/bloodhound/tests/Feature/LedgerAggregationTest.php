@@ -271,6 +271,9 @@ describe('the queue is not a data path', function () {
         // Nothing the queue was holding ever runs.
         expect($this->user->fresh()->uploaded)->toBe(0);
 
+        // Two ticks: the scheduled fold stops at the horizon the previous
+        // tick saw (Job #193, F12), so a fresh backlog drains on the second.
+        $this->artisan('bloodhound:aggregate-ledger')->assertSuccessful();
         $this->artisan('bloodhound:aggregate-ledger')->assertSuccessful();
 
         expect($this->user->fresh()->uploaded)->toBe(4_000);

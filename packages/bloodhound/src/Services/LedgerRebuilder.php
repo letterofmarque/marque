@@ -34,7 +34,16 @@ class LedgerRebuilder
      */
     public function rebuild(?int $userId = null): void
     {
-        DB::transaction(function () use ($userId) {
+        $aggregator = app(LedgerAggregator::class);
+        $aggregator->ensureCursor();
+
+        DB::transaction(function () use ($userId, $aggregator) {
+            // The aggregator's lock, first. A fold that committed between the
+            // reset and the replay below would be overwritten by totals that
+            // never saw it (F13); holding the cursor makes a fold wait until
+            // the rebuild has committed, then go on from the same position.
+            $aggregator->lockCursor();
+
             $this->resetProjections($userId);
             $this->replayLedger($userId);
 

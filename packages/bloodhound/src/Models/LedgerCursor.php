@@ -19,18 +19,21 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $id
  * @property string $stream
  * @property int $position
+ * @property int $horizon
  */
 class LedgerCursor extends Model
 {
     protected $fillable = [
         'stream',
         'position',
+        'horizon',
     ];
 
     protected function casts(): array
     {
         return [
             'position' => 'integer',
+            'horizon' => 'integer',
         ];
     }
 
