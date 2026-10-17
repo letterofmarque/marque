@@ -10,6 +10,7 @@ use Marque\Marque\Install\ComposerRunner;
 use Marque\Marque\Install\FreshProcess;
 use Marque\Marque\Install\InstallAnswers;
 use Marque\Marque\Install\InstalledPackages;
+use Marque\Marque\Install\RedisInfo;
 use Marque\Marque\Tests\TestCase;
 
 /**
@@ -95,6 +96,26 @@ final class InstallCommandHandoffTest extends TestCase
         $this->assertNotContains('marque/parley', $answers->selection->packages());
         $this->assertSame('Ada', $answers->adminName);
         $this->assertSame('ada@example.com', $answers->adminEmail);
+    }
+
+    // Job #193: a private tracker on a Redis that can forget is refused after
+    // the interview and before anything is installed.
+    public function test_a_private_tracker_on_a_redis_that_can_forget_installs_nothing(): void
+    {
+        $this->app->instance(RedisInfo::class, new class extends RedisInfo
+        {
+            public function section(string $section): array
+            {
+                return ['aof_enabled' => '0', 'maxmemory_policy' => 'allkeys-lru'];
+            }
+        });
+
+        $this->runFreshInstall()
+            ->expectsOutputToContain('appendonly yes')
+            ->expectsOutputToContain('No packages were installed')
+            ->assertFailed();
+
+        $this->assertSame([], $this->handedOff);
     }
 
     public function test_it_reports_the_fresh_process_failing(): void

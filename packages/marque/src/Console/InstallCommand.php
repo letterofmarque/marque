@@ -101,11 +101,11 @@ class InstallCommand extends Command
         $this->newLine();
         $selection = $this->interview($existing);
 
-        $check->runConditional($report, $selection->needsRedis());
+        $check->runConditional($report, $selection->needsRedis(), needsDurableRedis: $selection->isPrivate());
 
         if ($report->isFatal()) {
             $this->newLine();
-            $this->renderReport($report, only: ['redis']);
+            $this->renderReport($report, only: ['redis', 'redis-durability']);
 
             // Deliberately NOT "nothing has been changed": the interview may
             // have written APP_NAME to .env by this point. No packages were

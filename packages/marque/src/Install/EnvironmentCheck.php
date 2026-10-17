@@ -55,10 +55,14 @@ final class EnvironmentCheck
      * The part that needs an answer first. Called after the interview with the
      * selection's own requirement.
      */
-    public function runConditional(EnvironmentReport $report, bool $needsRedis): EnvironmentReport
+    public function runConditional(EnvironmentReport $report, bool $needsRedis, bool $needsDurableRedis = false): EnvironmentReport
     {
         if ($needsRedis) {
             $this->checkRedis($report);
+
+            if ($needsDurableRedis && $report->passed('redis')) {
+                $this->checkRedisDurability($report);
+            }
         }
 
         return $report;
@@ -110,6 +114,60 @@ final class EnvironmentCheck
                 $this->firstLine($e->getMessage()),
             ));
         }
+    }
+
+    /**
+     * Fatal for a private tracker (bloodhound 8.0, Job #193).
+     *
+     * A private tracker credits every announce against the peer's last
+     * counters, held in Redis, so Redis is a store there and not a cache: it
+     * must persist (AOF) and never evict. bloodhound refuses announces in
+     * production on a Redis that does not; refusing here, before anything is
+     * installed, makes that a one-line fix and a re-run instead of a tracker
+     * that will not start.
+     *
+     * BLOODHOUND_REDIS_DURABILITY=attested covers persistence a provider
+     * gives another way. The eviction policy is checked regardless whenever
+     * INFO answers. Read from the environment: bloodhound, and its config,
+     * are not installed yet.
+     */
+    private function checkRedisDurability(EnvironmentReport $report): void
+    {
+        $attested = env('BLOODHOUND_REDIS_DURABILITY') === 'attested';
+        $info = $this->app->make(RedisInfo::class);
+        $read = function (string $section, string $field) use ($info): ?string {
+            try {
+                return $info->section($section)[$field] ?? null;
+            } catch (Throwable) {
+                return null;
+            }
+        };
+
+        $aof = $read('persistence', 'aof_enabled');
+        $policy = $read('memory', 'maxmemory_policy');
+        $problems = [];
+
+        if ($aof !== '1' && ! $attested) {
+            $problems[] = 'persistence is off: set appendonly yes (and appendfsync everysec)';
+        }
+
+        if ($policy !== null && $policy !== 'noeviction') {
+            $problems[] = "the eviction policy is {$policy}: set maxmemory-policy noeviction";
+        } elseif ($policy === null && ! $attested) {
+            $problems[] = 'INFO is refused, so the eviction policy cannot be checked: set maxmemory-policy noeviction';
+        }
+
+        if ($problems === []) {
+            $report->pass('redis-durability');
+
+            return;
+        }
+
+        $report->fail('redis-durability', 'Redis cannot be trusted to keep the tracker\'s data: '.implode('; ', $problems).'.'
+            ."\n".'  A private tracker credits every announce against peer state held in Redis, so a'
+            ."\n".'  restart without persistence, or an eviction, silently costs members their credit.'
+            ."\n".'  If your provider makes the data durable another way (replication, snapshots),'
+            ."\n".'  set BLOODHOUND_REDIS_DURABILITY=attested in .env. The eviction policy still applies.');
     }
 
     /**

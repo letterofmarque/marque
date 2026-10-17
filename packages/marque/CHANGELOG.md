@@ -5,6 +5,18 @@ All notable changes to `marque/marque` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **A private tracker is not installed on a Redis that can forget.** bloodhound 8.0
+  credits every announce against peer state held in Redis, so after the interview, and
+  before anything is installed, `marque:install` checks that the tracker's Redis persists
+  (`appendonly yes`) and never evicts (`maxmemory-policy noeviction`), and refuses with
+  the line to set if not. `BLOODHOUND_REDIS_DURABILITY=attested` in `.env` covers a
+  provider that makes the data durable another way; the eviction policy is checked
+  regardless. A public tracker is not held to it.
+
 ## [1.0.0] — 2026-10-01
 
 > First release of the installer: one composer require, then `php artisan marque:install` interviews you and wires a working tracker.

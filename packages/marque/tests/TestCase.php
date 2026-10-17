@@ -6,6 +6,7 @@ namespace Marque\Marque\Tests;
 
 use Marque\Marque\Install\ComposerResult;
 use Marque\Marque\Install\ComposerRunner;
+use Marque\Marque\Install\RedisInfo;
 use Marque\Marque\MarqueServiceProvider;
 use Orchestra\Testbench\TestCase as BaseTestCase;
 
@@ -43,6 +44,18 @@ abstract class TestCase extends BaseTestCase
             public function require(array $packages, ?callable $onOutput = null): ComposerResult
             {
                 throw new \LogicException('A test reached a real composer require: '.implode(' ', $packages));
+            }
+        });
+
+        // A durable Redis by default, so the install flow is tested on the
+        // Redis a private tracker requires; the machine running the suite need
+        // not be configured like one. RedisDurabilityGateTest says otherwise
+        // where that is the point.
+        $this->app->instance(RedisInfo::class, new class extends RedisInfo
+        {
+            public function section(string $section): array
+            {
+                return ['aof_enabled' => '1', 'maxmemory_policy' => 'noeviction'];
             }
         });
     }
