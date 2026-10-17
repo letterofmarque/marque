@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\ServiceProvider;
 use Marque\Bloodhound\Console\Commands\AggregateLedger;
 use Marque\Bloodhound\Console\Commands\AuditLedger;
+use Marque\Bloodhound\Console\Commands\CheckRedis;
 use Marque\Bloodhound\Console\Commands\ManageSeedboxes;
 use Marque\Bloodhound\Console\Commands\PruneAnnounceLog;
 use Marque\Bloodhound\Console\Commands\RebuildTotals;
@@ -22,6 +23,7 @@ use Marque\Bloodhound\Listeners\IssueAnnounceKeyOnVerification;
 use Marque\Bloodhound\Listeners\RecordCompletion;
 use Marque\Bloodhound\Contracts\SeedboxRegistry;
 use Marque\Bloodhound\Models\AnnounceLog;
+use Marque\Bloodhound\Services\RedisDurability;
 use Marque\Bloodhound\Services\Seedboxes;
 use Marque\Bloodhound\Services\AnnounceLogService;
 use Marque\Bloodhound\Services\AnnounceService;
@@ -75,8 +77,20 @@ class BloodhoundServiceProvider extends ServiceProvider
         // record. It exposes the seam; the private tracker fills it. hound
         // leaves it unfilled and keeps the old behaviour, which is right —
         // a public tracker has no ledger and nothing to recover from.
+        //
+        // Since Job #193 Redis is a required, durable store, so the ledger is
+        // read for a baseline only in a recovery window, opened when Redis has
+        // actually been lost (RedisDurability::recovering()). And an expired
+        // peer's record is kept as its baseline for baseline_retention, so a
+        // member back from a crash without having sent `stopped` is credited
+        // what they moved in between.
+        $this->app->singleton(RedisDurability::class);
+
         $this->app->extend(PeerService::class, function (PeerService $peers) {
-            $peers->resolveBaselineUsing($this->recoverBaselineFromLedger(...));
+            $peers->retainBaselinesFor((int) config('bloodhound.baseline_retention', 7 * 86_400));
+            $peers->resolveBaselineUsing(fn (int $torrentId, string $peerId, ?int $userId = null) => $this->app->make(RedisDurability::class)->recovering()
+                ? $this->recoverBaselineFromLedger($torrentId, $peerId, $userId)
+                : null);
 
             return $peers;
         });
@@ -173,6 +187,7 @@ class BloodhoundServiceProvider extends ServiceProvider
         $this->commands([
             AggregateLedger::class,
             AuditLedger::class,
+            CheckRedis::class,
             ManageSeedboxes::class,
             PruneAnnounceLog::class,
             RebuildTotals::class,

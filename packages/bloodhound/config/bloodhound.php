@@ -224,6 +224,30 @@ return [
     |--------------------------------------------------------------------------
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Redis
+    |--------------------------------------------------------------------------
+    |
+    | Every announce is credited against the peer's last counters, kept in
+    | Redis, so Redis must keep what it holds: appendonly yes and
+    | maxmemory-policy noeviction, on a database of its own. In production
+    | announces are refused until it does; `php artisan bloodhound:check-redis`
+    | says what to change. If your provider makes the data durable another
+    | way (replication, snapshots) and offers no AOF, set durability to
+    | 'attested'; the eviction policy is still checked.
+    |
+    */
+
+    'redis' => [
+        'durability' => env('BLOODHOUND_REDIS_DURABILITY', 'required'),
+    ],
+
+    // Seconds an expired peer's record is kept as its baseline after its last
+    // announce, so a member back from a crash without having sent `stopped`
+    // is credited what they moved in between.
+    'baseline_retention' => env('BLOODHOUND_BASELINE_RETENTION', 7 * 86_400),
+
     'anti_cheat' => [
         'enabled' => env('BLOODHOUND_ANTICHEAT', true),
 

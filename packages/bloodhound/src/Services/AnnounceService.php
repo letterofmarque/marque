@@ -23,6 +23,7 @@ final class AnnounceService
         private readonly PeerService $peerService,
         private readonly ClientValidationService $clientValidation,
         private readonly AntiCheatService $antiCheat,
+        private readonly RedisDurability $durability,
     ) {}
 
     /**
@@ -50,6 +51,13 @@ final class AnnounceService
         bool $compact,
         int $numWant,
     ): Response {
+        // The baseline every credit is measured against lives in Redis. A
+        // Redis that can forget it is refused in production, before anything
+        // is read or written (Job #193).
+        if (! $this->durability->allowsAnnounces()) {
+            return TrackerResponse::error('Tracker storage is not configured for durability; the operator has been notified');
+        }
+
         $announce = new AnnounceRequest($user, $torrent, $peerId, $ip, $port, $uploaded, $downloaded, $left, $userAgent, $this->eventLabel($event));
 
         // A refused client is still an announce from a known member on a known

@@ -6,6 +6,7 @@ namespace Marque\Bloodhound\Console\Commands;
 
 use Illuminate\Console\Command;
 use Marque\Bloodhound\Services\LedgerAggregator;
+use Marque\Bloodhound\Services\RedisDurability;
 
 /**
  * Fold pending ledger rows into user and per-torrent totals.
@@ -27,8 +28,12 @@ class AggregateLedger extends Command
 
     protected $description = 'Fold pending announce ledger rows into user and per-torrent totals';
 
-    public function handle(LedgerAggregator $aggregator): int
+    public function handle(LedgerAggregator $aggregator, RedisDurability $durability): int
     {
+        // Every minute, whether or not anyone announces: a tracker nobody is
+        // using still learns its Redis cannot be trusted.
+        $durability->reportFromSchedule();
+
         $folded = $aggregator->runScheduled(batchSize: max(1, (int) $this->option('batch')));
 
         $this->info($folded === 0
