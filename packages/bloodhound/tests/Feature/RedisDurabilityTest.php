@@ -221,3 +221,35 @@ test('expired peers are kept as baselines for baseline_retention', function () {
         ->and($row->upload_delta)->toBe(500)
         ->and($row->seed_seconds)->toBe(3_600);
 });
+
+describe('recovery, at the edges', function () {
+    // An install upgraded from 7.x has a full swarm in Redis and no sentinel:
+    // its first announces must not read as Redis having been lost.
+    test('the upgrade marks Redis as present, so the first announces open no recovery window', function () {
+        AnnounceLog::create([
+            'user_id' => $this->user->id, 'torrent_id' => $this->torrent->id, 'peer_id' => '-qB4210-bbbbbbbbbbbb', 'event' => 'regular',
+            'ip' => '10.0.0.1', 'port' => 51413, 'uploaded' => 0, 'downloaded' => 0, 'left' => 0, 'upload_delta' => 0, 'download_delta' => 0,
+        ]);
+
+        (require __DIR__.'/../../database/migrations/2026_10_18_000003_mark_redis_present.php')->up();
+
+        expect(app(RedisDurability::class)->recovering())->toBeFalse();
+    });
+
+    // Retained baselines last baseline_retention; a recovered one may not
+    // reach further back than that.
+    test('recovery reads no baseline older than baseline_retention', function () {
+        config(['bloodhound.baseline_retention' => 86_400]);
+        $this->travelTo(now()->startOfMinute());
+        durableAnnounce($this, $this->user, $this->torrent, ['event' => 'started', 'uploaded' => 1_000])->assertOk();
+
+        $this->travel(3)->days();
+        app(RedisDurability::class)->openRecoveryWindow();
+        Redis::connection(config('threepio.redis.connection', 'default'))
+            ->hdel(config('threepio.redis.prefix').'peers:'.$this->torrent->id, '-qB4210-aaaaaaaaaaaa');
+
+        durableAnnounce($this, $this->user, $this->torrent, ['uploaded' => 4_000])->assertOk();
+
+        expect(AnnounceLog::query()->orderByDesc('id')->value('prior_up'))->toBeNull();
+    });
+});
