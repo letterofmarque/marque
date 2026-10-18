@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
 use Marque\Hound\Services\AnnounceService;
+use Marque\Threepio\Support\RawQuery;
 use Marque\Threepio\Support\TrackerResponse;
 use Marque\Trove\Models\Torrent;
 
@@ -31,7 +32,7 @@ class AnnounceController extends Controller
         }
 
         // Get info_hash and find torrent
-        $infoHash = $this->parseInfoHash($request->get('info_hash'));
+        $infoHash = $this->parseInfoHash(RawQuery::of($request)->first('info_hash') ?? '');
         if ($infoHash === null) {
             return TrackerResponse::error('Invalid info_hash');
         }
@@ -42,7 +43,7 @@ class AnnounceController extends Controller
         }
 
         // Get peer_id
-        $peerId = $request->get('peer_id');
+        $peerId = (string) RawQuery::of($request)->first('peer_id');
         if (strlen($peerId) !== 20) {
             return TrackerResponse::error('Invalid peer_id length');
         }
@@ -83,8 +84,12 @@ class AnnounceController extends Controller
     {
         $required = ['info_hash', 'peer_id', 'port', 'uploaded', 'downloaded', 'left'];
 
+        // From the raw query string: info_hash and peer_id are binary, and
+        // the trimmed copies in $request can be shorter, or empty, or gone.
+        $raw = RawQuery::of($request);
+
         foreach ($required as $param) {
-            if (! $request->has($param)) {
+            if ($raw->first($param) === null && ! $request->has($param)) {
                 return TrackerResponse::error("Missing parameter: {$param}");
             }
         }

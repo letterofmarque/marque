@@ -20,6 +20,13 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ### Fixed
 
+- **About one torrent in twenty could never be announced or scraped**, and some clients
+  were refused: Laravel's TrimStrings middleware stripped NUL and whitespace bytes from the
+  ends of the binary `info_hash` and `peer_id`. Both are now read from the raw query
+  string (#11057).
+- **A scrape for several torrents answered for only the last.** Every repeated
+  `info_hash` is read now.
+
 - **An address at the cap was refused on its own next announce.** The count included the
   announcing peer, so it could neither keep seeding nor send `stopped`, and its peers aged
   out of the swarm. Only a new peer is refused now.

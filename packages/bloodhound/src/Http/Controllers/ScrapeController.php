@@ -9,6 +9,7 @@ use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
 use Marque\Bloodhound\Support\AnnounceRouting;
 use Marque\Threepio\Services\PeerService;
+use Marque\Threepio\Support\RawQuery;
 use Marque\Threepio\Support\TrackerResponse;
 use Marque\Trove\Models\Torrent;
 
@@ -83,18 +84,9 @@ class ScrapeController extends Controller
     private function parseInfoHashes(Request $request): array
     {
         $hashes = [];
-
-        // Get all info_hash values (PHP converts multiple same-name params to array)
-        $rawHashes = $request->get('info_hash');
-
-        if ($rawHashes === null) {
-            return [];
-        }
-
-        // Ensure array
-        if (! is_array($rawHashes)) {
-            $rawHashes = [$rawHashes];
-        }
+        // Every value of a repeated key, from the raw query string: PHP keeps
+        // only the last, and TrimStrings mangles binary ones (#11057).
+        $rawHashes = RawQuery::of($request)->all('info_hash');
 
         foreach ($rawHashes as $rawHash) {
             $parsed = $this->parseInfoHash($rawHash);

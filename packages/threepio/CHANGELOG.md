@@ -39,6 +39,12 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ### Added
 
+- **`Support\RawQuery`**: the announce or scrape query string as the client sent it. Read
+  `info_hash` and `peer_id` from it, not from `$request->get()`. Laravel's TrimStrings
+  middleware, global by default, strips NUL and whitespace bytes from the ends of every
+  query value, which breaks about one binary hash in twenty, and PHP keeps only the last of
+  a repeated key, which a multi-hash scrape sends. `first($key)` and `all($key)`.
+
 - **`lookup($torrentId, $peerId, $userId): PeerLookup`**, one read of a peer for
   everything that judges or credits its announce. `upsertPeer(..., lookup:)` takes it,
   so anti-cheat and the credit see the same baseline and the peer is not read twice.

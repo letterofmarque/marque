@@ -83,6 +83,15 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ### Fixed
 
+- **About one torrent in twenty could never be announced, and some clients were refused.**
+  Laravel's TrimStrings middleware strips NUL, space, tab, newline, carriage return and
+  vertical tab from the ends of every query value, including the binary `info_hash` and
+  `peer_id`. A torrent whose info hash started or ended with one of those bytes got
+  "Invalid info_hash"; a client whose peer ID did got "Invalid peer_id length". Both are
+  now read from the raw query string (#11057).
+- **A scrape for several torrents answered for only the last.** PHP keeps only the last
+  of a repeated `info_hash` key; every one is read now.
+
 - **A member's record could be overwritten, or removed, by another member using the same
   peer ID**, and their next announce was credited nothing. A peer ID live in the swarm for
   another member is now refused.
