@@ -39,7 +39,14 @@ final class RawQuery
             }
 
             [$key, $value] = array_pad(explode('=', $pair, 2), 2, '');
-            $values[urldecode($key)][] = urldecode($value);
+            $key = urldecode($key);
+
+            // `info_hash[]=` is how PHP-minded clients spell a repeated key.
+            if (str_ends_with($key, '[]')) {
+                $key = substr($key, 0, -2);
+            }
+
+            $values[$key][] = urldecode($value);
         }
 
         return new self($values);

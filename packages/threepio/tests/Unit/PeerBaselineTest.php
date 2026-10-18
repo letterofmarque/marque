@@ -337,3 +337,35 @@ test('removing a peer consumes its retained baseline too', function () {
     expect($this->redis->hexists($this->prefix.'gone:1', '-qB4210-aaaaaaaaaaaa'))->toBeFalse()
         ->and($this->peers->lookup(1, '-qB4210-aaaaaaaaaaaa', 1)->baseline)->toBeNull();
 });
+
+// #11058: BEP 3 allows a peer ID of any 20 bytes. With invalid UTF-8 in it (or
+// in the user agent) the record JSON-encoded to false, so the peer never had
+// a baseline and was never credited.
+test('a binary peer ID and user agent are stored, credited and listed', function () {
+    $peerId = "-lt0D80-\x9a\xb3\xff\x00\x01abcdefg";
+
+    $this->peers->upsertPeer(torrentId: 1, peerId: $peerId, userId: 1, ip: '10.0.0.1', port: 51413,
+        uploaded: 1_000, downloaded: 0, left: 0, userAgent: "rtorrent/\xff\xfe", isSeeder: true);
+
+    $result = $this->peers->upsertPeer(torrentId: 1, peerId: $peerId, userId: 1, ip: '10.0.0.1', port: 51413,
+        uploaded: 4_000, downloaded: 0, left: 0, userAgent: "rtorrent/\xff\xfe", isSeeder: true);
+
+    expect($result['upload_delta'])->toBe(3_000)
+        ->and($this->peers->find(1, $peerId))->not->toBeNull()
+        ->and(array_keys($this->peers->livePeers(1)))->toBe([$peerId])
+        ->and($this->peers->getPeersForAnnounce(1, 'someone-else', false, 10)[0]['peer_id'])->toBe($peerId);
+});
+
+test('a peer lock lets one holder in at a time, and is released after', function () {
+    $inner = null;
+
+    $outer = $this->peers->withPeerLock(1, 'peer', function () use (&$inner) {
+        $inner = $this->peers->withPeerLock(1, 'peer', fn () => 'inner ran', waitMilliseconds: 50);
+
+        return 'outer ran';
+    });
+
+    expect($outer)->toBe('outer ran')
+        ->and($inner)->toBeNull()
+        ->and($this->peers->withPeerLock(1, 'peer', fn () => 'after'))->toBe('after');
+});

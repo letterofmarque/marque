@@ -41,3 +41,10 @@ it('answers null and an empty list for a key that is absent', function () {
     expect($query->first('info_hash'))->toBeNull()
         ->and($query->all('info_hash'))->toBe([]);
 });
+
+it('reads a key sent with [] as the key itself', function () {
+    $a = str_repeat("\x01", 20);
+    $b = str_repeat("\x02", 20);
+
+    expect(RawQuery::of(rawRequest('info_hash%5B%5D='.rawurlencode($a).'&info_hash[]='.rawurlencode($b)))->all('info_hash'))->toBe([$a, $b]);
+});

@@ -32,6 +32,9 @@ class RedisDurability
     /** Seconds a verdict on the announce path is cached. */
     private const CACHE_SECONDS = 300;
 
+    /** Seconds a failing verdict is cached before INFO is asked again. */
+    private const RETRY_SECONDS = 15;
+
     public function verify(): DurabilityVerdict
     {
         $attested = config('bloodhound.redis.durability', 'required') === 'attested';
@@ -85,7 +88,21 @@ class RedisDurability
         // is down, it is asked anyway: a cache outage must not become a
         // tracker outage.
         try {
-            return Cache::remember('bloodhound:redis-durability', self::CACHE_SECONDS, fn () => $this->judge($production));
+            $cached = Cache::get('bloodhound:redis-durability');
+
+            if ($cached !== null) {
+                return (bool) $cached;
+            }
+
+            $allowed = $this->judge($production);
+
+            // A passing verdict is kept for five minutes. A failing one only
+            // briefly: a check that failed because one INFO call was lost in
+            // transit must not refuse every announce for five minutes on a
+            // Redis that is configured right.
+            Cache::put('bloodhound:redis-durability', $allowed, $allowed ? self::CACHE_SECONDS : self::RETRY_SECONDS);
+
+            return $allowed;
         } catch (Throwable) {
             return $this->judge($production);
         }
@@ -103,16 +120,36 @@ class RedisDurability
             $message = 'bloodhound: the tracker\'s Redis is not configured for durability; '.implode(' ', $verdict->problems)
                 .' Run php artisan bloodhound:check-redis.';
 
+            $firstThisWindow = $this->firstReportThisWindow();
+
             if ($production) {
-                Log::critical($message.' Announces are refused until it is.');
+                if ($firstThisWindow) {
+                    Log::critical($message.' Announces are refused until it is.');
+                }
 
                 return false;
             }
 
-            Log::warning($message);
+            if ($firstThisWindow) {
+                Log::warning($message);
+            }
 
             return true;
         })();
+    }
+
+    /**
+     * Whether this is the first report of a failing check in five minutes,
+     * so retries every few seconds don't each log one. Yes if the cache is
+     * down: an extra line beats a silent failure.
+     */
+    private function firstReportThisWindow(): bool
+    {
+        try {
+            return Cache::add('bloodhound:redis-durability-reported', true, self::CACHE_SECONDS);
+        } catch (Throwable) {
+            return true;
+        }
     }
 
     /**

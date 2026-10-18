@@ -20,6 +20,9 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ### Fixed
 
+- **A peer ID that isn't UTF-8 text was never recorded** (threepio's record JSON-encoded
+  to nothing); it now is (#11058).
+
 - **About one torrent in twenty could never be announced or scraped**, and some clients
   were refused: Laravel's TrimStrings middleware stripped NUL and whitespace bytes from the
   ends of the binary `info_hash` and `peer_id`. Both are now read from the raw query

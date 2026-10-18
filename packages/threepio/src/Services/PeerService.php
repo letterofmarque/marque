@@ -142,6 +142,45 @@ final class PeerService
     }
 
     /**
+     * Run $work while holding this peer's lock; null if another holder kept it.
+     *
+     * One peer's announces must be read, credited and written one at a time:
+     * two at once both read the same record and both credit the interval it
+     * opens. A client announcing over IPv4 and IPv6 at the same moment, with
+     * one peer ID, does exactly that. The lock is a Redis key set only if
+     * absent, with a short expiry so a crashed holder cannot keep it, and it
+     * is released only by the holder that set it.
+     *
+     * @template T
+     *
+     * @param  callable(): T  $work
+     * @return T|null
+     */
+    public function withPeerLock(int $torrentId, string $peerId, callable $work, int $waitMilliseconds = 2000): mixed
+    {
+        $redis = $this->redis();
+        $key = $this->prefix.'lock:'.$torrentId.':'.bin2hex($peerId);
+        $token = bin2hex(random_bytes(8));
+        $deadline = microtime(true) + $waitMilliseconds / 1000;
+
+        $acquire = "return redis.call('set', KEYS[1], ARGV[1], 'NX', 'PX', ARGV[2]) and 1 or 0";
+
+        while (! (int) $redis->eval($acquire, 1, $key, $token, 5000)) {
+            if (microtime(true) >= $deadline) {
+                return null;
+            }
+
+            usleep(20_000);
+        }
+
+        try {
+            return $work();
+        } finally {
+            $redis->eval("if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) end return 0", 1, $key, $token);
+        }
+    }
+
+    /**
      * Add or update a peer.
      *
      * Pass the lookup the caller already made (anti-cheat reads the same one),
@@ -173,15 +212,20 @@ final class PeerService
         $stored = $lookup->stored;
         $baseline = $lookup->baseline;
 
+        // The record is keyed by the raw peer ID, which Redis stores as bytes.
+        // It is not repeated inside the JSON: BEP 3 lets a peer ID be any 20
+        // bytes, and JSON cannot hold bytes that are not UTF-8 (json_encode
+        // returned false, so such a peer was never recorded or credited). The
+        // user agent is the client's own text and is scrubbed for the same
+        // reason.
         $peerData = [
-            'peer_id' => $peerId,
             'user_id' => $userId,
             'ip' => $ip,
             'port' => $port,
             'uploaded' => $uploaded,
             'downloaded' => $downloaded,
             'left' => $left,
-            'user_agent' => $userAgent,
+            'user_agent' => mb_scrub($userAgent, 'UTF-8'),
             'is_seeder' => $isSeeder,
             'last_action' => $now,
             'started' => $baseline['started'] ?? $now,
@@ -246,7 +290,7 @@ final class PeerService
         // leave only through removePeer(), which keeps all of those in step,
         // driven by cleanupExpiredPeers() on the scheduler. Redis deletes the
         // hash itself when its last peer is removed.
-        $redis->hset($peerKey, $peerId, json_encode($peerData));
+        $redis->hset($peerKey, $peerId, json_encode($peerData, JSON_THROW_ON_ERROR));
 
         if ($uploadDelta > 0) {
             $redis->incrby($this->prefix."swarm:{$torrentId}:uploaded", $uploadDelta);
@@ -414,7 +458,7 @@ final class PeerService
             $peers[] = [
                 'ip' => $peer['ip'],
                 'port' => $peer['port'],
-                'peer_id' => $peer['peer_id'],
+                'peer_id' => (string) $peerId,
             ];
         }
 

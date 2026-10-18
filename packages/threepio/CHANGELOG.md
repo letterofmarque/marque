@@ -29,6 +29,10 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 - **`getUserPeerCountForTorrent()` counts from the torrent's peer hash** (live peers
   whose `user_id` matches) instead of scanning every torrent in the member's set, and
   accepts a `livePeers()` result already read this announce.
+- **Records are keyed by the raw peer ID and no longer repeat it inside the JSON**, and
+  the user agent is scrubbed to UTF-8. BEP 3 allows a peer ID of any 20 bytes; one that
+  wasn't UTF-8 made `json_encode()` return false, so the peer was never recorded (#11058).
+  An encoding failure now throws rather than storing nothing.
 - **A record owned by another user is never a baseline**, from the swarm hash or a
   retained record. Overwriting it moves the peer between the two users' sets.
 - **Intervals are measured on Carbon's clock**, not `time()`: the same clock a Laravel
@@ -38,6 +42,12 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   `left` and `last_action`.
 
 ### Added
+
+- **`PeerService::withPeerLock($torrentId, $peerId, $work)`**: runs `$work` while holding
+  that peer's lock (a Redis key set if absent, expiring after 5 s, released only by its
+  holder), or returns null if another holder kept it for the wait. A tracker crediting
+  announces needs one peer's announces handled one at a time.
+- **`RawQuery` reads `info_hash[]=` as `info_hash`.**
 
 - **`Support\RawQuery`**: the announce or scrape query string as the client sent it. Read
   `info_hash` and `peer_id` from it, not from `$request->get()`. Laravel's TrimStrings

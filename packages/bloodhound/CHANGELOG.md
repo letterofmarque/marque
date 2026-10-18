@@ -83,6 +83,19 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ### Fixed
 
+- **A peer ID that isn't UTF-8 text was never credited, and failed the announce on MySQL,
+  MariaDB and PostgreSQL** (BEP 3 allows any 20 bytes): threepio's record JSON-encoded to
+  nothing, and the ledger column refused the bytes. It is stored hex-encoded when it has
+  to be; the user agent is scrubbed (#11058).
+- **Two announces from one peer at once were both credited**, the dual-stack case: a
+  client announcing over IPv4 and IPv6 at the same moment. Each peer's announces are now
+  handled one at a time under a short lock.
+- **A dual-stack client's announce from its other address was refused by the minimum
+  gap.** The gap applies to the same address only.
+- **A seedbox lookup during a cache outage failed the announce**, and **one INFO call
+  lost in transit refused every announce for five minutes.** The lookup falls back to the
+  database, and a failing durability verdict is retried after 15 seconds.
+
 - **About one torrent in twenty could never be announced, and some clients were refused.**
   Laravel's TrimStrings middleware strips NUL, space, tab, newline, carriage return and
   vertical tab from the ends of every query value, including the binary `info_hash` and

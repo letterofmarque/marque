@@ -62,3 +62,28 @@ it('scrapes every info_hash a client asks for, edge bytes included', function ()
 
     expect(array_keys(Bencode::decode($body)['files']))->toHaveCount(2);
 });
+
+// #11058: a peer ID that is not valid UTF-8 (BEP 3 allows any 20 bytes)
+// failed the ledger insert on MySQL, MariaDB and PostgreSQL, and PostgreSQL
+// truncated one at a NUL.
+it('credits a binary peer ID, and finds it again after Redis is lost', function () {
+    $torrent = edgeTorrent(20, str_repeat('ef', 20));
+    $peerId = "-lt0D80-\x9a\xb3\xff\x00\x01abcdefg";
+
+    $announce = fn (int $uploaded, string $event = '') => $this->withoutMiddleware(BlockBrowsers::class)
+        ->withHeaders(['User-Agent' => "rtorrent/\xff"])
+        ->get('/announce/'.keyOf($this->user).'?'.http_build_query(array_filter([
+            'info_hash' => hex2bin($torrent->info_hash), 'peer_id' => $peerId, 'port' => 51413,
+            'uploaded' => $uploaded, 'downloaded' => 0, 'left' => 0, 'event' => $event, 'compact' => 1,
+        ], fn ($v) => $v !== '')))
+        ->assertOk()->assertDontSee('failure reason');
+
+    $announce(1_000, 'started');
+    $announce(3_000);
+
+    Redis::connection(config('threepio.redis.connection', 'default'))->flushdb();
+    $announce(4_500);
+
+    expect(AnnounceLog::query()->orderBy('id')->pluck('upload_delta')->all())->toBe([0, 2_000, 1_500])
+        ->and(AnnounceLog::query()->distinct()->count('peer_id'))->toBe(1);
+});

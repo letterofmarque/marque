@@ -290,8 +290,8 @@ return [
         // applies, and without it registering approves it. min_prefix_v4/v6
         // are the widest range allowed: a /24 (IPv4) or a /48 (IPv6), so a
         // range cannot take in other customers of the same provider. Only
-        // the speed cap changes for a seedbox; the location and per-IP
-        // limits still apply.
+        // the speed cap changes for a seedbox; the location limits and the
+        // client cap still apply.
         'seedbox' => [
             'max_upload_speed' => env('BLOODHOUND_SEEDBOX_MAX_UPLOAD_SPEED', 1_250_000_000),
             'max_download_speed' => env('BLOODHOUND_SEEDBOX_MAX_DOWNLOAD_SPEED', 1_250_000_000),
@@ -300,8 +300,10 @@ return [
             'min_prefix_v6' => 48,
         ],
 
-        // Minimum seconds between two regular announces from one peer (a
-        // hammer guard), measured from its last accepted announce. started,
+        // Minimum seconds between two regular announces from one peer at one
+        // address (a hammer guard), measured from its last accepted announce;
+        // a dual-stack client's announce from its other address is not
+        // hammering. started,
         // completed and stopped are never refused for timing, and a refusal
         // moves nothing, so a client retrying early is accepted once the gap
         // has passed.

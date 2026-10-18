@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Response;
 use Marque\Bloodhound\Events\TorrentCompleted;
 use Marque\Bloodhound\Models\AnnounceLog;
+use Marque\Bloodhound\Support\PeerIdColumn;
 use Marque\Threepio\Enums\AnnounceEvent;
 use Marque\Threepio\Services\PeerService;
 use Marque\Threepio\Support\TrackerResponse;
@@ -69,6 +70,40 @@ final class AnnounceService
 
             return TrackerResponse::error($reason);
         }
+
+        // One announce per peer at a time: two at once would both read the
+        // same record and both credit the interval it opens (a client
+        // announcing over IPv4 and IPv6 at the same moment does this).
+        $response = $this->peerService->withPeerLock(
+            $torrent->id,
+            $peerId,
+            fn () => $this->announceLocked($announce, $event, $compact, $numWant),
+        );
+
+        if ($response === null) {
+            $reason = 'Another announce from this client is still being handled; try again';
+            $this->writeRefusal($announce, $reason);
+
+            return TrackerResponse::error($reason);
+        }
+
+        return $response;
+    }
+
+    /**
+     * The announce, under the peer's lock: read the peer once, judge it,
+     * credit it, write the ledger, then Redis.
+     */
+    private function announceLocked(AnnounceRequest $announce, ?string $event, bool $compact, int $numWant): Response
+    {
+        $user = $announce->user;
+        $torrent = $announce->torrent;
+        $peerId = $announce->peerId;
+        $ip = $announce->ip;
+        $port = $announce->port;
+        $uploaded = $announce->uploaded;
+        $downloaded = $announce->downloaded;
+        $left = $announce->left;
 
         // One read of the peer, for anti-cheat and the credit alike, and one
         // of the torrent's live peers, for the location limits and the
@@ -352,11 +387,12 @@ final class AnnounceService
         (new AnnounceLog)->forceFill([
             'user_id' => $announce->user->getAuthIdentifier(),
             'torrent_id' => $announce->torrent->id,
-            'peer_id' => $announce->peerId,
+            'peer_id' => PeerIdColumn::encode($announce->peerId),
             'event' => $announce->eventLabel,
             'ip' => $announce->ip,
             'port' => $announce->port,
-            'user_agent' => $announce->userAgent,
+            // The client's own text: scrubbed, since the column holds UTF-8.
+            'user_agent' => mb_scrub($announce->userAgent, 'UTF-8'),
             'uploaded' => $announce->uploaded,
             'downloaded' => $announce->downloaded,
             'left' => $announce->left,

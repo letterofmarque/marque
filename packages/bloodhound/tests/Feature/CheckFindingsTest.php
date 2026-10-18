@@ -179,3 +179,95 @@ test('the time opening balance locks the cursor before it reads what to carry', 
 
     expect($lock)->not->toBeFalse()->and($lock)->toBeLessThan($read);
 });
+
+// Second check, D1: two announces from one peer at once were both credited
+// against the same baseline. libtorrent announces over IPv4 and IPv6 at the
+// same moment with one peer ID.
+test('two announces from one peer at once are credited once', function () {
+    found($this, 0, ['event' => 'started']);
+
+    $this->travelTo($this->t->copy()->addSeconds(1_800));
+    $nested = false;
+    AnnounceLog::creating(function () use (&$nested) {
+        if ($nested) {
+            return;
+        }
+        $nested = true;
+        // The second announce arrives while the first is between reading the
+        // peer and writing it back.
+        $this->withoutMiddleware(BlockBrowsers::class)->withServerVariables(['REMOTE_ADDR' => '2001:db8::5'])
+            ->get('/announce/'.keyOf($this->user).'?'.http_build_query([
+                'info_hash' => hex2bin($this->torrent->info_hash), 'peer_id' => '-qB4210-aaaaaaaaaaaa', 'port' => 51413,
+                'uploaded' => 1_000, 'downloaded' => 0, 'left' => 0, 'compact' => 1,
+            ]));
+    });
+
+    found($this, 1_800, ['uploaded' => 1_000]);
+    app(LedgerAggregator::class)->run();
+
+    expect(totalsOf($this->user))->toBe([1_000, 1_800]);
+});
+
+// Second check, D3: a dual-stack client announces over both families; the
+// second, seconds later from its other address, was refused by the gap.
+test('a dual-stack client\'s second announce from its other address is accepted, and credits only what is new', function () {
+    config(['bloodhound.anti_cheat.min_announce_gap' => 60]);
+    found($this, 0, ['event' => 'started']);
+    found($this, 1_800, ['uploaded' => 1_000], ip: '203.0.113.5');
+
+    expect(found($this, 1_802, ['uploaded' => 1_000], ip: '2001:db8::5'))->not->toContain('failure')
+        ->and(found($this, 1_810, ['uploaded' => 1_000], ip: '2001:db8::5'))->toContain('too frequently');
+
+    app(LedgerAggregator::class)->run();
+
+    expect(totalsOf($this->user))->toBe([1_000, 1_802]);
+});
+
+// Second check, D4: the cache-outage fallback missed the seedbox lookup, which
+// only an announce with a baseline reaches.
+test('a regular announce works when the cache store is down', function () {
+    found($this, 0, ['event' => 'started']);
+
+    Illuminate\Support\Facades\Cache::extend('broken', fn () => Illuminate\Support\Facades\Cache::repository(new class extends Illuminate\Cache\ArrayStore
+    {
+        public function get($key)
+        {
+            throw new RuntimeException('cache down');
+        }
+
+        public function put($key, $value, $seconds)
+        {
+            throw new RuntimeException('cache down');
+        }
+    }));
+    config(['cache.stores.broken' => ['driver' => 'broken'], 'cache.default' => 'broken']);
+    app('cache')->forgetDriver('broken');
+
+    expect(found($this, 1_800, ['uploaded' => 1_000]))->not->toContain('failure');
+});
+
+// Second check, D5: one INFO call that failed in transit refused every
+// announce for five minutes on a correctly configured Redis.
+test('a failed durability check is retried soon, not held for five minutes', function () {
+    $this->app['env'] = 'production';
+    $durability = new class extends Marque\Bloodhound\Services\RedisDurability
+    {
+        public int $calls = 0;
+
+        protected function info(string $section): array
+        {
+            if ($this->calls++ < 2) {
+                throw new RuntimeException('connection reset');
+            }
+
+            return ['aof_enabled' => '1', 'maxmemory_policy' => 'noeviction'];
+        }
+    };
+
+    expect($durability->allowsAnnounces())->toBeFalse();
+
+    $this->travel(20)->seconds();
+
+    expect($durability->allowsAnnounces())->toBeTrue();
+    $this->app['env'] = 'testing';
+});

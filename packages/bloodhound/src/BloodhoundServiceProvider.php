@@ -28,6 +28,7 @@ use Marque\Bloodhound\Contracts\SeedboxRegistry;
 use Marque\Bloodhound\Exceptions\RemovedConfiguration;
 use Marque\Bloodhound\Models\AnnounceLog;
 use Marque\Bloodhound\Services\RedisDurability;
+use Marque\Bloodhound\Support\PeerIdColumn;
 use Marque\Bloodhound\Services\Seedboxes;
 use Marque\Bloodhound\Services\AnnounceLogService;
 use Marque\Bloodhound\Services\AnnounceService;
@@ -122,7 +123,7 @@ class BloodhoundServiceProvider extends ServiceProvider
     {
         $last = AnnounceLog::query()
             ->where('torrent_id', $torrentId)
-            ->where('peer_id', $peerId)
+            ->where('peer_id', PeerIdColumn::encode($peerId))
             ->where('user_id', $userId)
             ->where('event', '!=', AnnounceLog::EVENT_OPENING_BALANCE)
             ->where(fn ($query) => $query->where('anti_cheat_flagged', false)->orWhereNotNull('prior_up'))

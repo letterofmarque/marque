@@ -371,7 +371,7 @@ a count.
 | Check | Applies to | Outcome |
 |---|---|---|
 | Port | Every announce | Refused: a port in `threepio.blacklisted_ports`, or outside 1–65535 |
-| Minimum gap | Regular announces (no `event`) from a peer in the swarm | Refused when sooner than `min_announce_gap` after its last accepted announce |
+| Minimum gap | Regular announces (no `event`) from a peer in the swarm, at the address it last announced from | Refused when sooner than `min_announce_gap` after its last accepted announce |
 | Location limits | A peer not in the swarm, other than `stopped` | Refused at a new location past the seeding or leeching limit |
 | Clients per torrent | A peer not in the swarm, other than `stopped` | Refused when the member already has `max_clients_per_torrent` live clients on the torrent |
 | Speed | Every announce with a baseline | The direction over the cap is forfeited; the announce is accepted |
@@ -385,6 +385,19 @@ for timing: they report something that happened, and refusing them loses a compl
 leaves a ghost peer in the swarm. The gap is measured from the peer's record and a refusal
 changes nothing, so a client retrying every 30 seconds is accepted every minute rather
 than locked out.
+
+The gap is from the same address only. A dual-stack client announces over IPv4 and IPv6
+seconds apart with one peer ID; the second is accepted and credited only what moved since
+the first.
+
+**One announce per peer at a time.** A peer's announces are read, credited and written
+under a short Redis lock, so two at once (the dual-stack case again) cannot both credit the
+interval the first opens. An announce that cannot get the lock within two seconds is
+refused and recorded; the client retries.
+
+**Peer IDs are any 20 bytes** (BEP 3). One that isn't UTF-8 text, or holds a NUL, is
+stored in the ledger as `x:` and its hex, the same way every time, so its rows still chain
+and recovery still finds them. The user agent is stored scrubbed to valid UTF-8.
 
 **Location limits.** A location is an IP address; for IPv6 it is the /64, because a
 connection is usually handed a whole /64 and clients pick addresses from it freely.

@@ -166,7 +166,7 @@ composer require marque/skipper
 - Redis-backed peer storage, credited against at announce time
 - Ratio and seedtime summed from an append-only ledger that can be reconciled, audited and rebuilt
 - Version-based client whitelist/blacklist
-- Anti-cheat (speed caps that forfeit, location and per-IP limits, swarm consistency), with registered seedboxes on their own speed cap
+- Anti-cheat (speed caps that forfeit, location limits and a cap on a member's clients per torrent, swarm consistency), with registered seedboxes on their own speed cap. How many torrents a member seeds is never limited
 - Ratio tracking modes (full, off, seedtime) — planned, not yet enforced (#10732)
 - Support for compact and dictionary peer formats
 

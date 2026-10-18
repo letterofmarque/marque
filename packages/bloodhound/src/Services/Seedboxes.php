@@ -16,6 +16,7 @@ use Marque\Bloodhound\Support\Network;
 use Marque\Trove\Contracts\SeedboxesInterface;
 use Marque\Trove\Contracts\UserInterface;
 use Marque\Trove\Support\Seedbox as SeedboxData;
+use Throwable;
 
 /**
  * Members' seedboxes: what they register, what admins approve, and which
@@ -134,15 +135,19 @@ final class Seedboxes implements SeedboxesInterface, SeedboxRegistry
      */
     public function isSeedbox(int $userId, string $ip): bool
     {
-        $networks = Cache::remember(
-            $this->cacheKey($userId),
-            self::CACHE_SECONDS,
-            fn () => Seedbox::query()
-                ->where('user_id', $userId)
-                ->where('status', SeedboxData::APPROVED)
-                ->pluck('network')
-                ->all(),
-        );
+        $approved = fn () => Seedbox::query()
+            ->where('user_id', $userId)
+            ->where('status', SeedboxData::APPROVED)
+            ->pluck('network')
+            ->all();
+
+        // From the database if the cache store is down: a cache outage must
+        // not become a tracker outage.
+        try {
+            $networks = Cache::remember($this->cacheKey($userId), self::CACHE_SECONDS, $approved);
+        } catch (Throwable) {
+            $networks = $approved();
+        }
 
         foreach ($networks as $network) {
             if (Network::parse($network)->contains($ip)) {
@@ -170,7 +175,11 @@ final class Seedboxes implements SeedboxesInterface, SeedboxRegistry
 
     private function forget(int $userId): void
     {
-        Cache::forget($this->cacheKey($userId));
+        try {
+            Cache::forget($this->cacheKey($userId));
+        } catch (Throwable) {
+            // A cache that is down holds nothing stale to forget.
+        }
     }
 
     private function cacheKey(int $userId): string

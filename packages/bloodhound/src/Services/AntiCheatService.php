@@ -72,7 +72,7 @@ final class AntiCheatService
             return $portCheck + $pass;
         }
 
-        $gapCheck = $this->checkAnnounceGap($event, $lookup);
+        $gapCheck = $this->checkAnnounceGap($event, $ip, $lookup);
         if (! $gapCheck['passed']) {
             return $gapCheck + $pass;
         }
@@ -140,9 +140,12 @@ final class AntiCheatService
      * peer's record, so a refusal moves nothing: a client retrying every 30
      * seconds is accepted every minute rather than locked out.
      */
-    public function checkAnnounceGap(?string $event, PeerLookup $lookup): array
+    public function checkAnnounceGap(?string $event, string $ip, PeerLookup $lookup): array
     {
-        if ($event !== null || ! $lookup->isLive()) {
+        // From the same address only. A dual-stack client announces over IPv4
+        // and IPv6 seconds apart with one peer ID; the second is not
+        // hammering, and is credited only what is new since the first.
+        if ($event !== null || ! $lookup->isLive() || (string) ($lookup->baseline['ip'] ?? '') !== $ip) {
             return ['passed' => true, 'reason' => null];
         }
 
