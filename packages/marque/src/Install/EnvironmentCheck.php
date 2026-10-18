@@ -128,12 +128,14 @@ final class EnvironmentCheck
      *
      * BLOODHOUND_REDIS_DURABILITY=attested covers persistence a provider
      * gives another way. The eviction policy is checked regardless whenever
-     * INFO answers. Read from the environment: bloodhound, and its config,
-     * are not installed yet.
+     * INFO answers. On a first install bloodhound and its config do not exist
+     * yet, so the installer's own key carries the same variable; on a re-run
+     * bloodhound's setting, the one the tracker will act on, wins. Never
+     * env() here: with config cached it answers null (#11061).
      */
     private function checkRedisDurability(EnvironmentReport $report): void
     {
-        $attested = env('BLOODHOUND_REDIS_DURABILITY') === 'attested';
+        $attested = (config('bloodhound.redis.durability') ?? config('marque.install.redis_durability', 'required')) === 'attested';
         $info = $this->app->make(RedisInfo::class);
         $read = function (string $section, string $field) use ($info): ?string {
             try {

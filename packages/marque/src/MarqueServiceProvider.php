@@ -18,11 +18,19 @@ use Marque\Marque\Console\InstallCommand;
  * reason this package exists (job #10539 planned the codeless version and
  * could not host a command).
  *
- * Nothing else is registered here. This package binds no routes, ships no
- * migrations and owns no models; it is a front door, not a layer.
+ * Nothing else is registered here but the installer's own config. This
+ * package binds no routes, ships no migrations and owns no models; it is a
+ * front door, not a layer.
  */
 class MarqueServiceProvider extends ServiceProvider
 {
+    public function register(): void
+    {
+        // What the installer reads before the packages it installs exist
+        // (#11061): through config, so it holds with config cached.
+        $this->mergeConfigFrom(__DIR__.'/../config/marque.php', 'marque');
+    }
+
     public function boot(): void
     {
         if ($this->app->runningInConsole()) {
