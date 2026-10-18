@@ -5,10 +5,10 @@ declare(strict_types=1);
 use Marque\Usarrs\Tests\ManageAuthDisabledTestCase;
 use Marque\Usarrs\Tests\PasskeysEnabledTestCase;
 use Marque\Usarrs\Tests\PrefixedTestCase;
+use Marque\Usarrs\Tests\SeedboxesBoundTestCase;
 use Marque\Usarrs\Tests\SocialiteDriverTestCase;
 use Marque\Usarrs\Tests\TestCase;
 use Marque\Usarrs\Tests\ThirdPartyPanelTestCase;
-use Marque\Usarrs\Tests\SeedboxesBoundTestCase;
 use Marque\Usarrs\Tests\TrackerBoundTestCase;
 
 // manage_auth=false flips route/component registration at boot, so it needs

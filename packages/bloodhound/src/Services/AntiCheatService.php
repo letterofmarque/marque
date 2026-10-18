@@ -326,7 +326,7 @@ final class AntiCheatService
             }
         }
 
-        return round($bytesPerSecond)." B/s";
+        return round($bytesPerSecond).' B/s';
     }
 
     /**

@@ -7,7 +7,6 @@ declare(strict_types=1);
 // than calling AnnounceService directly, since the thing under test is the
 // actual wiring from a real request through to a logged row.
 
-use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Testing\TestResponse;
 use Marque\Bloodhound\Models\AnnounceLog;

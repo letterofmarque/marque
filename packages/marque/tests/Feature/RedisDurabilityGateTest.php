@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Marque\Marque\Tests\Feature;
 
 use Marque\Marque\Install\EnvironmentCheck;
+use Marque\Marque\Install\EnvironmentReport;
 use Marque\Marque\Install\RedisInfo;
 use Marque\Marque\Tests\TestCase;
 use RuntimeException;
@@ -36,7 +37,7 @@ final class RedisDurabilityGateTest extends TestCase
         });
     }
 
-    private function gate(bool $private): \Marque\Marque\Install\EnvironmentReport
+    private function gate(bool $private): EnvironmentReport
     {
         $check = $this->app->make(EnvironmentCheck::class);
 

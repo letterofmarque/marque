@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
 use Marque\Bloodhound\Models\AnnounceLog;
 use Marque\Bloodhound\Models\LedgerCursor;
+use Marque\Bloodhound\Services\LedgerAudit;
 use Marque\Bloodhound\Services\LedgerAuditor;
 use Marque\Bloodhound\Tests\TestUser;
 use Marque\Threepio\Http\Middleware\BlockBrowsers;
@@ -76,7 +77,7 @@ function continuing($test, int $fromMinutes, int $minutes, int $priorUp, int $up
     ], $attributes));
 }
 
-function auditOf(): Marque\Bloodhound\Services\LedgerAudit
+function auditOf(): LedgerAudit
 {
     return app(LedgerAuditor::class)->audit();
 }

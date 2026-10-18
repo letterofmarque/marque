@@ -38,7 +38,7 @@ class LedgerBackfill
 
     /**
      * @return array<string, array{user_id: int, torrent_id: int, uploaded: int, downloaded: int, seedtime: int, leechtime: int}>|null
-     *                                                                                                                               what was credited, or null when there was nothing to do
+     *                                                                                                                                 what was credited, or null when there was nothing to do
      *
      * @throws RuntimeException when the aggregator has not reached the end of 7.x history yet
      */
@@ -52,7 +52,7 @@ class LedgerBackfill
 
         if (LedgerCursor::positionFor(LedgerAggregator::STREAM) < $boundary) {
             throw new RuntimeException(
-                "The aggregator has folded the ledger to id ".LedgerCursor::positionFor(LedgerAggregator::STREAM)
+                'The aggregator has folded the ledger to id '.LedgerCursor::positionFor(LedgerAggregator::STREAM)
                 .", not yet to {$boundary}, the last row written before 8.0. Let bloodhound:aggregate-ledger catch up and run this again."
             );
         }

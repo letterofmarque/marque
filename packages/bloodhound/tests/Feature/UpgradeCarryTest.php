@@ -15,7 +15,6 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Marque\Bloodhound\Models\AnnounceLog;
 use Marque\Bloodhound\Models\LedgerCarry;
-use Marque\Bloodhound\Models\LedgerCursor;
 use Marque\Bloodhound\Models\TorrentUser;
 use Marque\Bloodhound\Services\LedgerAggregator;
 use Marque\Bloodhound\Services\LedgerAuditor;

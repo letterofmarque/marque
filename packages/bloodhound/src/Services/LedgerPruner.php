@@ -77,39 +77,39 @@ class LedgerPruner
         $aggregator->lockCursor();
 
         return $connection->transaction(function () use ($cutoff, $watermark, $rowsPerChunk, &$after) {
-                $rows = AnnounceLog::query()
-                    ->toBase()
-                    ->select(['id', 'user_id', 'torrent_id', 'upload_delta', 'download_delta', 'seed_seconds', 'leech_seconds'])
-                    ->where('id', '>', $after)
-                    ->where('id', '<=', $watermark)
-                    ->where('created_at', '<', $cutoff)
-                    ->orderBy('id')
-                    ->limit($rowsPerChunk)
-                    ->get();
+            $rows = AnnounceLog::query()
+                ->toBase()
+                ->select(['id', 'user_id', 'torrent_id', 'upload_delta', 'download_delta', 'seed_seconds', 'leech_seconds'])
+                ->where('id', '>', $after)
+                ->where('id', '<=', $watermark)
+                ->where('created_at', '<', $cutoff)
+                ->orderBy('id')
+                ->limit($rowsPerChunk)
+                ->get();
 
-                if ($rows->isEmpty()) {
-                    return 0;
-                }
+            if ($rows->isEmpty()) {
+                return 0;
+            }
 
-                $carried = [];
+            $carried = [];
 
-                foreach ($rows as $row) {
-                    $key = $row->user_id.':'.$row->torrent_id;
-                    $carried[$key] ??= ['user_id' => (int) $row->user_id, 'torrent_id' => (int) $row->torrent_id, 'uploaded' => 0, 'downloaded' => 0, 'seedtime' => 0, 'leechtime' => 0];
-                    $carried[$key]['uploaded'] += (int) $row->upload_delta;
-                    $carried[$key]['downloaded'] += (int) $row->download_delta;
-                    $carried[$key]['seedtime'] += (int) $row->seed_seconds;
-                    $carried[$key]['leechtime'] += (int) $row->leech_seconds;
-                }
+            foreach ($rows as $row) {
+                $key = $row->user_id.':'.$row->torrent_id;
+                $carried[$key] ??= ['user_id' => (int) $row->user_id, 'torrent_id' => (int) $row->torrent_id, 'uploaded' => 0, 'downloaded' => 0, 'seedtime' => 0, 'leechtime' => 0];
+                $carried[$key]['uploaded'] += (int) $row->upload_delta;
+                $carried[$key]['downloaded'] += (int) $row->download_delta;
+                $carried[$key]['seedtime'] += (int) $row->seed_seconds;
+                $carried[$key]['leechtime'] += (int) $row->leech_seconds;
+            }
 
-                foreach ($carried as $amounts) {
-                    $this->addToCarry($amounts);
-                }
+            foreach ($carried as $amounts) {
+                $this->addToCarry($amounts);
+            }
 
-                $ids = $rows->pluck('id')->map(fn ($id) => (int) $id)->all();
-                $after = max($ids);
+            $ids = $rows->pluck('id')->map(fn ($id) => (int) $id)->all();
+            $after = max($ids);
 
-                return AnnounceLog::query()->whereIn('id', $ids)->delete();
+            return AnnounceLog::query()->whereIn('id', $ids)->delete();
         });
     }
 

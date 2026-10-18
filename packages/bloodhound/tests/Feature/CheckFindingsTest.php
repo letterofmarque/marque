@@ -5,12 +5,17 @@ declare(strict_types=1);
 // The independent check of Job #193 found these with the full suite green.
 // Each test is that check's reproduction.
 
+use Illuminate\Cache\ArrayStore;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
+use Marque\Bloodhound\BloodhoundServiceProvider;
 use Marque\Bloodhound\Models\AnnounceLog;
 use Marque\Bloodhound\Services\LedgerAggregator;
 use Marque\Bloodhound\Services\LedgerAuditor;
+use Marque\Bloodhound\Services\RedisDurability;
+use Marque\Bloodhound\Services\TimeOpeningBalance;
 use Marque\Bloodhound\Tests\TestUser;
 use Marque\Threepio\Http\Middleware\BlockBrowsers;
 use Marque\Threepio\Services\PeerService;
@@ -118,7 +123,7 @@ test('started, completed and stopped in one second audit clean', function () {
 // Bug 5 (check item 6a): the durability verdict and the removed-config notice
 // went through the cache, so a cache outage failed every announce.
 test('announces still work when the cache store is down', function () {
-    Illuminate\Support\Facades\Cache::extend('broken', fn () => Illuminate\Support\Facades\Cache::repository(new class extends Illuminate\Cache\ArrayStore
+    Cache::extend('broken', fn () => Cache::repository(new class extends ArrayStore
     {
         public function get($key)
         {
@@ -138,7 +143,7 @@ test('announces still work when the cache store is down', function () {
     config(['cache.stores.broken' => ['driver' => 'broken'], 'cache.default' => 'broken', 'bloodhound.anti_cheat.max_connections_per_torrent' => 3]);
     app('cache')->forgetDriver('broken');
 
-    (new Marque\Bloodhound\BloodhoundServiceProvider(app()))->refuseRemovedConfiguration();
+    (new BloodhoundServiceProvider(app()))->refuseRemovedConfiguration();
 
     expect(found($this, 0, ['event' => 'started']))->not->toContain('failure');
 });
@@ -170,7 +175,7 @@ test('the time opening balance locks the cursor before it reads what to carry', 
     DB::table($this->user->getTable())->where('id', $this->user->id)->update(['seedtime' => 900]);
 
     DB::enableQueryLog();
-    app(Marque\Bloodhound\Services\TimeOpeningBalance::class)->record();
+    app(TimeOpeningBalance::class)->record();
     $queries = collect(DB::getQueryLog())->pluck('query');
     DB::disableQueryLog();
 
@@ -228,7 +233,7 @@ test('a dual-stack client\'s second announce from its other address is accepted,
 test('a regular announce works when the cache store is down', function () {
     found($this, 0, ['event' => 'started']);
 
-    Illuminate\Support\Facades\Cache::extend('broken', fn () => Illuminate\Support\Facades\Cache::repository(new class extends Illuminate\Cache\ArrayStore
+    Cache::extend('broken', fn () => Cache::repository(new class extends ArrayStore
     {
         public function get($key)
         {
@@ -250,7 +255,7 @@ test('a regular announce works when the cache store is down', function () {
 // announce for five minutes on a correctly configured Redis.
 test('a failed durability check is retried soon, not held for five minutes', function () {
     $this->app['env'] = 'production';
-    $durability = new class extends Marque\Bloodhound\Services\RedisDurability
+    $durability = new class extends RedisDurability
     {
         public int $calls = 0;
 
