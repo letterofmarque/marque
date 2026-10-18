@@ -23,6 +23,10 @@ beforeEach(function () {
 
     config(['bloodhound.anti_cheat.enabled' => false]);
 
+    // Intervals are asserted to the second: a second ticking between two
+    // announces would read as one more (found by the third check).
+    $this->freezeTime();
+
     $this->user = TestUser::create(['name' => 'Credit', 'email' => 'credit@example.com', 'password' => 'password']);
     issueAnnounceKey($this->user, 'creditcreditcreditcreditcredit00');
 

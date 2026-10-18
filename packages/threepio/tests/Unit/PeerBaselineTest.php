@@ -17,6 +17,10 @@ beforeEach(function () {
     $this->redis->flushdb();
     $this->prefix = config('threepio.redis.prefix', 'marque:');
     $this->peers = app(PeerService::class);
+
+    // Intervals are asserted to the second: a second ticking between two
+    // announces would read as one more.
+    $this->freezeTime();
 });
 
 function announce(
@@ -302,7 +306,7 @@ describe('the resolver, after retention', function () {
         $this->peers->resolveBaselineUsing(function (int $torrentId, string $peerId, ?int $userId) use (&$calls) {
             $calls[] = [$torrentId, $peerId, $userId];
 
-            return ['uploaded' => 1_000, 'downloaded' => 0, 'left' => 0, 'last_action' => time() - 900];
+            return ['uploaded' => 1_000, 'downloaded' => 0, 'left' => 0, 'last_action' => now()->getTimestamp() - 900];
         });
 
         $result = announce($this->peers, userId: 5, uploaded: 1_600);
