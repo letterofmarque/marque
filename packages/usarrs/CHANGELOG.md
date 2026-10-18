@@ -16,6 +16,12 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   `/profile/stats`, and admins approve or revoke them at `/admin/seedboxes`, advertised to
   the admin panel. Without such a tracker, both routes answer 404 and nothing links to
   them. Requires the trove release that adds the contract.
+- **Sessions screen.** When a tracker binds trove's `TrackerSessionsInterface` (bloodhound
+  8.0), members see their live sessions at `/profile/sessions`, linked from
+  `/profile/stats`: torrent, seeding or leeching, client, address and last announce, 50 to
+  a page, with **End** on each. Ending one frees a client restarted somewhere else from the
+  tracker's location limits. Without such a tracker the route answers 404 and nothing
+  links to it.
 
 ## [8.2.1] — 2026-10-03
 

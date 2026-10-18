@@ -225,7 +225,10 @@ final class AntiCheatService
             if (count($locations) >= $max) {
                 return [
                     'passed' => false,
-                    'reason' => "Location limit reached ({$max} {$kind} locations per torrent)",
+                    // A client restarted somewhere else under a new peer ID
+                    // is the usual way to arrive here, and the member can
+                    // clear the old session rather than wait for it to expire.
+                    'reason' => "Location limit reached ({$max} {$kind} locations per torrent); if a client restarted somewhere else, end the other session from your profile",
                 ];
             }
         }

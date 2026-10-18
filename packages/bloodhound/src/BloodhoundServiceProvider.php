@@ -35,10 +35,12 @@ use Marque\Bloodhound\Services\AnnounceService;
 use Marque\Bloodhound\Services\AntiCheatService;
 use Marque\Bloodhound\Services\ClientValidationService;
 use Marque\Bloodhound\Services\TorrentFilePolicy;
+use Marque\Bloodhound\Services\TrackerSessions;
 use Marque\Bloodhound\Services\TrackerStatsService;
 use Marque\Threepio\Services\PeerService;
 use Marque\Trove\Contracts\TorrentFilePolicyInterface;
 use Marque\Trove\Contracts\SeedboxesInterface;
+use Marque\Trove\Contracts\TrackerSessionsInterface;
 use Marque\Trove\Contracts\TrackerStatsInterface;
 use Throwable;
 
@@ -74,6 +76,10 @@ class BloodhoundServiceProvider extends ServiceProvider
         $this->app->singleton(Seedboxes::class);
         $this->app->singleton(SeedboxesInterface::class, fn ($app) => $app->make(Seedboxes::class));
         $this->app->singleton(SeedboxRegistry::class, fn ($app) => $app->make(Seedboxes::class));
+
+        // A member's live sessions, and ending one (Job #193, D8), for a
+        // frontend to show: the leeching limit is only fair with it.
+        $this->app->singleton(TrackerSessionsInterface::class, TrackerSessions::class);
 
         // Teach threepio's peer store to recover a lost baseline from the
         // ledger (Spec #99 CP3).
@@ -114,8 +120,9 @@ class BloodhoundServiceProvider extends ServiceProvider
      * The baseline is the last row that took part in the session: a refusal
      * credited nothing and diffed against nothing, so it is skipped (F5: its
      * counters were never accepted), and an opening balance is not an
-     * announce. If that row is a stop, the session is over and there is no
-     * baseline: the next announce starts a new one.
+     * announce. If that row is a stop, or a session the member ended, the
+     * session is over and there is no baseline: the next announce starts a
+     * new one.
      *
      * @return array{uploaded: int, downloaded: int, left: int, last_action: int}|null
      */
@@ -133,7 +140,7 @@ class BloodhoundServiceProvider extends ServiceProvider
             ->orderByDesc('id')
             ->first();
 
-        if ($last === null || $last->event === 'stopped') {
+        if ($last === null || in_array($last->event, AnnounceLog::SESSION_ENDS, true)) {
             return null;
         }
 

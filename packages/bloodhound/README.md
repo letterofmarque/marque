@@ -270,8 +270,8 @@ warning and opens a recovery window for twice `peer_expiry` (two hours by defaul
 enough for every peer that was in the swarm to announce again. During it, a peer that
 Redis has no record of is looked up in the ledger instead: the last accepted announce from
 that member, on that torrent, under that peer ID, and no older than `baseline_retention`.
-A refused announce is never a baseline, and if the last row is a `stopped` the session is
-over and there is none.
+A refused announce is never a baseline, and if the last row is a `stopped`, or `ended`, the
+session is over and there is none.
 
 Outside the window the announce path never reads the ledger.
 `php artisan bloodhound:check-redis --recover` opens a window by hand.
@@ -483,6 +483,27 @@ php artisan bloodhound:seedbox approve 12 --by=1    # --by: the admin's user id
 php artisan bloodhound:seedbox revoke 12 --by=1
 ```
 
+## Ending a session
+
+A session is one client announcing one torrent. A client restarted under a new peer ID
+somewhere else (a laptop moved to another network, a VPN switched on) is a new location,
+and the old session stays live until it expires (`peer_expiry`, an hour). With the
+leeching limit at one location, the restarted client is refused until then. So a member
+can end the old session themselves; the refusal tells them to.
+
+Ending one removes the peer from the swarm, and any retained baseline, and writes an
+**`ended`** ledger row carrying the counters the session last reported. It credits
+nothing: whatever the session moved since its last announce is lost, which is the price of
+not waiting. Like a `stopped`, it closes the session, so if the old client announces again
+under the same peer ID it starts a new one, the audit expects no baseline after it, and
+recovery mode offers none. A member can end only their own sessions. It runs under the
+peer's lock, as an announce does, so an announce from that session cannot land halfway
+through.
+
+Bloodhound implements trove's `TrackerSessionsInterface` (`sessionsFor()`, a member's live
+sessions, leeching first; `endSession()`), and
+[usarrs](../usarrs/README.md#sessions) renders it at `/profile/sessions`.
+
 ## Configuration
 
 Published to `config/bloodhound.php`. Bloodhound's config is merged with the published
@@ -664,7 +685,7 @@ credit with nothing left to re-derive it from.
 | Column | Meaning |
 |---|---|
 | `user_id`, `torrent_id`, `peer_id` | Who, on what, from which client session |
-| `event` | `started`, `regular`, `completed`, `stopped`, or `opening_balance` for a migration's carried total |
+| `event` | `started`, `regular`, `completed`, `stopped`; `ended` for a session the member ended; or `opening_balance` for a migration's carried total |
 | `ip`, `port`, `user_agent` | Where from |
 | `uploaded`, `downloaded`, `left` | The cumulative counters the client reported |
 | `upload_delta`, `download_delta` | Bytes this row credits |
@@ -748,17 +769,18 @@ written under the old one report as differences.
 
 **The chain, per member, torrent and peer ID, in order.** Each row's baseline should be
 what the previous row reported, and its `prior_at` the previous row's `created_at`. After
-a `stopped`, the next row starts a new session with no baseline. Refusals and opening
-balances are not part of the chain, and stops end it cleanly, so neither is ever reported
-as a break. What is reported, with the reason:
+a `stopped`, or a session the member ended (`ended`, which has no baseline itself), the
+next row starts a new session with no baseline. Refusals and opening balances are not part
+of the chain, and stops and ended sessions end it cleanly, so none of them is ever
+reported as a break. What is reported, with the reason:
 
 - **Redis lost this peer:** a row with no baseline that should have had one. Not reported
   when the gap is longer than `baseline_retention`, since no baseline is kept that long.
 - **Duplicate interval:** two rows measured against the same baseline: one interval
   credited twice (a Redis write that failed after its row, or two announces from one peer
   at once).
-- **The baseline does not continue the previous announce**, and **a baseline after the
-  session stopped**.
+- **The baseline does not continue the previous announce**, **a baseline after the
+  session stopped** (or **ended**), and **an ended session with a baseline**.
 
 With a persistent Redis a break should not happen; when one does, you learn which row.
 

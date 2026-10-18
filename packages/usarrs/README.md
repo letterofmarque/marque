@@ -443,6 +443,17 @@ The tracker decides what a valid range is and what approval means. usarrs shows 
 answers, including its reason when it refuses a range. With no such tracker, both routes
 still exist (a link to them is never fatal) and answer 404, and nothing links to them.
 
+### Sessions
+
+When a tracker keeps live sessions (bloodhound binds trove's `TrackerSessionsInterface`),
+members see theirs at **`/profile/sessions`**, linked from `/profile/stats`: each torrent
+they are announcing, seeding or leeching, the client, the address and the last announce,
+leeching first and 50 to a page. **End** ends one. It is for a client that restarted
+somewhere else and is refused by the tracker's location limits while its old session is
+still live. The tracker decides what ending costs (bloodhound credits nothing the old
+session moved since its last announce) and refuses to end another member's. With no such
+tracker the route exists and answers 404, and nothing links to it.
+
 ## Requirements
 
 - PHP 8.3+

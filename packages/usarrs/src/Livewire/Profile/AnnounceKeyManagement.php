@@ -51,6 +51,7 @@ class AnnounceKeyManagement extends Component
             'allowRegen' => config('usarrs.profile.allow_announce_key_regen', true),
             'addressUnproven' => VerifiedAddress::missing($user),
             'seedboxesAvailable' => $this->seedboxes() !== null,
+            'sessionsAvailable' => $this->trackerSessions() !== null,
         ])->title(__('Tracker Stats'));
     }
 }

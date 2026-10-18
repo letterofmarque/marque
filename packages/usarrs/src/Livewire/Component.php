@@ -7,6 +7,7 @@ namespace Marque\Usarrs\Livewire;
 use Illuminate\Contracts\View\View;
 use Livewire\Component as LivewireComponent;
 use Marque\Trove\Contracts\SeedboxesInterface;
+use Marque\Trove\Contracts\TrackerSessionsInterface;
 use Marque\Trove\Contracts\TrackerStatsInterface;
 
 abstract class Component extends LivewireComponent
@@ -36,6 +37,17 @@ abstract class Component extends LivewireComponent
     {
         return app()->bound(SeedboxesInterface::class)
             ? app(SeedboxesInterface::class)
+            : null;
+    }
+
+    /**
+     * The tracker's live sessions, or null if there is no tracker that keeps
+     * them. Asked for, never assumed, as tracker() is.
+     */
+    protected function trackerSessions(): ?TrackerSessionsInterface
+    {
+        return app()->bound(TrackerSessionsInterface::class)
+            ? app(TrackerSessionsInterface::class)
             : null;
     }
 

@@ -39,7 +39,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   from `max_seeding_locations_per_torrent` (3) locations and leech it from
   `max_leeching_locations_per_torrent` (1). A location is an IP address, or an IPv6 /64.
   Only a new location is refused, so a client already in the swarm, or a second client at
-  a location already in use, never is.
+  a location already in use, never is. The refusal tells the member they can end the other
+  session (below).
 - **No refusal touches Redis, and client-validation refusals are recorded too.** A
   client-validation or anti-cheat refusal writes a flagged ledger row with no credit and no
   baseline, and changes nothing in Redis, so the next accepted announce is measured from
@@ -66,6 +67,13 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   does the same from the console. Events: `SeedboxRegistered`, `SeedboxApproved`,
   `SeedboxRevoked`. The announce path matches against each member's cached approved
   networks, so it costs no query.
+- **Members end their own sessions.** A client restarted under a new peer ID somewhere
+  else is refused by the leeching limit until its old session expires; the member can end
+  the old one instead. Bloodhound implements trove's `TrackerSessionsInterface`, which
+  usarrs renders at `/profile/sessions`. Ending one removes the peer and any retained
+  baseline and writes an `ended` ledger row that credits nothing (what the session moved
+  since its last announce is lost) and closes the session like a `stopped`: the audit and
+  recovery mode treat it as one.
 - **Retained baselines** (`baseline_retention`, 7 days): the hourly sweep keeps an
   expired peer's record, so a client that comes back under the same peer ID without having
   sent `stopped` is credited what it moved in between.

@@ -16,6 +16,12 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   address or range, an admin approves or revokes it, and an approved seedbox's announces
   are held to the tracker's seedbox speed cap. Implemented by bloodhound 8.0. As with
   `TrackerStatsInterface`, check `app()->bound(SeedboxesInterface::class)` before using it.
+- **`Contracts\TrackerSessionsInterface`** and **`Support\TrackerSession`**: a member's live
+  tracker sessions (torrent, client, address, seeding or leeching, last announce, counters)
+  and `endSession()`, so a member can end one their restarted client left behind. It
+  answers false for a session that is not theirs or no longer live, and throws a
+  `RuntimeException` fit to show the member when it is busy with an announce. Implemented
+  by bloodhound 8.0; check `app()->bound(TrackerSessionsInterface::class)` first.
 
 ## [4.5.0] — 2026-10-06
 

@@ -12,6 +12,7 @@ use Marque\Usarrs\Livewire\Invite\InviteIndex;
 use Marque\Usarrs\Livewire\Profile\AnnounceKeyManagement;
 use Marque\Usarrs\Livewire\Profile\Edit as ProfileEdit;
 use Marque\Usarrs\Livewire\Profile\SeedboxManagement;
+use Marque\Usarrs\Livewire\Profile\SessionManagement;
 use Marque\Usarrs\Livewire\Profile\Show as ProfileShow;
 
 /*
@@ -38,6 +39,9 @@ Route::middleware([...config('usarrs.auth_middleware', ['web', 'auth']), 'auth.s
         // Registered on every install, like dashboard: a link to it must never
         // be fatal. It answers 404 where no tracker keeps seedboxes.
         Route::get('profile/seedboxes', SeedboxManagement::class)->name('profile.seedboxes');
+
+        // Likewise: 404 where no tracker keeps sessions (Job #193, D8).
+        Route::get('profile/sessions', SessionManagement::class)->name('profile.sessions');
 
         Route::get('invites', InviteIndex::class)->name('invites.index');
         Route::get('invites/create', InviteCreate::class)->name('invites.create');

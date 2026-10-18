@@ -51,6 +51,7 @@ use Marque\Usarrs\Livewire\Profile\AnnounceKeyManagement;
 use Marque\Usarrs\Livewire\Profile\Edit;
 use Marque\Usarrs\Livewire\Profile\PasskeyManagement;
 use Marque\Usarrs\Livewire\Profile\SeedboxManagement;
+use Marque\Usarrs\Livewire\Profile\SessionManagement;
 use Marque\Usarrs\Livewire\Profile\Show;
 use Marque\Usarrs\Livewire\Profile\TwoFactorSetup;
 use Marque\Usarrs\Models\Invite;
@@ -402,6 +403,7 @@ class UsarrsServiceProvider extends ServiceProvider
         Livewire::component('usarrs-admin-user-show', UserShow::class);
         Livewire::component('usarrs-admin-seedbox-index', SeedboxIndex::class);
         Livewire::component('usarrs-seedbox-management', SeedboxManagement::class);
+        Livewire::component('usarrs-session-management', SessionManagement::class);
         Livewire::component('usarrs-invite-index', InviteIndex::class);
         Livewire::component('usarrs-invite-create', InviteCreate::class);
     }

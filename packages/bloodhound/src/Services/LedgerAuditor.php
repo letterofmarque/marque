@@ -294,7 +294,8 @@ class LedgerAuditor
      * the chain (refusals and opening balances do not: they credit nothing
      * and diff against nothing):
      *
-     * - after a `stopped`, the next row starts a new session: no baseline;
+     * - after a `stopped`, or a session the member ended, the next row starts
+     *   a new session: no baseline;
      * - otherwise the next row's baseline is what the previous one reported,
      *   and its prior_at is the previous row's created_at;
      * - a row with no baseline after one without a stop means the baseline
@@ -362,8 +363,14 @@ class LedgerAuditor
      */
     protected function chainReason(AnnounceLog $row, array $last, int $retention): ?string
     {
-        if ($last['event'] === 'stopped') {
-            return $row->prior_up === null ? null : 'a baseline after the session stopped';
+        // A session the member ended credits nothing and diffs against
+        // nothing: it closes the chain without continuing it.
+        if ($row->event === AnnounceLog::EVENT_ENDED) {
+            return $row->prior_up === null ? null : 'an ended session with a baseline';
+        }
+
+        if (in_array($last['event'], AnnounceLog::SESSION_ENDS, true)) {
+            return $row->prior_up === null ? null : "a baseline after the session {$last['event']}";
         }
 
         if ($row->prior_up === null) {

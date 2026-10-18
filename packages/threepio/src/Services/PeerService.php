@@ -404,6 +404,58 @@ final class PeerService
     }
 
     /**
+     * A member's live peers on every torrent, each with its record.
+     *
+     * Read from `user:{id}:peers`, then checked against the swarm hash: the
+     * set is bookkeeping and can hold a member that no longer applies (a
+     * record expired and not yet swept, or one another member now owns under
+     * the same peer ID), and the hash is the record. One pipelined round trip
+     * for the records, so a seedbox's whole library costs one, not one each.
+     *
+     * @return list<array{torrent_id: int, peer_id: string, peer: array<string, mixed>}>
+     */
+    public function peersOfUser(int $userId): array
+    {
+        $redis = $this->redis();
+        $members = [];
+
+        foreach ($redis->smembers($this->prefix."user:{$userId}:peers") as $member) {
+            // "{torrent}:{peer_id}": the torrent id has no colon, and the peer
+            // ID, any 20 bytes, may.
+            [$torrentId, $peerId] = explode(':', (string) $member, 2) + [1 => ''];
+
+            if (ctype_digit($torrentId) && $peerId !== '') {
+                $members[] = [(int) $torrentId, $peerId];
+            }
+        }
+
+        if ($members === []) {
+            return [];
+        }
+
+        $records = $redis->pipeline(function ($pipe) use ($members) {
+            foreach ($members as [$torrentId, $peerId]) {
+                $pipe->hget($this->prefix."peers:{$torrentId}", $peerId);
+            }
+        });
+
+        $now = $this->now();
+        $peers = [];
+
+        foreach ($members as $i => [$torrentId, $peerId]) {
+            $peer = $this->decode($records[$i] ?? null);
+
+            if ($peer === null || ! $this->sameOwner($peer, $userId) || $now - $peer['last_action'] > $this->peerExpiry) {
+                continue;
+            }
+
+            $peers[] = ['torrent_id' => $torrentId, 'peer_id' => $peerId, 'peer' => $peer];
+        }
+
+        return $peers;
+    }
+
+    /**
      * The clock every interval is measured on.
      *
      * Carbon's rather than time(), so it is the same clock the tracker stamps

@@ -53,6 +53,20 @@ class AnnounceLog extends Model
      */
     public const EVENT_OPENING_BALANCE = 'opening_balance';
 
+    /**
+     * Marks a session the member ended themselves (Job #193, D8).
+     *
+     * Not a protocol event either: no client sends it. It credits nothing and
+     * closes the session as `stopped` does, so the audit expects no baseline
+     * after it and recovery offers none.
+     */
+    public const EVENT_ENDED = 'ended';
+
+    /**
+     * Events after which a session is over: the next row starts a new one.
+     */
+    public const SESSION_ENDS = ['stopped', self::EVENT_ENDED];
+
     protected $table = 'announce_log';
 
     public const UPDATED_AT = null;

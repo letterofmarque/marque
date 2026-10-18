@@ -29,6 +29,14 @@
         </div>
     @endif
 
+    @if ($sessionsAvailable)
+        <div class="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-900">
+            <x-deck::heading size="sm" class="mb-2">{{ __('Sessions') }}</x-deck::heading>
+            <x-deck::text class="mb-4">{{ __('Restarted a client somewhere else and been refused? End the old session here.') }}</x-deck::text>
+            <x-deck::button variant="ghost" :href="route('profile.sessions')" wire:navigate>{{ __('Manage sessions') }}</x-deck::button>
+        </div>
+    @endif
+
     @if (session('status'))
         <div class="rounded-lg bg-green-50 p-4 dark:bg-green-900/20">
             <x-deck::text class="text-sm text-green-700 dark:text-green-300">{{ session('status') }}</x-deck::text>

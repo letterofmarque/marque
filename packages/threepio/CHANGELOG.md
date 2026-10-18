@@ -9,6 +9,13 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [Unreleased]
 
+### Added
+
+- **`PeerService::peersOfUser($userId)`**: a member's live peers on every torrent, each
+  with its record, read from `user:{id}:peers` and checked against the swarm hash in one
+  pipelined round trip. A set member that no longer applies (expired, or another member's
+  record under the same peer ID) is left out. Bloodhound lists a member's sessions with it.
+
 ### Changed
 
 - **Breaking: the per-IP count is of sessions, not peer_ids.** `getIpPeerCount()` is

@@ -189,6 +189,7 @@ because both are safe to lose: they self-clean when an IP or a torrent goes quie
 | `getSwarmStats($torrentId)` | Totals plus both counters, for anti-cheat |
 | `getUserPeerCountForTorrent($userId, $torrentId, $livePeers)` | A member's live peers on a torrent |
 | `getIpSessionCount($ip)` | Live sessions (torrent, peer_id) from an IP |
+| `peersOfUser($userId)` | A member's live peers on every torrent, with their records (one pipelined read) |
 | `cleanupExpiredPeers($torrentId)` | Sweep expired peers, returns the count removed |
 | `retainBaselinesFor($seconds)` | Keep expired peers' records as baselines (private trackers) |
 | `resolveBaselineUsing($resolver)` | A durable fallback for a lost baseline |
