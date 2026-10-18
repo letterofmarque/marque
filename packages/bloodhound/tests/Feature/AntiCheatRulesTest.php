@@ -122,23 +122,42 @@ describe('location limits (F6, A3)', function () {
         expect(refused(ruled($this, '-qB4210-bbbbbbbbbbbb', '10.0.0.2', 1_800)))->toBeFalse();
     });
 
-    // The audit's B3: an IP at its session cap refused its own next announce.
-    test('an IP at its session cap can still announce its existing sessions', function () {
-        config(['bloodhound.anti_cheat.max_connections_per_ip' => 2]);
-        $other = Torrent::create(['name' => 'Two', 'info_hash' => str_repeat('e', 40), 'size' => 1_000, 'user_id' => $this->user->id]);
+    // Per-IP limits punished exactly the members who keep a site alive: one
+    // seedbox, one address, thousands of torrents around the clock.
+    test('one address can seed hundreds of torrents', function () {
+        foreach (range(1, 150) as $i) {
+            $torrent = Torrent::create(['name' => "t{$i}", 'info_hash' => str_repeat(sprintf('%02x', $i + 16), 20), 'size' => 1_000, 'user_id' => $this->user->id]);
 
-        ruled($this, '-qB4210-aaaaaaaaaaaa', '10.0.0.1', 0, ['event' => 'started']);
-        ruled($this, '-qB4210-bbbbbbbbbbbb', '10.0.0.1', 1, ['event' => 'started']);
+            $body = $this->withoutMiddleware(BlockBrowsers::class)
+                ->withServerVariables(['REMOTE_ADDR' => '10.0.0.1'])
+                ->get('/announce/'.keyOf($this->user).'?'.http_build_query([
+                    'info_hash' => hex2bin($torrent->info_hash), 'peer_id' => '-qB4210-aaaaaaaaaaaa', 'port' => 51413,
+                    'uploaded' => 0, 'downloaded' => 0, 'left' => 0, 'event' => 'started', 'compact' => 1,
+                ]))->getContent();
 
-        $newSession = $this->withoutMiddleware(BlockBrowsers::class)
-            ->withServerVariables(['REMOTE_ADDR' => '10.0.0.1'])
-            ->get('/announce/'.keyOf($this->user).'?'.http_build_query([
-                'info_hash' => hex2bin($other->info_hash), 'peer_id' => '-qB4210-cccccccccccc', 'port' => 51413,
-                'uploaded' => 0, 'downloaded' => 0, 'left' => 0, 'event' => 'started', 'compact' => 1,
-            ]))->getContent();
+            expect($body)->not->toContain('failure reason');
+        }
+    });
 
-        expect(refused($newSession))->toBeTrue()
-            ->and(refused(ruled($this, '-qB4210-aaaaaaaaaaaa', '10.0.0.1', 1_800)))->toBeFalse();
+    // What a cap is for: many peer IDs on ONE torrent, polluting its swarm.
+    test('a member\'s client past max_clients_per_torrent is refused; the ones in the swarm keep announcing', function () {
+        config(['bloodhound.anti_cheat.max_clients_per_torrent' => 2]);
+
+        ruled($this, '-qB4210-000000000001', '10.0.0.1', 0, ['event' => 'started']);
+        ruled($this, '-qB4210-000000000002', '10.0.0.1', 1, ['event' => 'started']);
+
+        expect(ruled($this, '-qB4210-000000000003', '10.0.0.1', 2, ['event' => 'started']))->toContain('2 clients per torrent')
+            ->and(refused(ruled($this, '-qB4210-000000000002', '10.0.0.1', 1_800)))->toBeFalse();
+    });
+
+    test('the client cap counts this member only', function () {
+        config(['bloodhound.anti_cheat.max_clients_per_torrent' => 1]);
+        $other = TestUser::create(['name' => 'O', 'email' => 'rules-other@example.com', 'password' => 'p']);
+        issueAnnounceKey($other, 'rulesotherrulesotherrulesother00');
+
+        ruled($this, '-qB4210-000000000001', '10.0.0.1', 0, ['event' => 'started']);
+
+        expect(refused(ruled($this, '-qB4210-000000000002', '10.0.0.1', 1, ['event' => 'started'], user: $other)))->toBeFalse();
     });
 });
 

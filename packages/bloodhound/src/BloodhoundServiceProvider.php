@@ -182,8 +182,10 @@ class BloodhoundServiceProvider extends ServiceProvider
      * config that still turns it off is refused outright. One that says true
      * is the old default and harmless.
      *
-     * max_connections_per_torrent was replaced by location limits. Ignoring it
-     * changes nothing dangerous, so it is reported once a day, not refused.
+     * max_connections_per_torrent and max_connections_per_ip were replaced
+     * (by location limits, and by a per-member client cap on each torrent).
+     * Ignoring them changes nothing dangerous, so they are reported once a
+     * day, not refused.
      * The retired queue keys are ignored: nothing ever read them in 7.x either.
      */
     public function refuseRemovedConfiguration(): void
@@ -195,12 +197,16 @@ class BloodhoundServiceProvider extends ServiceProvider
             );
         }
 
-        if (array_key_exists('max_connections_per_torrent', (array) config('bloodhound.anti_cheat'))
-            && $this->firstToday('bloodhound:removed-config-reported')) {
-            Log::warning(
-                'bloodhound.anti_cheat.max_connections_per_torrent was removed in 8.0.0 and is ignored. '
-                .'Use max_seeding_locations_per_torrent and max_leeching_locations_per_torrent instead.'
-            );
+        $replaced = [
+            'max_connections_per_torrent' => 'max_seeding_locations_per_torrent and max_leeching_locations_per_torrent',
+            'max_connections_per_ip' => 'max_clients_per_torrent (a member\'s clients on one torrent; how many torrents one address seeds is no longer limited)',
+        ];
+        $stale = array_intersect_key($replaced, (array) config('bloodhound.anti_cheat'));
+
+        if ($stale !== [] && $this->firstToday('bloodhound:removed-config-reported')) {
+            foreach ($stale as $key => $instead) {
+                Log::warning("bloodhound.anti_cheat.{$key} was removed in 8.0.0 and is ignored. Use {$instead}.");
+            }
         }
     }
 

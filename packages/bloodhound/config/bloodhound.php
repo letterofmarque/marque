@@ -317,10 +317,11 @@ return [
         'max_seeding_locations_per_torrent' => env('BLOODHOUND_MAX_SEEDING_LOCATIONS', 3),
         'max_leeching_locations_per_torrent' => env('BLOODHOUND_MAX_LEECHING_LOCATIONS', 1),
 
-        // Live sessions (one torrent, one peer ID) from one IP; only a new
-        // session is refused. A seedbox running hundreds of torrents from one
-        // address needs this raised.
-        'max_connections_per_ip' => env('BLOODHOUND_MAX_CONN_IP', 10),
+        // A member's live clients (peer IDs) on one torrent, counted only for
+        // a new one. Many peer IDs on one torrent pollute its swarm; one
+        // client per torrent across thousands of torrents is a seedbox doing
+        // its job, and how many torrents a member seeds is never limited.
+        'max_clients_per_torrent' => env('BLOODHOUND_MAX_CLIENTS_PER_TORRENT', 5),
 
         // Block announces from known datacenter/proxy IPs (requires external list)
         // check-docs: ignore — never built, needs a design decision first (#10813)

@@ -373,7 +373,7 @@ a count.
 | Port | Every announce | Refused: a port in `threepio.blacklisted_ports`, or outside 1–65535 |
 | Minimum gap | Regular announces (no `event`) from a peer in the swarm | Refused when sooner than `min_announce_gap` after its last accepted announce |
 | Location limits | A peer not in the swarm, other than `stopped` | Refused at a new location past the seeding or leeching limit |
-| Sessions per IP | A peer not in the swarm, other than `stopped` | Refused when the IP already has `max_connections_per_ip` sessions |
+| Clients per torrent | A peer not in the swarm, other than `stopped` | Refused when the member already has `max_clients_per_torrent` live clients on the torrent |
 | Speed | Every announce with a baseline | The direction over the cap is forfeited; the announce is accepted |
 | Data anomaly | Every announce | More `left` than the torrent's size: reported, never refused |
 | Swarm consistency | A 5% sample of announces | Swarm downloads well beyond uploads plus seeders' copies: reported, never refused |
@@ -405,10 +405,13 @@ location is counted against a limit:
 
 The counts come from the torrent's live peers, which the response reads anyway.
 
-**Sessions per IP.** A session is one peer ID on one torrent, so a client running 40
-torrents from one address is 40 sessions. Only a new session is refused. The default, 10,
-is low for a seedbox: raise `max_connections_per_ip` if your members run many torrents
-from one address. An approved seedbox is not exempt from this or the location limits.
+**Clients per torrent.** A member may run `max_clients_per_torrent` (5) live peer IDs on
+one torrent; only a new one past that is refused. Many peer IDs on one torrent pollute its
+swarm and inflate its seeder count, and that is the abuse a cap exists for. How many
+torrents a member, or an address, seeds is never limited: the members who seed thousands
+of torrents around the clock from one seedbox are the ones keeping a site alive. (8.0
+removed `max_connections_per_ip`, which counted across torrents and refused exactly them.)
+An approved seedbox is not exempt from this or the location limits.
 
 **Speed.** The bytes since the baseline over the real time elapsed, per direction,
 against `max_upload_speed` / `max_download_speed` (100 MiB/s each), or the seedbox caps
@@ -424,7 +427,7 @@ their bytes.
 
 **Events.** Only the checks that accept the announce fire `CheatDetected`, with `type`
 `speed_violation`, `data_anomaly` or `swarm_anomaly` (the last with no user), and add an
-entry to the Redis `suspicious` list. Refusals (port, gap, location, sessions per IP, and
+entry to the Redis `suspicious` list. Refusals (port, gap, location, clients per torrent, and
 client validation) fire nothing: each is a flagged ledger row with its reason, which
 `AnnounceLogServiceInterface::flagged()` returns along with forfeits.
 
@@ -583,7 +586,7 @@ per second.
 | `anti_cheat.min_announce_gap` | `60` | Min seconds between two regular announces from one peer |
 | `anti_cheat.max_seeding_locations_per_torrent` | `3` | Locations a member may seed one torrent from |
 | `anti_cheat.max_leeching_locations_per_torrent` | `1` | Locations a member may leech one torrent from |
-| `anti_cheat.max_connections_per_ip` | `10` | Live sessions (torrent, peer ID) from one IP |
+| `anti_cheat.max_clients_per_torrent` | `5` | A member's live clients (peer IDs) on one torrent; only a new one is refused |
 | `anti_cheat.block_datacenter_ips` | `false` | Not built yet; setting it does nothing <!-- check-docs: ignore — never built, needs a design decision first (#10813) --> |
 
 ### Completions
@@ -626,6 +629,7 @@ See [The ledger](#the-ledger).
 | `announce_log.enabled` | Set to `false`, bloodhound refuses to boot, naming the key. `true` is harmless | Nothing: the ledger is always on |
 | `queue.enabled`, `queue.connection`, `queue.queue` | Ignored, as they already were in 7.x (#10816) | Nothing: byte counts never travel through a queue |
 | `anti_cheat.max_connections_per_torrent` | Ignored; a warning is logged once a day naming the replacements | `max_seeding_locations_per_torrent` and `max_leeching_locations_per_torrent` |
+| `anti_cheat.max_connections_per_ip` | Ignored; a warning is logged once a day | `max_clients_per_torrent`, a member's clients on one torrent. Nothing limits how many torrents one address seeds |
 
 The ledger can't be turned off because every credit is written to it and nowhere else: a
 tracker without it would credit nobody anything.
@@ -863,8 +867,9 @@ This is a Bloodhound feature and has no equivalent in [marque/hound](https://pac
    `max_leeching_locations_per_torrent`. Add the new keys you want to set by environment:
    `redis.durability`, `baseline_retention` and the `anti_cheat.seedbox` block. Simplest
    is to re-publish and re-apply your changes.
-4. **Check `max_connections_per_ip`** against members who seed many torrents from one
-   address: it now counts sessions (one per torrent), not peer IDs.
+4. **Delete `max_connections_per_ip`** from a published config: it is gone, and nothing
+   limits how many torrents one address seeds. `max_clients_per_torrent` caps a member's
+   clients on one torrent instead.
 5. **Review the speed caps.** Over the cap now forfeits the bytes instead of refusing the
    announce. Lower the ordinary caps to suit your members, and have seedbox users register
    their seedboxes (and approve them) so they are held to the seedbox cap.

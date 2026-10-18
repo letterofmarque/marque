@@ -66,15 +66,16 @@ return [
     | IP Limiting
     |--------------------------------------------------------------------------
     |
-    | Limit the number of live sessions from a single IP address. A session is
-    | one peer ID on one torrent, so a client running 40 torrents is 40.
+    | Limit the live peers one IP address may have on ONE torrent: many peer
+    | IDs from one address pollute that torrent's swarm. Never counted across
+    | torrents, so an address seeding thousands of them is never limited.
     | This is the primary abuse prevention for a public tracker.
     |
     */
 
     'ip_limiting' => [
         'enabled' => env('HOUND_IP_LIMITING', true),
-        'max_per_ip' => env('HOUND_MAX_PER_IP', 50),
+        'max_peers_per_torrent' => env('HOUND_MAX_PEERS_PER_TORRENT', 10),
     ],
 
     /*

@@ -23,8 +23,9 @@ use Marque\Threepio\Support\PeerLookup;
  * - a regular announce sooner than the minimum gap after the peer's last
  *   accepted one (protocol events are never refused for timing);
  * - a NEW location past the member's seeding or leeching limit on the
- *   torrent, or a new session past the IP's limit (a peer already in the
- *   swarm is never refused by a count).
+ *   torrent, or a new client past the member's limit on it (a peer already
+ *   in the swarm is never refused by a count, and how many torrents a member
+ *   seeds is never limited).
  *
  * A claimed speed over the cap is not refused: those bytes are forfeited,
  * the baseline moves on, and the rest of the announce is credited. Data and
@@ -159,7 +160,7 @@ final class AntiCheatService
 
     /**
      * Refuse a new location past the member's limit on this torrent, or a
-     * new session past the IP's.
+     * new client past their limit on it.
      *
      * A peer already in the swarm, announcing from where it was in the state
      * it was in, is never refused by a count: the count used to include the
@@ -226,14 +227,25 @@ final class AntiCheatService
             }
         }
 
-        // A session new to this IP: a new peer, or one that moved here.
-        if ($record === null || (string) $record['ip'] !== $ip) {
-            $maxPerIp = (int) config('bloodhound.anti_cheat.max_connections_per_ip', 10);
+        // A new peer: at most max_clients_per_torrent of the member's live
+        // peer IDs on this torrent. Many peer IDs on one torrent pollute its
+        // swarm and inflate its seeder count; a member's number of torrents
+        // is never limited, because the members who seed thousands of them
+        // from one seedbox are the ones keeping the site alive.
+        if ($record === null) {
+            $max = (int) config('bloodhound.anti_cheat.max_clients_per_torrent', 5);
+            $clients = 0;
 
-            if ($this->peerService->getIpSessionCount($ip) >= $maxPerIp) {
+            foreach ($livePeers as $otherPeerId => $peer) {
+                if ((string) $otherPeerId !== $peerId && ($peer['user_id'] ?? null) === $userId) {
+                    $clients++;
+                }
+            }
+
+            if ($clients >= $max) {
                 return [
                     'passed' => false,
-                    'reason' => "Connection limit exceeded ({$maxPerIp} per IP)",
+                    'reason' => "Client limit reached ({$max} clients per torrent)",
                 ];
             }
         }

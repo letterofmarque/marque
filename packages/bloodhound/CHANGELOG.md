@@ -29,9 +29,12 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   land later; the other direction and the time are still credited, and the row is flagged
   with the cap that applied. A refusal used to leave the baseline in place, so the next
   announce credited the same bytes and the cap delayed them by a minute.
-- **`max_connections_per_ip` counts sessions** (one peer ID on one torrent), not peer IDs,
-  and refuses only a new session. A seedbox running many torrents from one address may
-  need it raised.
+- **`max_connections_per_ip` is removed; nothing limits how many torrents one address
+  seeds.** It counted across torrents, so the members who seed thousands of torrents from
+  one seedbox were the ones it refused. What a cap is for, many peer IDs polluting one
+  torrent's swarm, is now `max_clients_per_torrent` (5): a member's live clients on one
+  torrent, counted only for a new one. A published config still setting the old key gets
+  a once-a-day notice.
 - **Location limits replace `max_connections_per_torrent`.** A member may seed one torrent
   from `max_seeding_locations_per_torrent` (3) locations and leech it from
   `max_leeching_locations_per_torrent` (1). A location is an IP address, or an IPv6 /64.
@@ -152,8 +155,8 @@ The full steps are in the README under "Upgrading from 7.x to 8.0".
    would cut ratios.
 3. **Update a published `config/bloodhound.php`**: delete `announce_log.enabled` and the
    `queue` block, replace `max_connections_per_torrent` with the two location limits, and
-   add the new keys (simplest: re-publish). Check `max_connections_per_ip` and the speed
-   caps against your members.
+   delete `max_connections_per_ip`, and add the new keys (simplest: re-publish). Check the
+   speed caps against your members.
 4. **Upgrade bloodhound and threepio together and migrate.** The migrations add the new
    columns and tables, record stored seedtime and leechtime that no row explains as carry,
    and, with `retention_days` set, record earlier prunes' lost credit as carry. No row is

@@ -9,19 +9,20 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [Unreleased]
 
-### Changed
+### Changed (breaking)
 
-- **`ip_limiting.max_per_ip` counts sessions, not peer IDs** (threepio 4.0). A session is
-  one peer ID on one torrent. A client that uses one peer ID for every torrent used to
-  count once however many torrents it ran, and dropped out of the count on its first
-  `stopped`; it now counts once per torrent. A client with a peer ID per torrent counts
-  as before. Raise the cap if your users run many torrents from one address.
+- **The per-IP cap is per torrent: `ip_limiting.max_peers_per_torrent` (10) replaces
+  `max_per_ip`.** It counts the live peers one address has on one torrent, which is what
+  pollutes a swarm. The old cap counted across every torrent, so a public seedbox seeding
+  hundreds of torrents from one address was refused once it passed 50. How many torrents
+  an address seeds is no longer limited. Rename the key in a published config;
+  `max_per_ip` is ignored.
 
 ### Fixed
 
-- **An IP at its cap was refused on its own next announce.** The count included the
-  announcing session, so an address at `max_per_ip` could neither keep seeding nor send
-  `stopped`, and its peers aged out of the swarm. Only a new session is refused now.
+- **An address at the cap was refused on its own next announce.** The count included the
+  announcing peer, so it could neither keep seeding nor send `stopped`, and its peers aged
+  out of the swarm. Only a new peer is refused now.
 
 ## [4.0.0] — 2026-10-06
 

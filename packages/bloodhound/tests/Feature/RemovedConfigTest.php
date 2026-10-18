@@ -42,6 +42,15 @@ test('the switch and the queue keys are gone from the config', function () {
         ->and(config('bloodhound.queue'))->toBeNull();
 });
 
+test('max_connections_per_ip is reported too, as removed', function () {
+    Log::spy();
+    config(['bloodhound.anti_cheat.max_connections_per_ip' => 10]);
+
+    checkRemovedConfig();
+
+    Log::shouldHaveReceived('warning')->once()->withArgs(fn ($message) => str_contains($message, 'max_connections_per_ip') && str_contains($message, 'max_clients_per_torrent'));
+});
+
 test('max_connections_per_torrent is reported once, naming its replacements', function () {
     Log::spy();
     config(['bloodhound.anti_cheat.max_connections_per_torrent' => 3]);

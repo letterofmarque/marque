@@ -42,15 +42,20 @@ final class AnnounceService
             return TrackerResponse::error("Port {$port} is blacklisted");
         }
 
-        // IP limiting: a new session past the cap is refused. One already in
-        // the swarm never is, or an IP at its cap could neither keep seeding
-        // nor say it was leaving (the count included the announcer itself).
+        // IP limiting, per torrent: one address announcing many peer IDs into
+        // one swarm pollutes it. Never across torrents: a public seedbox
+        // seeding thousands of them from one address is the healthiest thing
+        // a tracker sees. A peer already in the swarm is never refused, or an
+        // address at the cap could neither keep seeding nor say it was leaving.
         if (config('hound.ip_limiting.enabled', true) && $this->peerService->getPeer($torrent->id, $peerId) === null) {
-            $maxPerIp = (int) config('hound.ip_limiting.max_per_ip', 50);
-            $ipCount = $this->peerService->getIpSessionCount($ip);
+            $max = (int) config('hound.ip_limiting.max_peers_per_torrent', 10);
+            $fromHere = count(array_filter(
+                $this->peerService->livePeers($torrent->id),
+                fn (array $peer) => ($peer['ip'] ?? null) === $ip,
+            ));
 
-            if ($ipCount >= $maxPerIp) {
-                return TrackerResponse::error('Too many connections from your IP');
+            if ($fromHere >= $max) {
+                return TrackerResponse::error('Too many peers from your address on this torrent');
             }
         }
 

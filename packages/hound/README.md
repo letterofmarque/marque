@@ -174,19 +174,19 @@ only one available.
 | Key | Default | Description |
 |-----|---------|-------------|
 | `ip_limiting.enabled` | `true` | Enable the per-IP peer cap |
-| `ip_limiting.max_per_ip` | `50` | Max live sessions (torrent, peer ID) from one IP |
+| `ip_limiting.max_peers_per_torrent` | `10` | Live peers one address may have on one torrent |
 
 ```env
 HOUND_IP_LIMITING=true
-HOUND_MAX_PER_IP=50
+HOUND_MAX_PEERS_PER_TORRENT=10
 ```
 
-At the cap, a **new** session from that IP gets a bencoded `Too many connections from your
-IP` failure. A peer already in the swarm is never refused by the count, so it can keep
-announcing and send `stopped`. A session is one peer ID on one torrent, so a client
-running 40 torrents from one address counts 40, however it chooses its peer IDs. Raise
-the cap if you expect legitimate NAT'd or institutional traffic, or users running many
-torrents from one address. Before threepio 3.2.1, dead peers could stay in the IP count
+The cap is per torrent. At it, a **new** peer from that address on that torrent gets a
+bencoded `Too many peers from your address on this torrent` failure. A peer already in the
+swarm is never refused by the count, so it can keep announcing and send `stopped`. How
+many torrents one address announces is never limited: a seedbox seeding hundreds of
+torrents from one address is the healthiest thing a public tracker sees. Raise the cap if
+you expect many users behind one address (CGNAT, a university) on the same torrent. Before threepio 3.2.1, dead peers could stay in the IP count
 for good, locking a busy IP out (#10804).
 
 ### Logging — planned, not yet built
