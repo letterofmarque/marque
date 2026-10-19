@@ -7,6 +7,15 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+### Changed
+
+- **No longer requires `marque/threepio` directly.** Nothing in this package's code uses
+  it; it arrives through `marque/trove`, which does. So a threepio major no longer needs a
+  release of this package. The published versions' `threepio ^3.0` would have blocked
+  threepio 4.0, which bloodhound 8.0 requires. Nothing changes for an install.
+
 ## [4.3.0] — 2026-10-06
 
 > API uploads meet the installed tracker's rules: a refused torrent is a 422 saying what to change, and warnings come back in `meta.warnings`.

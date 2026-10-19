@@ -33,7 +33,7 @@
     "require": {
         "php": "^8.3",
         "marque/trove": "^4.5",
-        "marque/threepio": "^3.1",
+        "marque/threepio": "^4.0",
         "illuminate/support": "^13.0",
         "illuminate/routing": "^13.0"
     },
@@ -55,7 +55,7 @@
     },
     "extra": {
         "branch-alias": {
-            "dev-main": "4.x-dev"
+            "dev-main": "5.x-dev"
         },
         "laravel": {
             "providers": [

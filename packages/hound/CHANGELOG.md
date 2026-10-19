@@ -11,6 +11,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ### Changed (breaking)
 
+- **Requires `marque/threepio` ^4.0**, for its session-based per-IP count and the raw
+  query reader.
 - **The per-IP cap is per torrent: `ip_limiting.max_peers_per_torrent` (10) replaces
   `max_per_ip`.** It counts the live peers one address has on one torrent, which is what
   pollutes a swarm. The old cap counted across every torrent, so a public seedbox seeding

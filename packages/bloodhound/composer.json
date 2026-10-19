@@ -32,8 +32,8 @@
     ],
     "require": {
         "php": "^8.3",
-        "marque/trove": "^4.5",
-        "marque/threepio": "^3.0",
+        "marque/trove": "^4.6",
+        "marque/threepio": "^4.0",
         "illuminate/support": "^13.0",
         "illuminate/routing": "^13.0",
         "illuminate/redis": "^13.0",
@@ -60,7 +60,7 @@
     },
     "extra": {
         "branch-alias": {
-            "dev-main": "7.x-dev"
+            "dev-main": "8.x-dev"
         },
         "laravel": {
             "providers": [

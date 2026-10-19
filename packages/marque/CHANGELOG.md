@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   installer's own config (`marque.install.redis_durability`, from that variable), so it
   holds with config cached; on a re-run, bloodhound's `redis.durability` wins.
 
+### Changed
+
+- **No longer requires `marque/threepio` directly.** Nothing in this package's code uses
+  it; it arrives through `marque/trove`, which does. So a threepio major no longer needs a
+  release of this package. The published versions' `threepio ^3.0` would have blocked
+  threepio 4.0, which bloodhound 8.0 requires. Nothing changes for an install.
+
 ## [1.0.0] — 2026-10-01
 
 > First release of the installer: one composer require, then `php artisan marque:install` interviews you and wires a working tracker.

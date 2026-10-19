@@ -23,6 +23,11 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   `RuntimeException` fit to show the member when it is busy with an announce. Implemented
   by bloodhound 8.0; check `app()->bound(TrackerSessionsInterface::class)` first.
 
+### Changed
+
+- **Accepts `marque/threepio` ^4.0** as well as ^3.3. trove uses only `Bencode`, which
+  4.0 leaves unchanged.
+
 ## [4.5.0] — 2026-10-06
 
 > Lets the installed tracker decide what an uploaded .torrent must be and what goes into a download: `TorrentFilePolicyInterface`, a `PrivateFlag` rule, and `TorrentFileService`, which refuses an upload that breaks the rule and builds each member's download around the untouched info dictionary.

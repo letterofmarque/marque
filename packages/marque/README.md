@@ -20,12 +20,12 @@ only appear once rebuilt. The installer doesn't run npm for you yet (#10796).
 
 ## What this package is
 
-A front door. It requires the four packages every Marque deployment needs:
+A front door. It brings the four packages every Marque deployment needs:
 
 | Package | Why it is always needed |
 |---|---|
 | `marque/trove` | Core models, services, contracts, registries |
-| `marque/threepio` | BitTorrent protocol primitives |
+| `marque/threepio` | BitTorrent protocol primitives (through trove, which requires it) |
 | `marque/deck` | App shell — layout, navigation, shared components |
 | `marque/usarrs` | Auth, users, roles, invites, admin |
 

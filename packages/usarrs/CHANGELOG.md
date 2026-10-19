@@ -23,6 +23,14 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   tracker's location limits. Without such a tracker the route answers 404 and nothing
   links to it.
 
+### Changed
+
+- **No longer requires `marque/threepio` directly.** Nothing in this package's code uses
+  it; it arrives through `marque/trove`, which does. So a threepio major no longer needs a
+  release of this package. The published versions' `threepio ^3.0` would have blocked
+  threepio 4.0, which bloodhound 8.0 requires. Nothing changes for an install.
+- **Requires `marque/trove` ^4.6**, for `TrackerSessionsInterface`.
+
 ## [8.2.1] — 2026-10-03
 
 > Ships what 8.2.0 should have contained: 8.2.0 reached Packagist without its last fix (manage_auth off no longer errors for unverified members) and its README corrections.

@@ -39,13 +39,22 @@ final class ManifestTest extends TestCase
     {
         $require = $this->manifest()['require'];
 
-        foreach (['marque/trove', 'marque/threepio', 'marque/deck', 'marque/usarrs'] as $package) {
+        // threepio is needed too, and arrives through trove, the package that
+        // uses it. Requiring it here as well would make every threepio major
+        // a release of the installer (how.md, "Require what the shipped code
+        // uses").
+        foreach (['marque/trove', 'marque/deck', 'marque/usarrs'] as $package) {
             $this->assertArrayHasKey(
                 $package,
                 $require,
                 "{$package} is needed by every deployment and must be required here",
             );
         }
+    }
+
+    public function test_threepio_comes_through_trove_not_directly(): void
+    {
+        $this->assertArrayNotHasKey('marque/threepio', $this->manifest()['require']);
     }
 
     public function test_it_requires_no_package_the_installer_should_choose(): void
