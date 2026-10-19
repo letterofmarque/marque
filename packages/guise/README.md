@@ -11,8 +11,8 @@ them or handle login. For a complete private tracker, install the set:
 composer require marque/trove marque/bloodhound marque/guise marque/usarrs marque/cennad
 ```
 
-That resolves `marque/threepio` and `marque/deck` for you. Verified working as a set,
-2026-09-10.
+That resolves `marque/threepio` and `marque/deck` for you. Verified installing as a set
+from Packagist, 2026-10-20.
 
 Browsing without accounts is [marque/disguise](https://packagist.org/packages/marque/disguise)
 instead.

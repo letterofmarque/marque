@@ -110,7 +110,7 @@ composer require marque/trove marque/guise marque/usarrs
 
 Each pulls in whatever it needs (`marque/threepio` for the BitTorrent protocol,
 `marque/deck` for the shared UI shell) — you don't name those yourself. All three
-verified installing cleanly as sets on 2026-09-10.
+verified installing cleanly from Packagist as sets on 2026-10-20 (Marque 9.0).
 
 Going this way you also need to add the Marque traits to your `User` model, add
 `@source` lines for the packages' views to `resources/css/app.css`, and give `/`
