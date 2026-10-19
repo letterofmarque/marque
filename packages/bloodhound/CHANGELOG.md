@@ -7,7 +7,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [8.0.0] — 2026-10-19
+## [8.0.0] — 2026-10-20
 
 > Every announce is credited when it arrives, bytes and seedtime alike, against a Redis that must persist and never evict; anti-cheat stops refusing legitimate clients, seedboxes get their own speed cap, and members can end a session their restarted client left behind.
 

@@ -7,7 +7,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [5.0.0] — 2026-10-19
+## [5.0.0] — 2026-10-20
 
 > The per-IP cap counts one address's peers on one torrent, so an address may seed any number of torrents; binary info hashes and peer IDs are read intact, and a scrape answers for every torrent it names.
 
