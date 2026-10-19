@@ -14,10 +14,9 @@ use Marque\Marque\Console\InstallCommand;
  * The package requires only what every deployment needs — trove (which
  * brings threepio), deck, usarrs — and carries `marque:install`, which
  * interviews the operator and adds the rest. It deliberately is NOT a
- * composer metapackage: a
- * metapackage cannot ship code, and shipping the installer is the entire
- * reason this package exists (job #10539 planned the codeless version and
- * could not host a command).
+ * composer metapackage: a metapackage cannot ship code, and shipping the
+ * installer is the entire reason this package exists (job #10539 planned the
+ * codeless version and could not host a command).
  *
  * Nothing else is registered here but the installer's own config. This
  * package binds no routes, ships no migrations and owns no models; it is a
