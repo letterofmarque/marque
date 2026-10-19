@@ -85,6 +85,8 @@ announce ledger. See
 | `Support\Bencode` | Bencode encoder/decoder |
 | `Support\TrackerResponse` | Builds bencoded announce, scrape and failure responses |
 | `Services\PeerService` | Redis-backed live peer storage |
+| `Support\PeerLookup` | One read of a peer: its baseline, where it came from, and the credit an announce earns against it |
+| `Support\RawQuery` | The announce or scrape query string as the client sent it: read `info_hash` and `peer_id` from it, never `$request->get()` |
 | `Enums\AnnounceEvent` | `started`, `completed`, `stopped` |
 | `Http\Middleware\BlockBrowsers` | Rejects web browsers from tracker endpoints |
 
@@ -163,11 +165,14 @@ hex info_hashes and converts them back to binary for the response.
 The live swarm. Everything is in Redis with a configurable prefix.
 
 **Reads never change anything.** A peer that stops announcing is skipped in peer lists
-and counts once it is older than `peer_expiry`, and `getPeer()` answers null for it.
+and per-member counts once it is older than `peer_expiry`, and `getPeer()` answers null
+for it. The seeder, leecher and per-IP counts read stored counters and sets, so they
+include it until the sweep.
 But it stays in the hash, the seeder/leecher counters and the per-IP and per-user sets
 until `cleanupExpiredPeers()` removes it. That sweep is the only way an expired peer
 leaves; it also recounts the counters from the peers present. Something has to call it
-periodically: bloodhound and hound each ship a `sync-swarm-counts` command that does,
+periodically: bloodhound and hound ship `bloodhound:sync-swarm-counts` and
+`hound:sync-swarm-counts`, which do,
 and both schedule it hourly, so the scheduler is required. A `stopped` announce removes
 its peer immediately through `removePeer()`.
 
@@ -189,10 +194,11 @@ because both are safe to lose: they self-clean when an IP or a torrent goes quie
 | `getSwarmStats($torrentId)` | Totals plus both counters, for anti-cheat |
 | `getUserPeerCountForTorrent($userId, $torrentId, $livePeers)` | A member's live peers on a torrent |
 | `getIpSessionCount($ip)` | Live sessions (torrent, peer_id) from an IP |
-| `peersOfUser($userId)` | A member's live peers on every torrent, with their records (one pipelined read) |
 | `cleanupExpiredPeers($torrentId)` | Sweep expired peers, returns the count removed |
 | `retainBaselinesFor($seconds)` | Keep expired peers' records as baselines (private trackers) |
 | `resolveBaselineUsing($resolver)` | A durable fallback for a lost baseline |
+| `withPeerLock($torrentId, $peerId, $work)` | Run `$work` holding the peer's lock; null if another holder kept it (a crediting tracker handles one peer's announces one at a time) |
+| `peersOfUser($userId)` | A member's live peers on every torrent, with their records (one pipelined read) |
 
 #### One read, shared
 
@@ -322,6 +328,7 @@ ip:{ip}:sessions                   set of "torrent_id:peer_id", TTL 2 x peer_exp
 gone:{torrent_id}                  hash of peer_id => retained record, TTL the retention
 swarm:{torrent_id}:uploaded        total bytes up
 swarm:{torrent_id}:downloaded      total bytes down
+lock:{torrent_id}:{hex peer_id}    withPeerLock()'s lock, expires after 5 s
 ```
 
 Give the tracker its own Redis database or prefix if the instance is shared with cache or

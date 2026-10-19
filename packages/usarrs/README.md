@@ -123,10 +123,10 @@ a time:
 | `socialite` | OAuth sign-in, via the providers in `config('usarrs.socialite_providers')` (default `['github']`) — plus passkeys, if you've enabled them (see [Passkeys](#passkeys-webauthn)). Requires `composer require laravel/socialite` | Password login, password registration, password reset and magic links — refused on the server, not just hidden. See [OAuth](#oauth-the-socialite-driver) |
 | `invite_only` | Password login, and registration through an invite | Open sign-up: `GET /register` is a 404 unless it carries a valid, unused, unexpired invite (`/register?invite=CODE`, the link in the invite email). Needs `invites.enabled` so members can create invites |
 
-Each driver's routes only exist under that driver: the OAuth routes only under
-`socialite`, magic-link verification only under `magic_link`, and password reset
-only under `password` and `invite_only`. A route that belongs to another driver is
-a 404, not a hidden form.
+The OAuth routes are registered only under `socialite`. Magic-link verification and
+password reset are registered under every driver, and answer 404 except under their
+own: magic links under `magic_link`, reset under `password` and `invite_only`. A route
+that belongs to another driver is a 404, not a hidden form.
 
 **Every driver's `GET /login`, `GET /register` etc. are usarrs' own routes.**
 Fortify's independently-registered equivalents are suppressed unconditionally

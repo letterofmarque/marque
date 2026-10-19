@@ -39,10 +39,10 @@ All routes require authentication and email verification.
 | Route | Component | Role Required | Description |
 |-------|-----------|---------------|-------------|
 | `GET /torrents` | Index | Any | Browse and search torrents |
-| `GET /torrents/{torrent}` | Show | Any | View torrent details |
+| `GET /torrents/{torrent}` | Show | Any (subject to the torrent's `min_role`) | View torrent details |
 | `GET /torrents/upload` | Upload | Uploader+ | Upload a .torrent file |
 | `GET /torrents/{torrent}/edit` | Edit | Owner / Moderator+ | Edit torrent metadata |
-| `GET /torrents/{torrent}/download` | *(controller)* | Any | Download .torrent file |
+| `GET /torrents/{torrent}/download` | *(controller)* | Any (subject to the torrent's `min_role`) | Download .torrent file |
 
 ## Components
 

@@ -61,7 +61,7 @@ changing your constraint, and ships with upgrade notes.
 - Changing default behaviour (a config default flipping, different response shape)
 - Raising the PHP or Laravel floor
 - Database migrations that drop or rename columns, or require data transformation
-- Changing the required set of `marque/*` packages
+- Adding a required `marque/*` package (see the grey areas)
 - Removing a published Blade component or changing its rendered markup in a way that
   breaks consumers who have not published their own copy
 
@@ -79,6 +79,12 @@ it changes what a consumer must install.
 
 **Adding a required dependency.** If a package starts requiring another `marque/*` package
 it did not before, that is **major** — it changes the install set.
+
+**Dropping a required dependency.** If a package stops requiring a `marque/*` package its
+code never used, and that package still arrives through another it requires, that is
+**minor**: the install set does not change. guise, disguise, cennad, usarrs and the
+installer dropped `marque/threepio` this way in Marque 9.0; it arrives through trove.
+Dropping one that would then leave the install is **major**.
 
 **Widening a framework constraint** (e.g. `^13.0` → `^13.0|^14.0`) is **minor**, because
 nothing breaks for existing users. **Raising the floor** (dropping `^13.0`) is **major**.

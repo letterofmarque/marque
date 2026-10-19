@@ -17,6 +17,10 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   it; it arrives through `marque/trove`, which does. So a threepio major no longer needs a
   release of this package. The published versions' `threepio ^3.0` would have blocked
   threepio 4.0, which bloodhound 8.0 requires. Nothing changes for an install.
+- **Docs: bans reach the API through usarrs.** With usarrs 8.3 or later, a banned,
+  disabled or pending member's token gets a 403 on every cennad route, because usarrs
+  runs its check in the `api` group. Keep `'api'` in both middleware lists if you replace
+  them.
 
 ## [4.3.0] — 2026-10-06
 

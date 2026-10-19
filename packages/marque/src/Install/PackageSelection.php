@@ -160,7 +160,7 @@ final class PackageSelection
 
     /**
      * Every tracker needs Redis: threepio's PeerService is Redis-backed peer
-     * storage and threepio is in marque/marque's own require block, so this
+     * storage, and threepio arrives with marque/marque through trove, so this
      * holds for public and private alike (job #10700).
      */
     public function needsRedis(): bool

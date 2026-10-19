@@ -183,7 +183,7 @@ them to recreate the torrent with "private" ticked or unticked.
 byte for byte. It sets `announce` to the tracker's URL for this user, and `comment` to the
 page you pass. Everything else the uploader's client wrote is dropped. That includes
 `announce-list`: clients prefer it over `announce`, and an uploader's list can carry their
-personal announce URL for another site. Cross-seeding is a separate package (#10950). When
+personal announce URL for another site. Cross-seeding is planned as a separate package (#10950). When
 the tracker has no URL for this user (a private tracker's member with no key yet),
 `forDownload()` throws `NoAnnounceUrl`; never serve a file without one. With no tracker
 installed, the stored file is served as it is.

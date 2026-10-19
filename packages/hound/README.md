@@ -163,8 +163,9 @@ unticked: the flag stops clients using DHT and peer exchange, which a public swa
 on. An unrecognised value is treated as `disallow`.
 
 Downloads, for guests and members alike, get hound's own announce URL and a `comment`
-linking the torrent's page, around the untouched info dictionary. Everything else the
-uploader's client wrote, `announce-list` included, is dropped.
+linking the torrent's page, around the untouched info dictionary (and its `encoding`, if
+the file has one). Everything else the uploader's client wrote, `announce-list` included,
+is dropped.
 
 ### IP limiting
 

@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`appendonly yes`) and never evicts (`maxmemory-policy noeviction`), and refuses with
   the line to set if not. `BLOODHOUND_REDIS_DURABILITY=attested` in `.env` covers a
   provider that makes the data durable another way; the eviction policy is checked
-  regardless. A public tracker is not held to it. The attestation is read through the
+  whenever Redis reports it. A public tracker is not held to it. The attestation is read through the
   installer's own config (`marque.install.redis_durability`, from that variable), so it
   holds with config cached; on a re-run, bloodhound's `redis.durability` wins.
 

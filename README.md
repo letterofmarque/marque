@@ -227,9 +227,9 @@ php artisan vendor:publish --tag=taxonomy-config
 ## Versioning
 
 Packages follow [Semantic Versioning](https://semver.org) and are versioned
-independently, so packages sit on different majors (usarrs on 8, threepio on 3) and that is normal.
+independently, so packages sit on different majors (usarrs on 8, threepio on 4) and that is normal.
 
-Most people want a caret on the current major (`^8.2` for usarrs today), which is what `composer require` gives you by default: new
+Most people want a caret on the current major (`^8.3` for usarrs today), which is what `composer require` gives you by default: new
 features and fixes automatically, never a breaking change. Minor releases are cut
 frequently, so you should not need to track `dev-main` to get a finished feature.
 
@@ -257,7 +257,7 @@ picks it up automatically. Two things to watch:
   more than three tags arrive in a single push — the tags land, nothing splits, and
   Packagist is never notified. It fails silently.
 - **Release in dependency order.** A package must be published before anything that
-  requires it: `threepio` → `trove` and `deck` → everything else.
+  requires it: `threepio` → `trove` → `deck` → everything else.
 
 If a split is missed, re-trigger it from an existing tag:
 

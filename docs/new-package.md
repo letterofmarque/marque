@@ -114,8 +114,10 @@ this" to consumers. The one case worth reconsidering is a package whose *public
 contract is a file format* rather than an API — Build #95 CP9 raises it for taxonomy,
 where the YAML shape is the thing consumers write against.
 
-**Optional inter-package dependencies use `class_exists` detection, not a hard
-require.** guise renders comments when parley is installed and nothing when it isn't.
+**Optional inter-package dependencies are detected, not required.** Use `class_exists`
+to register something in your own provider, and `app()->providerIsLoaded()` to decide
+whether to render another package's UI (see [integration.md](integration.md)): guise
+renders comments when parley's provider is loaded and nothing when it isn't.
 This keeps the dependent package at a MINOR bump and keeps the new package genuinely
 optional.
 

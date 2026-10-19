@@ -165,9 +165,9 @@ The default middleware uses `auth:api`, which needs a guard named `api` in
 or set `read_middleware` and `write_middleware` to `['api', 'auth:sanctum']`. Any guard
 works, as long as the middleware names it.
 
-**Bans reach the API through the `api` group.** With usarrs installed, a banned, disabled
-or pending member's token gets a 403 on every cennad route, because usarrs runs its
-check in that group. Keep `'api'` in both middleware lists if you replace them, or add
+**Bans reach the API through the `api` group.** With usarrs 8.3 or later installed, a
+banned, disabled or pending member's token gets a 403 on every cennad route, because
+usarrs runs its check in that group. Keep `'api'` in both middleware lists if you replace them, or add
 usarrs' `EnsureUserIsActive` yourself.
 
 Reads and writes are configured separately so a public tracker can expose its catalogue
