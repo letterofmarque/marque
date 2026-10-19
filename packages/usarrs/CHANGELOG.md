@@ -40,6 +40,10 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   logout, so nothing else happens; reinstating the member makes the same token work
   again. Both registrations go through the HTTP kernel, so a later kernel change can't
   silently drop them.
+- **The magic-link mail said the link lasts 15 minutes; it lasts the password broker's
+  expiry** (Laravel's default is 60), and now says so (#10839). It also named the site
+  from `id.app_name`, a key gone since `id` became `deck`; it reads `deck.app_name`, then
+  `app.name`.
 
 ## [8.2.1] — 2026-10-03
 
