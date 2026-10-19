@@ -193,7 +193,7 @@ because both are safe to lose: they self-clean when an IP or a torrent goes quie
 | `getSeeders($torrentId)` / `getLeechers($torrentId)` | Swarm counters |
 | `getSwarmStats($torrentId)` | Totals plus both counters, for anti-cheat |
 | `getUserPeerCountForTorrent($userId, $torrentId, $livePeers)` | A member's live peers on a torrent |
-| `getIpSessionCount($ip)` | Live sessions (torrent, peer_id) from an IP |
+| `getIpSessionCount($ip)` | Sessions (torrent, peer_id) in an IP's set; includes expired ones until the sweep |
 | `cleanupExpiredPeers($torrentId)` | Sweep expired peers, returns the count removed |
 | `retainBaselinesFor($seconds)` | Keep expired peers' records as baselines (private trackers) |
 | `resolveBaselineUsing($resolver)` | A durable fallback for a lost baseline |

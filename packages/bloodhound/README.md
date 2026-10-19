@@ -63,11 +63,12 @@ or session store.
 **In production, announces are refused until the check passes.** Each one is answered
 `Tracker storage is not configured for durability; the operator has been notified`, and
 the failure is logged at `critical`. No ledger row is written for these, since the refusal
-is the tracker's, not the member's. A passing verdict is cached in your application cache for
-five minutes and a failing one for 15 seconds, so a fix takes effect within 15 seconds,
-and the failure is logged at most once every five minutes. This is deliberately a hard stop: a tracker that credits ratio against a store
-that can forget is worse than one that is briefly down, and putting it right is a
-two-line change. In any other environment (`APP_ENV` other than `production`) a warning is
+is the tracker's, not the member's. A passing verdict is cached in your application
+cache for five minutes and a failing one for 15 seconds, so a fix takes effect within 15
+seconds. Announces log the failure at most once every five minutes; the scheduled check
+below logs it on every run. This is deliberately a hard stop: a tracker that credits
+ratio against a store that can forget is worse than one that is briefly down, and
+putting it right is a two-line change. In any other environment (`APP_ENV` other than `production`) a warning is
 logged instead and announces go ahead, so development machines and CI need nothing.
 
 `bloodhound:aggregate-ledger`, scheduled every minute, runs the same check and logs a

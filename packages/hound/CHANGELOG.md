@@ -19,8 +19,10 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   `max_per_ip`.** It counts the live peers one address has on one torrent, which is what
   pollutes a swarm. The old cap counted across every torrent, so a public seedbox seeding
   hundreds of torrents from one address was refused once it passed 50. How many torrents
-  an address seeds is no longer limited. Rename the key in a published config;
-  `max_per_ip` is ignored.
+  an address seeds is no longer limited. Rename the key in a published config, and
+  `HOUND_MAX_PER_IP` to `HOUND_MAX_PEERS_PER_TORRENT` in `.env`; `max_per_ip` is ignored.
+  The old figure capped every torrent together, so choose a per-torrent one rather than
+  carrying it over.
 
 ### Fixed
 

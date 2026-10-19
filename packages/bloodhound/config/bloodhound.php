@@ -228,9 +228,9 @@ return [
     | Redis, so Redis must keep what it holds: appendonly yes (appendfsync
     | everysec) and maxmemory-policy noeviction, on a database of its own
     | (THREEPIO_REDIS_CONNECTION). In production, announces are refused
-    | until it does; elsewhere a warning is logged. The check is cached for
-    | five minutes, and `php artisan bloodhound:check-redis` says what to
-    | change. If your provider makes the data durable another way
+    | until it does; elsewhere a warning is logged. A passing check is cached
+    | for five minutes and a failing one for 15 seconds, and
+    | `php artisan bloodhound:check-redis` says what to change. If your provider makes the data durable another way
     | (replication, snapshots) and offers no AOF, set durability to
     | 'attested': that covers persistence, and the eviction policy is still
     | checked whenever Redis answers INFO.
@@ -260,7 +260,7 @@ return [
     | Refuses only what a legitimate client never does, and never refuses a
     | peer already in the swarm on a count: a bad port, a regular announce
     | inside the minimum gap, a new location past the member's limit, a new
-    | session past the IP's. A refusal is a flagged ledger row that credits
+    | client past the member's clients on the torrent. A refusal is a flagged ledger row that credits
     | nothing and changes nothing in Redis; it fires no event. A speed over
     | the cap is forfeited, not refused; it, a data anomaly and a sampled
     | swarm anomaly fire CheatDetected.
