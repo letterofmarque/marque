@@ -7,7 +7,9 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [Unreleased]
+## [5.2.0] — 2026-10-19
+
+> No longer requires marque/threepio directly, so it installs beside bloodhound 8 and threepio 4.
 
 ### Changed
 
