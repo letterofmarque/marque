@@ -31,6 +31,16 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   threepio 4.0, which bloodhound 8.0 requires. Nothing changes for an install.
 - **Requires `marque/trove` ^4.6**, for `TrackerSessionsInterface`.
 
+### Fixed
+
+- **A banned member's API token kept working** (#10920). A ban ended web sessions only:
+  cennad's routes are `['api', 'auth:api']`, and the `api` group never ran the check.
+  `EnsureUserIsActive` now runs in the `api` group too, ordered after authentication, and
+  answers a token route with a 403 and the reason. A token guard has no session or
+  logout, so nothing else happens; reinstating the member makes the same token work
+  again. Both registrations go through the HTTP kernel, so a later kernel change can't
+  silently drop them.
+
 ## [8.2.1] — 2026-10-03
 
 > Ships what 8.2.0 should have contained: 8.2.0 reached Packagist without its last fix (manage_auth off no longer errors for unverified members) and its README corrections.

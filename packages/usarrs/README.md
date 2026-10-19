@@ -97,6 +97,11 @@ if they already are:
   `EnsureUserIsActive` onto that group, so a ban covers browsing and
   downloading everywhere. It also covers Livewire actions from a tab that was
   already open.
+- **An API token is refused too.** The same check runs in the `api` group,
+  ordered after authentication, so a token route such as cennad's
+  (`['api', 'auth:api']`) answers 403 with the reason. Nothing is revoked:
+  reinstate the user and the same token works again. A route outside both
+  groups is not covered; put `EnsureUserIsActive` on it yourself.
 
 Only the three statuses usarrs defines as inactive are refused: `banned`,
 `disabled` and `pending`. usarrs adds the `status` column only if your app

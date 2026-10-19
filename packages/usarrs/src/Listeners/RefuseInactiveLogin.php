@@ -35,7 +35,13 @@ class RefuseInactiveLogin
             return;
         }
 
-        Auth::guard($guard)->logout();
+        // A token guard (Passport, Sanctum) has no session to end and no
+        // logout(): refusing the request is all there is (#10920).
+        $auth = Auth::guard($guard);
+
+        if (method_exists($auth, 'logout')) {
+            $auth->logout();
+        }
 
         if (request()->hasSession()) {
             request()->session()->invalidate();

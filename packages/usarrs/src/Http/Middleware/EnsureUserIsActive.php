@@ -15,7 +15,8 @@ use Symfony\Component\HttpFoundation\Response;
  * Pushed onto the whole `web` group, not just usarrs' routes: a ban that only
  * held on /profile would leave the user browsing and downloading everywhere
  * else. Livewire's update endpoint runs in that group too, so a tab opened
- * before the ban can't keep acting.
+ * before the ban can't keep acting. And onto the `api` group, ordered after
+ * authentication, so a banned member's API token is refused too (#10920).
  */
 class EnsureUserIsActive
 {

@@ -6,6 +6,9 @@ namespace Marque\Usarrs;
 
 use Illuminate\Auth\Events\Login as LoginEvent;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
+use Illuminate\Contracts\Http\Kernel as HttpKernel;
+use Illuminate\Foundation\Http\Kernel as FoundationHttpKernel;
 use Illuminate\Http\Request;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Support\Facades\Event;
@@ -93,6 +96,40 @@ class UsarrsServiceProvider extends ServiceProvider
         }
     }
 
+    /**
+     * Run EnsureUserIsActive on every web and API request.
+     *
+     * The `api` group too (#10920): cennad's routes are ['api', 'auth:api'],
+     * and a ban that held on the web but not on a token would leave a banned
+     * member reading and writing through the API. On a token route the user
+     * is only known once the guard has run, so the check is ordered after
+     * authentication in the middleware priority; Laravel sorts a route's
+     * stack by it.
+     *
+     * Through the HTTP kernel rather than the router: any later kernel change
+     * re-syncs the router from the kernel's own lists, which would silently
+     * drop a group entry or a priority made on the router alone.
+     */
+    private function enforceActiveUsers(): void
+    {
+        $kernel = $this->app->make(HttpKernel::class);
+
+        if (! $kernel instanceof FoundationHttpKernel) {
+            $this->app['router']->pushMiddlewareToGroup('web', EnsureUserIsActive::class);
+            $this->app['router']->pushMiddlewareToGroup('api', EnsureUserIsActive::class);
+
+            return;
+        }
+
+        foreach (['web', 'api'] as $group) {
+            if (array_key_exists($group, $kernel->getMiddlewareGroups())) {
+                $kernel->appendMiddlewareToGroup($group, EnsureUserIsActive::class);
+            }
+        }
+
+        $kernel->addToMiddlewarePriorityAfter(AuthenticatesRequests::class, EnsureUserIsActive::class);
+    }
+
     public function boot(): void
     {
         // Every sign-in records the password hash it signed in under, so
@@ -102,7 +139,7 @@ class UsarrsServiceProvider extends ServiceProvider
         // A banned user is refused however they sign in, and a live session
         // ends on its next request to any web page, not just usarrs' (#10857).
         Event::listen(LoginEvent::class, RefuseInactiveLogin::class);
-        $this->app['router']->pushMiddlewareToGroup('web', EnsureUserIsActive::class);
+        $this->enforceActiveUsers();
 
         if (config('usarrs.passkeys.enabled', false)) {
             $this->configurePasskeys();
