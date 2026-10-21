@@ -240,6 +240,22 @@ public function boot(): void
 shorthand for a role gate, with the same semantics as `NavItem::forRole()` — a guest never
 clears it.
 
+**The dashboard admits unverified users, and your torrent routes probably don't.** usarrs'
+`/dashboard` needs only `auth`, so that the announce key panel can tell a new member to
+verify their address. guise's torrent pages and downloads need `verified`. A panel that lists
+torrents, or anything else those routes guard, has to ask the same question, or it shows an
+unverified member what the routes would refuse them. `DashboardPanel::verifiedOnly()` does that:
+
+```php
+DashboardPanel::verifiedOnly('acme-latest', 'Latest torrents', 'acme-latest-panel',
+    position: 15,
+    visible: fn (object $user): bool => Torrent::exists(),   // asked only once verified
+);
+```
+
+It answers the way Laravel's `verified` middleware does. A user model that doesn't implement
+`MustVerifyEmail` has no verification to pass, so it is let through. Guests never are.
+
 **Nothing depends on the dashboard in order to contribute to it.** Registering a panel needs
 trove and nothing else; if usarrs is not installed the declaration simply goes unread. Your
 package boots and behaves identically either way.

@@ -7,6 +7,17 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+### Added
+
+- **`DashboardPanel::verifiedOnly()`**, for a panel only a verified user sees, with optional
+  visibility of its own on top (#11070). The dashboard admits unverified users, while the
+  frontends' torrent routes need `verified`, so a panel showing torrents has to ask the same
+  question. It answers as Laravel's `verified` middleware does: a user model without
+  `MustVerifyEmail` passes, and guests never do. The README's Dashboard panels section
+  covers the gap.
+
 ## [4.6.0] — 2026-10-20
 
 > Contracts for members' seedboxes and live tracker sessions, so a frontend can manage both without knowing the tracker; accepts threepio 4.

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Marque\Trove\Registry;
 
 use Closure;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use InvalidArgumentException;
 use Marque\Trove\Enums\Role;
 
@@ -89,6 +90,49 @@ final class DashboardPanel
                 }
 
                 return $user->hasRoleAtLeast($minimumRole);
+            },
+        );
+    }
+
+    /**
+     * A panel only a verified user sees, with optional visibility of its own.
+     *
+     * The dashboard admits unverified users on purpose (the announce panel is
+     * what tells them to verify), but a frontend's torrent routes need
+     * `verified`. A panel showing what those routes guard has to ask the same
+     * question, or it shows an unverified user what the routes refuse (#11070).
+     *
+     * It is answered the way Laravel's `verified` middleware answers it: a user
+     * model without MustVerifyEmail has no verification to pass, so it is let
+     * through. Guests never are. `$visible` is asked only once the user has
+     * passed.
+     *
+     * @param  (Closure(object|null): bool)|null  $visible
+     */
+    public static function verifiedOnly(
+        string $identifier,
+        string $label,
+        string $component,
+        ?string $icon = null,
+        int $position = 100,
+        ?Closure $visible = null,
+    ): self {
+        return new self(
+            identifier: $identifier,
+            label: $label,
+            component: $component,
+            icon: $icon,
+            position: $position,
+            visible: function (?object $user) use ($visible): bool {
+                if ($user === null) {
+                    return false;
+                }
+
+                if ($user instanceof MustVerifyEmail && ! $user->hasVerifiedEmail()) {
+                    return false;
+                }
+
+                return $visible === null || $visible($user);
             },
         );
     }

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Marque\Trove\Enums\Role;
 use Marque\Trove\Registry\DashboardPanel;
 use Marque\Trove\Registry\DashboardPanelRegistry;
@@ -106,6 +107,71 @@ describe('DashboardPanel', function () {
             $panel = DashboardPanel::forRole('mod', 'Mod', 'mod-panel', Role::User);
 
             expect($panel->isVisibleTo(new stdClass))->toBeFalse();
+        });
+    });
+
+    // #11070 item 4: the dashboard admits unverified users, while guise's
+    // torrent routes need `verified`. A panel showing torrents must not show
+    // an unverified user what the routes would refuse them.
+    describe('verifiedOnly()', function () {
+        $verifiable = fn (bool $verified) => new class($verified) implements MustVerifyEmail
+        {
+            public function __construct(private bool $verified) {}
+
+            public function hasVerifiedEmail(): bool
+            {
+                return $this->verified;
+            }
+
+            public function markEmailAsVerified(): bool
+            {
+                return true;
+            }
+
+            public function markEmailAsUnverified(): bool
+            {
+                return true;
+            }
+
+            public function sendEmailVerificationNotification(): void {}
+
+            public function getEmailForVerification(): string
+            {
+                return 'x@example.com';
+            }
+        };
+
+        it('admits a verified user and denies an unverified one', function () use ($verifiable) {
+            $panel = DashboardPanel::verifiedOnly('latest', 'Latest', 'latest-panel');
+
+            expect($panel->isVisibleTo($verifiable(true)))->toBeTrue()
+                ->and($panel->isVisibleTo($verifiable(false)))->toBeFalse();
+        });
+
+        // The same answer Laravel's `verified` middleware gives: an app whose
+        // user model has no verification at all lets everyone through.
+        it('admits a user whose model has no email verification', function () {
+            $panel = DashboardPanel::verifiedOnly('latest', 'Latest', 'latest-panel');
+
+            expect($panel->isVisibleTo(new TestUser(['role' => Role::User->value])))->toBeTrue();
+        });
+
+        it('never admits a guest', function () {
+            expect(DashboardPanel::verifiedOnly('latest', 'Latest', 'latest-panel')->isVisibleTo(null))->toBeFalse();
+        });
+
+        it('applies its own visibility only once the user is verified', function () use ($verifiable) {
+            $asked = 0;
+            $panel = DashboardPanel::verifiedOnly('latest', 'Latest', 'latest-panel', visible: function (?object $user) use (&$asked): bool {
+                $asked++;
+
+                return false;
+            });
+
+            expect($panel->isVisibleTo($verifiable(false)))->toBeFalse()
+                ->and($asked)->toBe(0)
+                ->and($panel->isVisibleTo($verifiable(true)))->toBeFalse()
+                ->and($asked)->toBe(1);
         });
     });
 });
