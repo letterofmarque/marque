@@ -18,7 +18,9 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   HTML 404 (#11070). That covers a wrong length, extra segments or no key at all. A client
   shows the 404 as a garbled or unknown error. The route constraint still vets the key, and
   the fallback refuses it without a lookup. The default stays `not_found` (the documented
-  404) through 8.x, and `failure` becomes the default in 9.0.
+  404) through 8.x, and `failure` becomes the default in 9.0. With a published
+  `config/bloodhound.php`, add the key to its `routes` block first; the env var is read
+  only once it is there.
 - **`bloodhound:issue-keys`** issues an announce key to every verified user without one (to
   every user, if the model doesn't verify addresses). Rows inserted without Eloquent, such
   as a bulk import or a migration from another tracker, never got one. It never touches an

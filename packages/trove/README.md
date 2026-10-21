@@ -207,7 +207,7 @@ one needs thought, so fixing them is your call.
 
 ## Dashboard panels
 
-The user dashboard (`/dashboard`, rendered by `marque/usarrs`) shows whatever panels
+The user dashboard (`/dashboard` by default, rendered by `marque/usarrs`; `usarrs.dashboard.path` moves it) shows whatever panels
 packages have registered. It names no package and holds no list of its own, so a package
 Marque has never heard of gets a panel exactly as a first-party one does — same card, same
 heading, ordered among the others by the position it chose.
@@ -301,7 +301,7 @@ Trove creates:
 - Adds a `role` column to the users table
 
 That is all trove adds to `users`. The tracker columns (`uploaded`, `downloaded`,
-`seedtime`) come from bloodhound's migrations, and announce keys live in bloodhound's own
+`seedtime`, `leechtime`) come from bloodhound's migrations, and announce keys live in bloodhound's own
 `announce_keys` table.
 
 Publish migrations to customise them:

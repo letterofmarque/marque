@@ -8,8 +8,9 @@
 > `marque/ise` — same package, same content, new name (the old one collided
 > conceptually with `marque/usarrs`). `marque/id` is marked abandoned on
 > Packagist pointing at the replacement. This guide is left as-written for
-> historical accuracy; substitute `marque/ise` for `marque/id` throughout if
-> you're following it today.
+> historical accuracy. `marque/ise` was itself renamed to `marque/deck` in Marque 6.0
+> (id → ise in 4.0, ise → deck in 6.0), so if you're following it today substitute
+> `marque/deck` for `marque/id` throughout: `deck::layouts.app`, `--tag=deck-config`.
 
 This guide covers migrating from Marque v1.x to v2.0. The major change is the extraction of shared protocol code into `marque/threepio` and the introduction of five new packages.
 

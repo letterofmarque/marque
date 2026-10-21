@@ -216,6 +216,10 @@ path, the route constraint vets the key before any lookup, and a request that fa
 fallback route under the same path instead. That route answers the same bencoded
 `Invalid announce key`, without touching the database. The 404 stays the default
 through 8.x because it was documented behaviour, and `failure` becomes the default in 9.0.
+**If you published `config/bloodhound.php` before 8.1.0**, add
+`'malformed_key' => env('BLOODHOUND_MALFORMED_KEY', 'not_found'),` to its `routes` block
+first. A published block replaces the shipped one whole (see [Configuration](#configuration)),
+so until the key is there the env var does nothing.
 On announce a missing key is refused the same way. Scrape accepts a missing key, since a
 public scrape is legitimate, and refuses only a malformed one. Only the configured paths
 are covered. A legacy URL at a different path (`/announce.php` when you serve `/announce`)

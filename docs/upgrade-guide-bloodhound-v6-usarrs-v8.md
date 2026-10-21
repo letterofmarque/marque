@@ -92,7 +92,8 @@ app(TrackerStatsInterface::class)->regenerateAnnounceKey($user);
 ```
 
 New users still get a key automatically when they're created, provided your User model
-uses `HasTrackerStats`. It's written to `announce_keys`.
+uses `HasTrackerStats`. It's written to `announce_keys`. From bloodhound 6.1, if your User
+model implements `MustVerifyEmail`, the key waits until the address is verified.
 
 If your User model defined its own `generateAnnounceKey()` to control the key format, it
 is no longer called. bloodhound mints 32 alphanumeric characters, which is what the
