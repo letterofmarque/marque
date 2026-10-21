@@ -7,7 +7,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [Unreleased]
+## [8.4.0] — 2026-10-21
 
 > An app's own /dashboard is reported and can coexist, login returns to the page it was going to, a member without an announce key can get one from the dashboard, and the stats panel shows seed and leech time.
 

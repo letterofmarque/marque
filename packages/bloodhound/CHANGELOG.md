@@ -7,7 +7,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [Unreleased]
+## [8.1.0] — 2026-10-21
 
 > What a real upgrade found: a stale published config is reported with the value actually in effect, imported members can be issued keys, a tracker with no scheduler says so, leechtime is reported, and a malformed announce key can get a reason instead of a 404.
 

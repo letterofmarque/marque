@@ -8,7 +8,7 @@ those versions describe the package under its former names.*
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
-## [Unreleased]
+## [2.0.1] — 2026-10-21
 
 > A nav entry whose route no longer exists is left out, instead of failing every page with RouteNotFoundException.
 
