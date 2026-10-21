@@ -17,6 +17,9 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   question. It answers as Laravel's `verified` middleware does: a user model without
   `MustVerifyEmail` passes, and guests never do. The README's Dashboard panels section
   covers the gap.
+- **`TrackerStats::$leechtime`**, in seconds, beside seedtime (#11070). It's an optional
+  last constructor parameter defaulting to 0, so a tracker that doesn't report it still
+  constructs one. bloodhound 8.1 reports it.
 
 ## [4.6.0] — 2026-10-20
 

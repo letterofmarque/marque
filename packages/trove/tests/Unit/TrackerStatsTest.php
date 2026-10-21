@@ -13,6 +13,17 @@ describe('TrackerStats', function () {
             ->and($stats->seedtime)->toBe(86_400);
     });
 
+    // #11070 item 5: the tracker credits leechtime per announce as it does
+    // seedtime, and the dashboard should be able to show both.
+    it('carries leechtime, zero when a tracker does not report it', function () {
+        expect((new TrackerStats(uploaded: 0, downloaded: 0, seedtime: 10, leechtime: 20))->leechtime)->toBe(20)
+            ->and((new TrackerStats(uploaded: 0, downloaded: 0, seedtime: 10))->leechtime)->toBe(0);
+    });
+
+    it('refuses a negative leechtime', function () {
+        new TrackerStats(uploaded: 0, downloaded: 0, seedtime: 0, leechtime: -1);
+    })->throws(InvalidArgumentException::class, 'leechtime');
+
     // Raw, not rounded: rounding is presentation, and the contract leaves
     // presentation to the consumer (Spec #119, "raw integers, not formatted strings").
     it('computes the ratio unrounded', function () {

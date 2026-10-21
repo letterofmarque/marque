@@ -35,13 +35,17 @@ final class TrackerStats
      * @param  int  $uploaded  Bytes.
      * @param  int  $downloaded  Bytes.
      * @param  int  $seedtime  Seconds.
+     * @param  int  $leechtime  Seconds. Optional, so a tracker written before
+     *                          trove 4.7 still constructs this; 0 then means
+     *                          "not reported", not "never leeched".
      */
     public function __construct(
         public readonly int $uploaded,
         public readonly int $downloaded,
         public readonly int $seedtime,
+        public readonly int $leechtime = 0,
     ) {
-        foreach (['uploaded' => $uploaded, 'downloaded' => $downloaded, 'seedtime' => $seedtime] as $field => $value) {
+        foreach (['uploaded' => $uploaded, 'downloaded' => $downloaded, 'seedtime' => $seedtime, 'leechtime' => $leechtime] as $field => $value) {
             if ($value < 0) {
                 throw new InvalidArgumentException("Tracker stats cannot be negative: {$field} is {$value}.");
             }

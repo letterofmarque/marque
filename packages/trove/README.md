@@ -100,7 +100,7 @@ $tracker = app()->bound(TrackerStatsInterface::class)
     ? app(TrackerStatsInterface::class)
     : null;                                   // no tracker installed
 
-$stats = $tracker?->statsFor($user);         // TrackerStats: uploaded, downloaded, seedtime, ratio
+$stats = $tracker?->statsFor($user);         // TrackerStats: uploaded, downloaded, seedtime, leechtime, ratio
 $key = $tracker?->announceKeyFor($user);     // the key for the user's announce URL
 $tracker?->regenerateAnnounceKey($user);     // issue a new one; the old stops working
 
