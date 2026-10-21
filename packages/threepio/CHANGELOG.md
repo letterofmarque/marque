@@ -9,6 +9,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [Unreleased]
 
+> A valid .torrent for your own test suite: `Testing\FakeTorrent`, private by default, with a distinct info_hash each time.
+
 ### Added
 
 - **`Testing\FakeTorrent`**, a valid .torrent for consumer test suites (#11070). It is

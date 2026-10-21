@@ -52,6 +52,7 @@ Newest first. Each links to the full write-up.
 
 | Release | Date | Summary | Who's affected |
 |---|---|---|---|
+| [9.1](releases/9.1.md) | | From one real 6.0 → 9.0 upgrade: an app's own `/dashboard` no longer breaks every page and is reported; a stale published bloodhound config is reported; login returns to the page it was going to; every member can get an announce key; a tracker with no scheduler says so; seed and leech time on the dashboard; `FakeTorrent` for consumer tests | apps with their own `/dashboard`; bloodhound configs published before 2.0; installs that imported members |
 | [9.0](releases/9.0.md) ([upgrade steps](../packages/bloodhound/README.md#upgrading-from-7x-to-80)) | 2026-10-20 | Bloodhound credits every announce when it arrives, bytes and seedtime alike, against a Redis that must persist and never evict; anti-cheat stops refusing legitimate clients; members register seedboxes and end their own sessions (screens in usarrs); a banned member's API token is refused | anyone running bloodhound, who must configure Redis before upgrading; hound users (`ip_limiting.max_per_ip` is replaced by `max_peers_per_torrent`, a cap per address per torrent) |
 | [8.0](releases/8.0.md) | 2026-10-06 | Downloads carry each member's own announce URL around the untouched info dictionary; uploads must match the tracker's private-flag rule (bloodhound requires private, hound disallows it) | anyone running bloodhound or hound |
 | [7.0](releases/7.0.md) | 2026-09-25 | Tracker data gets an owner: packages ask a declared contract instead of probing your User model; announce keys move to a bloodhound-owned table; tracker columns no longer mass-assignable | anyone running bloodhound; anyone reading `$user->announce_key` |
@@ -103,6 +104,7 @@ release each guide belongs to.
 | 16 | Release | [Marque 8.0](releases/8.0.md) | 8.0 | Personalised downloads; private-flag rules on upload (set `*_PRIVATE_FLAG=allow` to keep the old behaviour) |
 | 17 | Release | [Marque 9.0](releases/9.0.md) | 9.0 | Credit at announce time on a durable Redis; anti-cheat that doesn't refuse legitimate clients; seedboxes and members' sessions; hound's per-torrent IP cap |
 | 18 | Guide | [bloodhound 7.x → 8.0](../packages/bloodhound/README.md#upgrading-from-7x-to-80) | 9.0 | Durable Redis first (production refuses announces without it), then config, migrate, the old Redis keys, and the optional history backfill |
+| 19 | Release | [Marque 9.1](releases/9.1.md) | 9.1 | Your own `/dashboard`, a stale published bloodhound config, imported members' keys, the scheduler, and test fixtures |
 
 ## Currently at 2.x or earlier?
 

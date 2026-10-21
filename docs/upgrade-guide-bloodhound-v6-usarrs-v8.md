@@ -143,6 +143,18 @@ edit your copies:
 
 For the ratio, render `$stats->hasInfiniteRatio() ? '∞' : number_format($stats->ratio, 2)`.
 
+## Step 8: Your Own `/dashboard`
+
+Skip this if your app has no `/dashboard` route. A Laravel starter kit has one.
+
+usarrs 8 registers `/dashboard` as `dashboard.index`. Your app's routes load later, so
+yours replaces it, the name goes with it, and every page that shows the navigation throws
+`RouteNotFoundException`. *(This step was added after 7.0 shipped.)* Either:
+
+- delete your route and move what it showed into dashboard panels (trove's README,
+  "Dashboard panels"), or
+- from usarrs 8.4, keep it and move usarrs' with `USARRS_DASHBOARD_PATH=home`.
+
 ## Verify
 
 - Announce with an existing .torrent file: it should work unchanged.

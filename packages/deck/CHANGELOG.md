@@ -10,6 +10,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
 ## [Unreleased]
 
+> A nav entry whose route no longer exists is left out, instead of failing every page with RouteNotFoundException.
+
 ### Fixed
 
 - **A nav entry whose route doesn't exist is left out, not rendered** (#11070). Before,

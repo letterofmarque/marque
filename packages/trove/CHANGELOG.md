@@ -9,6 +9,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [Unreleased]
 
+> Dashboard panels for verified members only, and leechtime beside seedtime in a tracker's stats.
+
 ### Added
 
 - **`DashboardPanel::verifiedOnly()`**, for a panel only a verified user sees, with optional

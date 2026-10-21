@@ -9,6 +9,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [Unreleased]
 
+> What a real upgrade found: a stale published config is reported with the value actually in effect, imported members can be issued keys, a tracker with no scheduler says so, leechtime is reported, and a malformed announce key can get a reason instead of a 404.
+
 ### Added
 
 - **`routes.malformed_key`** (`BLOODHOUND_MALFORMED_KEY`). With `failure`, a malformed key

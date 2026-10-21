@@ -9,6 +9,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [Unreleased]
 
+> An app's own /dashboard is reported and can coexist, login returns to the page it was going to, a member without an announce key can get one from the dashboard, and the stats panel shows seed and leech time.
+
 ### Added
 
 - **`usarrs.dashboard.path`** (`USARRS_DASHBOARD_PATH`, default `dashboard`), so an app
