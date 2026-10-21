@@ -37,6 +37,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   var, the value your config sets and the value in effect. twentyt's
   `BLOODHOUND_MIN_ANNOUNCE_INTERVAL=900` had been silently replaced by 300 for several
   majors. The README's "Moved or removed earlier" table lists them all.
+- **`statsFor()` reports leechtime**, which trove 4.7's `TrackerStats` carries. Requires
+  `marque/trove ^4.7`.
 
 ## [8.0.0] — 2026-10-20
 

@@ -19,7 +19,7 @@ use Marque\Trove\Support\TrackerStats;
 
 beforeEach(function () {
     $this->user = makeTrackerUser('aaaabbbbccccddddeeeeffffgggghhhh', 'stats@example.com');
-    $this->user->forceFill(['uploaded' => 6_000, 'downloaded' => 2_000, 'seedtime' => 7_200])->save();
+    $this->user->forceFill(['uploaded' => 6_000, 'downloaded' => 2_000, 'seedtime' => 7_200, 'leechtime' => 1_800])->save();
 
     $this->torrent = Torrent::create([
         'name' => 'Stats Torrent',
@@ -44,6 +44,7 @@ describe('statsFor', function () {
             ->and($stats->uploaded)->toBe(6_000)
             ->and($stats->downloaded)->toBe(2_000)
             ->and($stats->seedtime)->toBe(7_200)
+            ->and($stats->leechtime)->toBe(1_800)
             ->and($stats->ratio)->toBe(3.0);
     });
 

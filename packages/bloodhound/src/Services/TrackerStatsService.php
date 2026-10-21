@@ -34,7 +34,7 @@ class TrackerStatsService implements TrackerStatsInterface
 {
     public function statsFor(UserInterface $user): ?TrackerStats
     {
-        $row = $this->userQuery($user)->first(['uploaded', 'downloaded', 'seedtime']);
+        $row = $this->userQuery($user)->first(['uploaded', 'downloaded', 'seedtime', 'leechtime']);
 
         if ($row === null) {
             return null;
@@ -44,6 +44,7 @@ class TrackerStatsService implements TrackerStatsInterface
             uploaded: (int) $row->getAttribute('uploaded'),
             downloaded: (int) $row->getAttribute('downloaded'),
             seedtime: (int) $row->getAttribute('seedtime'),
+            leechtime: (int) $row->getAttribute('leechtime'),
         );
     }
 
