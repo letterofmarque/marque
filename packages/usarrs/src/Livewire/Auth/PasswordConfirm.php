@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Actions\ConfirmPassword;
 use Livewire\Attributes\Title;
+use Marque\Usarrs\Auth\LoginCompletion;
 use Marque\Usarrs\Livewire\Component;
 
 /**
@@ -57,7 +58,7 @@ class PasswordConfirm extends Component
 
         // Back to the page that asked, as Laravel's own confirm flow does: the
         // password.confirm middleware records it (Job #141 review).
-        $this->redirect(session()->pull('url.intended', url('/')), navigate: true);
+        $this->redirect(session()->pull('url.intended', LoginCompletion::home()), navigate: true);
     }
 
     public function render(): View

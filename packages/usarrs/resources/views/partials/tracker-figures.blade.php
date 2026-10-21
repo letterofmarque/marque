@@ -1,5 +1,5 @@
 {{--
-    Uploaded, downloaded and ratio from a TrackerStats. Shared by /profile/stats
+    Uploaded, downloaded, ratio, seed time and leech time from a TrackerStats. Shared by /profile/stats
     and the dashboard panel so the two cannot drift apart. A null ratio means
     nothing downloaded, which is infinite, never 0.00.
 
@@ -18,5 +18,13 @@
     <div class="{{ $itemClass ?? '' }}">
         <x-deck::text class="text-sm text-zinc-500">{{ __('Ratio') }}</x-deck::text>
         <x-deck::heading size="lg" class="mt-1">{{ $stats->hasInfiniteRatio() ? '∞' : number_format($stats->ratio, 2) }}</x-deck::heading>
+    </div>
+    <div class="{{ $itemClass ?? '' }}">
+        <x-deck::text class="text-sm text-zinc-500">{{ __('Seed time') }}</x-deck::text>
+        <x-deck::heading size="lg" class="mt-1">{{ \Marque\Usarrs\Support\Duration::short($stats->seedtime) }}</x-deck::heading>
+    </div>
+    <div class="{{ $itemClass ?? '' }}">
+        <x-deck::text class="text-sm text-zinc-500">{{ __('Leech time') }}</x-deck::text>
+        <x-deck::heading size="lg" class="mt-1">{{ \Marque\Usarrs\Support\Duration::short($stats->leechtime) }}</x-deck::heading>
     </div>
 </div>

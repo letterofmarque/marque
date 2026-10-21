@@ -29,8 +29,9 @@ Route::middleware([...config('usarrs.auth_middleware', ['web', 'auth']), 'auth.s
         // whether any panel exists would make the route table install-dependent
         // — route('dashboard.index') safe on one install and fatal on another,
         // so every consumer linking to it would need a Route::has() guard
-        // (Spec #118).
-        Route::get('dashboard', DashboardIndex::class)->name('dashboard.index');
+        // (Spec #118). The path moves (usarrs.dashboard.path) for an app that
+        // keeps its own /dashboard; the name never does (#11070).
+        Route::get(config('usarrs.dashboard.path', 'dashboard'), DashboardIndex::class)->name('dashboard.index');
 
         Route::get('profile', ProfileShow::class)->name('profile.show');
         Route::get('profile/edit', ProfileEdit::class)->name('profile.edit');

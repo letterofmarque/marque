@@ -412,15 +412,31 @@ user. **The route is registered on every install**, whatever else is present, so
 `route('dashboard.index')` is always safe to link to — no `Route::has()` guard needed. A
 Dashboard entry is added to the navigation for signed-in users, and `marque:install`
 offers it as the home page (the default for a private tracker), since `marque/marque`
-1.0.0.
+1.0.0. Login lands on the page the user was sent to log in from, else on `usarrs.home`
+(`USARRS_HOME`, default `/`). Set it to `/dashboard` to send members there when your `/`
+is a splash page.
+
+**Does your app have its own `/dashboard`?** Laravel's starter kits ship one:
+`Route::get('dashboard', ...)->name('dashboard')`. Your app's routes load after usarrs', and
+two routes on one path can't both exist. Yours replaces usarrs' and the name
+`dashboard.index` goes with it. deck leaves the dead nav link out, and usarrs logs an
+error once a day naming your route. There are two ways out:
+
+- **Drop yours and move what it showed into panels.** A panel is a Livewire component plus
+  one registration (trove's README, [Dashboard panels](../trove/README.md#dashboard-panels)).
+  It sits on the dashboard beside usarrs' and the tracker's own panels. Use
+  `DashboardPanel::verifiedOnly()` for anything your `verified` routes guard. The
+  dashboard admits unverified members, because the Announce Key panel tells them to verify.
+- **Keep yours and move usarrs'.** Set `usarrs.dashboard.path` (`USARRS_DASHBOARD_PATH`),
+  for example to `home`. The route name stays `dashboard.index`, so every link follows it.
 
 The page renders panels from trove's `DashboardPanelRegistry`. usarrs registers these, each
 appearing only when it has something true to say:
 
 | Panel | Appears when |
 |---|---|
-| Tracker Stats — uploaded, downloaded, ratio | a tracker has bound `TrackerStatsInterface`, and it keeps figures for this user |
-| Announce Key — with regenerate | a tracker is bound, the user has a key, and `profile.show_announce_key` is on |
+| Tracker Stats — uploaded, downloaded, ratio, seed time, leech time | a tracker has bound `TrackerStatsInterface`, and it keeps figures for this user |
+| Announce Key — the key with regenerate, or Generate for a verified user without one, or "verify your address" | a tracker is bound and `profile.show_announce_key` is on |
 | Account Security — two-factor, passkeys | `two_factor.enabled` or `passkeys.enabled`, and the User model supports it; not registered when `manage_auth` is `false` |
 | Invites — allowance, pending, send | `invites.enabled`, and the user can send one or has one outstanding |
 

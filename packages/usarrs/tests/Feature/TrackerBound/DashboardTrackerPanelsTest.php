@@ -86,14 +86,61 @@ it('omits the stats panel for a user the tracker keeps no figures for', function
         ->assertSee('Announce Key');
 });
 
-it('omits the announce key panel for a user with no key', function () {
+// #11070 item 6. The panel used to hide for a user with no key, and the
+// partial's "Generate announce key" button behind it was only reachable on
+// /profile/stats. A user imported verified, or one whose key was never issued,
+// saw nothing on the dashboard at all.
+it('offers a verified user with no key the button to get one', function () {
     unset($this->tracker->keys[$this->user->id]);
 
     $this->actingAs($this->user)
         ->get(route('dashboard.index'))
         ->assertOk()
-        ->assertDontSee('Announce Key')
-        ->assertSee('Tracker Stats');
+        ->assertSee('Announce Key')
+        ->assertSee('Generate announce key');
+});
+
+it('tells an unverified user to verify, which is what the dashboard admits them for', function () {
+    $unverified = TestUser::factory()->unverified()->create();
+
+    $this->actingAs($unverified)
+        ->get(route('dashboard.index'))
+        ->assertOk()
+        ->assertSee('Announce Key')
+        ->assertSee('Verify your email address to get an announce key.')
+        ->assertDontSee('Generate announce key');
+});
+
+it('issues the first key from the dashboard panel', function () {
+    unset($this->tracker->keys[$this->user->id]);
+    $this->actingAs($this->user);
+
+    Livewire::test(AnnounceKeyPanel::class)
+        ->call('regenerateAnnounceKey')
+        ->assertSee($this->tracker->keys[$this->user->id]);
+});
+
+// #11070 item 5: 9.0 credits seed and leech time per announce, and the panel
+// showed neither.
+it('shows seed time and leech time beside the byte counts', function () {
+    $this->tracker->stats[$this->user->id] = new TrackerStats(uploaded: 0, downloaded: 0, seedtime: 93_784, leechtime: 7_260);
+
+    $this->actingAs($this->user)
+        ->get(route('dashboard.index'))
+        ->assertSee('Seed time')
+        ->assertSee('1d 2h')
+        ->assertSee('Leech time')
+        ->assertSee('2h 1m');
+});
+
+// #11070 item 7: in a narrow card the key and the Regenerate button sat in one
+// row that never wrapped, and the button was clipped to "Rege".
+it('lets the key row wrap and the key break, so a narrow card clips nothing', function () {
+    $this->actingAs($this->user);
+
+    Livewire::test(AnnounceKeyPanel::class)
+        ->assertSeeHtml('flex-wrap')
+        ->assertSeeHtml('break-all');
 });
 
 it('omits the announce key panel when the operator hides announce keys', function () {

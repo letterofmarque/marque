@@ -145,8 +145,9 @@ class TwoFactorChallenge extends Component
     {
         RateLimiter::clear($this->throttleKey($user));
 
-        app(LoginCompletion::class)->finish($user, (bool) session('login.remember', false));
+        $completion = app(LoginCompletion::class);
+        $completion->finish($user, (bool) session('login.remember', false));
 
-        $this->redirect(url('/'), navigate: true);
+        $this->redirect($completion->destination(), navigate: true);
     }
 }

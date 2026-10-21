@@ -10,10 +10,15 @@ use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Contracts\Http\Kernel as HttpKernel;
 use Illuminate\Foundation\Http\Kernel as FoundationHttpKernel;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Events\Routing;
+use Illuminate\Routing\RouteCollection;
 use Illuminate\Session\Middleware\AuthenticateSession;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Fortify\Fortify;
 use Laravel\Passkeys\Passkeys;
@@ -61,6 +66,7 @@ use Marque\Usarrs\Models\Invite;
 use Marque\Usarrs\Policies\InvitePolicy;
 use Marque\Usarrs\Policies\UserPolicy;
 use Marque\Usarrs\Services\InviteService;
+use Throwable;
 
 class UsarrsServiceProvider extends ServiceProvider
 {
@@ -170,6 +176,24 @@ class UsarrsServiceProvider extends ServiceProvider
         $this->registerNavItems();
         $this->registerAdminScreens();
         $this->registerDashboardPanels();
+
+        // Only once the app's own routes have loaded can a route that replaced
+        // ours be seen. Uncached, they load as each provider boots, so after
+        // boot is enough. A cached table is loaded by an app-booted callback
+        // registered after this one, so it is empty here; then ask on the
+        // first request, which every cached (production) install gets.
+        if ($this->app->routesAreCached()) {
+            Event::listen(Routing::class, function (): void {
+                static $checked = false;
+
+                if (! $checked) {
+                    $checked = true;
+                    $this->reportDashboardCollision();
+                }
+            });
+        } else {
+            $this->app->booted(fn () => $this->reportDashboardCollision());
+        }
 
         if (class_exists(Livewire::class)) {
             if ($manageAuth) {
@@ -281,6 +305,58 @@ class UsarrsServiceProvider extends ServiceProvider
     }
 
     /**
+     * Say so when an app route has taken the dashboard's path (#11070).
+     *
+     * Two routes on one method and URI can't coexist: the one registered later
+     * replaces the other in the route table, and the app's routes load after
+     * every package's. So a starter kit's /dashboard silently removes usarrs'
+     * and the name dashboard.index with it. deck leaves the dead nav link out;
+     * this tells the operator why, and the two ways out. Once a day, because
+     * it is decided on every boot and the answer doesn't change between them.
+     */
+    public function reportDashboardCollision(): void
+    {
+        $path = trim(implode('/', array_filter([config('usarrs.prefix', ''), config('usarrs.dashboard.path', 'dashboard')])), '/');
+        $routes = Route::getRoutes();
+
+        // Asks which route is AT the path, not whether the name exists. This
+        // runs before the framework refreshes its name lookups (that is an
+        // app-booted callback registered after this one), so the lookup still
+        // names our replaced route and Route::has() would answer yes. The
+        // table keyed by method and URI is already current, and one lookup.
+        // A cached route table is compiled, its names already right.
+        if ($routes instanceof RouteCollection) {
+            $taker = $routes->getRoutesByMethod()['GET'][$path] ?? null;
+        } else {
+            if (Route::has('dashboard.index')) {
+                return;
+            }
+
+            $taker = rescue(fn () => $routes->match(Request::create('/'.$path)), null, false);
+        }
+
+        // Ours, or nothing there at all: no collision to name.
+        if ($taker === null || $taker->getName() === 'dashboard.index') {
+            return;
+        }
+
+        try {
+            if (! Cache::add('usarrs:dashboard-collision-reported', true, 86_400)) {
+                return;
+            }
+        } catch (Throwable) {
+            // No cache: report anyway. An extra line beats a silent dashboard.
+        }
+
+        $name = $taker->getName() !== null ? "'{$taker->getName()}'" : 'an unnamed route';
+
+        Log::error("usarrs: the dashboard at /{$path} has been replaced by your app's own route there ({$name}, {$taker->getActionName()}), "
+            .'so dashboard.index does not exist and nothing links to the dashboard. Either remove your route and move what it showed into '
+            .'dashboard panels (see trove\'s README, "Dashboard panels"), or keep it and move usarrs\' dashboard elsewhere with '
+            .'usarrs.dashboard.path (USARRS_DASHBOARD_PATH).');
+    }
+
+    /**
      * Declare the tracker panels on the user dashboard.
      *
      * usarrs renders them, but only when a tracker is bound: that is the one
@@ -314,14 +390,17 @@ class UsarrsServiceProvider extends ServiceProvider
                 && app(TrackerStatsInterface::class)->statsFor($user) !== null,
         ));
 
+        // Shown whether or not the user has a key yet: the panel is how they get
+        // one (Generate), or learn why they can't (verify first). Hiding it
+        // until a key existed left an imported or keyless user with nothing on
+        // the dashboard at all (#11070).
         $registry->register(new DashboardPanel(
             identifier: 'usarrs-announce-key',
             label: 'Announce Key',
             component: 'usarrs-dashboard-announce-key',
             position: 20,
             visible: fn (?object $user): bool => $user instanceof UserInterface
-                && config('usarrs.profile.show_announce_key', true)
-                && app(TrackerStatsInterface::class)->announceKeyFor($user) !== null,
+                && config('usarrs.profile.show_announce_key', true),
         ));
     }
 

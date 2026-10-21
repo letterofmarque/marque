@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Marque\Usarrs\Tests\DashboardPathTestCase;
 use Marque\Usarrs\Tests\ManageAuthDisabledTestCase;
 use Marque\Usarrs\Tests\PasskeysEnabledTestCase;
 use Marque\Usarrs\Tests\PrefixedTestCase;
@@ -22,7 +23,7 @@ pest()->extend(TestCase::class)->in(
     'Unit',
     ...array_filter(
         glob(__DIR__.'/Feature/*'),
-        fn (string $path) => ! in_array(basename($path), ['ManageAuthDisabled', 'TrackerBound', 'SeedboxesBound', 'ThirdParty', 'SocialiteDriver', 'PasskeysEnabled', 'Prefixed'], true),
+        fn (string $path) => ! in_array(basename($path), ['ManageAuthDisabled', 'TrackerBound', 'SeedboxesBound', 'ThirdParty', 'SocialiteDriver', 'PasskeysEnabled', 'Prefixed', 'DashboardPath'], true),
     ),
 );
 
@@ -45,3 +46,4 @@ pest()->extend(ThirdPartyPanelTestCase::class)->in('Feature/ThirdParty');
 pest()->extend(SocialiteDriverTestCase::class)->in('Feature/SocialiteDriver');
 pest()->extend(PasskeysEnabledTestCase::class)->in('Feature/PasskeysEnabled');
 pest()->extend(PrefixedTestCase::class)->in('Feature/Prefixed');
+pest()->extend(DashboardPathTestCase::class)->in('Feature/DashboardPath');

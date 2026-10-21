@@ -84,6 +84,57 @@ describe('magic link', function () {
     });
 });
 
+// #11070 item 8. Every login landed on url('/') whatever the app had asked
+// for: the page the user was sent to log in from was lost, and an app whose
+// '/' is a splash page had no way to send members to the dashboard instead.
+describe('where a login lands', function () {
+    it('goes back to the page the user was sent to log in from', function () {
+        $user = TestUser::factory()->create();
+        session()->put('url.intended', url('/torrents/42'));
+
+        expect(app(LoginCompletion::class)->begin($user, remember: false))->toBe(url('/torrents/42'))
+            ->and(session()->has('url.intended'))->toBeFalse();
+    });
+
+    it('goes to usarrs.home when nothing was intended', function () {
+        config()->set('usarrs.home', '/dashboard');
+        $user = TestUser::factory()->create();
+
+        expect(app(LoginCompletion::class)->begin($user, remember: false))->toBe(url('/dashboard'));
+    });
+
+    it('keeps the intended page across a two-factor challenge', function () {
+        config()->set('usarrs.two_factor.enabled', true);
+        [$user, $secret] = twoFactorUser();
+        session()->put('url.intended', url('/torrents/42'));
+
+        expect(app(LoginCompletion::class)->begin($user, remember: false))->toBe(route('two-factor.login'));
+
+        Livewire::test(TwoFactorChallenge::class)
+            ->set('code', app(Google2FA::class)->getCurrentOtp($secret))
+            ->call('challenge')
+            ->assertRedirect(url('/torrents/42'));
+    });
+
+    it('lands a two-factor login on usarrs.home when nothing was intended', function () {
+        config()->set(['usarrs.two_factor.enabled' => true, 'usarrs.home' => '/dashboard']);
+        [$user, $secret] = twoFactorUser();
+        app(LoginCompletion::class)->begin($user, remember: false);
+
+        Livewire::test(TwoFactorChallenge::class)
+            ->set('code', app(Google2FA::class)->getCurrentOtp($secret))
+            ->call('challenge')
+            ->assertRedirect(url('/dashboard'));
+    });
+
+    it('lands a magic link on usarrs.home', function () {
+        config()->set(['usarrs.auth_driver' => 'magic_link', 'usarrs.home' => '/dashboard']);
+        $user = TestUser::factory()->create();
+
+        $this->get(magicLinkFor($user))->assertRedirect(url('/dashboard'));
+    });
+});
+
 describe('the seam', function () {
     it('signs in and regenerates the session when no challenge is due', function () {
         $user = TestUser::factory()->create();

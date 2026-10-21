@@ -126,6 +126,19 @@ return [
 
     'prefix' => env('USARRS_PREFIX', ''),
 
+    // Where a login lands when the user wasn't sent to it from another page
+    // (that page always wins). A path or a URL. '/dashboard' sends members to
+    // usarrs' dashboard; the default keeps the app's own '/' (#11070).
+    'home' => env('USARRS_HOME', '/'),
+
+    // The dashboard's path, under the prefix. An app that keeps its own
+    // /dashboard (a starter kit's, say) moves usarrs' here instead: two routes
+    // on one path can't both exist, and the app's, registered later, wins.
+    // The route NAME is dashboard.index whatever this says.
+    'dashboard' => [
+        'path' => env('USARRS_DASHBOARD_PATH', 'dashboard'),
+    ],
+
     // Base middleware for the auth route group (password reset, magic link,
     // socialite callbacks). Deliberately NOT guest-gated: an authenticated
     // user can legitimately follow a reset link from email, click a magic

@@ -7,6 +7,37 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+### Added
+
+- **`usarrs.dashboard.path`** (`USARRS_DASHBOARD_PATH`, default `dashboard`), so an app
+  that keeps its own `/dashboard` can move usarrs' elsewhere. The route name stays
+  `dashboard.index`.
+- **A log error when an app route has taken the dashboard's path** (#11070). A starter
+  kit's `Route::get('dashboard')` loads after usarrs' and replaces it, taking the name
+  `dashboard.index` with it, and nothing said why. The error names the route that took the
+  path and gives both ways out (panels, or `usarrs.dashboard.path`). It's logged once a day,
+  checked after boot, or on the first request when routes are cached. With deck 2.0.1 the
+  dead nav link is left out instead of failing every page.
+- **`usarrs.home`** (`USARRS_HOME`, default `/`) is where a login lands when the user
+  wasn't sent to it from another page.
+- **Seed time and leech time on the Tracker Stats panel** and on `/profile/stats`, shown as
+  days and hours (never months). Needs `marque/trove ^4.7` for leechtime.
+
+### Changed
+
+- **A login goes back to the page the user was sent to log in from** (#11070). This covers
+  password, magic link, OAuth, after registering, and across a two-factor challenge.
+  Otherwise it goes to `usarrs.home`. Before, every login landed on `url('/')`. Password
+  confirmation falls back to `usarrs.home` too.
+- **The Announce Key panel shows whether or not the user has a key yet.** A verified user
+  without one gets the Generate button, and an unverified user is told to verify. Before,
+  the panel hid until a key existed, so an imported user, or one whose key was never
+  issued, saw nothing on the dashboard.
+- **The announce key row wraps, and the key breaks anywhere**, so a narrow dashboard card
+  no longer clips the Regenerate button.
+
 ## [8.3.0] — 2026-10-20
 
 > Members manage their seedboxes and end their own tracker sessions, admins approve seedboxes, a banned member's API token is refused, and the magic-link mail states the link's real lifetime.

@@ -58,7 +58,30 @@ class LoginCompletion
 
         $this->finish($user, $remember);
 
-        return url('/');
+        return $this->destination();
+    }
+
+    /**
+     * Where a finished login lands: the page the user was sent to log in from,
+     * else usarrs.home. It used to be url('/') always, which lost the page and
+     * gave an app whose '/' is a splash page no way to choose (#11070).
+     *
+     * The intended URL is the one Laravel's auth middleware recorded from the
+     * request, so it is always this app's. It survives a two-factor challenge
+     * because the session does; the challenge asks here once the code is good.
+     */
+    public function destination(): string
+    {
+        return session()->pull('url.intended', self::home());
+    }
+
+    /**
+     * usarrs.home as an absolute URL. Also where password confirmation falls
+     * back to when nothing asked for it.
+     */
+    public static function home(): string
+    {
+        return url((string) config('usarrs.home', '/'));
     }
 
     /**
