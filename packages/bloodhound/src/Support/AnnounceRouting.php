@@ -91,6 +91,17 @@ final class AnnounceRouting
         return is_string($key) && $key !== '' ? $key : null;
     }
 
+    /**
+     * How a malformed key in the path is answered: 'not_found' (the router's
+     * 404, the 8.x default) or 'failure' (a bencoded failure reason).
+     *
+     * Anything unrecognised is 'not_found', the documented behaviour.
+     */
+    public static function malformedKeyAnswer(): string
+    {
+        return config('bloodhound.routes.malformed_key') === 'failure' ? 'failure' : 'not_found';
+    }
+
     public static function announcePath(): string
     {
         return self::path('announce_path', 'announce');

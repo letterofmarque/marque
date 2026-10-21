@@ -25,6 +25,7 @@ final class AnnounceService
         private readonly ClientValidationService $clientValidation,
         private readonly AntiCheatService $antiCheat,
         private readonly RedisDurability $durability,
+        private readonly LedgerFreshness $freshness,
     ) {}
 
     /**
@@ -58,6 +59,10 @@ final class AnnounceService
         if (! $this->durability->allowsAnnounces()) {
             return TrackerResponse::error('Tracker storage is not configured for durability; the operator has been notified');
         }
+
+        // Is anything folding the ledger into totals? Asked here because a
+        // missing scheduler can't report itself (#11070).
+        $this->freshness->reportFromAnnounce();
 
         $announce = new AnnounceRequest($user, $torrent, $peerId, $ip, $port, $uploaded, $downloaded, $left, $userAgent, $this->eventLabel($event));
 

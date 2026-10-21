@@ -62,6 +62,25 @@ trait HasTrackerStats
                 app(TrackerStatsInterface::class)->regenerateAnnounceKey($model);
             }
         });
+
+        // Verified without the Verified event: email_verified_at set directly,
+        // as an import, an admin screen or a seeder does. Nothing else would
+        // ever issue that user a key (#11070). Never rotates an existing one.
+        static::updated(function ($model) {
+            if (! $model instanceof MustVerifyEmail || ! $model instanceof UserInterface) {
+                return;
+            }
+
+            if (! $model->wasChanged('email_verified_at') || ! $model->hasVerifiedEmail()) {
+                return;
+            }
+
+            $tracker = app(TrackerStatsInterface::class);
+
+            if ($tracker->announceKeyFor($model) === null) {
+                $tracker->regenerateAnnounceKey($model);
+            }
+        });
     }
 
     /**

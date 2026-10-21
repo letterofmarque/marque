@@ -7,6 +7,37 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+### Added
+
+- **`routes.malformed_key`** (`BLOODHOUND_MALFORMED_KEY`). With `failure`, a malformed key
+  in the path gets a bencoded `failure reason` of `Invalid announce key`, not the app's
+  HTML 404 (#11070). That covers a wrong length, extra segments or no key at all. A client
+  shows the 404 as a garbled or unknown error. The route constraint still vets the key, and
+  the fallback refuses it without a lookup. The default stays `not_found` (the documented
+  404) through 8.x, and `failure` becomes the default in 9.0.
+- **`bloodhound:issue-keys`** issues an announce key to every verified user without one (to
+  every user, if the model doesn't verify addresses). Rows inserted without Eloquent, such
+  as a bulk import or a migration from another tracker, never got one. It never touches an
+  existing key. `--dry-run` reports the count.
+- **A user verified by setting `email_verified_at` directly** now gets a key, as one verified
+  through the `Verified` event already did. This covers an admin screen, a seeder or an
+  import. An existing key is never rotated.
+- **Announces report a ledger nobody is folding.** At most once every five minutes, an
+  announce checks whether the oldest row not yet folded into totals is more than ten minutes
+  old. If it is, it logs an error naming `schedule:run`. A tracker without the scheduler
+  credits nobody, and a scheduled check can't report that. The check never fails an
+  announce.
+- **A published config still setting keys bloodhound no longer reads is reported**, once a
+  day. That covers the protocol settings that moved to threepio in 2.0.0
+  (`announce_interval`, `min_announce_interval`, `max_peers_per_announce`, `peer_expiry`,
+  `redis.connection`, `redis.prefix`), `logging` (replaced by `announce_log` in 4.1.0) and
+  `queue` (removed in 8.0.0). For a moved key the warning names the threepio key and env
+  var, the value your config sets and the value in effect. twentyt's
+  `BLOODHOUND_MIN_ANNOUNCE_INTERVAL=900` had been silently replaced by 300 for several
+  majors. The README's "Moved or removed earlier" table lists them all.
+
 ## [8.0.0] — 2026-10-20
 
 > Every announce is credited when it arrives, bytes and seedtime alike, against a Redis that must persist and never evict; anti-cheat stops refusing legitimate clients, seedboxes get their own speed cap, and members can end a session their restarted client left behind.

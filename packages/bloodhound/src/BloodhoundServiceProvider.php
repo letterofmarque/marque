@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Marque\Bloodhound;
 
 use Illuminate\Auth\Events\Verified;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
@@ -14,6 +15,7 @@ use Marque\Bloodhound\Console\Commands\AggregateLedger;
 use Marque\Bloodhound\Console\Commands\AuditLedger;
 use Marque\Bloodhound\Console\Commands\BackfillLedger;
 use Marque\Bloodhound\Console\Commands\CheckRedis;
+use Marque\Bloodhound\Console\Commands\IssueAnnounceKeys;
 use Marque\Bloodhound\Console\Commands\ManageSeedboxes;
 use Marque\Bloodhound\Console\Commands\PruneAnnounceLog;
 use Marque\Bloodhound\Console\Commands\RebuildTotals;
@@ -205,18 +207,67 @@ class BloodhoundServiceProvider extends ServiceProvider
             );
         }
 
+        $warnings = [];
+
         $replaced = [
             'max_connections_per_torrent' => 'max_seeding_locations_per_torrent and max_leeching_locations_per_torrent',
             'max_connections_per_ip' => 'max_clients_per_torrent (a member\'s clients on one torrent; how many torrents one address seeds is no longer limited)',
         ];
-        $stale = array_intersect_key($replaced, (array) config('bloodhound.anti_cheat'));
 
-        if ($stale !== [] && $this->firstToday('bloodhound:removed-config-reported')) {
-            foreach ($stale as $key => $instead) {
-                Log::warning("bloodhound.anti_cheat.{$key} was removed in 8.0.0 and is ignored. Use {$instead}.");
+        foreach (array_intersect_key($replaced, (array) config('bloodhound.anti_cheat')) as $key => $instead) {
+            $warnings[] = "bloodhound.anti_cheat.{$key} was removed in 8.0.0 and is ignored. Use {$instead}.";
+        }
+
+        // Moved to threepio in 2.0.0. A config published before then still
+        // sets them, and the tracker quietly runs on threepio's values instead
+        // (#11070: 900 configured, 300 in effect, for several majors). So the
+        // warning says what is actually in effect, not just where to look.
+        //
+        // Read as whole arrays, and the names built with implode(), never a
+        // dotted string with the key interpolated: tools/check-docs takes any
+        // such string as a read of everything beneath its prefix, which here
+        // is every key in both configs.
+        $bloodhound = (array) config('bloodhound');
+        $threepio = (array) config('threepio');
+
+        foreach (self::MOVED_TO_THREEPIO as $key => $env) {
+            if (Arr::has($bloodhound, $key)) {
+                $old = implode('.', ['bloodhound', $key]);
+                $new = implode('.', ['threepio', $key]);
+                $configured = json_encode(Arr::get($bloodhound, $key));
+                $effective = json_encode(Arr::get($threepio, $key));
+                $warnings[] = "{$old} moved to {$new} ({$env}) in 2.0.0 and is ignored: "
+                    ."your config says {$configured}, the tracker is using {$effective}. Set it in config/threepio.php or {$env}.";
+            }
+        }
+
+        if (config()->has('bloodhound.logging')) {
+            $warnings[] = 'bloodhound.logging was replaced by bloodhound.announce_log in 4.1.0 and is ignored.';
+        }
+
+        if (config()->has('bloodhound.queue')) {
+            $warnings[] = 'bloodhound.queue was removed in 8.0.0 and is ignored: the ledger folds on the scheduler.';
+        }
+
+        if ($warnings !== [] && $this->firstToday('bloodhound:removed-config-reported')) {
+            foreach ($warnings as $warning) {
+                Log::warning($warning);
             }
         }
     }
+
+    /**
+     * Settings bloodhound held before 2.0.0, now threepio's, with the env var
+     * threepio reads them from.
+     */
+    private const MOVED_TO_THREEPIO = [
+        'announce_interval' => 'THREEPIO_ANNOUNCE_INTERVAL',
+        'min_announce_interval' => 'THREEPIO_MIN_ANNOUNCE_INTERVAL',
+        'max_peers_per_announce' => 'THREEPIO_MAX_PEERS',
+        'peer_expiry' => 'THREEPIO_PEER_EXPIRY',
+        'redis.connection' => 'THREEPIO_REDIS_CONNECTION',
+        'redis.prefix' => 'THREEPIO_REDIS_PREFIX',
+    ];
 
     /**
      * Whether this is the first time today, by the cache. With the cache down,
@@ -252,6 +303,7 @@ class BloodhoundServiceProvider extends ServiceProvider
             AuditLedger::class,
             BackfillLedger::class,
             CheckRedis::class,
+            IssueAnnounceKeys::class,
             ManageSeedboxes::class,
             PruneAnnounceLog::class,
             RebuildTotals::class,

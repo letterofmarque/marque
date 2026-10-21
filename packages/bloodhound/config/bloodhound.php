@@ -52,12 +52,16 @@ return [
     | tight as your existing keys allow, and anchor nothing yourself; the
     | pattern is anchored for you.
     |
-    | On key_source and error surfaces: with the key in the path, a malformed
-    | key is a 404 from the router and never reaches PHP. As a query parameter
-    | every request reaches the controller, which answers a malformed key with
-    | a bencoded 'failure reason' and HTTP 200 — the same shape as every other
-    | tracker error, because that is what BitTorrent clients expect. Trackers
-    | are probed constantly; know which of the two you are running.
+    | 'malformed_key'  How a malformed key in the PATH is answered: 'not_found'
+    |                  (the router's 404, the 8.x default) or 'failure' (a
+    |                  bencoded 'failure reason', HTTP 200). 'failure' becomes
+    |                  the default in 9.0.
+    |
+    | On error surfaces: BitTorrent clients show a bencoded 'failure reason';
+    | a 404, or the app's HTML 404 page, reads as an unreachable tracker or a
+    | garbled error. With the key in the query, a malformed one always gets the
+    | failure reason. With it in the path, the route constraint vets it and
+    | 'malformed_key' decides what a request that fails it gets.
     |
     | Route NAMES never change: 'tracker.announce' and 'tracker.scrape'
     | whatever you set here, so route() calls keep working.
@@ -70,6 +74,7 @@ return [
         'key_source' => env('BLOODHOUND_KEY_SOURCE', 'path'),
         'key_parameter' => env('BLOODHOUND_KEY_PARAMETER', 'announce_key'),
         'key_pattern' => env('BLOODHOUND_KEY_PATTERN', '[0-9a-zA-Z]{32}'),
+        'malformed_key' => env('BLOODHOUND_MALFORMED_KEY', 'not_found'),
     ],
 
     /*

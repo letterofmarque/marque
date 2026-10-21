@@ -117,6 +117,10 @@ php artisan migrate
 
 Bloodhound schedules its own commands (see [Commands](#commands)), so it needs
 [Laravel's scheduler running](https://laravel.com/docs/scheduling#running-the-scheduler).
+Without it nobody is credited for anything: totals move only when
+`bloodhound:aggregate-ledger` folds the ledger. Announces notice this. At most once
+every five minutes, an announce checks whether the oldest row not yet folded is more than
+ten minutes old, and if it is, logs an error naming the scheduler.
 
 ## How It Works
 
@@ -142,7 +146,17 @@ another person's address and announce before anyone proved the inbox. Taking
 the key back afterwards would mean rotating it, and every rotation makes the
 user re-download their `.torrent` files. A user who already has a key keeps it
 when their address is verified. Users created already verified, and apps that
-don't verify addresses, get a key at creation as before. The legacy `users.announce_key` column is deprecated
+don't verify addresses, get a key at creation as before. So does a user verified by
+setting `email_verified_at` directly (an admin screen, a seeder), which fires no
+`Verified` event.
+
+**Importing users?** A row inserted without Eloquent (a bulk `insert()`, raw SQL, a
+migration from another tracker) passes through none of those, so it has no key and cannot
+announce. Run `php artisan bloodhound:issue-keys` after the import. It issues a key to
+every verified user without one (every user, if your model doesn't verify addresses) and
+never touches an existing key. `--dry-run` reports the count first. If you are bringing
+legacy keys across instead, insert them into `announce_keys` before running it, and those
+users keep their old keys. The legacy `users.announce_key` column is deprecated
 and never read. Peer data is stored in Redis; the announce path makes one query to resolve
 the user.
 
@@ -192,14 +206,20 @@ characters. Keep it as tight as your existing keys allow; widening it is your ri
 take. Don't anchor it yourself, and don't add delimiters — it is used directly as a
 Laravel route constraint and anchored for you when matching.
 
-**`key_source` changes where errors come from.** With the key in the path, a malformed
-key is a **404 from the router** and no application code runs. As a query parameter every
-request reaches the controller, which answers a malformed key with a bencoded
-`failure reason` at **HTTP 200** — the same shape as every other tracker error, because a
-4xx reads to a BitTorrent client as an unreachable tracker rather than a message worth
-showing the user. On announce a missing key is refused the same way. Scrape accepts a
-missing key, since a public scrape is legitimate, and refuses only a malformed one.
-Trackers get probed constantly; know which of the two you are running.
+**Set `routes.malformed_key` to `failure`.** A BitTorrent client shows a bencoded
+`failure reason`. A 4xx, or your app's HTML 404 page, reads to it as an unreachable tracker
+or a garbled error, not a message worth showing the user. With the key in the query, a
+malformed one is always answered `Invalid announce key` at **HTTP 200**. With it in the
+path, the route constraint vets the key before any lookup, and a request that fails it
+(wrong length, extra segments, no key at all) gets **the router's 404** by default. With
+`malformed_key` set to `failure` (`BLOODHOUND_MALFORMED_KEY=failure`), it reaches a
+fallback route under the same path instead. That route answers the same bencoded
+`Invalid announce key`, without touching the database. The 404 stays the default
+through 8.x because it was documented behaviour, and `failure` becomes the default in 9.0.
+On announce a missing key is refused the same way. Scrape accepts a missing key, since a
+public scrape is legitimate, and refuses only a malformed one. Only the configured paths
+are covered. A legacy URL at a different path (`/announce.php` when you serve `/announce`)
+is still the app's 404 until you configure that path.
 
 #### An nginx rewrite is the right fix for an outage, not for a migration
 
@@ -550,6 +570,7 @@ Covered in full under [Announce URL shape](#announce-url-shape) above.
 | `routes.key_source` | `path` | `path` or `query` |
 | `routes.key_parameter` | `announce_key` | Route segment or query parameter name |
 | `routes.key_pattern` | `[0-9a-zA-Z]{32}` | Regex the key must match — no delimiters, no anchors |
+| `routes.malformed_key` | `not_found` | A malformed key in the path: `not_found` (404) or `failure` (bencoded reason). `failure` becomes the default in 9.0 |
 
 ### Redis and baselines
 
@@ -662,12 +683,30 @@ See [The ledger](#the-ledger).
 | Removed key | What happens if your config still has it | Use instead |
 |---|---|---|
 | `announce_log.enabled` | Set to `false`, bloodhound refuses to boot, naming the key. `true` is harmless | Nothing: the ledger is always on |
-| `queue.enabled`, `queue.connection`, `queue.queue` | Ignored, as they already were in 7.x (#10816) | Nothing: byte counts never travel through a queue |
+| `queue.enabled`, `queue.connection`, `queue.queue` | Ignored, as they already were in 7.x (#10816); from 8.1.0 a warning is logged once a day | Nothing: byte counts never travel through a queue |
 | `anti_cheat.max_connections_per_torrent` | Ignored; a warning is logged once a day naming the replacements | `max_seeding_locations_per_torrent` and `max_leeching_locations_per_torrent` |
 | `anti_cheat.max_connections_per_ip` | Ignored; a warning is logged once a day | `max_clients_per_torrent`, a member's clients on one torrent. Nothing limits how many torrents one address seeds |
 
 The ledger can't be turned off because every credit is written to it and nowhere else: a
 tracker without it would credit nobody anything.
+
+### Moved or removed earlier
+
+A config published before these changes still holds the old keys. They are ignored, and
+from 8.1.0 a warning is logged once a day naming each one. For a moved key, the warning
+gives both the value your config sets and the value actually in effect.
+
+| Key in `config/bloodhound.php` | Since | Now |
+|---|---|---|
+| `announce_interval` (`BLOODHOUND_ANNOUNCE_INTERVAL`) | 2.0.0 | `threepio.announce_interval` (`THREEPIO_ANNOUNCE_INTERVAL`) |
+| `min_announce_interval` (`BLOODHOUND_MIN_ANNOUNCE_INTERVAL`) | 2.0.0 | `threepio.min_announce_interval` (`THREEPIO_MIN_ANNOUNCE_INTERVAL`) |
+| `max_peers_per_announce` (`BLOODHOUND_MAX_PEERS`) | 2.0.0 | `threepio.max_peers_per_announce` (`THREEPIO_MAX_PEERS`) |
+| `peer_expiry` (`BLOODHOUND_PEER_EXPIRY`) | 2.0.0 | `threepio.peer_expiry` (`THREEPIO_PEER_EXPIRY`) |
+| `redis.connection` (`BLOODHOUND_REDIS_CONNECTION`) | 2.0.0 | `threepio.redis.connection` (`THREEPIO_REDIS_CONNECTION`) |
+| `redis.prefix` (`BLOODHOUND_REDIS_PREFIX`) | 2.0.0 | `threepio.redis.prefix` (`THREEPIO_REDIS_PREFIX`) |
+| `logging` | 4.1.0 | `announce_log` |
+
+`redis.durability` is still bloodhound's. Only `connection` and `prefix` moved.
 
 ## The ledger
 
@@ -876,6 +915,7 @@ This is a Bloodhound feature and has no equivalent in [marque/hound](https://pac
 | `bloodhound:prune-announce-log` | Daily | Deletes rows past `retention_days`, carrying what they credited |
 | `bloodhound:sync-swarm-counts` | Hourly | Sweeps expired peers, keeping their baselines; settles swarm counts |
 | `bloodhound:check-redis` | — | Checks AOF and the eviction policy; `--recover` opens a recovery window |
+| `bloodhound:issue-keys` | — | Issues a key to every verified user without one, after an import; `--dry-run` |
 | `bloodhound:audit-ledger` | — | Checks every row's arithmetic and every peer's chain |
 | `bloodhound:rebuild-totals` | — | Recomputes totals from the ledger and carry; `--user=` for one member |
 | `bloodhound:seedbox` | — | `list` (`--status=`), `approve` or `revoke` a seedbox (`--by=`) |

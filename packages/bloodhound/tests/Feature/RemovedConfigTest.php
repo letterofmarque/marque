@@ -77,3 +77,66 @@ test('the ledger is written whatever a stale config says', function () {
 
     expect(AnnounceLog::query()->count())->toBe(1);
 });
+
+// #11070 item 2: twentyt's published config still set min_announce_interval
+// from BLOODHOUND_MIN_ANNOUNCE_INTERVAL=900. The setting moved to threepio in
+// 2.0.0, so 300 had been in effect for several majors with nothing said.
+describe('keys that moved to threepio', function () {
+    test('are reported with their new home, env var and the value actually in effect', function () {
+        Log::spy();
+        config(['bloodhound.min_announce_interval' => 900, 'threepio.min_announce_interval' => 300]);
+
+        checkRemovedConfig();
+
+        Log::shouldHaveReceived('warning')->once()->withArgs(fn ($message) => str_contains($message, 'bloodhound.min_announce_interval')
+            && str_contains($message, 'threepio.min_announce_interval')
+            && str_contains($message, 'THREEPIO_MIN_ANNOUNCE_INTERVAL')
+            && str_contains($message, '900')
+            && str_contains($message, '300'));
+    });
+
+    test('cover every protocol key bloodhound used to hold, the redis block included', function () {
+        Log::spy();
+        config([
+            'bloodhound.announce_interval' => 1800,
+            'bloodhound.min_announce_interval' => 300,
+            'bloodhound.max_peers_per_announce' => 50,
+            'bloodhound.peer_expiry' => 3600,
+            'bloodhound.redis.connection' => 'tracker',
+            'bloodhound.redis.prefix' => 'bloodhound:',
+        ]);
+
+        checkRemovedConfig();
+
+        foreach (['announce_interval', 'min_announce_interval', 'max_peers_per_announce', 'peer_expiry', 'redis.connection', 'redis.prefix'] as $key) {
+            Log::shouldHaveReceived('warning')->withArgs(fn ($message) => str_contains($message, "bloodhound.{$key} ") && str_contains($message, "threepio.{$key}"));
+        }
+    });
+
+    test('leave bloodhound.redis.durability alone, which is still bloodhound\'s', function () {
+        Log::spy();
+        config(['bloodhound.redis.durability' => 'attested']);
+
+        checkRemovedConfig();
+
+        Log::shouldNotHaveReceived('warning');
+    });
+});
+
+test('the retired logging and queue blocks are reported as ignored', function () {
+    Log::spy();
+    config(['bloodhound.logging' => ['enabled' => true], 'bloodhound.queue' => ['enabled' => false]]);
+
+    checkRemovedConfig();
+
+    Log::shouldHaveReceived('warning')->withArgs(fn ($message) => str_contains($message, 'bloodhound.logging') && str_contains($message, 'announce_log'));
+    Log::shouldHaveReceived('warning')->withArgs(fn ($message) => str_contains($message, 'bloodhound.queue'));
+});
+
+test('the package\'s own config reports nothing', function () {
+    Log::spy();
+
+    checkRemovedConfig();
+
+    Log::shouldNotHaveReceived('warning');
+});

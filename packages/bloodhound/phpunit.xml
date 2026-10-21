@@ -23,6 +23,7 @@
             <directory>tests/RoutingPath</directory>
             <directory>tests/RoutingQuery</directory>
             <directory>tests/RoutingPattern</directory>
+            <directory>tests/RoutingMalformed</directory>
         </testsuite>
         <!-- Spec #119: one directory per ratio_mode; see tests/Pest.php. -->
         <testsuite name="Stats">
