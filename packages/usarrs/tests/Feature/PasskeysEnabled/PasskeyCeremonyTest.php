@@ -50,15 +50,26 @@ it('signs in with that passkey through the real endpoints', function () {
     $this->assertAuthenticatedAs($user);
 });
 
-it('sends a passkey sign-in to the site root, not Fortify\'s /home', function () {
+it('sends a passkey sign-in to usarrs.home, not Fortify\'s /home', function () {
     // Fortify 1.39 overwrites passkeys.redirect with its own home, a page a
-    // usarrs app doesn't have.
+    // usarrs app doesn't have. And it was pinned to '/', after every other
+    // sign-in had moved to usarrs.home (#11070).
     $user = TestUser::factory()->create();
     $authenticator = new SoftAuthenticator;
     registerPasskey($this, $user, $authenticator);
     auth()->logout();
 
-    expect(signInWithPasskey($this, $authenticator)->json('redirect'))->toBe(url('/'));
+    expect(signInWithPasskey($this, $authenticator)->json('redirect'))->toBe(url('/dashboard'));
+});
+
+it('sends a passkey sign-in to the page it was sent from, like every other sign-in', function () {
+    $user = TestUser::factory()->create();
+    $authenticator = new SoftAuthenticator;
+    registerPasskey($this, $user, $authenticator);
+    auth()->logout();
+    session()->put('url.intended', url('/torrents/42'));
+
+    expect(signInWithPasskey($this, $authenticator)->json('redirect'))->toBe(url('/torrents/42'));
 });
 
 it('refuses a passkey sign-in by a banned user, with a 422 rather than a session (#10857)', function () {

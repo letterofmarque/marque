@@ -30,7 +30,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 ### Changed
 
 - **A login goes back to the page the user was sent to log in from** (#11070). This covers
-  password, magic link, OAuth, after registering, and across a two-factor challenge.
+  password, magic link, OAuth, passkey, after registering, and across a two-factor challenge.
   Otherwise it goes to `usarrs.home`. Before, every login landed on `url('/')`. Password
   confirmation falls back to `usarrs.home` too.
 - **The Announce Key panel shows whether or not the user has a key yet.** A verified user

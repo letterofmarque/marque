@@ -348,8 +348,9 @@ registers none of them and leaves `laravel/passkeys` to register its own (or
 Fortify to suppress them, as 1.39 does).
 
 With passkeys on, the login page shows **Sign in with a passkey** under every
-driver. A passkey sign-in lands on `/`, like every other usarrs sign-in, and a
-banned or inactive user's passkey is refused (422) before any session exists.
+driver. Like every other usarrs sign-in, a passkey sign-in lands on the page the user
+was sent from, else `usarrs.home`. A banned or inactive user's passkey is refused (422)
+before any session exists.
 
 **Passkey sign-in is the one login usarrs doesn't finish itself.** Every other way in
 — password, magic link, OAuth, straight after registering — ends in one place that
@@ -409,7 +410,8 @@ sign-up that carries one.
 
 `/dashboard` (`dashboard.index`) is one screen answering "how am I doing" for a signed-in
 user. **The route is registered on every install**, whatever else is present, so
-`route('dashboard.index')` is always safe to link to — no `Route::has()` guard needed. A
+`route('dashboard.index')` is safe to link to without a `Route::has()` guard, unless your
+app registers its own route at the dashboard's path (see below). A
 Dashboard entry is added to the navigation for signed-in users, and `marque:install`
 offers it as the home page (the default for a private tracker), since `marque/marque`
 1.0.0. Login lands on the page the user was sent to log in from, else on `usarrs.home`

@@ -21,4 +21,13 @@ abstract class PasskeysEnabledTestCase extends TestCase
 
         $app['config']->set('usarrs.passkeys.enabled', true);
     }
+
+    // A home that isn't '/', before boot (where the passkey redirect is set),
+    // so a passkey sign-in can be seen following usarrs.home like every other.
+    protected function defineEnvironment($app): void
+    {
+        parent::defineEnvironment($app);
+
+        $app['config']->set('usarrs.home', '/dashboard');
+    }
 }

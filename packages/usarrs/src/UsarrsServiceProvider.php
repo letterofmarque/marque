@@ -236,9 +236,10 @@ class UsarrsServiceProvider extends ServiceProvider
         // any session exists. The Login listener stays as the backstop.
         Passkeys::authorizeLoginUsing(fn ($request, $user) => UserStatus::refusalFor($user) === null);
 
-        // Where a passkey sign-in lands. Fortify sets this to its own home
-        // (/home); every other usarrs sign-in lands on the site root.
-        config(['passkeys.redirect' => '/']);
+        // Where a passkey sign-in lands when nothing was intended (laravel/
+        // passkeys honours the intended page itself). Fortify sets this to its
+        // own home (/home); every other usarrs sign-in lands on usarrs.home.
+        config(['passkeys.redirect' => config('usarrs.home', '/')]);
     }
 
     protected function registerPolicies(): void
