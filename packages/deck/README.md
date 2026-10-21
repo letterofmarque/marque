@@ -102,6 +102,12 @@ NavItem::forRole('acme-admin', 'Acme Admin', 'acme.admin', Role::Admin);
 Items are ordered by `position`, then label. Registering a duplicate `identifier` throws
 rather than silently replacing the existing entry.
 
+An item whose route doesn't exist is left out of the nav rather than rendered, because
+`route()` would throw on every page. That happens when an app registers a route at the same
+method and URI as a package's, which replaces the package's route and its name.
+`/dashboard` from a starter kit is the usual case. Before 2.0.1 every page failed with
+`RouteNotFoundException`.
+
 **Admin screens are a separate registry** — see
 [`marque/skipper`](../skipper/README.md) and `AdminScreenRegistry`. A nav item is a
 top-level link evaluated per request; an admin screen is a routed panel entry with a role

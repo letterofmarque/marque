@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Marque\Deck\View\Components;
 
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Route;
 use Livewire\Component;
 use Marque\Trove\Registry\NavRegistry;
 
@@ -46,6 +47,13 @@ class Navigation extends Component
         // role, on a query, or on nothing at all. The registry owns that rule;
         // this component only asks.
         $visible = app(NavRegistry::class)->visibleTo(auth()->user());
+
+        // An entry whose route doesn't exist is left out rather than rendered:
+        // route() would throw, and this component is on every page. It happens
+        // when an app's route takes the URI a package registered, which drops
+        // the package's route name with it (#11070). The package that owns the
+        // entry is the one to say why; here it costs only its own link.
+        $visible = array_filter($visible, fn ($item): bool => Route::has($item->route));
 
         $this->items = array_values(array_map(
             fn ($item): array => [

@@ -25,4 +25,19 @@ describe('navigation rendering', function () {
     it('renders an empty nav without erroring', function () {
         Livewire::test(Navigation::class)->assertOk();
     });
+
+    // #11070: an app's own /dashboard replaced usarrs' route, the name
+    // dashboard.index went with it, and route() threw on every page that
+    // rendered the nav. One missing route must cost its own link, not the site.
+    it('leaves out an entry whose route does not exist, and renders the rest', function () {
+        Route::get('probe', fn () => 'ok')->name('probe.index');
+
+        app(NavRegistry::class)->register(new NavItem('gone', 'Gone Link', 'gone.index'));
+        app(NavRegistry::class)->register(new NavItem('probe', 'Probe Link', 'probe.index'));
+
+        Livewire::test(Navigation::class)
+            ->assertOk()
+            ->assertDontSee('Gone Link')
+            ->assertSee('Probe Link');
+    });
 });

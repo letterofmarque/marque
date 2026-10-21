@@ -8,6 +8,15 @@ those versions describe the package under its former names.*
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
+## [Unreleased]
+
+### Fixed
+
+- **A nav entry whose route doesn't exist is left out, not rendered** (#11070). Before,
+  `route()` threw `RouteNotFoundException` on every page that showed the nav. That
+  happened when an app's own route took the URI a package registered: a starter kit's
+  `/dashboard` replaced usarrs', taking the name `dashboard.index` with it.
+
 ## [2.0.0] — 2026-09-10
 
 > Renames the package from `marque/ise` to `marque/deck` — same components, new name and namespace.

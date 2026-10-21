@@ -2,11 +2,24 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\Route;
 use Marque\Deck\View\Components\Navigation;
 use Marque\Trove\Registry\NavItem;
 use Marque\Trove\Registry\NavRegistry;
 
 describe('Navigation Component', function () {
+    // The entries below name these routes. An entry whose route doesn't exist
+    // is left out (#11070, see NavigationRenderTest), so they have to exist.
+    beforeEach(function () {
+        foreach (['torrents.index', 'acme.stats.index', 'a.index', 'b.index', 'c.index', 'p.index', 'h.index'] as $name) {
+            Route::get('/nav-test/'.$name, fn () => 'ok')->name($name);
+        }
+
+        // Named after being added, so the lookup has to be rebuilt, as a
+        // real boot does once the route files are loaded.
+        Route::getRoutes()->refreshNameLookups();
+    });
+
     it('can be resolved from container', function () {
         $component = $this->app->make(Navigation::class);
 
