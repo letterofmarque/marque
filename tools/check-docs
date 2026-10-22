@@ -573,7 +573,10 @@ function checkKey(string $key, ?string $documented, int $line, string $configNam
         return;
     }
     $actual = normalise(getPath($values, $key));
-    if ($actual !== null && $doc !== $actual) {
+    // Numbers compare as numbers: PHP's string cast turns a 1.0 default into
+    // "1", which no doc writing `1.0` would ever match.
+    $same = is_numeric($doc) && is_numeric($actual) ? (float) $doc === (float) $actual : $doc === $actual;
+    if ($actual !== null && ! $same) {
         $emit($line, 'config-default', "`$key` documented as $doc, $file says $actual", $marker);
     }
 }

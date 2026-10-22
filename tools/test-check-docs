@@ -219,6 +219,21 @@ sed -i 's/| `10` | Daily cap/| `20` | Daily cap/' "$SCRATCH/default/packages/acm
 run_case default
 expect "$out" "config-default: a default the config file disagrees with" 'config-default.*`limits\.per_day`.*20.*10'
 
+# A float default reads back as "1" through PHP's string cast, so `1.0` in a
+# doc used to be flagged as disagreeing with 1.0 in the config (Job #256).
+make_repo "$SCRATCH/float"
+sed -i "s/'enabled' => env('ACME_ENABLED', true),/'enabled' => env('ACME_ENABLED', true),\n    'ratio' => env('ACME_RATIO', 1.0),/" "$SCRATCH/float/packages/acme/config/acme.php"
+sed -i "s/public function on(): bool { return config('acme.enabled'); }/public function on(): bool { return config('acme.enabled'); }\n    public function ratio(): float { return config('acme.ratio'); }/" "$SCRATCH/float/packages/acme/src/Acme.php"
+sed -i 's/| `enabled` | `true` | Master switch |/| `enabled` | `true` | Master switch |\n| `ratio` | `1.0` | A ratio |/' "$SCRATCH/float/packages/acme/README.md"
+run_case float
+refuse "$out" "a float default written as 1.0 matches 1.0 in the config" 'config-default.*`ratio`'
+make_repo "$SCRATCH/floatwrong"
+sed -i "s/'enabled' => env('ACME_ENABLED', true),/'enabled' => env('ACME_ENABLED', true),\n    'ratio' => env('ACME_RATIO', 1.0),/" "$SCRATCH/floatwrong/packages/acme/config/acme.php"
+sed -i "s/public function on(): bool { return config('acme.enabled'); }/public function on(): bool { return config('acme.enabled'); }\n    public function ratio(): float { return config('acme.ratio'); }/" "$SCRATCH/floatwrong/packages/acme/src/Acme.php"
+sed -i 's/| `enabled` | `true` | Master switch |/| `enabled` | `true` | Master switch |\n| `ratio` | `1.5` | A ratio |/' "$SCRATCH/floatwrong/packages/acme/README.md"
+run_case floatwrong
+expect "$out" "a float default that really differs is still flagged" 'config-default.*`ratio`.*1\.5'
+
 make_repo "$SCRATCH/unread"
 sed -i "s/config('acme.enabled')/true/" "$SCRATCH/unread/packages/acme/src/Acme.php"
 run_case unread
