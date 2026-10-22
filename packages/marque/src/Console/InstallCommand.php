@@ -17,6 +17,7 @@ use Marque\Marque\Install\EnvironmentCheck;
 use Marque\Marque\Install\EnvironmentReport;
 use Marque\Marque\Install\EnvWriter;
 use Marque\Marque\Install\FreshProcess;
+use Marque\Marque\Install\HitAndRunDefault;
 use Marque\Marque\Install\HomePage;
 use Marque\Marque\Install\InstallAnswers;
 use Marque\Marque\Install\InstalledPackages;
@@ -131,6 +132,7 @@ class InstallCommand extends Command
         $this->wireStylesheet($selection);
         $this->patchUserModel($selection);
         $this->chooseHomePage($selection);
+        $this->enableHitAndRun($selection, freshInstall: $existing === null);
 
         // The rest needs the installed packages' code and the patched User
         // model loaded, which this process can't have: it booted before both.
@@ -295,6 +297,22 @@ class InstallCommand extends Command
         }
 
         return true;
+    }
+
+    /**
+     * A private tracker built from nothing starts with hit-and-run on (Job
+     * #256); bloodhound ships it off so an upgrade changes nothing. Said, so
+     * the operator knows it's there to turn off.
+     */
+    private function enableHitAndRun(PackageSelection $selection, bool $freshInstall): void
+    {
+        try {
+            if ((new HitAndRunDefault($this->laravel->basePath('.env')))->apply($selection, $freshInstall)) {
+                $this->components->task('Hit-and-run on: seed each torrent 72 hours or to 1:1 (BLOODHOUND_HIT_AND_RUN=true; set it false to turn it off)');
+            }
+        } catch (RuntimeException $e) {
+            $this->components->warn('Could not turn hit-and-run on: '.$e->getMessage());
+        }
     }
 
     /**

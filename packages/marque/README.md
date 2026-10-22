@@ -40,6 +40,14 @@ Everything else is a choice, and `marque:install` makes it with you:
 | Content taxonomy | `marque/taxonomy` |
 | Admin panel | `marque/skipper` |
 
+**A new private tracker starts with hit-and-run on.** bloodhound ships its hit-and-run
+rule off, so upgrading an existing tracker changes nothing for its members. A tracker built
+from nothing has no members yet to surprise. So on a first install, `marque:install` writes
+`BLOODHOUND_HIT_AND_RUN=true` to `.env` and says so: each torrent a member downloads is owed
+72 hours of seeding, or a 1:1 ratio on it. A re-run, a public tracker, or a `.env` that
+already sets the key is left alone. Set it to `false` to turn the rule off. See bloodhound's
+README, "Hit-and-run".
+
 ### Why it does not just require everything
 
 A private tracker must not have `marque/hound` installed. hound registers an
