@@ -25,6 +25,7 @@ class TrackerStatsPanel extends Component
 
         return view('usarrs::dashboard.panels.tracker-stats', [
             'stats' => $user instanceof UserInterface ? $this->tracker()?->statsFor($user) : null,
+            'obligations' => $user instanceof UserInterface ? ($this->seedingObligations()?->obligationsFor($user) ?? []) : [],
         ]);
     }
 }

@@ -7,6 +7,7 @@ namespace Marque\Usarrs\Livewire;
 use Illuminate\Contracts\View\View;
 use Livewire\Component as LivewireComponent;
 use Marque\Trove\Contracts\SeedboxesInterface;
+use Marque\Trove\Contracts\SeedingObligationsInterface;
 use Marque\Trove\Contracts\TrackerSessionsInterface;
 use Marque\Trove\Contracts\TrackerStatsInterface;
 
@@ -48,6 +49,17 @@ abstract class Component extends LivewireComponent
     {
         return app()->bound(TrackerSessionsInterface::class)
             ? app(TrackerSessionsInterface::class)
+            : null;
+    }
+
+    /**
+     * The tracker's hit-and-run obligations, or null if no tracker keeps them
+     * (Job #256).
+     */
+    protected function seedingObligations(): ?SeedingObligationsInterface
+    {
+        return app()->bound(SeedingObligationsInterface::class)
+            ? app(SeedingObligationsInterface::class)
             : null;
     }
 

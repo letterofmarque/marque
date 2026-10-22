@@ -52,6 +52,7 @@ class AnnounceKeyManagement extends Component
             'addressUnproven' => VerifiedAddress::missing($user),
             'seedboxesAvailable' => $this->seedboxes() !== null,
             'sessionsAvailable' => $this->trackerSessions() !== null,
+            'obligations' => $user instanceof UserInterface ? ($this->seedingObligations()?->obligationsFor($user) ?? []) : [],
         ])->title(__('Tracker Stats'));
     }
 }

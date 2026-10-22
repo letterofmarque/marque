@@ -437,7 +437,7 @@ appearing only when it has something true to say:
 
 | Panel | Appears when |
 |---|---|
-| Tracker Stats — uploaded, downloaded, ratio, seed time, leech time, and the member's standing against the ratio rule (on watch until a date, downloads paused, or exempt) | a tracker has bound `TrackerStatsInterface`, and it keeps figures for this user |
+| Tracker Stats — uploaded, downloaded, ratio, seed time, leech time, the member's standing (on watch until a date, downloads paused, or exempt), and how many torrents they owe seeding on under hit-and-run, linking to the list | a tracker has bound `TrackerStatsInterface`, and it keeps figures for this user |
 | Announce Key — the key with regenerate, or Generate for a verified user without one, or "verify your address" | a tracker is bound and `profile.show_announce_key` is on |
 | Account Security — two-factor, passkeys | `two_factor.enabled` or `passkeys.enabled`, and the User model supports it; not registered when `manage_auth` is `false` |
 | Invites — allowance, pending, send | `invites.enabled`, and the user can send one or has one outstanding |
@@ -465,6 +465,16 @@ member's announces are held to.
 The tracker decides what a valid range is and what approval means. usarrs shows its
 answers, including its reason when it refuses a range. With no such tracker, both routes
 still exist (a link to them is never fatal) and answer 404, and nothing links to them.
+
+### Seeding owed
+
+When a tracker keeps hit-and-run obligations (bloodhound binds trove's
+`SeedingObligationsInterface`), `/profile/stats` lists what the member still owes
+seeding on. Each torrent shows its seeding so far against what's required, and the ratio
+where the tracker accepts one. A hit-and-run strike shows when it lapses, and a
+pre-warning says a strike is coming. Strikes come first. The dashboard's Tracker Stats
+panel shows the count and links to the list. Nothing shows when nothing is owed or no
+tracker keeps obligations.
 
 ### Sessions
 

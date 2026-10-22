@@ -7,6 +7,18 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+### Added
+
+- **Seeding owed** (Job #256). `/profile/stats` lists the torrents a member still owes
+  seeding on under the tracker's hit-and-run rule: seeding so far against what's required,
+  the ratio where the tracker accepts one, strikes with when they lapse, and pre-warnings.
+  The dashboard's Tracker Stats panel shows the count and links to the list. It's read from
+  trove 4.9's `SeedingObligationsInterface`, which bloodhound 9.1 binds, so it requires
+  `marque/trove ^4.9`. If you published usarrs' views, re-publish `profile/stats.blade.php`
+  and `dashboard/panels/tracker-stats.blade.php`.
+
 ## [8.5.0] — 2026-10-22
 
 > Members see where they stand against the tracker's ratio rule: on watch until a date, downloads paused, or exempt.
