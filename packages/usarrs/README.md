@@ -437,7 +437,7 @@ appearing only when it has something true to say:
 
 | Panel | Appears when |
 |---|---|
-| Tracker Stats — uploaded, downloaded, ratio, seed time, leech time | a tracker has bound `TrackerStatsInterface`, and it keeps figures for this user |
+| Tracker Stats — uploaded, downloaded, ratio, seed time, leech time, and the member's standing against the ratio rule (on watch until a date, downloads paused, or exempt) | a tracker has bound `TrackerStatsInterface`, and it keeps figures for this user |
 | Announce Key — the key with regenerate, or Generate for a verified user without one, or "verify your address" | a tracker is bound and `profile.show_announce_key` is on |
 | Account Security — two-factor, passkeys | `two_factor.enabled` or `passkeys.enabled`, and the User model supports it; not registered when `manage_auth` is `false` |
 | Invites — allowance, pending, send | `invites.enabled`, and the user can send one or has one outstanding |

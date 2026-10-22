@@ -7,6 +7,17 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+### Added
+
+- **The member's standing against the tracker's ratio rule**, on the Tracker Stats panel
+  and `/profile/stats` (#10732). On watch shows the deadline and what to do, in the
+  tracker's words. Paused downloads show why and how to recover. Exempt says so. Ok says
+  nothing. It's read from trove 4.8's `TrackerStats::$standing`, which bloodhound 9
+  reports, so it requires `marque/trove ^4.8`. If you published usarrs' views, re-publish
+  `partials/tracker-figures.blade.php`.
+
 ## [8.4.0] — 2026-10-21
 
 > An app's own /dashboard is reported and can coexist, login returns to the page it was going to, a member without an announce key can get one from the dashboard, and the stats panel shows seed and leech time.

@@ -14,6 +14,7 @@ declare(strict_types=1);
 use Livewire\Livewire;
 use Marque\Trove\Contracts\TrackerStatsInterface;
 use Marque\Trove\Registry\DashboardPanelRegistry;
+use Marque\Trove\Support\TrackerStanding;
 use Marque\Trove\Support\TrackerStats;
 use Marque\Usarrs\Livewire\Dashboard\AnnounceKeyPanel;
 use Marque\Usarrs\Tests\TestUser;
@@ -131,6 +132,47 @@ it('shows seed time and leech time beside the byte counts', function () {
         ->assertSee('1d 2h')
         ->assertSee('Leech time')
         ->assertSee('2h 1m');
+});
+
+// #10732: where the member stands against the tracker's ratio rule, said where
+// they look at their ratio. Ok says nothing: no news is good news.
+describe('the member\'s standing', function () {
+    it('shows a watch, with its deadline and what to do', function () {
+        $this->tracker->stats[$this->user->id] = new TrackerStats(uploaded: 1, downloaded: 10, seedtime: 0, standing: TrackerStanding::watch(
+            \Illuminate\Support\Carbon::parse('2026-11-15 10:00:00'),
+            'Your ratio is 0.10 and this tracker asks for at least 0.50. Seed to raise it by Sun, Nov 15, 2026, or new downloads will be paused until you do.',
+        ));
+
+        foreach ([route('dashboard.index'), route('profile.stats')] as $page) {
+            $this->actingAs($this->user)->get($page)
+                ->assertSee('Ratio watch')
+                ->assertSee('Seed to raise it by Sun, Nov 15, 2026');
+        }
+    });
+
+    it('shows a restriction, with its reason', function () {
+        $this->tracker->stats[$this->user->id] = new TrackerStats(uploaded: 1, downloaded: 10, seedtime: 0, standing: TrackerStanding::restricted(
+            'New downloads are paused: your ratio is 0.10 and this tracker asks for at least 0.50. Keep seeding; downloads resume within the hour once it is back up.',
+        ));
+
+        $this->actingAs($this->user)->get(route('dashboard.index'))
+            ->assertSee('Downloads paused')
+            ->assertSee('Keep seeding; downloads resume within the hour once it is back up.');
+    });
+
+    it('says when the member is exempt', function () {
+        $this->tracker->stats[$this->user->id] = new TrackerStats(uploaded: 1, downloaded: 10, seedtime: 0, standing: TrackerStanding::exempt());
+
+        $this->actingAs($this->user)->get(route('dashboard.index'))
+            ->assertSee('exempt from the ratio rule');
+    });
+
+    it('says nothing extra when the member is ok', function () {
+        $this->actingAs($this->user)->get(route('dashboard.index'))
+            ->assertDontSee('Ratio watch')
+            ->assertDontSee('Downloads paused')
+            ->assertDontSee('exempt from the ratio rule');
+    });
 });
 
 // #11070 item 7: in a narrow card the key and the Regenerate button sat in one
