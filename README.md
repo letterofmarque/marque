@@ -167,7 +167,7 @@ composer require marque/skipper
 - Ratio and seedtime summed from an append-only ledger that can be reconciled, audited and rebuilt
 - Version-based client whitelist/blacklist
 - Anti-cheat (speed caps that forfeit, location limits and a cap on a member's clients per torrent, swarm consistency), with registered seedboxes on their own speed cap. How many torrents a member seeds is never limited
-- Ratio tracking modes (full, off, seedtime) — planned, not yet enforced (#10732)
+- Ratio enforcement: a member below the minimum ratio goes on watch, then has new downloading paused until they recover (seeding never is), with a grace allowance and staff and per-member exemptions; or `ratio_mode` off. Per-torrent seeding rules (`seedtime` mode) are planned
 - Support for compact and dictionary peer formats
 
 ### Guise (Web UI)

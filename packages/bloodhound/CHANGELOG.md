@@ -9,6 +9,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [Unreleased]
 
+> The ratio is enforced: a member below min_ratio goes on watch, then has new downloading paused until they recover, while seeding never is; and a malformed announce key gets a reason by default.
+
 ### Changed (breaking)
 
 - **`min_ratio` is enforced** under `ratio_mode` `full`, the default (#10732). A member

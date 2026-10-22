@@ -308,9 +308,9 @@ Published to `config/trove.php`:
 | `storage_disk` | `local` | Filesystem disk for .torrent files |
 | `hide_dead_torrents` | `false` | Hide torrents with no seeders from listings |
 
-Ratio enforcement isn't configured here. It belongs to the tracker, and bloodhound's
-`ratio_mode` / `min_ratio` / `min_seedtime` keys are planned and not enforced yet
-(#10732).
+Ratio enforcement isn't configured here. It belongs to the tracker: see bloodhound's
+[Ratio enforcement](../bloodhound/README.md#ratio-enforcement). trove carries the
+outcome, as `TrackerStats::$standing` and the download gate.
 
 ## Migrations
 

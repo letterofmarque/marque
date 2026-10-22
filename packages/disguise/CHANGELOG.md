@@ -9,6 +9,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [Unreleased]
 
+> A download the tracker refuses is a 403 with the reason, never a 500.
+
 ### Fixed
 
 - **A download the tracker refuses is a 403 with the reason, never a 500** (#10732). The

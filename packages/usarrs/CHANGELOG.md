@@ -9,6 +9,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [Unreleased]
 
+> Members see where they stand against the tracker's ratio rule: on watch until a date, downloads paused, or exempt.
+
 ### Added
 
 - **The member's standing against the tracker's ratio rule**, on the Tracker Stats panel

@@ -9,6 +9,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [Unreleased]
 
+> A tracker can refuse a download through a download gate, and a tracker's stats carry where the member stands against its ratio rule.
+
 ### Added
 
 - **`DownloadGateInterface`**, for a tracker that restricts downloading (#10732).
