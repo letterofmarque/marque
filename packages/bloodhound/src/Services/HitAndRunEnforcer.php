@@ -93,6 +93,15 @@ class HitAndRunEnforcer
         return $this->applies() ? Strike::query()->where('user_id', $userId)->active()->count() : 0;
     }
 
+    /**
+     * Whether the rule passes this member by: staff at or above the exempt
+     * role, or exempted by an admin. The same exemptions as the ratio rule.
+     */
+    public function isExempt(int $userId): bool
+    {
+        return isset($this->exemptAmong([$userId])[$userId]);
+    }
+
     public function requiredSeconds(): int
     {
         return max(0, (int) config('bloodhound.min_seedtime', 72 * 3600));

@@ -42,6 +42,10 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   alone).
 - `bloodhound:enforce-hit-and-run` runs just before `bloodhound:enforce-ratio` each hour,
   so a new strike restricts in the same run.
+- **trove's `SeedingObligationsInterface`**, bound always. It lists what a member still
+  owes seeding on: strikes first, with when each lapses, then pre-warnings, then the rest,
+  each with seeded and required time and the ratio. The list is empty when hit-and-run is
+  off or the member is exempt. Requires `marque/trove ^4.9`.
 
 ## [9.0.0] — 2026-10-22
 

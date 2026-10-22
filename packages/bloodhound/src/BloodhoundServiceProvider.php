@@ -39,6 +39,7 @@ use Marque\Bloodhound\Services\ClientValidationService;
 use Marque\Bloodhound\Services\RatioDownloadGate;
 use Marque\Bloodhound\Services\RedisDurability;
 use Marque\Bloodhound\Services\Seedboxes;
+use Marque\Bloodhound\Services\SeedingObligations;
 use Marque\Bloodhound\Services\TorrentFilePolicy;
 use Marque\Bloodhound\Services\TrackerSessions;
 use Marque\Bloodhound\Services\TrackerStatsService;
@@ -46,6 +47,7 @@ use Marque\Bloodhound\Support\PeerIdColumn;
 use Marque\Threepio\Services\PeerService;
 use Marque\Trove\Contracts\DownloadGateInterface;
 use Marque\Trove\Contracts\SeedboxesInterface;
+use Marque\Trove\Contracts\SeedingObligationsInterface;
 use Marque\Trove\Contracts\TorrentFilePolicyInterface;
 use Marque\Trove\Contracts\TrackerSessionsInterface;
 use Marque\Trove\Contracts\TrackerStatsInterface;
@@ -81,6 +83,10 @@ class BloodhoundServiceProvider extends ServiceProvider
         // whose downloading is paused, for a torrent they aren't already in.
         // Bound in every ratio_mode; with enforcement off it refuses nobody.
         $this->app->singleton(DownloadGateInterface::class, RatioDownloadGate::class);
+
+        // A member's seeding obligations under hit-and-run (Job #256), for a
+        // frontend to show. Bound always; an empty list when the rule is off.
+        $this->app->singleton(SeedingObligationsInterface::class, SeedingObligations::class);
 
         // Members' seedboxes (Job #193): one store, two faces. trove's
         // SeedboxesInterface is what a frontend manages them through;

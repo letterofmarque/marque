@@ -32,7 +32,7 @@
     ],
     "require": {
         "php": "^8.3",
-        "marque/trove": "^4.8",
+        "marque/trove": "^4.9",
         "marque/threepio": "^4.0",
         "illuminate/support": "^13.0",
         "illuminate/routing": "^13.0",
