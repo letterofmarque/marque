@@ -12,7 +12,7 @@ composer require marque/trove marque/bloodhound marque/guise marque/usarrs marqu
 ```
 
 That resolves `marque/threepio` and `marque/deck` for you. Verified installing as a set
-from Packagist, 2026-10-20.
+from Packagist, 2026-10-22 (Marque 10.0: guise 5.3 with bloodhound 9.0).
 
 Browsing without accounts is [marque/disguise](https://packagist.org/packages/marque/disguise)
 instead.

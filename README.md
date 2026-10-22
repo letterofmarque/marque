@@ -110,7 +110,9 @@ composer require marque/trove marque/guise marque/usarrs
 
 Each pulls in whatever it needs (`marque/threepio` for the BitTorrent protocol,
 `marque/deck` for the shared UI shell) — you don't name those yourself. All three
-verified installing cleanly from Packagist as sets on 2026-10-20 (Marque 9.0).
+verified installing cleanly from Packagist as sets on 2026-10-20 (Marque 9.0). The private
+tracker set again on 2026-10-22 (Marque 10.0): it resolves bloodhound 9.0, trove 4.8,
+guise 5.3 and usarrs 8.5, migrates and boots in a fresh Laravel 13 app.
 
 Going this way you also need to add the Marque traits to your `User` model, add
 `@source` lines for the packages' views to `resources/css/app.css`, and give `/`
