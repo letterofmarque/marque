@@ -249,8 +249,9 @@ key formats are disjoint first.
 4. The peer's record read from Redis, once, along with the torrent's live peers. A peer ID
    live in the swarm for another member is refused here: two members cannot share one,
    and letting the second through would overwrite or remove the first's record.
-5. A leech from a member whose downloading is paused by the ratio rule is refused here,
-   unless it's a torrent they're already in (see [Ratio enforcement](#ratio-enforcement)).
+5. A leech from a member whose downloading is paused, by the ratio rule or by hit-and-run
+   strikes, is refused here, unless it's a torrent they're already in (see
+   [Ratio enforcement](#ratio-enforcement) and [Hit-and-run](#hit-and-run)).
 6. Anti-cheat judges the announce against that record.
 7. The credit computed from the same record, and the ledger row written.
 8. Only then Redis updated: the peer's record, the swarm counters and sets.
@@ -357,7 +358,7 @@ Each kind of announce:
 - **`stopped`**: credits the bytes and seconds since the previous announce, against the
   record it removes. The protocol sends final counters on a stop, so they count. The
   session then ends; nothing is kept for it.
-- **A refused announce** (client validation, the ratio rule or anti-cheat): credits nothing and changes
+- **A refused announce** (client validation, the ratio rule or hit-and-run, or anti-cheat): credits nothing and changes
   nothing in Redis. The next accepted announce is measured from the last accepted one, so
   its bytes are credited in full; its seconds are capped as usual.
 - **A speed forfeit**: the direction over the cap credits 0, the other direction and the
@@ -544,7 +545,7 @@ how a member recovers.
 | exempt | role at or above `enforcement.exempt_role` (moderator), or exempted by an admin | never watched or restricted |
 
 **Restricted** refuses a leech announce (left > 0) on a torrent the member isn't already in,
-with a bencoded reason that names the ratio and the way out. The ledger records it like any
+with a bencoded reason that names whichever rule applies and the way out. The ledger records it like any
 refusal. Their `.torrent` download for such a torrent is refused with the same words,
 through trove's `DownloadGateInterface`, which guise and disguise 5.3 answer with a 403.
 
@@ -556,8 +557,9 @@ Restricted never refuses:
 
 **It's decided hourly**, by `bloodhound:enforce-ratio`, from the folded totals. The announce
 path and the download only read what was decided: one indexed lookup. A member who seeds
-back above `min_ratio` is restored within the hour. Switching `ratio_mode` away from `full`
-stops refusals at once, and the next run clears every watch and restriction. The figures
+back above `min_ratio` is restored within the hour. Switching `ratio_mode` to `off` stops
+refusals at once, and the next run clears every watch and restriction. Switching to
+`seedtime` does that for the ratio rule only: hit-and-run restrictions stay. The figures
 are recorded the same way in every mode.
 
 **Exemptions.** Staff at or above `enforcement.exempt_role` are exempt. An admin can exempt
@@ -622,7 +624,8 @@ exemptions apply: `enforcement.exempt_role` and above, and `bloodhound:standing 
 
 **It never reaches back.** It counts only torrents first active after it's switched on, so
 turning it on doesn't strike everyone's history at once. Switched off and on again, it
-starts afresh.
+starts afresh: only torrents first active from then are counted, and a strike from before
+no longer counts, lapsed or not.
 
 **Where the defaults come from.** The mechanics are UNIT3D's: the buffer, pre-warning,
 grace, expiry and three-strike limit, from its `config/hitrun.php`. UNIT3D asks for 7 days

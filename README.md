@@ -169,7 +169,7 @@ composer require marque/skipper
 - Ratio and seedtime summed from an append-only ledger that can be reconciled, audited and rebuilt
 - Version-based client whitelist/blacklist
 - Anti-cheat (speed caps that forfeit, location limits and a cap on a member's clients per torrent, swarm consistency), with registered seedboxes on their own speed cap. How many torrents a member seeds is never limited
-- Ratio enforcement: a member below the minimum ratio goes on watch, then has new downloading paused until they recover (seeding never is), with a grace allowance and staff and per-member exemptions; or `ratio_mode` off. Per-torrent seeding rules (`seedtime` mode) are planned
+- Ratio enforcement: a member below the minimum ratio goes on watch, then has new downloading paused until they recover (seeding never is), with a grace allowance and staff and per-member exemptions; and hit-and-run: a downloaded torrent is owed 72 hours of seeding or 1:1 on it, and three strikes pause new downloading. It's off until you turn it on, and runs beside the ratio rule, or alone under `ratio_mode` `seedtime`; or `ratio_mode` off
 - Support for compact and dictionary peer formats
 
 ### Guise (Web UI)
@@ -231,7 +231,7 @@ php artisan vendor:publish --tag=taxonomy-config
 Packages follow [Semantic Versioning](https://semver.org) and are versioned
 independently, so packages sit on different majors (usarrs on 8, threepio on 4) and that is normal.
 
-Most people want a caret on the current major (`^8.5` for usarrs today), which is what `composer require` gives you by default: new
+Most people want a caret on the current major (`^8.6` for usarrs today), which is what `composer require` gives you by default: new
 features and fixes automatically, never a breaking change. Minor releases are cut
 frequently, so you should not need to track `dev-main` to get a finished feature.
 

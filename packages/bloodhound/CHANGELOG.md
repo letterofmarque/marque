@@ -28,7 +28,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
     requirement. A torrent is struck once, ever.
   - **When it applies.** Under `ratio_mode` `seedtime`, or `full` with `hit_and_run.enabled`.
     It's off by default, so an upgraded tracker is unchanged.
-  - **Not retroactive.** It counts only activity after it is first switched on.
+  - **Not retroactive.** It counts only activity after it is switched on, and switched off
+    and on again it starts afresh: a strike from before no longer counts.
   - **Exemptions.** The ratio rule's exemptions apply.
   - **Running it.** `bloodhound:enforce-hit-and-run` runs hourly. Events:
     `HitAndRunPrewarned`, `HitAndRunStrike`, `HitAndRunCleared`.
