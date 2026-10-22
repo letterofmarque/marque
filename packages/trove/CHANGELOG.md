@@ -7,6 +7,17 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+### Added
+
+- **`SeedingObligationsInterface`**, for a tracker with a hit-and-run rule (Job #256).
+  `obligationsFor($user)` returns the torrents a member still owes seeding on, and the ones
+  they've been struck for, as **`SeedingObligation`**: seeded and required seconds, the
+  ratio on the torrent and the ratio that satisfies the rule (null: time only), an
+  **`ObligationState`** (`Open`, `Prewarned`, `Struck`), and when a strike lapses. `met()`
+  is time or ratio, whichever comes first. Nothing bound means no rule.
+
 ## [4.8.0] — 2026-10-22
 
 > A tracker can refuse a download through a download gate, and a tracker's stats carry where the member stands against its ratio rule.

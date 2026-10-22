@@ -120,6 +120,22 @@ $stats->standing;             // TrackerStanding: where the member stands agains
 
 `reason` is written for the member. A tracker that doesn't judge reports `Ok`.
 
+**Seeding obligations.** A tracker with a hit-and-run rule binds
+`SeedingObligationsInterface`; bloodhound does, from 9.1. `obligationsFor($user)` lists the
+torrents the member still owes seeding on, and the ones they've been struck for, as
+`SeedingObligation`s:
+
+```php
+$o->torrentId; $o->torrentName;
+$o->seededSeconds; $o->requiredSeconds; $o->remainingSeconds();
+$o->ratio; $o->requiredRatio;       // ratio on this torrent, and what satisfies the rule (null: time only)
+$o->state;                          // ObligationState: Open, Prewarned or Struck
+$o->until;                          // for a strike, when it lapses
+$o->met();                          // time or ratio, whichever comes first
+```
+
+With nothing bound, there's no rule and nothing to show.
+
 `statsForTorrent($user, $torrent)` returns a `TorrentStats` for one torrent, including when
 the user first and last completed it. Every figure is a raw integer (bytes, seconds) —
 formatting is yours.
