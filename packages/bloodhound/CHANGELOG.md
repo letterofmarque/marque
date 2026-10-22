@@ -16,6 +16,22 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   batched write it already makes, and never moved backwards. Rebuild and prune leave it
   alone, unlike `updated_at`. It isn't backfilled; a row without it is set by its next
   fold.
+- **Hit-and-run** (Job #256, the rest of #10732):
+  - **The obligation.** A torrent a member downloaded more than `hit_and_run.buffer_percent`
+    (10%) of is owed `min_seedtime` (72 hours) of seeding, or a ratio of `hit_and_run.ratio`
+    (1.0) on it, whichever comes first.
+  - **Warning and strike.** Away from it while short (no live peer of theirs on it, last seen
+    `prewarn_days` ago), they're pre-warned. Still away at `grace_days` (3), they get a
+    strike, which lapses after `expire_days` (14) and clears if they seed it to the
+    requirement. A torrent is struck once, ever.
+  - **When it applies.** Under `ratio_mode` `seedtime`, or `full` with `hit_and_run.enabled`.
+    It's off by default, so an upgraded tracker is unchanged.
+  - **Not retroactive.** It counts only activity after it is first switched on.
+  - **Exemptions.** The ratio rule's exemptions apply.
+  - **Running it.** `bloodhound:enforce-hit-and-run` runs hourly. Events:
+    `HitAndRunPrewarned`, `HitAndRunStrike`, `HitAndRunCleared`.
+  - **Defaults** are UNIT3D's mechanics, with 72 hours of seeding rather than its 7 days.
+- `min_seedtime` is read now. Its default is 72 hours (was 24, never read).
 
 ## [9.0.0] — 2026-10-22
 

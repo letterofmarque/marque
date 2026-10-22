@@ -15,6 +15,7 @@ use Marque\Bloodhound\Console\Commands\AggregateLedger;
 use Marque\Bloodhound\Console\Commands\AuditLedger;
 use Marque\Bloodhound\Console\Commands\BackfillLedger;
 use Marque\Bloodhound\Console\Commands\CheckRedis;
+use Marque\Bloodhound\Console\Commands\EnforceHitAndRun;
 use Marque\Bloodhound\Console\Commands\EnforceRatio;
 use Marque\Bloodhound\Console\Commands\IssueAnnounceKeys;
 use Marque\Bloodhound\Console\Commands\ManageSeedboxes;
@@ -312,6 +313,7 @@ class BloodhoundServiceProvider extends ServiceProvider
             AuditLedger::class,
             BackfillLedger::class,
             CheckRedis::class,
+            EnforceHitAndRun::class,
             EnforceRatio::class,
             IssueAnnounceKeys::class,
             ManageSeedboxes::class,
@@ -346,5 +348,9 @@ class BloodhoundServiceProvider extends ServiceProvider
         // minute, and a restriction lifts here once a member has seeded back
         // up, so an hour is the longest a recovered member waits (#10732).
         Schedule::command('bloodhound:enforce-ratio')->hourly()->withoutOverlapping();
+
+        // Hourly too. Its strikes feed the same restricted standing, which
+        // enforce-ratio decides (Job #256).
+        Schedule::command('bloodhound:enforce-hit-and-run')->hourly()->withoutOverlapping();
     }
 }

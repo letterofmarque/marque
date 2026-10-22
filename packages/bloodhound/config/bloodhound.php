@@ -110,9 +110,9 @@ return [
     |              watch for enforcement.watch_days; still below at the end,
     |              new downloading is paused until they recover. Seeding never
     |              is. Judged hourly by bloodhound:enforce-ratio.
-    | 'seedtime' - per-torrent seeding rules instead of a ratio. Not built yet,
-    |              so this enforces nothing for now.
-    | 'off'      - no minimum. Nothing is enforced.
+    | 'seedtime' - per-torrent seeding rules (hit-and-run, below) instead of a
+    |              ratio.
+    | 'off'      - nothing is enforced, hit-and-run included.
     |
     */
 
@@ -121,9 +121,9 @@ return [
     // The minimum ratio 'full' enforces
     'min_ratio' => env('BLOODHOUND_MIN_RATIO', 0.5),
 
-    // The minimum seedtime, in seconds, 'seedtime' will enforce
-    // check-docs: ignore — not yet enforced, read by nothing until the hit-and-run Job after #10732
-    'min_seedtime' => env('BLOODHOUND_MIN_SEEDTIME', 86400), // 24 hours
+    // Hit-and-run: the seeding each torrent is owed, in seconds. 72 hours by
+    // default; UNIT3D ships 7 days.
+    'min_seedtime' => env('BLOODHOUND_MIN_SEEDTIME', 72 * 3600),
 
     // How the minimum ratio is enforced, under 'full'.
     //
@@ -139,6 +139,28 @@ return [
         'watch_days' => env('BLOODHOUND_RATIO_WATCH_DAYS', 14),
         'grace_bytes' => env('BLOODHOUND_RATIO_GRACE_BYTES', 5 * 1024 ** 3),
         'exempt_role' => env('BLOODHOUND_RATIO_EXEMPT_ROLE', 'moderator'),
+    ],
+
+    // Hit-and-run: a torrent a member downloaded more than buffer_percent of
+    // is owed min_seedtime of seeding, or a ratio of 'ratio' on it (null:
+    // time only), whichever first. Away from it while short: a pre-warning
+    // after prewarn_days, a strike after grace_days. A strike clears once
+    // seeded to the requirement and lapses after expire_days; max_strikes
+    // active pause new downloading, as the ratio rule does. The exemptions
+    // above apply. Defaults are UNIT3D's mechanics.
+    //
+    // 'enabled' runs it beside the ratio rule under 'full'; ratio_mode
+    // 'seedtime' runs it on its own. Off by default, so an existing tracker is
+    // unchanged on upgrade; marque:install turns it on for a new private one.
+    // It counts only activity after it is first switched on.
+    'hit_and_run' => [
+        'enabled' => env('BLOODHOUND_HIT_AND_RUN', false),
+        'ratio' => env('BLOODHOUND_HIT_AND_RUN_RATIO', 1.0),
+        'buffer_percent' => env('BLOODHOUND_HIT_AND_RUN_BUFFER', 10),
+        'prewarn_days' => env('BLOODHOUND_HIT_AND_RUN_PREWARN_DAYS', 1),
+        'grace_days' => env('BLOODHOUND_HIT_AND_RUN_GRACE_DAYS', 3),
+        'expire_days' => env('BLOODHOUND_HIT_AND_RUN_EXPIRE_DAYS', 14),
+        'max_strikes' => env('BLOODHOUND_HIT_AND_RUN_MAX_STRIKES', 3),
     ],
 
     /*
