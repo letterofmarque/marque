@@ -11,6 +11,7 @@ use Marque\Bloodhound\Events\RatioWatchStarted;
 use Marque\Bloodhound\Events\StandingRestored;
 use Marque\Bloodhound\Models\MemberStanding;
 use Marque\Bloodhound\Models\TorrentUser;
+use Marque\Threepio\Services\PeerService;
 use Marque\Trove\Enums\Role;
 use Marque\Trove\Enums\StandingState;
 use Marque\Trove\Support\TrackerStanding;
@@ -34,6 +35,8 @@ use Marque\Trove\Support\TrackerStanding;
  */
 class RatioEnforcer
 {
+    public function __construct(private readonly PeerService $peers) {}
+
     public function enforcing(): bool
     {
         return config('bloodhound.ratio_mode', 'full') === 'full';
@@ -131,13 +134,14 @@ class RatioEnforcer
      * download gate. One indexed lookup for a member who isn't restricted,
      * which is nearly everyone.
      *
-     * Only new leeching is refused. A torrent the member is already in (a
-     * live peer of theirs, or a torrent_user row the ledger has folded) is
-     * theirs to finish, and its .torrent theirs to download again.
+     * Only new leeching is refused. A torrent the member is already in is
+     * theirs to finish, and its .torrent theirs to download again: a
+     * torrent_user row the ledger has folded, or, before the fold, a live
+     * peer of theirs on it, from any of their clients.
      */
-    public function leechRefusal(int|string $userId, int $torrentId, bool $alreadyInSwarm = false): ?string
+    public function leechRefusal(int|string $userId, int $torrentId): ?string
     {
-        if (! $this->enforcing() || $alreadyInSwarm) {
+        if (! $this->enforcing()) {
             return null;
         }
 
@@ -147,13 +151,32 @@ class RatioEnforcer
             ->whereNull('exempted_at')
             ->exists();
 
-        if (! $restricted || TorrentUser::query()->where('user_id', $userId)->where('torrent_id', $torrentId)->exists()) {
+        if (! $restricted || $this->alreadyIn((int) $userId, $torrentId)) {
             return null;
         }
 
         $user = $this->userModel()->newQuery()->find($userId);
 
         return $this->restrictionReason($user === null ? 0.0 : $this->ratioOf($user));
+    }
+
+    /**
+     * Asked only for a restricted member, so only they cost the Redis reads.
+     */
+    private function alreadyIn(int $userId, int $torrentId): bool
+    {
+        if (TorrentUser::query()->where('user_id', $userId)->where('torrent_id', $torrentId)->exists()) {
+            return true;
+        }
+
+        // Live and theirs: peersOfUser() checks both against the swarm hash.
+        foreach ($this->peers->peersOfUser($userId) as $peer) {
+            if ($peer['torrent_id'] === $torrentId) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

@@ -13,7 +13,9 @@
 @if ($standing->state === \Marque\Trove\Enums\StandingState::Watch)
     <div class="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-950">
         <x-deck::text class="font-medium text-amber-900 dark:text-amber-200">{{ __('Ratio watch') }}</x-deck::text>
-        <x-deck::text class="mt-1 text-sm text-amber-900 dark:text-amber-200">{{ $standing->reason }}</x-deck::text>
+        <x-deck::text class="mt-1 text-sm text-amber-900 dark:text-amber-200">
+            {{ $standing->reason ?? __('Your ratio is below this tracker\'s minimum. Seed to raise it by :date, or new downloads will be paused until you do.', ['date' => $standing->until?->toFormattedDayDateString()]) }}
+        </x-deck::text>
     </div>
 @elseif ($standing->state === \Marque\Trove\Enums\StandingState::Restricted)
     <div class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 dark:border-red-700 dark:bg-red-950">

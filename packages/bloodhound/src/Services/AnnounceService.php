@@ -137,8 +137,7 @@ final class AnnounceService
         // in (a live peer of theirs, even one the ledger hasn't folded yet)
         // are always answered: seeding is how they recover.
         if ($left > 0 && $eventEnum !== AnnounceEvent::Stopped) {
-            $inSwarm = $stored !== null && ($stored['user_id'] ?? null) === $user->getAuthIdentifier();
-            $refusal = $this->ratio->leechRefusal($user->getAuthIdentifier(), $torrent->id, $inSwarm);
+            $refusal = $this->ratio->leechRefusal($user->getAuthIdentifier(), $torrent->id);
 
             if ($refusal !== null) {
                 $this->writeRefusal($announce, $refusal);

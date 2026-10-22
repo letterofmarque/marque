@@ -151,6 +151,18 @@ describe('the member\'s standing', function () {
         }
     });
 
+    // A tracker may report a watch with no wording of its own; the deadline
+    // is still the thing the member needs.
+    it('shows a watch\'s deadline when the tracker gives no reason', function () {
+        $this->tracker->stats[$this->user->id] = new TrackerStats(uploaded: 1, downloaded: 10, seedtime: 0, standing: TrackerStanding::watch(
+            Carbon::parse('2026-11-15 10:00:00'),
+        ));
+
+        $this->actingAs($this->user)->get(route('dashboard.index'))
+            ->assertSee('Ratio watch')
+            ->assertSee('Sun, Nov 15, 2026');
+    });
+
     it('shows a restriction, with its reason', function () {
         $this->tracker->stats[$this->user->id] = new TrackerStats(uploaded: 1, downloaded: 10, seedtime: 0, standing: TrackerStanding::restricted(
             'New downloads are paused: your ratio is 0.10 and this tracker asks for at least 0.50. Keep seeding; downloads resume within the hour once it is back up.',

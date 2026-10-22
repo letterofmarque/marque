@@ -81,6 +81,16 @@ describe('at announce', function () {
         expect(announceOn($this, $this->member, $this->torrent, left: 900, event: null))->not->toHaveKey('failure reason');
     });
 
+    // A client restarted under a new peer ID is still the member finishing
+    // what they started, even before the ledger folds a torrent_user row.
+    it('still answers a restricted member\'s second client on a torrent they are in', function () {
+        announceOn($this, $this->member, $this->torrent, left: 1_000, peerId: '-qB4210-aaaaaaaaaaaa');
+        restrict($this->member);
+
+        expect(announceOn($this, $this->member, $this->torrent, left: 1_000, peerId: '-qB4210-bbbbbbbbbbbb'))
+            ->not->toHaveKey('failure reason');
+    });
+
     it('still answers a restricted member stopping a leech', function () {
         restrict($this->member);
 
@@ -122,6 +132,14 @@ describe('the .torrent download', function () {
 
     it('is served to a member who is not restricted', function () {
         expect(app(TorrentFileService::class)->forDownload($this->stored, $this->member))->toBeString();
+    });
+
+    it('is served for a torrent the restricted member is in, before the ledger has folded it', function () {
+        announceOn($this, $this->member, $this->stored, left: 1_000);
+        restrict($this->member);
+
+        expect(TorrentUser::query()->where('torrent_id', $this->stored->id)->exists())->toBeFalse()
+            ->and(app(TorrentFileService::class)->forDownload($this->stored, $this->member))->toBeString();
     });
 
     it('is served for a torrent the restricted member is already in, to replace a lost file', function () {
