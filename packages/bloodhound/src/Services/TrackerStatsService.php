@@ -34,7 +34,8 @@ class TrackerStatsService implements TrackerStatsInterface
 {
     public function statsFor(UserInterface $user): ?TrackerStats
     {
-        $row = $this->userQuery($user)->first(['uploaded', 'downloaded', 'seedtime', 'leechtime']);
+        $query = $this->userQuery($user);
+        $row = $query->first([$query->getModel()->getKeyName(), 'uploaded', 'downloaded', 'seedtime', 'leechtime', 'role']);
 
         if ($row === null) {
             return null;
@@ -45,6 +46,9 @@ class TrackerStatsService implements TrackerStatsInterface
             downloaded: (int) $row->getAttribute('downloaded'),
             seedtime: (int) $row->getAttribute('seedtime'),
             leechtime: (int) $row->getAttribute('leechtime'),
+            // Where they stand against the ratio rule, as last decided
+            // (#10732): read, never judged here.
+            standing: app(RatioEnforcer::class)->standingFor($row),
         );
     }
 

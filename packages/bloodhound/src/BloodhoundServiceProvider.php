@@ -35,6 +35,7 @@ use Marque\Bloodhound\Services\AnnounceLogService;
 use Marque\Bloodhound\Services\AnnounceService;
 use Marque\Bloodhound\Services\AntiCheatService;
 use Marque\Bloodhound\Services\ClientValidationService;
+use Marque\Bloodhound\Services\RatioDownloadGate;
 use Marque\Bloodhound\Services\RedisDurability;
 use Marque\Bloodhound\Services\Seedboxes;
 use Marque\Bloodhound\Services\TorrentFilePolicy;
@@ -42,6 +43,7 @@ use Marque\Bloodhound\Services\TrackerSessions;
 use Marque\Bloodhound\Services\TrackerStatsService;
 use Marque\Bloodhound\Support\PeerIdColumn;
 use Marque\Threepio\Services\PeerService;
+use Marque\Trove\Contracts\DownloadGateInterface;
 use Marque\Trove\Contracts\SeedboxesInterface;
 use Marque\Trove\Contracts\TorrentFilePolicyInterface;
 use Marque\Trove\Contracts\TrackerSessionsInterface;
@@ -73,6 +75,11 @@ class BloodhoundServiceProvider extends ServiceProvider
         // What downloads and uploads need from this tracker (#10947): the
         // member's keyed announce URL, and private torrents by default.
         $this->app->singleton(TorrentFilePolicyInterface::class, TorrentFilePolicy::class);
+
+        // The ratio rule's half of downloads (#10732): no .torrent for a member
+        // whose downloading is paused, for a torrent they aren't already in.
+        // Bound in every ratio_mode; with enforcement off it refuses nobody.
+        $this->app->singleton(DownloadGateInterface::class, RatioDownloadGate::class);
 
         // Members' seedboxes (Job #193): one store, two faces. trove's
         // SeedboxesInterface is what a frontend manages them through;

@@ -26,6 +26,7 @@ final class AnnounceService
         private readonly AntiCheatService $antiCheat,
         private readonly RedisDurability $durability,
         private readonly LedgerFreshness $freshness,
+        private readonly RatioEnforcer $ratio,
     ) {}
 
     /**
@@ -129,6 +130,21 @@ final class AnnounceService
             $this->writeRefusal($announce, 'Peer ID is in use by another member; restart your client');
 
             return TrackerResponse::error('Peer ID is in use by another member; restart your client');
+        }
+
+        // A member whose downloading is paused by the ratio rule may not start
+        // leeching (#10732). Seeding, stopping, and a torrent they are already
+        // in (a live peer of theirs, even one the ledger hasn't folded yet)
+        // are always answered: seeding is how they recover.
+        if ($left > 0 && $eventEnum !== AnnounceEvent::Stopped) {
+            $inSwarm = $stored !== null && ($stored['user_id'] ?? null) === $user->getAuthIdentifier();
+            $refusal = $this->ratio->leechRefusal($user->getAuthIdentifier(), $torrent->id, $inSwarm);
+
+            if ($refusal !== null) {
+                $this->writeRefusal($announce, $refusal);
+
+                return TrackerResponse::error($refusal);
+            }
         }
 
         $antiCheatCheck = $this->antiCheat->check(

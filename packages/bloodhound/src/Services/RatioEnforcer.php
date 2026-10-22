@@ -10,6 +10,7 @@ use Marque\Bloodhound\Events\MemberRestricted;
 use Marque\Bloodhound\Events\RatioWatchStarted;
 use Marque\Bloodhound\Events\StandingRestored;
 use Marque\Bloodhound\Models\MemberStanding;
+use Marque\Bloodhound\Models\TorrentUser;
 use Marque\Trove\Enums\Role;
 use Marque\Trove\Enums\StandingState;
 use Marque\Trove\Support\TrackerStanding;
@@ -122,6 +123,37 @@ class RatioEnforcer
             StandingState::Restricted->value => TrackerStanding::restricted($this->restrictionReason($ratio)),
             default => TrackerStanding::ok(),
         };
+    }
+
+    /**
+     * Why this member may not start leeching this torrent, or null if they
+     * may. Asked by the announce path (for a leech, left > 0) and by the
+     * download gate. One indexed lookup for a member who isn't restricted,
+     * which is nearly everyone.
+     *
+     * Only new leeching is refused. A torrent the member is already in (a
+     * live peer of theirs, or a torrent_user row the ledger has folded) is
+     * theirs to finish, and its .torrent theirs to download again.
+     */
+    public function leechRefusal(int|string $userId, int $torrentId, bool $alreadyInSwarm = false): ?string
+    {
+        if (! $this->enforcing() || $alreadyInSwarm) {
+            return null;
+        }
+
+        $restricted = MemberStanding::query()
+            ->where('user_id', $userId)
+            ->where('state', StandingState::Restricted->value)
+            ->whereNull('exempted_at')
+            ->exists();
+
+        if (! $restricted || TorrentUser::query()->where('user_id', $userId)->where('torrent_id', $torrentId)->exists()) {
+            return null;
+        }
+
+        $user = $this->userModel()->newQuery()->find($userId);
+
+        return $this->restrictionReason($user === null ? 0.0 : $this->ratioOf($user));
     }
 
     /**

@@ -29,6 +29,16 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 - **Events** to notify on: `RatioWatchStarted` (with the deadline), `MemberRestricted` and
   `StandingRestored` (with what it was before).
 - A `member_standings` table, holding only members on watch, restricted or exempted.
+- **What restricted means.** A leech announce (left>0) on a torrent the member isn't
+  already in gets a bencoded failure that names the ratio and the way out, recorded in the
+  ledger like any refusal. Seeding, `stopped`, and a torrent they're already in are answered
+  as normal. "Already in" means a live peer of theirs, or a folded `torrent_user` row. The
+  `.torrent` download is refused the same way, through trove 4.8's `DownloadGateInterface`,
+  which bloodhound binds. A torrent they're already in can be downloaded again. With
+  `ratio_mode` off or `seedtime`, nobody is refused, at once, without waiting for the next
+  run.
+- **`statsFor()` reports the member's standing** (`TrackerStats::$standing`): ok, on watch
+  until a date, restricted, or exempt. Requires `marque/trove ^4.8`.
 
 ## [8.1.0] — 2026-10-21
 
