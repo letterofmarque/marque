@@ -9,6 +9,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [Unreleased]
 
+> Members see what they owe seeding on under the tracker's hit-and-run rule, and their strikes.
+
 ### Added
 
 - **Seeding owed** (Job #256). `/profile/stats` lists the torrents a member still owes

@@ -9,6 +9,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [Unreleased]
 
+> Hit-and-run: a torrent downloaded is owed 72 hours of seeding or 1:1 on it; away while short, a pre-warning then a strike; three strikes pause new downloading. Off until you turn it on.
+
 ### Added
 
 - **`torrent_user.last_seen`**: when a member was last seen on a torrent, in unix seconds
@@ -31,7 +33,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   - **Running it.** `bloodhound:enforce-hit-and-run` runs hourly. Events:
     `HitAndRunPrewarned`, `HitAndRunStrike`, `HitAndRunCleared`.
   - **Defaults** are UNIT3D's mechanics, with 72 hours of seeding rather than its 7 days.
-- `min_seedtime` is read now. Its default is 72 hours (was 24, never read).
+- `min_seedtime` is read now. Its default is 72 hours (was 24, never read). **A published config still holding 86400 enforces 24 hours** once hit-and-run is on: change it if you meant 72.
 - **One restricted standing for both rules.** `hit_and_run.max_strikes` (3) active strikes
   pause new downloading at once, through the same announce refusal and download gate as the
   ratio rule. A member restricted by both stays restricted until both clear. If strikes

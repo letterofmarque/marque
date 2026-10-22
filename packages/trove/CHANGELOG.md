@@ -9,6 +9,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [Unreleased]
 
+> A contract for a tracker's hit-and-run obligations, so a frontend can show a member what they owe seeding on.
+
 ### Added
 
 - **`SeedingObligationsInterface`**, for a tracker with a hit-and-run rule (Job #256).

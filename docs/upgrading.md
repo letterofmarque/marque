@@ -52,6 +52,7 @@ Newest first. Each links to the full write-up.
 
 | Release | Date | Summary | Who's affected |
 |---|---|---|---|
+| [10.1](releases/10.1.md) | | Hit-and-run: a downloaded torrent is owed 72 hours of seeding or 1:1 on it; pre-warning, then strike; three strikes pause new downloading. Off on upgrade, on for a new private tracker; members see what they owe | nobody on upgrade; anyone who turns it on (a published `min_seedtime` of 86400 enforces 24 hours) |
 | [10.0](releases/10.0.md) ([upgrade steps](../packages/bloodhound/README.md#upgrading-from-8x-to-90)) | 2026-10-22 | The ratio is enforced: members below `min_ratio` go on watch, then have new downloading paused until they recover (seeding never is); grace allowance, staff and per-member exemptions; members see their standing on the dashboard; a malformed announce key gets a reason by default | anyone running bloodhound, whose members go on watch after upgrading; guise/disguise must be 5.3 |
 | [9.1](releases/9.1.md) | 2026-10-21 | From one real 6.0 → 9.0 upgrade: an app's own `/dashboard` no longer breaks every page and is reported; a stale published bloodhound config is reported; login returns to the page it was going to; every member can get an announce key; a tracker with no scheduler says so; seed and leech time on the dashboard; `FakeTorrent` for consumer tests | apps with their own `/dashboard`; bloodhound configs published before 2.0; installs that imported members |
 | [9.0](releases/9.0.md) ([upgrade steps](../packages/bloodhound/README.md#upgrading-from-7x-to-80)) | 2026-10-20 | Bloodhound credits every announce when it arrives, bytes and seedtime alike, against a Redis that must persist and never evict; anti-cheat stops refusing legitimate clients; members register seedboxes and end their own sessions (screens in usarrs); a banned member's API token is refused | anyone running bloodhound, who must configure Redis before upgrading; hound users (`ip_limiting.max_per_ip` is replaced by `max_peers_per_torrent`, a cap per address per torrent) |
@@ -108,6 +109,7 @@ release each guide belongs to.
 | 19 | Release | [Marque 9.1](releases/9.1.md) | 9.1 | Your own `/dashboard`, a stale published bloodhound config, imported members' keys, the scheduler, and test fixtures |
 | 20 | Release | [Marque 10.0](releases/10.0.md) | 10.0 | Ratio enforcement on by default: tell members, check the numbers, exempt, or `ratio_mode=off` |
 | 21 | Guide | [bloodhound 8.x → 9.0](../packages/bloodhound/README.md#upgrading-from-8x-to-90) | 10.0 | What changes for members, the malformed-key default, upgrading guise/disguise together |
+| 22 | Release | [Marque 10.1](releases/10.1.md) | 10.1 | Hit-and-run, off until you turn it on; check a published `min_seedtime` first |
 
 ## Currently at 2.x or earlier?
 
