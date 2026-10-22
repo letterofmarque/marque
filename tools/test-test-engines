@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+#
+# Tests for tools/test-engines' run lock (#11035).
+#
+# Two runs at once on one machine shared the per-worker databases
+# (marque_test_<n>) and Redis databases (REDIS_DB=<n>), and each created,
+# dropped and flushed the other's: "Unknown database 'marque_test_1'", or a
+# test reading peers another run had just flushed. Every checkout and session
+# uses the same containers on the same ports, so the lock is machine-wide: a
+# second run waits, says so, and names the run it waits on.
+#
+# These run test-engines against SQLite on one tiny package, so they need no
+# containers. TEST_ENGINES_LOCK points the lock somewhere private, and
+# TEST_ENGINES_LOCK_WAIT bounds the wait.
+
+set -uo pipefail
+
+cd "$(dirname "$0")/.."
+ENGINES="$PWD/tools/test-engines"
+SCRATCH="$(mktemp -d)"
+trap 'kill $(jobs -p) 2>/dev/null; rm -rf "$SCRATCH"' EXIT
+
+PASSED=0
+FAILED=0
+pass() { printf '  \033[32m✓\033[0m %s\n' "$1"; PASSED=$((PASSED + 1)); }
+fail() { printf '  \033[31m✗\033[0m %s\n      %s\n' "$1" "$2"; FAILED=$((FAILED + 1)); }
+
+LOCK="$SCRATCH/test-engines.lock"
+run() { TEST_ENGINES_LOCK="$LOCK" "$ENGINES" --packages deck "$@" sqlite 2>&1; }
+
+printf '\033[1mThe run lock\033[0m\n'
+
+# A run holding the lock: a live process's pid in it.
+sleep 30 &
+holder=$!
+mkdir "$LOCK" && echo "$holder" > "$LOCK/pid"
+
+out=$(TEST_ENGINES_LOCK_WAIT=2 run)
+rc=$?
+if [[ $rc -ne 0 ]] && grep -q "another test-engines run" <<<"$out" && grep -q "$holder" <<<"$out"; then
+    pass "a second run waits, names the run it waits on, and gives up after the wait"
+else
+    fail "a second run waits, names the run it waits on, and gives up after the wait" "rc=$rc: $(head -3 <<<"$out")"
+fi
+
+[[ -d "$LOCK" ]] && pass "…and leaves the other run's lock alone" || fail "…and leaves the other run's lock alone" "lock gone"
+
+kill "$holder" 2>/dev/null
+wait "$holder" 2>/dev/null
+
+out=$(TEST_ENGINES_LOCK_WAIT=2 run)
+rc=$?
+if [[ $rc -eq 0 ]] && grep -q "stale" <<<"$out"; then
+    pass "a lock left by a run that died is taken over, and says so"
+else
+    fail "a lock left by a run that died is taken over, and says so" "rc=$rc: $(head -3 <<<"$out")"
+fi
+
+[[ ! -d "$LOCK" ]] && pass "a run releases the lock when it ends" || fail "a run releases the lock when it ends" "lock still there"
+
+# Two at once: the second waits for the first, and both pass.
+# The first runs a longer package, and the second starts only once the lock
+# exists, so it is certain to find the first one running.
+TEST_ENGINES_LOCK="$LOCK" "$ENGINES" --packages usarrs sqlite > "$SCRATCH/a.out" 2>&1 &
+a=$!
+for _ in $(seq 1 100); do [[ -d "$LOCK" ]] && break; sleep 0.1; done
+TEST_ENGINES_LOCK_WAIT=600 run > "$SCRATCH/b.out"
+rc_b=$?
+wait "$a"
+rc_a=$?
+if [[ $rc_a -eq 0 && $rc_b -eq 0 ]] && grep -q "another test-engines run" "$SCRATCH/b.out"; then
+    pass "two runs at once: the second waits for the first, and both pass"
+else
+    fail "two runs at once: the second waits for the first, and both pass" "a=$rc_a b=$rc_b: $(head -3 "$SCRATCH/b.out")"
+fi
+
+printf '\n'
+if [[ $FAILED -eq 0 ]]; then
+    printf '\033[32m%d passed\033[0m\n' "$PASSED"
+else
+    printf '\033[31m%d failed\033[0m, %d passed\n' "$FAILED" "$PASSED"
+    exit 1
+fi

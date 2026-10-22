@@ -23,8 +23,12 @@
 # the concurrency. Give each worker its own database and the races disappear;
 # that is exactly what CI does when it runs 52 jobs at once.
 #
-# So: each worker owns marque_test_<n> for the life of the run and nothing
-# else ever touches it. Workers pull packages off a shared queue, so one slow
+# So: each worker owns marque_test_<n> (and Redis database <n>) for the life
+# of the run and nothing else ever touches it. "Nothing else" includes another
+# run: every checkout and session on a machine uses the same containers on the
+# same ports, so two runs at once dropped and flushed each other's databases
+# ("Unknown database 'marque_test_1'", #11035). A machine-wide lock makes a
+# second run wait, and say whose run it is waiting on. Workers pull packages off a shared queue, so one slow
 # package (bloodhound is ~670s on MySQL) does not idle the rest of the pool.
 #
 # The per-worker databases need a grant the official MySQL/MariaDB images do
@@ -72,8 +76,57 @@ cleanup() {
     else
         rm -rf "$RESULTS"
     fi
+
+    release_lock
 }
 trap cleanup EXIT
+
+# One run at a time on this machine (#11035). A directory, because mkdir is
+# atomic everywhere and flock isn't on macOS. It holds the owner's pid: a lock
+# whose owner has died is taken over, said out loud. TEST_ENGINES_LOCK moves it
+# (for tools/test-test-engines); TEST_ENGINES_LOCK_WAIT bounds the wait, in
+# seconds (default: an hour, longer than any full sweep).
+LOCK="${TEST_ENGINES_LOCK:-/tmp/marque-test-engines.lock}"
+LOCK_HELD=false
+
+release_lock() {
+    if $LOCK_HELD; then
+        rm -rf "$LOCK"
+        LOCK_HELD=false
+    fi
+}
+
+acquire_lock() {
+    local wait="${TEST_ENGINES_LOCK_WAIT:-3600}" waited=0 owner said=false
+
+    while ! mkdir "$LOCK" 2>/dev/null; do
+        owner=$(cat "$LOCK/pid" 2>/dev/null)
+
+        if [[ -n "$owner" ]] && ! kill -0 "$owner" 2>/dev/null; then
+            printf 'Taking over a stale test-engines lock: its run (pid %s) is gone.\n' "$owner"
+            rm -rf "$LOCK"
+            continue
+        fi
+
+        if ! $said; then
+            printf 'Waiting: another test-engines run (pid %s) is using the test databases. Runs share them, so they take turns.\n' "${owner:-unknown}"
+            said=true
+        fi
+
+        if (( waited >= wait )); then
+            printf '\033[31mGave up after %ss: another test-engines run (pid %s) still holds %s.\033[0m\n' "$wait" "${owner:-unknown}" "$LOCK" >&2
+            exit 1
+        fi
+
+        sleep 1
+        waited=$((waited + 1))
+    done
+
+    echo $$ > "$LOCK/pid"
+    LOCK_HELD=true
+}
+
+acquire_lock
 
 ALL_ENGINES=(sqlite mysql mariadb pgsql)
 PACKAGES=""
