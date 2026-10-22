@@ -49,28 +49,41 @@ final class BatchIncrement
      * @param  list<string>  $keys  the same columns' keys in $amountsById
      * @param  array<int, array<string, int>>  $amountsById
      * @param  array{string, mixed}|null  $touch  [wrapped column, value] to set alongside
+     * @param  list<string>  $wrappedMaxColumns  columns that keep the larger of stored and given
+     *                                           (Job #256: last_seen), wrapped. A given 0 means
+     *                                           "nothing to say" and never writes.
+     * @param  list<string>  $maxKeys  those columns' keys in $amountsById
      * @return array{string, list<mixed>}
      */
-    public function statement(string $table, string $id, array $wrappedColumns, array $keys, array $amountsById, ?array $touch = null): array
+    public function statement(string $table, string $id, array $wrappedColumns, array $keys, array $amountsById, ?array $touch = null, array $wrappedMaxColumns = [], array $maxKeys = []): array
     {
         $bindings = [];
 
         foreach ($amountsById as $rowId => $amounts) {
             $bindings[] = $rowId;
 
-            foreach ($keys as $key) {
+            foreach ([...$keys, ...$maxKeys] as $key) {
                 $bindings[] = (int) ($amounts[$key] ?? 0);
             }
         }
 
         $alias = $this->quote(self::ALIAS);
-        $width = count($wrappedColumns) + 1;
+        $all = [...$wrappedColumns, ...$wrappedMaxColumns];
+        $width = count($all) + 1;
+
+        // The larger of the two, where the batch has one to give. CASE rather
+        // than GREATEST/MAX, which the engines spell differently.
+        $keepLarger = fn (string $column, string $stored) => "CASE WHEN {$alias}.{$column} > 0 AND ({$stored} IS NULL OR {$stored} < {$alias}.{$column}) THEN {$alias}.{$column} ELSE {$stored} END";
 
         if ($this->driver === 'mysql' || $this->driver === 'mariadb') {
-            $first = 'SELECT ? AS '.$id.', '.implode(', ', array_map(fn ($column) => "? AS {$column}", $wrappedColumns));
+            $first = 'SELECT ? AS '.$id.', '.implode(', ', array_map(fn ($column) => "? AS {$column}", $all));
             $rest = str_repeat(' UNION ALL SELECT '.implode(', ', array_fill(0, $width, '?')), count($amountsById) - 1);
 
             $sets = array_map(fn ($column) => "{$table}.{$column} = {$table}.{$column} + {$alias}.{$column}", $wrappedColumns);
+
+            foreach ($wrappedMaxColumns as $column) {
+                $sets[] = "{$table}.{$column} = ".$keepLarger($column, "{$table}.{$column}");
+            }
 
             if ($touch !== null) {
                 $sets[] = "{$table}.{$touch[0]} = ?";
@@ -88,13 +101,17 @@ final class BatchIncrement
 
         $sets = array_map(fn ($column) => "{$column} = {$table}.{$column} + {$alias}.{$column}", $wrappedColumns);
 
+        foreach ($wrappedMaxColumns as $column) {
+            $sets[] = "{$column} = ".$keepLarger($column, "{$table}.{$column}");
+        }
+
         if ($touch !== null) {
             $sets[] = "{$touch[0]} = ?";
             $bindings[] = $touch[1];
         }
 
         return [
-            "WITH {$alias} ({$id}, ".implode(', ', $wrappedColumns).") AS (VALUES {$values}) "
+            "WITH {$alias} ({$id}, ".implode(', ', $all).") AS (VALUES {$values}) "
             ."UPDATE {$table} SET ".implode(', ', $sets)
             ." FROM {$alias} WHERE {$table}.{$id} = {$alias}.{$id}",
             $bindings,

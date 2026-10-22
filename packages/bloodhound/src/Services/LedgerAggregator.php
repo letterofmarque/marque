@@ -6,6 +6,7 @@ namespace Marque\Bloodhound\Services;
 
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Marque\Bloodhound\Models\AnnounceLog;
 use Marque\Bloodhound\Models\LedgerCursor;
 use Marque\Bloodhound\Support\BatchIncrement;
@@ -47,13 +48,20 @@ class LedgerAggregator
     private const TOTALS = ['uploaded', 'downloaded', 'seedtime', 'leechtime'];
 
     /**
-     * Rows per write statement. An insert binds 9 values per row and an
-     * increment 5, so 1,000 rows stays under 9,001 placeholders: inside
+     * Rows per write statement. An insert binds 10 values per row and an
+     * increment of torrent_user 6, so 1,000 rows stays under 10,001 placeholders: inside
      * SQLite's 32,766 and MySQL's and PostgreSQL's 65,535. (SQLite before
      * 3.32 allowed 999; bloodhound's README states the floor, which UPDATE
      * ... FROM raises to 3.33 anyway.)
      */
     private const ROWS_PER_STATEMENT = 1000;
+
+    /**
+     * Whether torrent_user has last_seen yet. Upgrade migrations fold the
+     * ledger before the one that adds it has run, so a fold must not name a
+     * column that isn't there. Asked once per aggregator.
+     */
+    private ?bool $hasLastSeen = null;
 
     /**
      * Fold everything the ledger has that this stream has not yet counted.
@@ -142,7 +150,7 @@ class LedgerAggregator
                 ->when($through !== null, fn ($query) => $query->where('id', '<=', $through))
                 ->orderBy('id')
                 ->limit($batchSize)
-                ->get(['id', 'user_id', 'torrent_id', 'upload_delta', 'download_delta', 'seed_seconds', 'leech_seconds']);
+                ->get(['id', 'user_id', 'torrent_id', 'upload_delta', 'download_delta', 'seed_seconds', 'leech_seconds', 'created_at']);
 
             if ($rows->isEmpty()) {
                 return 0;
@@ -215,6 +223,11 @@ class LedgerAggregator
             $perTorrent[$key]['downloaded'] += $row->download_delta;
             $perTorrent[$key]['seedtime'] += $row->seed_seconds;
             $perTorrent[$key]['leechtime'] += $row->leech_seconds;
+
+            // When the member was last seen on this torrent (Job #256): the
+            // newest stamp in the batch. The write keeps the larger of this
+            // and what is stored, so an older row folding late moves nothing.
+            $perTorrent[$key]['last_seen'] = max($perTorrent[$key]['last_seen'], $row->created_at?->getTimestamp() ?? 0);
         }
 
         $perUser = [];
@@ -266,6 +279,8 @@ class LedgerAggregator
             'downloaded' => 0,
             'seedtime' => 0,
             'leechtime' => 0,
+            // 0: nothing to say (carry is not activity). Never written.
+            'last_seen' => 0,
         ];
     }
 
@@ -319,11 +334,18 @@ class LedgerAggregator
             $increments[(int) $row->id] = $entry;
         }
 
+        if ($this->hasLastSeen()) {
+            foreach ($inserts as $i => $insert) {
+                $seen = $perTorrent[$insert['user_id'].':'.$insert['torrent_id']]['last_seen'] ?? 0;
+                $inserts[$i]['last_seen'] = $seen > 0 ? $seen : null;
+            }
+        }
+
         foreach (array_chunk($inserts, self::ROWS_PER_STATEMENT) as $chunk) {
             DB::table('torrent_user')->insert($chunk);
         }
 
-        $this->incrementByKey('torrent_user', $increments, touch: true);
+        $this->incrementByKey('torrent_user', $increments, touch: true, keepLarger: $this->hasLastSeen() ? ['last_seen'] : []);
     }
 
     /**
@@ -349,7 +371,7 @@ class LedgerAggregator
      *
      * @param  array<int, array{uploaded: int, downloaded: int, seedtime: int, leechtime: int}>  $amountsById
      */
-    protected function incrementByKey(string $table, array $amountsById, bool $touch): void
+    protected function incrementByKey(string $table, array $amountsById, bool $touch, array $keepLarger = []): void
     {
         $connection = DB::connection();
         $grammar = $connection->getQueryGrammar();
@@ -363,10 +385,17 @@ class LedgerAggregator
                 self::TOTALS,
                 $chunk,
                 $touch ? [$grammar->wrap('updated_at'), now()] : null,
+                array_map(fn ($column) => $grammar->wrap($column), $keepLarger),
+                $keepLarger,
             );
 
             $connection->update($sql, $bindings);
         }
+    }
+
+    private function hasLastSeen(): bool
+    {
+        return $this->hasLastSeen ??= Schema::hasColumn('torrent_user', 'last_seen');
     }
 
     protected function advanceCursor(int $from, int $to): void

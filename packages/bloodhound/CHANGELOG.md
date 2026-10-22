@@ -7,6 +7,16 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+### Added
+
+- **`torrent_user.last_seen`**: when a member was last seen on a torrent, in unix seconds
+  (Job #256). It's the newest folded ledger row's stamp, kept by the aggregator in the
+  batched write it already makes, and never moved backwards. Rebuild and prune leave it
+  alone, unlike `updated_at`. It isn't backfilled; a row without it is set by its next
+  fold.
+
 ## [9.0.0] — 2026-10-22
 
 > The ratio is enforced: a member below min_ratio goes on watch, then has new downloading paused until they recover, while seeding never is; and a malformed announce key gets a reason by default.
