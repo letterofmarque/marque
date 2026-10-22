@@ -11,6 +11,7 @@ declare(strict_types=1);
 // This directory runs with the fake bound BEFORE boot (TrackerBoundTestCase).
 // The unbound half lives in DashboardTest, on the ordinary TestCase.
 
+use Illuminate\Support\Carbon;
 use Livewire\Livewire;
 use Marque\Trove\Contracts\TrackerStatsInterface;
 use Marque\Trove\Registry\DashboardPanelRegistry;
@@ -139,7 +140,7 @@ it('shows seed time and leech time beside the byte counts', function () {
 describe('the member\'s standing', function () {
     it('shows a watch, with its deadline and what to do', function () {
         $this->tracker->stats[$this->user->id] = new TrackerStats(uploaded: 1, downloaded: 10, seedtime: 0, standing: TrackerStanding::watch(
-            \Illuminate\Support\Carbon::parse('2026-11-15 10:00:00'),
+            Carbon::parse('2026-11-15 10:00:00'),
             'Your ratio is 0.10 and this tracker asks for at least 0.50. Seed to raise it by Sun, Nov 15, 2026, or new downloads will be paused until you do.',
         ));
 
