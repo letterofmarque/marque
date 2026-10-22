@@ -5,9 +5,11 @@ declare(strict_types=1);
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Marque\Threepio\Support\Bencode;
+use Marque\Trove\Contracts\DownloadGateInterface;
 use Marque\Trove\Contracts\TorrentFilePolicyInterface;
 use Marque\Trove\Contracts\UserInterface;
 use Marque\Trove\Enums\PrivateFlag;
+use Marque\Trove\Exceptions\DownloadRefused;
 use Marque\Trove\Exceptions\NoAnnounceUrl;
 use Marque\Trove\Exceptions\TorrentRefused;
 use Marque\Trove\Models\Torrent;
@@ -178,5 +180,60 @@ describe('building a download', function () {
         $torrent = storedTorrent($this, torrentBytes());
 
         expect(fn () => $this->files->forDownload($torrent, $this->user))->toThrow(NoAnnounceUrl::class);
+    });
+
+    // #10732: a tracker can refuse a download outright, for a member it has
+    // restricted. One exception covers that and a missing announce URL, so a
+    // frontend catches DownloadRefused once.
+    test('asks a bound download gate, and refuses with its reason', function () {
+        bindPolicy(PrivateFlag::Allow);
+        $torrent = storedTorrent($this, torrentBytes());
+        app()->instance(DownloadGateInterface::class, new class implements DownloadGateInterface
+        {
+            public function refusalFor(?UserInterface $user, Torrent $torrent): ?string
+            {
+                return 'Downloading is paused until your ratio reaches 0.5.';
+            }
+        });
+
+        expect(fn () => $this->files->forDownload($torrent, $this->user))
+            ->toThrow(DownloadRefused::class, 'Downloading is paused until your ratio reaches 0.5.');
+    });
+
+    test('builds the download when the gate allows it', function () {
+        bindPolicy(PrivateFlag::Allow);
+        $torrent = storedTorrent($this, torrentBytes());
+        $asked = [];
+        app()->instance(DownloadGateInterface::class, new class($asked) implements DownloadGateInterface
+        {
+            public function __construct(private array &$asked) {}
+
+            public function refusalFor(?UserInterface $user, Torrent $torrent): ?string
+            {
+                $this->asked[] = [$user?->getAuthIdentifier(), $torrent->getKey()];
+
+                return null;
+            }
+        });
+
+        expect(array_keys(Bencode::rawDictionary($this->files->forDownload($torrent, $this->user))))->toBe(['announce', 'info'])
+            ->and($asked)->toBe([[$this->user->getAuthIdentifier(), $torrent->getKey()]]);
+    });
+
+    test('asks the gate even with no tracker policy bound', function () {
+        $torrent = storedTorrent($this, torrentBytes());
+        app()->instance(DownloadGateInterface::class, new class implements DownloadGateInterface
+        {
+            public function refusalFor(?UserInterface $user, Torrent $torrent): ?string
+            {
+                return 'No.';
+            }
+        });
+
+        expect(fn () => $this->files->forDownload($torrent, $this->user))->toThrow(DownloadRefused::class, 'No.');
+    });
+
+    test('treats a missing announce URL as one kind of refused download', function () {
+        expect(new NoAnnounceUrl)->toBeInstanceOf(DownloadRefused::class);
     });
 });

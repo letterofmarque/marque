@@ -31,6 +31,8 @@ final class TrackerStats
      */
     public readonly ?float $ratio;
 
+    public readonly TrackerStanding $standing;
+
     /**
      * @param  int  $uploaded  Bytes.
      * @param  int  $downloaded  Bytes.
@@ -38,13 +40,20 @@ final class TrackerStats
      * @param  int  $leechtime  Seconds. Optional, so a tracker written before
      *                          trove 4.7 still constructs this; 0 then means
      *                          "not reported", not "never leeched".
+     * @param  TrackerStanding|null  $standing  Where the member stands against the
+     *                                          tracker's ratio rule (trove 4.8, #10732).
+     *                                          Null, from a tracker that doesn't
+     *                                          judge, reads as ok.
      */
     public function __construct(
         public readonly int $uploaded,
         public readonly int $downloaded,
         public readonly int $seedtime,
         public readonly int $leechtime = 0,
+        ?TrackerStanding $standing = null,
     ) {
+        $this->standing = $standing ?? TrackerStanding::ok();
+
         foreach (['uploaded' => $uploaded, 'downloaded' => $downloaded, 'seedtime' => $seedtime, 'leechtime' => $leechtime] as $field => $value) {
             if ($value < 0) {
                 throw new InvalidArgumentException("Tracker stats cannot be negative: {$field} is {$value}.");

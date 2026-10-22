@@ -7,9 +7,11 @@ namespace Marque\Trove\Services;
 use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
 use Marque\Threepio\Support\Bencode;
+use Marque\Trove\Contracts\DownloadGateInterface;
 use Marque\Trove\Contracts\TorrentFilePolicyInterface;
 use Marque\Trove\Contracts\UserInterface;
 use Marque\Trove\Enums\PrivateFlag;
+use Marque\Trove\Exceptions\DownloadRefused;
 use Marque\Trove\Exceptions\NoAnnounceUrl;
 use Marque\Trove\Models\Torrent;
 use Marque\Trove\Support\UploadInspection;
@@ -88,10 +90,18 @@ class TorrentFileService
      * info dictionary, byte for byte, under a new top level: announce (the
      * tracker's URL for this user) and comment (the torrent's page, if given).
      *
+     * Asks the tracker's download gate first, when one is bound (#10732).
+     *
+     * @throws DownloadRefused when the gate refuses this user
      * @throws NoAnnounceUrl when the tracker has no announce URL for this user
      */
     public function forDownload(Torrent $torrent, ?UserInterface $user, ?string $comment = null): string
     {
+        if (app()->bound(DownloadGateInterface::class)
+            && ($refusal = app(DownloadGateInterface::class)->refusalFor($user, $torrent)) !== null) {
+            throw new DownloadRefused($refusal);
+        }
+
         $stored = (string) Storage::disk(config('trove.storage_disk', 'local'))->get((string) $torrent->torrent_file);
         $policy = $this->policy();
 

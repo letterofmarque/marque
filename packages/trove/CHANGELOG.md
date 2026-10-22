@@ -7,6 +7,24 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+### Added
+
+- **`DownloadGateInterface`**, for a tracker that restricts downloading (#10732).
+  `TorrentFileService::forDownload()` asks it before building anything, and throws
+  **`DownloadRefused`** with the gate's reason, which is written for the member. Nothing
+  bound means nobody is refused.
+- **`TrackerStats::$standing`**, a `TrackerStanding` (`Ok`, `Watch` with a deadline,
+  `Restricted` with a reason, or `Exempt`). It reports where the member stands against the
+  tracker's ratio rule. It's an optional constructor parameter, and a tracker that doesn't
+  judge reports `Ok`.
+
+### Changed
+
+- **`NoAnnounceUrl` extends `DownloadRefused`**, so a frontend catches one exception for
+  every refused download. It's still a `RuntimeException`, so existing catches keep working.
+
 ## [4.7.0] — 2026-10-21
 
 > Dashboard panels for verified members only, and leechtime beside seedtime in a tracker's stats.

@@ -106,7 +106,19 @@ $tracker?->regenerateAnnounceKey($user);     // issue a new one; the old stops w
 
 $stats->ratio;                // float, unrounded — or null, meaning INFINITE (nothing downloaded)
 $stats->hasInfiniteRatio();   // say it without relying on the null
+$stats->standing;             // TrackerStanding: where the member stands against the ratio rule
 ```
+
+`$stats->standing->state` is a `StandingState`:
+
+| State | Meaning | Also set |
+|---|---|---|
+| `Ok` | within the rule, or no rule applies | — |
+| `Watch` | below the rule, with time to recover | `until` (the deadline), `reason` |
+| `Restricted` | new downloading paused until they recover; seeding never is | `reason` |
+| `Exempt` | the rule doesn't apply to this member | — |
+
+`reason` is written for the member. A tracker that doesn't judge reports `Ok`.
 
 `statsForTorrent($user, $torrent)` returns a `TorrentStats` for one torrent, including when
 the user first and last completed it. Every figure is a raw integer (bytes, seconds) —
@@ -187,6 +199,14 @@ personal announce URL for another site. Cross-seeding is planned as a separate p
 the tracker has no URL for this user (a private tracker's member with no key yet),
 `forDownload()` throws `NoAnnounceUrl`; never serve a file without one. With no tracker
 installed, the stored file is served as it is.
+
+**A tracker can refuse a download outright.** A tracker that restricts downloading binds
+`DownloadGateInterface`. bloodhound does this for a member whose downloading is paused by
+its ratio rule. `forDownload()` asks the gate before building anything and throws
+`DownloadRefused` with the gate's reason, which is written for the member. `NoAnnounceUrl`
+is one kind of `DownloadRefused`, so a frontend catches `DownloadRefused` once and answers
+403 with the message. guise and disguise do this from 5.3. With no gate bound, nobody is
+refused.
 
 ### Checking stored info hashes
 
