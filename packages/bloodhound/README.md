@@ -540,7 +540,7 @@ how a member recovers.
 |---|---|---|
 | ok | at or above `min_ratio`, or under the grace allowance | nothing |
 | watch | below `min_ratio`, having downloaded at least `enforcement.grace_bytes` | a deadline `enforcement.watch_days` away (14). Nothing is refused yet |
-| restricted | still below at the deadline | new leeching refused (below) |
+| restricted | still below at the deadline, or `hit_and_run.max_strikes` active [hit-and-run](#hit-and-run) strikes | new leeching refused (below) |
 | exempt | role at or above `enforcement.exempt_role` (moderator), or exempted by an admin | never watched or restricted |
 
 **Restricted** refuses a leech announce (left > 0) on a torrent the member isn't already in,
@@ -578,7 +578,7 @@ Listen for the events to email or notify:
 | Event | Carries |
 |---|---|
 | `RatioWatchStarted` | `userId`, `ratio`, `required`, `deadline` |
-| `MemberRestricted` | `userId`, `ratio`, `required` |
+| `MemberRestricted` | `userId`, `ratio`, `required`, `strikes` (0 when it was the ratio alone) |
 | `StandingRestored` | `userId`, `previous` (watch or restricted) |
 
 **Choosing the numbers.** Bloodhound's figures are conservative, which is worth knowing
@@ -588,6 +588,54 @@ before copying thresholds from another tracker:
 - anti-cheat forfeits over-cap bytes.
 
 The grace allowance keeps every new member's first download from putting them on watch.
+
+## Hit-and-run
+
+Per torrent, the other rule private trackers run: a member who downloads a torrent owes it
+some seeding. It's off by default, so upgrading changes nothing for an existing tracker.
+Turn it on with `BLOODHOUND_HIT_AND_RUN=true` beside the ratio rule, or set `ratio_mode`
+to `seedtime` to run it without one. `marque:install` turns it on for a private tracker it
+builds from nothing.
+
+**The obligation.** A torrent a member downloaded more than `hit_and_run.buffer_percent`
+(10%) of is owed `min_seedtime` (72 hours) of seeding in all, or a ratio of
+`hit_and_run.ratio` (1.0) on it, whichever comes first. A few files of a pack don't count.
+Set `ratio` to null (`BLOODHOUND_HIT_AND_RUN_RATIO=`) to accept time only.
+
+**Warnings and strikes.** A member away from a torrent they still owe gets:
+
+| Away for | Then |
+|---|---|
+| `prewarn_days` (1) | a pre-warning (`HitAndRunPrewarned`) |
+| `grace_days` (3), with the pre-warning at least `prewarn_days` old | a strike (`HitAndRunStrike`), lapsing after `expire_days` (14) |
+
+"Away" means no live peer of theirs on the torrent, and last seen on it before then. Coming
+back before the grace runs out forgets the pre-warning. A member seeding it right now is
+never struck. **Seeding the torrent to the requirement clears its strike**
+(`HitAndRunCleared`). A torrent is struck once, ever.
+
+**`hit_and_run.max_strikes` (3) active strikes pause new downloading**, through the same
+restricted standing as the [ratio rule](#ratio-enforcement): the same refusal at announce,
+the same download gate, and seeding still never paused. Restricted by both rules, a member
+stays restricted until both clear, and the reason names whichever applies. The same
+exemptions apply: `enforcement.exempt_role` and above, and `bloodhound:standing exempt`.
+
+**It never reaches back.** It counts only torrents first active after it's switched on, so
+turning it on doesn't strike everyone's history at once. Switched off and on again, it
+starts afresh.
+
+**Where the defaults come from.** The mechanics are UNIT3D's: the buffer, pre-warning,
+grace, expiry and three-strike limit, from its `config/hitrun.php`. UNIT3D asks for 7 days
+of seeding. Bloodhound asks 72 hours, the commonest figure trackers publish, because its
+seedtime is counted conservatively (above). The 1:1 alternative is common on trackers too.
+Every number is configurable.
+
+**Showing members.** trove's `SeedingObligationsInterface`, which bloodhound binds, lists
+what a member owes: strikes first, with when each lapses. usarrs shows it on
+`/profile/stats` and counts it on the dashboard.
+
+It's decided hourly by `bloodhound:enforce-hit-and-run`, just before
+`bloodhound:enforce-ratio`, so a new strike restricts in the same run.
 
 ## Configuration
 
@@ -722,15 +770,22 @@ it again for the same download, so time decides what counts as a new completion.
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `ratio_mode` | `full` | `full` enforces `min_ratio`. `off` enforces nothing. `seedtime` will enforce per-torrent seeding rules instead, but isn't built yet, so for now it enforces nothing |
+| `ratio_mode` | `full` | `full` enforces `min_ratio`, plus hit-and-run when `hit_and_run.enabled`. `seedtime` enforces hit-and-run alone. `off` enforces nothing |
 | `min_ratio` | `0.5` | The ratio `full` enforces |
-| `min_seedtime` | `86400` | Planned: what `seedtime` mode will read <!-- check-docs: ignore — not yet enforced, read by nothing until the hit-and-run Job after #10732 --> |
+| `min_seedtime` | `259200` (72h) | Hit-and-run: the seeding each torrent is owed |
 | `enforcement.watch_days` | `14` | How long a member below `min_ratio` has to recover before new downloading is paused |
 | `enforcement.grace_bytes` | 5 GiB | Nothing is enforced until a member has downloaded this much |
-| `enforcement.exempt_role` | `moderator` | This trove role and above are never watched or restricted |
+| `enforcement.exempt_role` | `moderator` | This trove role and above are never watched or restricted, by either rule |
+| `hit_and_run.enabled` | `false` | Run hit-and-run beside the ratio rule under `full` |
+| `hit_and_run.ratio` | `1.0` | A ratio on the torrent that also meets it; null for time only |
+| `hit_and_run.buffer_percent` | `10` | It counts only past this share of the torrent downloaded |
+| `hit_and_run.prewarn_days` | `1` | Away this long while short: a pre-warning |
+| `hit_and_run.grace_days` | `3` | Away this long while short: a strike |
+| `hit_and_run.expire_days` | `14` | A strike lapses after this |
+| `hit_and_run.max_strikes` | `3` | This many active strikes pause new downloading |
 
 Bytes and time are recorded in every mode; the mode decides only what is enforced. See
-[Ratio enforcement](#ratio-enforcement).
+[Ratio enforcement](#ratio-enforcement) and [Hit-and-run](#hit-and-run).
 
 ### Announce Log
 
@@ -982,7 +1037,8 @@ This is a Bloodhound feature and has no equivalent in [marque/hound](https://pac
 | `bloodhound:reconcile-ledger` | Daily | Reports totals that disagree with the ledger |
 | `bloodhound:prune-announce-log` | Daily | Deletes rows past `retention_days`, carrying what they credited |
 | `bloodhound:sync-swarm-counts` | Hourly | Sweeps expired peers, keeping their baselines; settles swarm counts |
-| `bloodhound:enforce-ratio` | Hourly | Applies the ratio rule: starts watches, restricts when they run out, restores members who recover |
+| `bloodhound:enforce-hit-and-run` | Hourly | Applies hit-and-run: pre-warns, strikes, clears strikes once seeded |
+| `bloodhound:enforce-ratio` | Hourly | Decides each member's standing from both rules: starts watches, restricts, restores |
 | `bloodhound:standing` | — | `show`, `exempt` (`--reason=`, `--by=`) or `unexempt` a member |
 | `bloodhound:check-redis` | — | Checks AOF and the eviction policy; `--recover` opens a recovery window |
 | `bloodhound:issue-keys` | — | Issues a key to every verified user without one, after an import; `--dry-run` |
@@ -1144,8 +1200,8 @@ exist.
 
 That row asserts the old total was correct **as of migration**. It is not evidence that
 it ever was — the per-announce history was never kept, which is exactly why the ledger now
-exists. Per-torrent history likewise starts empty, so hit-and-run enforcement is only
-meaningful for torrents grabbed after the upgrade.
+exists. Per-torrent history likewise starts empty. Hit-and-run counts only torrents first
+active after it's switched on anyway.
 
 ## Events
 
@@ -1157,8 +1213,11 @@ meaningful for torrents grabbed after the upgrade.
 | `SeedboxApproved` | An admin approves one | seedbox, by |
 | `SeedboxRevoked` | An admin revokes one | seedbox, by |
 | `RatioWatchStarted` | A member falls below `min_ratio` and goes on watch | userId, ratio, required, deadline |
-| `MemberRestricted` | A watch runs out with the member still below | userId, ratio, required |
+| `MemberRestricted` | A watch runs out with the member still below, or they reach the strike limit | userId, ratio, required, strikes |
 | `StandingRestored` | A watch or restriction clears (recovered, exempted, or enforcement off) | userId, previous |
+| `HitAndRunPrewarned` | A member is away from a torrent they owe | userId, torrentId, seededSeconds, requiredSeconds |
+| `HitAndRunStrike` | Still away at the grace period | userId, torrentId, expiresAt, activeStrikes |
+| `HitAndRunCleared` | A struck torrent is seeded to the requirement | userId, torrentId |
 
 `TorrentCompleted` automatically records a snatch (completion record) via the built-in listener.
 
