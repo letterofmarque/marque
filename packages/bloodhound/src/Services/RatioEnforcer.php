@@ -9,6 +9,7 @@ use Illuminate\Support\Carbon;
 use Marque\Bloodhound\Events\MemberRestricted;
 use Marque\Bloodhound\Events\RatioWatchStarted;
 use Marque\Bloodhound\Events\StandingRestored;
+use Marque\Bloodhound\Models\HitAndRunStrike;
 use Marque\Bloodhound\Models\MemberStanding;
 use Marque\Bloodhound\Models\TorrentUser;
 use Marque\Threepio\Services\PeerService;
@@ -17,83 +18,109 @@ use Marque\Trove\Enums\StandingState;
 use Marque\Trove\Support\TrackerStanding;
 
 /**
- * The ratio rule, applied (#10732, Job #255).
+ * A member's standing against the tracker's rules, decided and read (#10732).
  *
- * A member below min_ratio who has downloaded at least the grace allowance,
- * and isn't exempt, goes on watch with a deadline. Still below at the
- * deadline, new downloading is paused (restricted). Back at or above, or
- * exempt, or with enforcement off, it all clears. Seeding is never paused:
- * it is how a member recovers.
+ * Two rules can restrict a member, and they share one standing:
  *
- * run() decides, on the scheduler, from the folded totals. Everything else
- * (the announce path, the download gate, statsFor) only reads what it decided,
- * so judging a member costs a request nothing.
+ * - the ratio rule (Job #255): below min_ratio, past the grace allowance,
+ *   goes on watch with a deadline; still below at the deadline, restricted;
+ * - hit-and-run (Job #256): max_strikes active strikes, restricted at once
+ *   (the strikes themselves were the warnings; see HitAndRunEnforcer).
  *
- * Only ratio_mode 'full' enforces. 'seedtime' will enforce per-torrent
- * hit-and-run rules, in their own Job; until then it, like 'off', enforces
- * nothing. Every mode records the same figures.
+ * Restricted means new downloading is paused; seeding never is, since it is
+ * how a member recovers. A member restricted by both stays restricted until
+ * both clear. When a hit-and-run restriction lifts mid-watch, the watch
+ * resumes with its own deadline. Exempt members (role, or an admin's
+ * exemption) are never watched or restricted.
+ *
+ * run() decides, hourly, from the folded totals and the strikes. Everything
+ * else (the announce path, the download gate, statsFor) only reads what it
+ * decided, so judging a member costs a request nothing.
+ *
+ * The ratio rule applies under ratio_mode 'full'; hit-and-run under
+ * 'seedtime', or 'full' with hit_and_run.enabled; neither under 'off'. Every
+ * mode records the same figures.
  */
 class RatioEnforcer
 {
-    public function __construct(private readonly PeerService $peers) {}
+    public function __construct(
+        private readonly PeerService $peers,
+        private readonly HitAndRunEnforcer $hitAndRun,
+    ) {}
 
+    /**
+     * Whether the ratio rule applies.
+     */
     public function enforcing(): bool
     {
         return config('bloodhound.ratio_mode', 'full') === 'full';
     }
 
     /**
-     * Judge every member the rule could apply to, and clear everyone it no
-     * longer does.
+     * Whether any rule can restrict a member.
+     */
+    public function restricting(): bool
+    {
+        return $this->enforcing() || $this->hitAndRun->applies();
+    }
+
+    /**
+     * Judge every member a rule could apply to, and clear everyone none does.
      *
      * @return array{watched: int, restricted: int, restored: int}
      */
     public function run(int $chunk = 1000): array
     {
         $counts = ['watched' => 0, 'restricted' => 0, 'restored' => 0];
-        $judged = [];
+        $userModel = $this->userModel();
+        $key = $userModel->getKeyName();
+        $ids = [];
 
         if ($this->enforcing()) {
-            $userModel = $this->userModel();
-            $key = $userModel->getKeyName();
             $grammar = $userModel->newQuery()->getQuery()->getGrammar();
 
-            // Only members below the rule can be put on watch or restricted,
-            // so only they are loaded, not every member hydrated every hour.
-            // A prefilter: judgeBelow() checks again in PHP. The ratio is cast,
-            // because PDO binds it as a string and PostgreSQL then reads it as
-            // the bigint it is multiplied with ('0.5' is not one).
-            $userModel->newQuery()
-                ->select([$key, 'uploaded', 'downloaded', 'role'])
+            // Only members below the ratio can be put on watch, so only they
+            // are found, not every member hydrated every hour. A prefilter:
+            // settle() decides in PHP. The ratio is cast, because PDO binds it
+            // as a string and PostgreSQL then reads it as the bigint it is
+            // multiplied with ('0.5' is not one).
+            foreach ($userModel->newQuery()
                 ->where('downloaded', '>=', $this->graceBytes())
                 ->where('downloaded', '>', 0)
                 ->whereRaw($grammar->wrap('uploaded').' < '.$grammar->wrap('downloaded').' * CAST(? AS DECIMAL(12,6))', [$this->required()])
-                ->chunkById($chunk, function ($users) use (&$counts, &$judged, $key): void {
-                    $standings = MemberStanding::query()
-                        ->whereIn('user_id', $users->pluck($key))
-                        ->get()
-                        ->keyBy('user_id');
-
-                    foreach ($users as $user) {
-                        $id = (int) $user->getKey();
-                        if ($this->judgeBelow($id, $user, $standings->get($id), $counts)) {
-                            $judged[$id] = true;
-                        }
-                    }
-                }, $key);
+                ->pluck($key) as $id) {
+                $ids[(int) $id] = true;
+            }
         }
 
-        // Everyone on watch or restricted who wasn't below the rule just now
-        // has recovered, fallen under the grace allowance, or enforcement is
-        // off: they are all restored.
-        MemberStanding::query()
+        if ($this->hitAndRun->applies()) {
+            foreach (HitAndRunStrike::query()->active()
+                ->groupBy('user_id')
+                ->havingRaw('COUNT(*) >= ?', [$this->maxStrikes()])
+                ->pluck('user_id') as $id) {
+                $ids[(int) $id] = true;
+            }
+        }
+
+        // And everyone the last run left on watch or restricted, to restore.
+        foreach (MemberStanding::query()
             ->whereIn('state', [StandingState::Watch->value, StandingState::Restricted->value])
-            ->orderBy('id')
-            ->each(function (MemberStanding $standing) use (&$counts, $judged): void {
-                if (! isset($judged[$standing->user_id]) && $this->restore($standing)) {
-                    $counts['restored']++;
-                }
-            });
+            ->pluck('user_id') as $id) {
+            $ids[(int) $id] = true;
+        }
+
+        foreach (array_chunk(array_keys($ids), max(1, $chunk)) as $batch) {
+            $users = $userModel->newQuery()->whereIn($key, $batch)->get([$key, 'uploaded', 'downloaded', 'role'])->keyBy(fn ($u) => (int) $u->getKey());
+            $standings = MemberStanding::query()->whereIn('user_id', $batch)->get()->keyBy('user_id');
+            $strikes = $this->hitAndRun->applies()
+                ? HitAndRunStrike::query()->active()->whereIn('user_id', $batch)->groupBy('user_id')
+                    ->selectRaw('user_id, COUNT(*) as strikes')->pluck('strikes', 'user_id')
+                : collect();
+
+            foreach ($batch as $id) {
+                $this->settle($id, $users->get($id), $standings->get($id), (int) ($strikes[$id] ?? 0), $counts);
+            }
+        }
 
         return $counts;
     }
@@ -103,7 +130,7 @@ class RatioEnforcer
      */
     public function standingFor(Model|int $user): TrackerStanding
     {
-        if (! $this->enforcing()) {
+        if (! $this->restricting()) {
             return TrackerStanding::ok();
         }
 
@@ -119,11 +146,9 @@ class RatioEnforcer
             return TrackerStanding::exempt();
         }
 
-        $ratio = $this->ratioOf($user);
-
         return match ($standing?->state) {
-            StandingState::Watch->value => TrackerStanding::watch($standing->deadline_at ?? now(), $this->watchReason($ratio, $standing->deadline_at)),
-            StandingState::Restricted->value => TrackerStanding::restricted($this->restrictionReason($ratio)),
+            StandingState::Watch->value => TrackerStanding::watch($standing->deadline_at ?? now(), $this->watchReason($this->ratioOf($user), $standing->deadline_at)),
+            StandingState::Restricted->value => TrackerStanding::restricted($this->restrictionReason($user)),
             default => TrackerStanding::ok(),
         };
     }
@@ -141,7 +166,7 @@ class RatioEnforcer
      */
     public function leechRefusal(int|string $userId, int $torrentId): ?string
     {
-        if (! $this->enforcing()) {
+        if (! $this->restricting()) {
             return null;
         }
 
@@ -157,30 +182,21 @@ class RatioEnforcer
 
         $user = $this->userModel()->newQuery()->find($userId);
 
-        return $this->restrictionReason($user === null ? 0.0 : $this->ratioOf($user));
+        if ($user === null) {
+            return $this->ratioRestrictionReason(0.0);
+        }
+
+        // Honoured only while a rule that applies now still explains it: a
+        // mode switched off, or a ratio already back up, lifts it at once
+        // rather than at the next run.
+        $ratioBelow = $this->enforcing() && $this->ratioOf($user) < $this->required();
+        $struckOut = $this->hitAndRun->applies() && $this->hitAndRun->activeStrikes((int) $userId) >= $this->maxStrikes();
+
+        return $ratioBelow || $struckOut ? $this->restrictionReason($user) : null;
     }
 
     /**
-     * Asked only for a restricted member, so only they cost the Redis reads.
-     */
-    private function alreadyIn(int $userId, int $torrentId): bool
-    {
-        if (TorrentUser::query()->where('user_id', $userId)->where('torrent_id', $torrentId)->exists()) {
-            return true;
-        }
-
-        // Live and theirs: peersOfUser() checks both against the swarm hash.
-        foreach ($this->peers->peersOfUser($userId) as $peer) {
-            if ($peer['torrent_id'] === $torrentId) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Take a member out of the rule, with the admin and reason on record.
+     * Take a member out of the rules, with the admin and reason on record.
      * Lifts a watch or restriction at once rather than at the next run.
      */
     public function exempt(int $userId, ?int $by, string $reason): void
@@ -204,7 +220,7 @@ class RatioEnforcer
     }
 
     /**
-     * Put a member back under the rule. They are judged at the next run.
+     * Put a member back under the rules. They are judged at the next run.
      */
     public function unexempt(int $userId): void
     {
@@ -225,82 +241,80 @@ class RatioEnforcer
     }
 
     /**
-     * A member the query found below the rule: start a watch, or restrict
-     * once it runs out, unless they are exempt. False when PHP finds them not
-     * below after all, leaving them to the restore pass.
+     * Decide one member's standing from both rules, and record any change.
      *
      * @param  array{watched: int, restricted: int, restored: int}  $counts
      */
-    private function judgeBelow(int $id, Model $user, ?MemberStanding $standing, array &$counts): bool
+    private function settle(int $id, ?Model $user, ?MemberStanding $standing, int $strikes, array &$counts): void
     {
-        if ($this->exemptByRole($user) || $standing?->isExempted()) {
-            if ($standing !== null && $this->restore($standing)) {
-                $counts['restored']++;
-            }
+        $previous = StandingState::tryFrom((string) $standing?->state) ?? StandingState::Ok;
+        $exempt = $user === null || $this->exemptByRole($user) || $standing?->isExempted();
+        $ratio = $user === null ? INF : $this->ratioOf($user);
 
-            return true;
-        }
+        $ratioBelow = ! $exempt && $this->enforcing()
+            && (int) $user->getAttribute('downloaded') >= $this->graceBytes()
+            && $ratio < $this->required();
+        $struckOut = ! $exempt && $this->hitAndRun->applies() && $strikes >= $this->maxStrikes();
 
-        $state = $standing?->state ?? StandingState::Ok->value;
-        $ratio = $this->ratioOf($user);
+        // The watch keeps its deadline while the ratio stays below, whatever
+        // else happens; a fresh one starts when it first falls below.
+        $deadline = $ratioBelow ? $standing?->deadline_at : null;
+        $watchStarts = $ratioBelow && $deadline === null;
+        $deadline ??= $ratioBelow ? now()->addDays($this->watchDays()) : null;
 
-        // The query only narrowed it down; the rule is decided here. Not
-        // below after all: left to the restore pass, like anyone else above.
-        if ($ratio >= $this->required()) {
-            return false;
-        }
+        $state = match (true) {
+            $struckOut, $ratioBelow && now()->gte($deadline) => StandingState::Restricted,
+            $ratioBelow => StandingState::Watch,
+            default => StandingState::Ok,
+        };
 
-        if ($state === StandingState::Ok->value) {
-            $deadline = now()->addDays($this->watchDays());
-
-            MemberStanding::query()->updateOrCreate(['user_id' => $id], [
-                'state' => StandingState::Watch->value,
-                'watch_started_at' => now(),
+        if ($state === StandingState::Ok && ! $standing?->isExempted()) {
+            $standing?->delete();
+        } elseif ($standing !== null || $state !== StandingState::Ok) {
+            ($standing ?? new MemberStanding(['user_id' => $id]))->fill([
+                'state' => $state->value,
+                'watch_started_at' => $ratioBelow ? ($watchStarts ? now() : $standing?->watch_started_at) : null,
                 'deadline_at' => $deadline,
-                'restricted_at' => null,
-            ]);
+                'restricted_at' => $state === StandingState::Restricted ? ($previous === StandingState::Restricted ? $standing?->restricted_at : now()) : null,
+            ])->save();
+        }
 
+        if ($watchStarts) {
             RatioWatchStarted::dispatch($id, $ratio, $this->required(), $deadline);
             $counts['watched']++;
-
-            return true;
         }
 
-        if ($state === StandingState::Watch->value && $standing?->deadline_at !== null && now()->gte($standing->deadline_at)) {
-            $standing->fill(['state' => StandingState::Restricted->value, 'restricted_at' => now()])->save();
-
-            MemberRestricted::dispatch($id, $ratio, $this->required());
+        if ($state === StandingState::Restricted && $previous !== StandingState::Restricted) {
+            MemberRestricted::dispatch($id, is_finite($ratio) ? $ratio : 0.0, $this->required(), $struckOut ? $strikes : 0);
             $counts['restricted']++;
         }
 
-        return true;
+        // Out of restriction (downloads resume, though a ratio watch may go
+        // on), or off a watch with nothing left against them.
+        if (($previous === StandingState::Restricted && $state !== StandingState::Restricted)
+            || ($previous === StandingState::Watch && $state === StandingState::Ok)) {
+            StandingRestored::dispatch($id, $previous);
+            $counts['restored']++;
+        }
     }
 
     /**
-     * Back to ok. The row goes, unless it holds an admin's exemption.
+     * Asked only for a restricted member, so only they cost the Redis reads.
      */
-    private function restore(MemberStanding $standing): bool
+    private function alreadyIn(int $userId, int $torrentId): bool
     {
-        $previous = StandingState::tryFrom((string) $standing->state);
-
-        if (! in_array($previous, [StandingState::Watch, StandingState::Restricted], true)) {
-            return false;
+        if (TorrentUser::query()->where('user_id', $userId)->where('torrent_id', $torrentId)->exists()) {
+            return true;
         }
 
-        if ($standing->isExempted()) {
-            $standing->fill([
-                'state' => StandingState::Ok->value,
-                'watch_started_at' => null,
-                'deadline_at' => null,
-                'restricted_at' => null,
-            ])->save();
-        } else {
-            $standing->delete();
+        // Live and theirs: peersOfUser() checks both against the swarm hash.
+        foreach ($this->peers->peersOfUser($userId) as $peer) {
+            if ($peer['torrent_id'] === $torrentId) {
+                return true;
+            }
         }
 
-        StandingRestored::dispatch($standing->user_id, $previous);
-
-        return true;
+        return false;
     }
 
     private function exemptByRole(Model $user): bool
@@ -331,13 +345,48 @@ class RatioEnforcer
         );
     }
 
-    private function restrictionReason(float $ratio): string
+    /**
+     * Why a restricted member is restricted, naming whichever rules apply now.
+     */
+    private function restrictionReason(Model $user): string
+    {
+        $ratio = $this->ratioOf($user);
+        $strikes = $this->hitAndRun->activeStrikes((int) $user->getKey());
+        $ratioBelow = $this->enforcing() && $ratio < $this->required();
+        $struckOut = $this->hitAndRun->applies() && $strikes >= $this->maxStrikes();
+
+        if ($struckOut && ! $ratioBelow) {
+            return sprintf(
+                'New downloads are paused: you have %d hit-and-run strikes, and this tracker allows %d. Seed the struck torrents to the requirement to clear them; downloads resume within the hour once you are under the limit.',
+                $strikes,
+                $this->maxStrikes() - 1,
+            );
+        }
+
+        if ($struckOut) {
+            return sprintf(
+                'New downloads are paused: your ratio is %.2f and this tracker asks for at least %.2f, and you have %d hit-and-run strikes. Keep seeding; downloads resume within the hour once both are back in line.',
+                $ratio,
+                $this->required(),
+                $strikes,
+            );
+        }
+
+        return $this->ratioRestrictionReason($ratio);
+    }
+
+    private function ratioRestrictionReason(float $ratio): string
     {
         return sprintf(
             'New downloads are paused: your ratio is %.2f and this tracker asks for at least %.2f. Keep seeding; downloads resume within the hour once it is back up.',
             $ratio,
             $this->required(),
         );
+    }
+
+    private function maxStrikes(): int
+    {
+        return max(1, (int) config('bloodhound.hit_and_run.max_strikes', 3));
     }
 
     private function graceBytes(): int

@@ -344,13 +344,15 @@ class BloodhoundServiceProvider extends ServiceProvider
         // so it runs unconditionally rather than being something to enable.
         Schedule::command('bloodhound:reconcile-ledger')->daily();
 
+        // Hourly, and before enforce-ratio: its strikes feed the restricted
+        // standing that enforce-ratio decides, and commands due in the same
+        // minute run in the order they are defined, so a strike counts at once
+        // rather than an hour later (Job #256).
+        Schedule::command('bloodhound:enforce-hit-and-run')->hourly()->withoutOverlapping();
+
         // Hourly. The ratio rule is judged from folded totals, which move every
         // minute, and a restriction lifts here once a member has seeded back
         // up, so an hour is the longest a recovered member waits (#10732).
         Schedule::command('bloodhound:enforce-ratio')->hourly()->withoutOverlapping();
-
-        // Hourly too. Its strikes feed the same restricted standing, which
-        // enforce-ratio decides (Job #256).
-        Schedule::command('bloodhound:enforce-hit-and-run')->hourly()->withoutOverlapping();
     }
 }

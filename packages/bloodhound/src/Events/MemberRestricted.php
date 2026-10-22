@@ -7,8 +7,9 @@ namespace Marque\Bloodhound\Events;
 use Illuminate\Foundation\Events\Dispatchable;
 
 /**
- * A member's watch ran out with their ratio still below the rule: new
- * downloading is paused until it recovers. Seeding is not.
+ * New downloading is paused for a member: their ratio watch ran out with the
+ * ratio still below the rule, or they reached the hit-and-run strike limit
+ * ($strikes, 0 when it was the ratio alone). Seeding is not paused.
  */
 class MemberRestricted
 {
@@ -18,5 +19,6 @@ class MemberRestricted
         public readonly int $userId,
         public readonly float $ratio,
         public readonly float $required,
+        public readonly int $strikes = 0,
     ) {}
 }
