@@ -118,8 +118,8 @@ be used to land an edit.
 Builds the viewer's `.torrent` under a sanitised filename: the stored info dictionary,
 untouched, with `announce` set to the installed tracker's URL (hound's open URL for
 everyone) and `comment` linking the torrent's page. 404s when `allow_download` is off or the
-torrent has no stored file, and 403s with the reason when the tracker has no announce URL
-for the viewer. With no tracker installed, the stored file is served as it is.
+torrent has no stored file, and 403s with the reason when the tracker refuses the viewer
+(no announce URL for them, or downloading paused by a tracker's ratio rule). With no tracker installed, the stored file is served as it is.
 
 ## Configuration
 

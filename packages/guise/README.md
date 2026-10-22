@@ -64,7 +64,7 @@ Edit form for name and description. Info hash, size, and file count are immutabl
 
 ### Torrent Download
 
-Builds the member's `.torrent` with a sanitised filename: the stored info dictionary, untouched, with `announce` set to the installed tracker's URL for them (their own key on bloodhound) and `comment` linking the torrent's page. Gated by the `view` policy. Returns 404 if no file is stored, and 403 with the reason if the tracker has no announce URL for the member (no key yet). With no tracker installed, the stored file is served as it is.
+Builds the member's `.torrent` with a sanitised filename: the stored info dictionary, untouched, with `announce` set to the installed tracker's URL for them (their own key on bloodhound) and `comment` linking the torrent's page. Gated by the `view` policy. Returns 404 if no file is stored, and 403 with the reason if the tracker refuses the member: no announce URL for them yet (no key), or downloading paused by its ratio rule (bloodhound 9). With no tracker installed, the stored file is served as it is.
 
 ## Configuration
 

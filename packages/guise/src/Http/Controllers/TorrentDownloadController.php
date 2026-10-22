@@ -7,7 +7,7 @@ namespace Marque\Guise\Http\Controllers;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Storage;
 use Marque\Trove\Contracts\UserInterface;
-use Marque\Trove\Exceptions\NoAnnounceUrl;
+use Marque\Trove\Exceptions\DownloadRefused;
 use Marque\Trove\Models\Torrent;
 use Marque\Trove\Services\TorrentFileService;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -38,7 +38,7 @@ class TorrentDownloadController
                 $user instanceof UserInterface ? $user : null,
                 route('torrents.show', $torrent),
             );
-        } catch (NoAnnounceUrl $e) {
+        } catch (DownloadRefused $e) {
             abort(403, $e->getMessage());
         }
 

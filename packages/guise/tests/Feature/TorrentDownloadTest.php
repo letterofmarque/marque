@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Storage;
 use Marque\Guise\Tests\TestUser;
 use Marque\Threepio\Support\Bencode;
+use Marque\Trove\Contracts\DownloadGateInterface;
 use Marque\Trove\Contracts\TorrentFilePolicyInterface;
 use Marque\Trove\Contracts\UserInterface;
 use Marque\Trove\Enums\PrivateFlag;
@@ -57,6 +58,23 @@ test('refuses a member the tracker has no announce URL for, and says why', funct
     $this->actingAs($this->user)->get(route('torrents.download', $this->torrent))
         ->assertForbidden()
         ->assertSee('announce key');
+});
+
+// #10732: a tracker can refuse a member outright (downloading paused by its
+// ratio rule). That is a 403 saying why, never a 500.
+test('refuses a member the tracker\'s download gate refuses, with its reason', function () {
+    guiseBindPolicy('https://tracker.example/announce/MEMBERKEY');
+    app()->instance(DownloadGateInterface::class, new class implements DownloadGateInterface
+    {
+        public function refusalFor(?UserInterface $user, Torrent $torrent): ?string
+        {
+            return 'Downloading is paused until your ratio reaches 0.5.';
+        }
+    });
+
+    $this->actingAs($this->user)->get(route('torrents.download', $this->torrent))
+        ->assertForbidden()
+        ->assertSee('Downloading is paused until your ratio reaches 0.5.');
 });
 
 test('serves the stored file unchanged when no tracker is installed', function () {

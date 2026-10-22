@@ -7,6 +7,15 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+### Fixed
+
+- **A download the tracker refuses is a 403 with the reason, never a 500** (#10732). The
+  download route caught only `NoAnnounceUrl`. trove 4.8 adds `DownloadRefused`, which a
+  tracker's download gate throws for a member whose downloading is paused (bloodhound 9's
+  ratio rule), and the route now catches that. Requires `marque/trove ^4.8`.
+
 ## [5.2.0] — 2026-10-20
 
 > No longer requires marque/threepio directly, so it installs beside hound 5 and threepio 4.

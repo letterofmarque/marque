@@ -8,6 +8,7 @@ use Livewire\Livewire;
 use Marque\Disguise\Livewire\Torrent\Upload;
 use Marque\Disguise\Tests\TestUser;
 use Marque\Threepio\Support\Bencode;
+use Marque\Trove\Contracts\DownloadGateInterface;
 use Marque\Trove\Contracts\TorrentFilePolicyInterface;
 use Marque\Trove\Contracts\UserInterface;
 use Marque\Trove\Enums\PrivateFlag;
@@ -63,6 +64,23 @@ test('refuses rather than hand out a file the tracker has no announce URL for', 
     $this->actingAs(TestUser::factory()->create())
         ->get(route('torrents.download', $this->torrent))
         ->assertForbidden();
+});
+
+// #10732: a tracker can refuse a member outright. A 403 saying why, never a 500.
+test('refuses a member the tracker\'s download gate refuses, with its reason', function () {
+    disguisePolicy();
+    app()->instance(DownloadGateInterface::class, new class implements DownloadGateInterface
+    {
+        public function refusalFor(?UserInterface $user, Torrent $torrent): ?string
+        {
+            return 'Downloading is paused until your ratio reaches 0.5.';
+        }
+    });
+
+    $this->actingAs(TestUser::factory()->create())
+        ->get(route('torrents.download', $this->torrent))
+        ->assertForbidden()
+        ->assertSee('Downloading is paused until your ratio reaches 0.5.');
 });
 
 test('an upload that breaks the private-flag rule is refused on the file field and not stored', function () {
