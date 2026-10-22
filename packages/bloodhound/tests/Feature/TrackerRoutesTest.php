@@ -36,11 +36,15 @@ describe('Tracker Routes', function () {
             expect($decoded)->toHaveKey('failure reason');
         });
 
-        it('returns 404 for invalid announce key format', function () {
-            // Invalid announce key (too short)
-            $response = trackerGet($this, '/announce/invalid');
+        // #11070, the default from 9.0: a malformed key gets the reason, not
+        // the app's HTML 404, which a client shows as a garbled error.
+        it('answers a malformed announce key with a bencoded failure, not a 404', function () {
+            foreach (['/announce/invalid', '/announce/'.str_repeat('a', 40), '/announce/a/b', '/announce'] as $path) {
+                $response = trackerGet($this, $path);
 
-            expect($response->getStatusCode())->toBe(404);
+                expect($response->getStatusCode())->toBe(200, $path)
+                    ->and(Bencode::decode($response->getContent())['failure reason'])->toBe('Invalid announce key');
+            }
         });
 
         it('rejects unknown announce key', function () {
@@ -78,10 +82,11 @@ describe('Tracker Routes', function () {
             expect($response->getStatusCode())->toBe(200);
         });
 
-        it('returns 404 for invalid announce key format', function () {
+        it('answers a malformed scrape key with a bencoded failure, not a 404', function () {
             $response = trackerGet($this, '/scrape/invalid');
 
-            expect($response->getStatusCode())->toBe(404);
+            expect($response->getStatusCode())->toBe(200)
+                ->and(Bencode::decode($response->getContent())['failure reason'])->toBe('Invalid announce key');
         });
     });
 });

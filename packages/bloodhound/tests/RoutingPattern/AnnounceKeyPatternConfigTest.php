@@ -26,14 +26,14 @@ it('rejects a key that only satisfies the old default', function () {
     // 32 alphanumerics: valid under the default pattern, invalid under this one.
     // This is the assertion that proves the configured pattern is genuinely in
     // force rather than the default quietly still applying somewhere.
-    expect(trackerRequest($this, '/announce/aaaabbbbccccddddeeeeffffgggghhhh')->getStatusCode())
-        ->toBe(404);
+    expect(decodeTracker(trackerRequest($this, '/announce/aaaabbbbccccddddeeeeffffgggghhhh'))['failure reason'])
+        ->toBe('Invalid announce key');
 });
 
 it('applies the same pattern to scrape', function () {
-    // The router refuses it, so scrape and announce cannot drift apart.
-    expect(trackerRequest($this, '/scrape/aaaabbbbccccddddeeeeffffgggghhhh')->getStatusCode())
-        ->toBe(404);
+    // The same check refuses it, so scrape and announce cannot drift apart.
+    expect(decodeTracker(trackerRequest($this, '/scrape/aaaabbbbccccddddeeeeffffgggghhhh'))['failure reason'])
+        ->toBe('Invalid announce key');
 
     expect(trackerRequest($this, '/scrape/'.str_repeat('a1b2', 10))->getStatusCode())
         ->toBe(200);

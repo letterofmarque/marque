@@ -19,6 +19,12 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   at the next hourly run. It's judged from the folded totals by `bloodhound:enforce-ratio`,
   hourly on the scheduler. Upgrading puts every member who is already below on watch at the
   first run, so tell them first, or set `ratio_mode` to `off`.
+- **`routes.malformed_key` defaults to `failure`.** A malformed key in the path gets a
+  bencoded `Invalid announce key` instead of the router's 404. A published config with no
+  such key gets it too. Set it to `not_found` to keep the 404.
+- **Conflicts with `marque/guise` and `marque/disguise` below 5.3.** Those don't catch a
+  refused download and would answer 500 to a restricted member. Upgrade them together
+  (README, "Upgrading from 8.x to 9.0").
 
 ### Added
 

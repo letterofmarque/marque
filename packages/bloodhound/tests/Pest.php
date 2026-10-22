@@ -11,7 +11,7 @@ use Marque\Bloodhound\Models\TorrentUser;
 use Marque\Bloodhound\Services\LedgerAggregator;
 use Marque\Bloodhound\Tests\CustomPathTestCase;
 use Marque\Bloodhound\Tests\CustomPatternTestCase;
-use Marque\Bloodhound\Tests\MalformedKeyFailureTestCase;
+use Marque\Bloodhound\Tests\MalformedKeyNotFoundTestCase;
 use Marque\Bloodhound\Tests\OutsideTransactionTestCase;
 use Marque\Bloodhound\Tests\QueryKeyTestCase;
 use Marque\Bloodhound\Tests\RatioModeFullTestCase;
@@ -38,7 +38,7 @@ pest()->extend(TestCase::class)->in('Feature', 'Unit');
 pest()->extend(CustomPathTestCase::class)->in('RoutingPath');
 pest()->extend(QueryKeyTestCase::class)->in('RoutingQuery');
 pest()->extend(CustomPatternTestCase::class)->in('RoutingPattern');
-pest()->extend(MalformedKeyFailureTestCase::class)->in('RoutingMalformed');
+pest()->extend(MalformedKeyNotFoundTestCase::class)->in('RoutingMalformed');
 
 // Spec #119: the stats binding must hold in every ratio_mode, and a binding is
 // decided before boot — so ratio_mode is set before the app boots, a directory

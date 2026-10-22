@@ -46,6 +46,8 @@
         "laravel/pao": "^1.1"
     },
     "conflict": {
+        "marque/disguise": "<5.3",
+        "marque/guise": "<5.3",
         "marque/usarrs": "<8.0"
     },
     "autoload": {

@@ -206,20 +206,18 @@ characters. Keep it as tight as your existing keys allow; widening it is your ri
 take. Don't anchor it yourself, and don't add delimiters — it is used directly as a
 Laravel route constraint and anchored for you when matching.
 
-**Set `routes.malformed_key` to `failure`.** A BitTorrent client shows a bencoded
+**A malformed key gets a reason, not a 404.** A BitTorrent client shows a bencoded
 `failure reason`. A 4xx, or your app's HTML 404 page, reads to it as an unreachable tracker
 or a garbled error, not a message worth showing the user. With the key in the query, a
-malformed one is always answered `Invalid announce key` at **HTTP 200**. With it in the
-path, the route constraint vets the key before any lookup, and a request that fails it
-(wrong length, extra segments, no key at all) gets **the router's 404** by default. With
-`malformed_key` set to `failure` (`BLOODHOUND_MALFORMED_KEY=failure`), it reaches a
-fallback route under the same path instead. That route answers the same bencoded
-`Invalid announce key`, without touching the database. The 404 stays the default
-through 8.x because it was documented behaviour, and `failure` becomes the default in 9.0.
-**If you published `config/bloodhound.php` before 8.1.0**, add
-`'malformed_key' => env('BLOODHOUND_MALFORMED_KEY', 'not_found'),` to its `routes` block
-first. A published block replaces the shipped one whole (see [Configuration](#configuration)),
-so until the key is there the env var does nothing.
+malformed one is answered `Invalid announce key` at **HTTP 200**. With it in the path, the
+route constraint vets the key before any lookup. A request that fails it (wrong length,
+extra segments, no key at all) reaches a fallback route under the same path, which answers
+the same bencoded `Invalid announce key` without touching the database. This is the
+default from 9.0, and a published config with no `malformed_key` in its `routes` block
+gets it too. Before 9.0 it was the router's 404. To keep that 404, set
+`routes.malformed_key` to `not_found` (`BLOODHOUND_MALFORMED_KEY=not_found`). With a
+published config, add the key to its `routes` block first; a published block replaces
+the shipped one whole (see [Configuration](#configuration)).
 On announce a missing key is refused the same way. Scrape accepts a missing key, since a
 public scrape is legitimate, and refuses only a malformed one. Only the configured paths
 are covered. A legacy URL at a different path (`/announce.php` when you serve `/announce`)
@@ -529,6 +527,66 @@ Bloodhound implements trove's `TrackerSessionsInterface` (`sessionsFor()`, a mem
 sessions, leeching first; `endSession()`), and
 [usarrs](../usarrs/README.md#sessions) renders it at `/profile/sessions`.
 
+## Ratio enforcement
+
+Under `ratio_mode` `full` (the default), `min_ratio` is enforced. A member who falls below
+it goes on **ratio watch**. If they're still below when the watch runs out, **new
+downloading is paused** until they recover. **Seeding is never paused**, because seeding is
+how a member recovers.
+
+| Standing | When | What it means |
+|---|---|---|
+| ok | at or above `min_ratio`, or under the grace allowance | nothing |
+| watch | below `min_ratio`, having downloaded at least `enforcement.grace_bytes` | a deadline `enforcement.watch_days` away (14). Nothing is refused yet |
+| restricted | still below at the deadline | new leeching refused (below) |
+| exempt | role at or above `enforcement.exempt_role` (moderator), or exempted by an admin | never watched or restricted |
+
+**Restricted** refuses a leech announce (left > 0) on a torrent the member isn't already in,
+with a bencoded reason that names the ratio and the way out. The ledger records it like any
+refusal. Their `.torrent` download for such a torrent is refused with the same words,
+through trove's `DownloadGateInterface`, which guise and disguise 5.3 answer with a 403.
+
+Restricted never refuses:
+- seeding (left 0);
+- `stopped`;
+- a torrent the member is already in, meaning a live peer of theirs, or a `torrent_user` row
+  once the ledger has folded it. They can finish it, and download its `.torrent` again.
+
+**It's decided hourly**, by `bloodhound:enforce-ratio`, from the folded totals. The announce
+path and the download only read what was decided: one indexed lookup. A member who seeds
+back above `min_ratio` is restored within the hour. Switching `ratio_mode` away from `full`
+stops refusals at once, and the next run clears every watch and restriction. The figures
+are recorded the same way in every mode.
+
+**Exemptions.** Staff at or above `enforcement.exempt_role` are exempt. An admin can exempt
+one member, with the reason and the admin on record:
+
+```bash
+php artisan bloodhound:standing exempt 42 --reason="Donor" --by=1
+php artisan bloodhound:standing show 42
+php artisan bloodhound:standing unexempt 42     # judged again at the next run
+```
+
+Exempting lifts a watch or restriction at once.
+
+**Telling members.** Each change fires an event, and the member's standing is in
+`statsFor()` (trove's `TrackerStats::$standing`), which usarrs shows on the dashboard.
+Listen for the events to email or notify:
+
+| Event | Carries |
+|---|---|
+| `RatioWatchStarted` | `userId`, `ratio`, `required`, `deadline` |
+| `MemberRestricted` | `userId`, `ratio`, `required` |
+| `StandingRestored` | `userId`, `previous` (watch or restricted) |
+
+**Choosing the numbers.** Bloodhound's figures are conservative, which is worth knowing
+before copying thresholds from another tracker:
+- the credited interval is capped at `threepio.peer_expiry`;
+- nothing is counted across a `stopped`;
+- anti-cheat forfeits over-cap bytes.
+
+The grace allowance keeps every new member's first download from putting them on watch.
+
 ## Configuration
 
 Published to `config/bloodhound.php`. Bloodhound's config is merged with the published
@@ -574,7 +632,7 @@ Covered in full under [Announce URL shape](#announce-url-shape) above.
 | `routes.key_source` | `path` | `path` or `query` |
 | `routes.key_parameter` | `announce_key` | Route segment or query parameter name |
 | `routes.key_pattern` | `[0-9a-zA-Z]{32}` | Regex the key must match — no delimiters, no anchors |
-| `routes.malformed_key` | `not_found` | A malformed key in the path: `not_found` (404) or `failure` (bencoded reason). `failure` becomes the default in 9.0 |
+| `routes.malformed_key` | `failure` | A malformed key in the path: `failure` (bencoded reason) or `not_found` (the router's 404, the default before 9.0) |
 
 ### Redis and baselines
 
@@ -658,15 +716,19 @@ per second.
 `event=completed` is client-supplied, and a client restart or a second machine reports
 it again for the same download, so time decides what counts as a new completion.
 
-### Ratio — planned, not yet enforced
+### Ratio
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `ratio_mode` | `full` | `full`, `off` or `seedtime`. Read by nothing yet <!-- check-docs: ignore — documented but not yet enforced, read by nothing until #10732 --> |
-| `min_ratio` | `0.5` | Read by nothing yet <!-- check-docs: ignore — not yet enforced, read by nothing until #10732 --> |
-| `min_seedtime` | `86400` | Read by nothing yet <!-- check-docs: ignore — not yet enforced, read by nothing until #10732 --> |
+| `ratio_mode` | `full` | `full` enforces `min_ratio`. `off` enforces nothing. `seedtime` will enforce per-torrent seeding rules instead, but isn't built yet, so for now it enforces nothing |
+| `min_ratio` | `0.5` | The ratio `full` enforces |
+| `min_seedtime` | `86400` | Planned: what `seedtime` mode will read <!-- check-docs: ignore — not yet enforced, read by nothing until the hit-and-run Job after #10732 --> |
+| `enforcement.watch_days` | `14` | How long a member below `min_ratio` has to recover before new downloading is paused |
+| `enforcement.grace_bytes` | 5 GiB | Nothing is enforced until a member has downloaded this much |
+| `enforcement.exempt_role` | `moderator` | This trove role and above are never watched or restricted |
 
-Bytes and time are recorded in every mode; these keys will decide what is enforced (#10732).
+Bytes and time are recorded in every mode; the mode decides only what is enforced. See
+[Ratio enforcement](#ratio-enforcement).
 
 ### Announce Log
 
@@ -918,6 +980,8 @@ This is a Bloodhound feature and has no equivalent in [marque/hound](https://pac
 | `bloodhound:reconcile-ledger` | Daily | Reports totals that disagree with the ledger |
 | `bloodhound:prune-announce-log` | Daily | Deletes rows past `retention_days`, carrying what they credited |
 | `bloodhound:sync-swarm-counts` | Hourly | Sweeps expired peers, keeping their baselines; settles swarm counts |
+| `bloodhound:enforce-ratio` | Hourly | Applies the ratio rule: starts watches, restricts when they run out, restores members who recover |
+| `bloodhound:standing` | — | `show`, `exempt` (`--reason=`, `--by=`) or `unexempt` a member |
 | `bloodhound:check-redis` | — | Checks AOF and the eviction policy; `--recover` opens a recovery window |
 | `bloodhound:issue-keys` | — | Issues a key to every verified user without one, after an import; `--dry-run` |
 | `bloodhound:audit-ledger` | — | Checks every row's arithmetic and every peer's chain |
@@ -925,6 +989,44 @@ This is a Bloodhound feature and has no equivalent in [marque/hound](https://pac
 | `bloodhound:seedbox` | — | `list` (`--status=`), `approve` or `revoke` a seedbox (`--by=`) |
 | `bloodhound:backfill-ledger` | — | Once, after upgrading from 7.x: credits pre-8.0 history its time and stopped bytes |
 | `bloodhound:record-pruned-history` | — | Once, if needed: accounts for rows a pre-8.0 prune deleted without carrying them |
+
+## Upgrading from 8.x to 9.0
+
+Two defaults change, and both are things your members will notice.
+
+**1. The ratio is enforced.** Under `ratio_mode` `full`, the default, which 8.x documented
+as planned, members below `min_ratio` (0.5) go on watch at the first hourly run after you
+upgrade. Fourteen days later, any still below have new downloading paused until they
+recover. Decide before you upgrade:
+
+- **Tell your members** what the rule is and when the first watch starts. The dashboard
+  shows each member's standing (usarrs 8.5), and the `RatioWatchStarted` event is there to
+  email from.
+- **Check the numbers.** `min_ratio`, `enforcement.watch_days` (14),
+  `enforcement.grace_bytes` (5 GiB) and `enforcement.exempt_role` (moderator) are all
+  configurable; see [Ratio enforcement](#ratio-enforcement).
+- **Exempt anyone who should be:** `bloodhound:standing exempt <id> --reason=...`.
+- **Or don't enforce at all:** set `BLOODHOUND_RATIO_MODE=off`. The figures are still
+  recorded.
+
+**2. A malformed announce key gets a bencoded reason, not a 404.** To keep the 404, set
+`routes.malformed_key` to `not_found`. See [Announce URL shape](#announce-url-shape).
+
+**The frontends must handle a refused download.** bloodhound 9 refuses a restricted
+member's `.torrent` through trove's download gate. guise and disguise before 5.3 don't
+catch that refusal and would answer 500, so bloodhound 9 declares a `conflict` with them.
+Upgrade together:
+
+```bash
+composer require marque/bloodhound:^9.0 marque/trove:^4.8 marque/guise:^5.3 marque/usarrs:^8.5 -W
+php artisan migrate        # creates member_standings
+```
+
+Use `marque/disguise:^5.3` in place of guise where that is your frontend.
+`bloodhound:enforce-ratio` is scheduled for you, so it needs the scheduler, like
+everything else here. To see who it will watch before it runs, ask the database for members
+whose `uploaded` is below `min_ratio` times `downloaded`, with `downloaded` at or above the
+grace allowance.
 
 ## Upgrading from 7.x to 8.0
 
@@ -1052,6 +1154,9 @@ meaningful for torrents grabbed after the upgrade.
 | `SeedboxRegistered` | A member registers a seedbox | seedbox, by (null) |
 | `SeedboxApproved` | An admin approves one | seedbox, by |
 | `SeedboxRevoked` | An admin revokes one | seedbox, by |
+| `RatioWatchStarted` | A member falls below `min_ratio` and goes on watch | userId, ratio, required, deadline |
+| `MemberRestricted` | A watch runs out with the member still below | userId, ratio, required |
+| `StandingRestored` | A watch or restriction clears (recovered, exempted, or enforcement off) | userId, previous |
 
 `TorrentCompleted` automatically records a snatch (completion record) via the built-in listener.
 

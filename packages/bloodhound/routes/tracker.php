@@ -66,8 +66,8 @@ Route::middleware([BlockBrowsers::class])
         // whose own check answers a bencoded "Invalid announce key". Registered
         // after the routes above, so a well-formed key never lands here.
         //
-        // Opt-in for 8.x: the 404 was documented behaviour, so answering
-        // differently by default waits for a major.
+        // The default from 9.0. routes.malformed_key = 'not_found' keeps the
+        // router's 404, the documented behaviour before it.
         if (AnnounceRouting::malformedKeyAnswer() !== 'failure') {
             return;
         }
