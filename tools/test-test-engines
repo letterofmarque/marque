@@ -28,12 +28,15 @@ fail() { printf '  \033[31m✗\033[0m %s\n      %s\n' "$1" "$2"; FAILED=$((FAILE
 LOCK="$SCRATCH/test-engines.lock"
 run() { TEST_ENGINES_LOCK="$LOCK" "$ENGINES" --packages deck "$@" sqlite 2>&1; }
 
-printf '\033[1mThe run lock\033[0m\n'
+# Held by flock, as test-engines takes it: is $LOCK free right now?
+lock_free() { flock -n "$LOCK" true; }
 
-# A run holding the lock: a live process's pid in it.
-sleep 30 &
+printf '\033[1mThe run lock, with flock\033[0m\n'
+
+# A run holding the lock: a live process holding the flock, its pid in .owner.
+( flock 9; echo "$BASHPID" > "$LOCK.owner"; exec sleep 30 ) 9>>"$LOCK" &
 holder=$!
-mkdir "$LOCK" && echo "$holder" > "$LOCK/pid"
+for _ in $(seq 1 50); do lock_free || break; sleep 0.1; done
 
 out=$(TEST_ENGINES_LOCK_WAIT=2 run)
 rc=$?
@@ -43,27 +46,55 @@ else
     fail "a second run waits, names the run it waits on, and gives up after the wait" "rc=$rc: $(head -3 <<<"$out")"
 fi
 
-[[ -d "$LOCK" ]] && pass "…and leaves the other run's lock alone" || fail "…and leaves the other run's lock alone" "lock gone"
+lock_free && fail "…and leaves the other run's lock alone" "the lock was free" || pass "…and leaves the other run's lock alone"
 
 kill "$holder" 2>/dev/null
 wait "$holder" 2>/dev/null
 
 out=$(TEST_ENGINES_LOCK_WAIT=2 run)
 rc=$?
-if [[ $rc -eq 0 ]] && grep -q "stale" <<<"$out"; then
-    pass "a lock left by a run that died is taken over, and says so"
+[[ $rc -eq 0 ]] && pass "a lock whose run died is free at once" || fail "a lock whose run died is free at once" "rc=$rc: $(head -3 <<<"$out")"
+
+lock_free && pass "a run releases the lock when it ends" || fail "a run releases the lock when it ends" "still held"
+
+# The mkdir lock could not tell a lock was dead if its run died before writing
+# a pid. flock needs no pid: the kernel knows.
+( flock 9; exec sleep 30 ) 9>>"$LOCK" &
+holder=$!
+for _ in $(seq 1 50); do lock_free || break; sleep 0.1; done
+rm -f "$LOCK.owner"
+kill "$holder" 2>/dev/null
+wait "$holder" 2>/dev/null
+out=$(TEST_ENGINES_LOCK_WAIT=2 run)
+rc=$?
+[[ $rc -eq 0 ]] && pass "a run that died before saying who it was leaves no lock behind" \
+    || fail "a run that died before saying who it was leaves no lock behind" "rc=$rc: $(head -3 <<<"$out")"
+
+# Two runs waiting on a run that dies: with the mkdir lock both could see it
+# as stale and both go ahead. Here they take turns.
+( flock 9; exec sleep 3 ) 9>>"$LOCK" &
+holder=$!
+for _ in $(seq 1 50); do lock_free || break; sleep 0.1; done
+TEST_ENGINES_LOCK_WAIT=600 TEST_ENGINES_TRACE="$SCRATCH/trace" run > "$SCRATCH/w1.out" &
+w1=$!
+TEST_ENGINES_LOCK_WAIT=600 TEST_ENGINES_TRACE="$SCRATCH/trace" run > "$SCRATCH/w2.out" &
+w2=$!
+wait "$holder" 2>/dev/null
+wait "$w1"; rc1=$?
+wait "$w2"; rc2=$?
+# Each run writes "start" when it has the lock and "end" as it lets go; taking
+# turns means the trace alternates.
+pattern=$(tr '\n' ' ' < "$SCRATCH/trace")
+if [[ $rc1 -eq 0 && $rc2 -eq 0 && "$pattern" == "start end start end " ]]; then
+    pass "two runs waiting on a run that ends take turns, never overlapping"
 else
-    fail "a lock left by a run that died is taken over, and says so" "rc=$rc: $(head -3 <<<"$out")"
+    fail "two runs waiting on a run that ends take turns, never overlapping" "rc=$rc1/$rc2 trace: $pattern"
 fi
 
-[[ ! -d "$LOCK" ]] && pass "a run releases the lock when it ends" || fail "a run releases the lock when it ends" "lock still there"
-
 # Two at once: the second waits for the first, and both pass.
-# The first runs a longer package, and the second starts only once the lock
-# exists, so it is certain to find the first one running.
 TEST_ENGINES_LOCK="$LOCK" "$ENGINES" --packages usarrs sqlite > "$SCRATCH/a.out" 2>&1 &
 a=$!
-for _ in $(seq 1 100); do [[ -d "$LOCK" ]] && break; sleep 0.1; done
+for _ in $(seq 1 100); do lock_free || break; sleep 0.1; done
 TEST_ENGINES_LOCK_WAIT=600 run > "$SCRATCH/b.out"
 rc_b=$?
 wait "$a"
@@ -72,6 +103,32 @@ if [[ $rc_a -eq 0 && $rc_b -eq 0 ]] && grep -q "another test-engines run" "$SCRA
     pass "two runs at once: the second waits for the first, and both pass"
 else
     fail "two runs at once: the second waits for the first, and both pass" "a=$rc_a b=$rc_b: $(head -3 "$SCRATCH/b.out")"
+fi
+
+printf '\n\033[1mThe run lock without flock (macOS)\033[0m\n'
+
+DIRLOCK="$LOCK.d"
+sleep 30 &
+holder=$!
+mkdir "$DIRLOCK" && echo "$holder" > "$DIRLOCK/pid"
+
+out=$(TEST_ENGINES_NO_FLOCK=1 TEST_ENGINES_LOCK_WAIT=2 run)
+rc=$?
+if [[ $rc -ne 0 ]] && grep -q "another test-engines run" <<<"$out" && grep -q "$holder" <<<"$out"; then
+    pass "a second run waits, names the run it waits on, and gives up"
+else
+    fail "a second run waits, names the run it waits on, and gives up" "rc=$rc: $(head -3 <<<"$out")"
+fi
+
+kill "$holder" 2>/dev/null
+wait "$holder" 2>/dev/null
+
+out=$(TEST_ENGINES_NO_FLOCK=1 TEST_ENGINES_LOCK_WAIT=2 run)
+rc=$?
+if [[ $rc -eq 0 ]] && grep -q "stale" <<<"$out" && [[ ! -d "$DIRLOCK" ]]; then
+    pass "a lock left by a run that died is taken over, said, and released"
+else
+    fail "a lock left by a run that died is taken over, said, and released" "rc=$rc: $(head -3 <<<"$out")"
 fi
 
 printf '\n\033[1mA crash PAO swallows (#11081)\033[0m\n'

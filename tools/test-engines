@@ -81,49 +81,97 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# One run at a time on this machine (#11035). A directory, because mkdir is
-# atomic everywhere and flock isn't on macOS. It holds the owner's pid: a lock
-# whose owner has died is taken over, said out loud. TEST_ENGINES_LOCK moves it
+# One run at a time on this machine (#11035). TEST_ENGINES_LOCK moves the lock
 # (for tools/test-test-engines); TEST_ENGINES_LOCK_WAIT bounds the wait, in
 # seconds (default: an hour, longer than any full sweep).
+#
+# flock where there is one (Linux, where every Claude here runs): the kernel
+# releases it the moment its holder dies, so there is no stale lock to judge
+# and no race to take one over. The lock file is never deleted, since a waiter
+# holding a deleted file would be locking nothing. "$LOCK.owner" carries the
+# holder's pid, only to say who is being waited on.
+#
+# Without flock (macOS), a directory, because mkdir is atomic everywhere. Its
+# pid lets a lock whose run died be taken over, but two runs both finding the
+# same dead lock can race, and a run that dies before writing its pid leaves a
+# lock that waits out the full hour. Install flock (util-linux) to close both.
 LOCK="${TEST_ENGINES_LOCK:-/tmp/marque-test-engines.lock}"
 LOCK_HELD=false
+LOCK_WAIT="${TEST_ENGINES_LOCK_WAIT:-3600}"
+
+if command -v flock >/dev/null 2>&1 && [[ -z "${TEST_ENGINES_NO_FLOCK:-}" ]]; then
+    LOCK_KIND=flock
+else
+    LOCK_KIND=mkdir
+fi
 
 release_lock() {
-    if $LOCK_HELD; then
-        rm -rf "$LOCK"
-        LOCK_HELD=false
+    $LOCK_HELD || return 0
+
+    # TEST_ENGINES_TRACE: tools/test-test-engines checks that runs take turns.
+    [[ -n "${TEST_ENGINES_TRACE:-}" ]] && echo end >> "$TEST_ENGINES_TRACE"
+
+    if [[ $LOCK_KIND == flock ]]; then
+        [[ "$(cat "$LOCK.owner" 2>/dev/null)" == "$$" ]] && rm -f "$LOCK.owner"
+        flock -u 9
+        exec 9>&-
+    else
+        rm -rf "$LOCK.d"
     fi
+
+    LOCK_HELD=false
+}
+
+waiting_for() {
+    printf 'Waiting: another test-engines run (pid %s) is using the test databases. Runs share them, so they take turns.\n' "${1:-unknown}"
+}
+
+giving_up() {
+    printf '\033[31mGave up after %ss: another test-engines run (pid %s) still holds %s.\033[0m\n' "$LOCK_WAIT" "${1:-unknown}" "$LOCK" >&2
+    exit 1
 }
 
 acquire_lock() {
-    local wait="${TEST_ENGINES_LOCK_WAIT:-3600}" waited=0 owner said=false
+    if [[ $LOCK_KIND == flock ]]; then
+        exec 9>>"$LOCK"
 
-    while ! mkdir "$LOCK" 2>/dev/null; do
-        owner=$(cat "$LOCK/pid" 2>/dev/null)
+        if ! flock -n 9; then
+            waiting_for "$(cat "$LOCK.owner" 2>/dev/null)"
+            flock -w "$LOCK_WAIT" 9 || giving_up "$(cat "$LOCK.owner" 2>/dev/null)"
+        fi
+
+        echo $$ > "$LOCK.owner"
+        LOCK_HELD=true
+        [[ -n "${TEST_ENGINES_TRACE:-}" ]] && echo start >> "$TEST_ENGINES_TRACE"
+
+        return
+    fi
+
+    local waited=0 owner said=false
+
+    while ! mkdir "$LOCK.d" 2>/dev/null; do
+        owner=$(cat "$LOCK.d/pid" 2>/dev/null)
 
         if [[ -n "$owner" ]] && ! kill -0 "$owner" 2>/dev/null; then
             printf 'Taking over a stale test-engines lock: its run (pid %s) is gone.\n' "$owner"
-            rm -rf "$LOCK"
+            rm -rf "$LOCK.d"
             continue
         fi
 
         if ! $said; then
-            printf 'Waiting: another test-engines run (pid %s) is using the test databases. Runs share them, so they take turns.\n' "${owner:-unknown}"
+            waiting_for "$owner"
             said=true
         fi
 
-        if (( waited >= wait )); then
-            printf '\033[31mGave up after %ss: another test-engines run (pid %s) still holds %s.\033[0m\n' "$wait" "${owner:-unknown}" "$LOCK" >&2
-            exit 1
-        fi
+        (( waited >= LOCK_WAIT )) && giving_up "$owner"
 
         sleep 1
         waited=$((waited + 1))
     done
 
-    echo $$ > "$LOCK/pid"
+    echo $$ > "$LOCK.d/pid"
     LOCK_HELD=true
+    [[ -n "${TEST_ENGINES_TRACE:-}" ]] && echo start >> "$TEST_ENGINES_TRACE"
 }
 
 acquire_lock
