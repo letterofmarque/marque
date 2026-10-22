@@ -11,10 +11,14 @@ changelogs — edit those, not this.*
 ## 2026-10-22
 
 - **[bloodhound 9.0.0](packages/bloodhound/CHANGELOG.md)** — The ratio is enforced: a member below min_ratio goes on watch, then has new downloading paused until they recover, while seeding never is; and a malformed announce key gets a reason by default.
+- **[bloodhound 9.1.0](packages/bloodhound/CHANGELOG.md)** — Hit-and-run: a torrent downloaded is owed 72 hours of seeding or 1:1 on it; away while short, a pre-warning then a strike; three strikes pause new downloading. Off until you turn it on.
 - **[disguise 5.3.0](packages/disguise/CHANGELOG.md)** — A download the tracker refuses is a 403 with the reason, never a 500.
 - **[guise 5.3.0](packages/guise/CHANGELOG.md)** — A download the tracker refuses is a 403 with the reason, never a 500.
+- **[marque 1.2.0](packages/marque/CHANGELOG.md)** — A new private tracker starts with hit-and-run on.
 - **[trove 4.8.0](packages/trove/CHANGELOG.md)** — A tracker can refuse a download through a download gate, and a tracker's stats carry where the member stands against its ratio rule.
+- **[trove 4.9.0](packages/trove/CHANGELOG.md)** — A contract for a tracker's hit-and-run obligations, so a frontend can show a member what they owe seeding on.
 - **[usarrs 8.5.0](packages/usarrs/CHANGELOG.md)** — Members see where they stand against the tracker's ratio rule: on watch until a date, downloads paused, or exempt.
+- **[usarrs 8.6.0](packages/usarrs/CHANGELOG.md)** — Members see what they owe seeding on under the tracker's hit-and-run rule, and their strikes.
 
 ## 2026-10-21
 

@@ -7,7 +7,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [Unreleased]
+## [9.1.0] — 2026-10-22
 
 > Hit-and-run: a torrent downloaded is owed 72 hours of seeding or 1:1 on it; away while short, a pre-warning then a strike; three strikes pause new downloading. Off until you turn it on.
 
