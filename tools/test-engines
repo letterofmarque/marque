@@ -392,6 +392,20 @@ except Exception:
 PY
     )"
 
+    # Pest died with no PAO line at all. PAO swallows a fatal error while a
+    # test file loads: exit 1, nothing printed (#11081). Run the package again
+    # without it, on a fresh database, so the failure section shows the error
+    # rather than an empty box. Rare, so the second run's cost doesn't matter.
+    if [[ $rc -ne 0 && "$result" == UNPARSEABLE ]]; then
+        reset_db "$engine" "$db" >/dev/null 2>&1
+        {
+            echo "pest exited $rc with no result line; run again without PAO (PAO_DISABLE=1) to show why:"
+            ( cd "$ROOT/packages/$pkg" && timeout "$PKG_TIMEOUT" env $(engine_env "$engine" "$db") PAO_DISABLE=1 ./vendor/bin/pest --colors=never 2>&1 ) \
+                | grep -vE '^\s*$|✓|^\s*PASS\b' | head -25
+        } > "$out" 2>&1
+        result=crashed
+    fi
+
     printf '%s\t%s\t%s' "$result" "$tests" "$elapsed" > "$RESULTS/$engine-$pkg.result"
 }
 
@@ -476,6 +490,10 @@ for engine in "${ENGINES[@]}"; do
                 ;;
             reset-failed)
                 printf '  \033[31m✗\033[0m %-12s database reset failed\n' "$pkg"
+                failed+=("$pkg"); OVERALL=1
+                ;;
+            crashed)
+                printf '  \033[31m✗\033[0m %-12s pest crashed with no result (the error is below)\n' "$pkg"
                 failed+=("$pkg"); OVERALL=1
                 ;;
             *)

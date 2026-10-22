@@ -74,6 +74,34 @@ else
     fail "two runs at once: the second waits for the first, and both pass" "a=$rc_a b=$rc_b: $(head -3 "$SCRATCH/b.out")"
 fi
 
+printf '\n\033[1mA crash PAO swallows (#11081)\033[0m\n'
+
+# A fatal error while a test file loads: under PAO, pest exits 1 and prints
+# nothing at all. Planted in deck for the length of the case, removed on exit.
+PROBE="$PWD/packages/deck/tests/Unit/ZzFatalProbeTest.php"
+trap 'kill $(jobs -p) 2>/dev/null; rm -f "$PROBE"; rm -rf "$SCRATCH"' EXIT
+cat > "$PROBE" <<'PHP'
+<?php
+
+declare(strict_types=1);
+
+it('never runs', function () {
+    $x = new class implements Countable {};
+});
+PHP
+
+out=$(run)
+rc=$?
+rm -f "$PROBE"
+# Within the failure section's first lines, where a person reads it, not
+# somewhere in the full output.
+section=$(sed -n '/--- sqlite\/deck ---/,$p' <<<"$out" | head -12)
+if [[ $rc -ne 0 ]] && grep -q "abstract method" <<<"$section"; then
+    pass "a package that crashes with no PAO output shows the real error"
+else
+    fail "a package that crashes with no PAO output shows the real error" "rc=$rc: $(tail -6 <<<"$out")"
+fi
+
 printf '\n'
 if [[ $FAILED -eq 0 ]]; then
     printf '\033[32m%d passed\033[0m\n' "$PASSED"
