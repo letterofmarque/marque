@@ -15,8 +15,10 @@ use Marque\Bloodhound\Console\Commands\AggregateLedger;
 use Marque\Bloodhound\Console\Commands\AuditLedger;
 use Marque\Bloodhound\Console\Commands\BackfillLedger;
 use Marque\Bloodhound\Console\Commands\CheckRedis;
+use Marque\Bloodhound\Console\Commands\EnforceRatio;
 use Marque\Bloodhound\Console\Commands\IssueAnnounceKeys;
 use Marque\Bloodhound\Console\Commands\ManageSeedboxes;
+use Marque\Bloodhound\Console\Commands\ManageStanding;
 use Marque\Bloodhound\Console\Commands\PruneAnnounceLog;
 use Marque\Bloodhound\Console\Commands\RebuildTotals;
 use Marque\Bloodhound\Console\Commands\ReconcileLedger;
@@ -303,8 +305,10 @@ class BloodhoundServiceProvider extends ServiceProvider
             AuditLedger::class,
             BackfillLedger::class,
             CheckRedis::class,
+            EnforceRatio::class,
             IssueAnnounceKeys::class,
             ManageSeedboxes::class,
+            ManageStanding::class,
             PruneAnnounceLog::class,
             RebuildTotals::class,
             RecordPrunedHistory::class,
@@ -330,5 +334,10 @@ class BloodhoundServiceProvider extends ServiceProvider
         // permanent-and-invisible into something an operator is told about,
         // so it runs unconditionally rather than being something to enable.
         Schedule::command('bloodhound:reconcile-ledger')->daily();
+
+        // Hourly. The ratio rule is judged from folded totals, which move every
+        // minute, and a restriction lifts here once a member has seeded back
+        // up, so an hour is the longest a recovered member waits (#10732).
+        Schedule::command('bloodhound:enforce-ratio')->hourly()->withoutOverlapping();
     }
 }

@@ -7,6 +7,29 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+### Changed (breaking)
+
+- **`min_ratio` is enforced** under `ratio_mode` `full`, the default (#10732). A member
+  below it goes on **ratio watch** for `enforcement.watch_days` (14 by default). The
+  conditions are that they've downloaded at least `enforcement.grace_bytes` (5 GiB) and
+  aren't exempt. If they're still below when the watch runs out, **new downloading is
+  paused** until they recover; seeding never is. Back at or above, the watch or pause clears
+  at the next hourly run. It's judged from the folded totals by `bloodhound:enforce-ratio`,
+  hourly on the scheduler. Upgrading puts every member who is already below on watch at the
+  first run, so tell them first, or set `ratio_mode` to `off`.
+
+### Added
+
+- **Exemptions:** `enforcement.exempt_role` (moderator by default) and above are never
+  watched. `bloodhound:standing exempt <user> --reason= --by=` exempts one member, with the
+  reason and the admin recorded, and lifts a watch or pause at once. `unexempt` puts them
+  back under the rule, and `show` prints where a member stands.
+- **Events** to notify on: `RatioWatchStarted` (with the deadline), `MemberRestricted` and
+  `StandingRestored` (with what it was before).
+- A `member_standings` table, holding only members on watch, restricted or exempted.
+
 ## [8.1.0] — 2026-10-21
 
 > What a real upgrade found: a stale published config is reported with the value actually in effect, imported members can be issued keys, a tracker with no scheduler says so, leechtime is reported, and a malformed announce key can get a reason instead of a 404.

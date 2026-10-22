@@ -102,23 +102,44 @@ return [
     | Ratio Tracking
     |--------------------------------------------------------------------------
     |
-    | Not yet read by anything: bytes, seedtime and leechtime are recorded the
-    | same way in every mode, and no minimum is enforced. These keys reserve
-    | the settings enforcement will read: 'full' (a minimum ratio), 'seedtime'
-    | (a minimum seedtime instead) and 'off' (no minimum). See #10732.
+    | Every mode records the same figures: bytes, seedtime and leechtime. The
+    | mode decides what is enforced.
+    |
+    | 'full'     - a minimum ratio (the default). A member below min_ratio who
+    |              has downloaded at least enforcement.grace_bytes goes on
+    |              watch for enforcement.watch_days; still below at the end,
+    |              new downloading is paused until they recover. Seeding never
+    |              is. Judged hourly by bloodhound:enforce-ratio.
+    | 'seedtime' - per-torrent seeding rules instead of a ratio. Not built yet,
+    |              so this enforces nothing for now.
+    | 'off'      - no minimum. Nothing is enforced.
     |
     */
 
-    // check-docs: ignore — documented but not yet enforced, read by nothing until #10732
     'ratio_mode' => env('BLOODHOUND_RATIO_MODE', 'full'),
 
-    // The minimum ratio 'full' will enforce
-    // check-docs: ignore — not yet enforced, read by nothing until #10732
+    // The minimum ratio 'full' enforces
     'min_ratio' => env('BLOODHOUND_MIN_RATIO', 0.5),
 
     // The minimum seedtime, in seconds, 'seedtime' will enforce
-    // check-docs: ignore — not yet enforced, read by nothing until #10732
+    // check-docs: ignore — not yet enforced, read by nothing until the hit-and-run Job after #10732
     'min_seedtime' => env('BLOODHOUND_MIN_SEEDTIME', 86400), // 24 hours
+
+    // How the minimum ratio is enforced, under 'full'.
+    //
+    // 'watch_days'  - how long a member below min_ratio has to recover
+    //                 before new downloading is paused.
+    // 'grace_bytes' - nothing is enforced until a member has downloaded this
+    //                 much, or every new member's first download would put
+    //                 them on watch. 5 GiB by default.
+    // 'exempt_role' - this role and above are never watched or restricted
+    //                 (trove roles: user, uploader, moderator, admin). An admin
+    //                 can also exempt one member: bloodhound:standing exempt.
+    'enforcement' => [
+        'watch_days' => env('BLOODHOUND_RATIO_WATCH_DAYS', 14),
+        'grace_bytes' => env('BLOODHOUND_RATIO_GRACE_BYTES', 5 * 1024 ** 3),
+        'exempt_role' => env('BLOODHOUND_RATIO_EXEMPT_ROLE', 'moderator'),
+    ],
 
     /*
     |--------------------------------------------------------------------------
