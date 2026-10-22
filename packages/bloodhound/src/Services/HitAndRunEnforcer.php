@@ -90,7 +90,7 @@ class HitAndRunEnforcer
      */
     public function activeStrikes(int $userId): int
     {
-        return $this->applies() ? Strike::query()->where('user_id', $userId)->active()->count() : 0;
+        return $this->applies() ? Strike::query()->where('user_id', $userId)->counting($this->since())->count() : 0;
     }
 
     /**

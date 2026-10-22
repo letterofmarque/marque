@@ -56,6 +56,19 @@ class HitAndRunStrike extends Model
         return $query->whereNotNull('struck_at')->whereNull('cleared_at')->where('expires_at', '>', now());
     }
 
+    /**
+     * The strikes that count against a member: active, and struck since the
+     * rule's current start. Switched off and on again, the rule starts
+     * afresh, and a strike from before that no longer counts.
+     *
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
+    public function scopeCounting(Builder $query, \DateTimeInterface $since): Builder
+    {
+        return $query->active()->where('struck_at', '>=', $since);
+    }
+
     public function isActive(): bool
     {
         return $this->struck_at !== null && $this->cleared_at === null && $this->expires_at?->isFuture() === true;

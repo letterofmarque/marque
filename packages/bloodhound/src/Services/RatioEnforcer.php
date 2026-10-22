@@ -94,7 +94,7 @@ class RatioEnforcer
         }
 
         if ($this->hitAndRun->applies()) {
-            foreach (HitAndRunStrike::query()->active()
+            foreach (HitAndRunStrike::query()->counting($this->hitAndRun->since())
                 ->groupBy('user_id')
                 ->havingRaw('COUNT(*) >= ?', [$this->maxStrikes()])
                 ->pluck('user_id') as $id) {
@@ -113,7 +113,7 @@ class RatioEnforcer
             $users = $userModel->newQuery()->whereIn($key, $batch)->get([$key, 'uploaded', 'downloaded', 'role'])->keyBy(fn ($u) => (int) $u->getKey());
             $standings = MemberStanding::query()->whereIn('user_id', $batch)->get()->keyBy('user_id');
             $strikes = $this->hitAndRun->applies()
-                ? HitAndRunStrike::query()->active()->whereIn('user_id', $batch)->groupBy('user_id')
+                ? HitAndRunStrike::query()->counting($this->hitAndRun->since())->whereIn('user_id', $batch)->groupBy('user_id')
                     ->selectRaw('user_id, COUNT(*) as strikes')->pluck('strikes', 'user_id')
                 : collect();
 

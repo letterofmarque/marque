@@ -243,6 +243,25 @@ describe('who it applies to', function () {
         // First active after the old start but before the new one.
         expect(strikeRow($this))->toBeNull();
     });
+
+    it('stops counting strikes from before it was switched off, once it is back on', function () {
+        owe($this, downloaded: 10 * HNR_GIB, seedtime: 3600);
+        $this->travelTo('2026-11-03 01:00:00');
+        hnr();
+        $this->travelTo('2026-11-05 01:00:00');
+        hnr();
+        expect(app(HitAndRunEnforcer::class)->activeStrikes($this->member->id))->toBe(1);
+
+        config(['bloodhound.hit_and_run.enabled' => false]);
+        $this->travelTo('2026-11-06 00:00:00');
+        hnr();
+        config(['bloodhound.hit_and_run.enabled' => true]);
+        $this->travelTo('2026-11-07 00:00:00');
+        hnr();
+
+        // Unexpired (it lapses on the 19th), but from before the fresh start.
+        expect(app(HitAndRunEnforcer::class)->activeStrikes($this->member->id))->toBe(0);
+    });
 });
 
 describe('the command', function () {
