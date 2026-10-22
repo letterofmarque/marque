@@ -242,6 +242,9 @@ runs it). It catches the lookup kind of wrong claim:
 - config keys a README documents that the config file doesn't have, or that nothing reads
 - defaults the config file disagrees with
 - keys a package ships that nothing reads
+- code that reads a config with no key after its name (`"acme.{$key}"`, `'acme.'.$x`, even in
+  a comment), which would count as reading every key in it and hide the dead ones. Read the
+  keys by name, or mark the line if it really does read whichever key it's given
 - renamed or nonexistent package names
 - Requirements constraints that drifted from `composer.json`
 - example tags that were never cut
@@ -256,7 +259,7 @@ on the line or the line before:
 
 ```
 <!-- check-docs: ignore — reason -->        (Markdown)
-// check-docs: ignore — reason              (config files)
+// check-docs: ignore — reason              (config files and code)
 ```
 
 Ignored findings are still printed, and a marker with no reason is itself a finding. The

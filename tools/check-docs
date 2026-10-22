@@ -114,10 +114,10 @@ foreach (glob("$root/packages/*/config/*.php") as $file) {
     $configs[$name] = loadConfig($file, $root);
 }
 
-$reads = collectReads($root, array_keys($configs));
-
 $findings = [];
 $ignored = [];
+
+$reads = collectReads($root, array_keys($configs));
 
 function finding(string $file, int $line, string $category, string $message): void
 {
@@ -336,9 +336,35 @@ function collectReads(string $root, array $names): array
                     continue;
                 }
                 $code = (string) file_get_contents($file->getPathname());
-                preg_match_all($pattern, $code, $m, PREG_SET_ORDER);
-                foreach ($m as [, $name, $path]) {
-                    $reads[$name][rtrim($path, '.')] = true;
+                preg_match_all($pattern, $code, $m, PREG_SET_ORDER | PREG_OFFSET_CAPTURE);
+                foreach ($m as [[$match, $offset], [$name], [$path]]) {
+                    $path = rtrim($path, '.');
+
+                    if ($path !== '') {
+                        $reads[$name][$path] = true;
+
+                        continue;
+                    }
+
+                    // No key after the prefix ("acme.{$key}", 'acme.'.$x, or the
+                    // same text in a comment): it could read anything in the
+                    // config. Counted as reading everything, it hid every dead key
+                    // in it, silently (#11082). So it is a finding unless the line,
+                    // or the one above, says why with the escape hatch.
+                    $rel = substr($file->getPathname(), strlen($root) + 1);
+                    $line = substr_count($code, "\n", 0, $offset) + 1;
+                    $lines = explode("\n", $code);
+                    $near = ($lines[$line - 2] ?? '')."\n".($lines[$line - 1] ?? '');
+
+                    if (preg_match('/check-docs: ignore\s*(?:—|-)\s*(.+)$/mu', $near, $marker)) {
+                        $reads[$name][''] = true;
+                        $GLOBALS['ignored'][] = [$rel, $line, trim($marker[1])];
+
+                        continue;
+                    }
+
+                    finding($rel, $line, 'config-blind', "`{$match}` reads `{$name}.` with no key, so nothing in config/{$name}.php can be "
+                        .'checked against it. Read the keys by name, or mark the line `// check-docs: ignore — <why>`');
                 }
 
                 // squidink reads its whole config — `get('squidink', [])` —

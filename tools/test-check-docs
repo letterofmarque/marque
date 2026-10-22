@@ -234,6 +234,23 @@ sed -i 's/| `enabled` | `true` | Master switch |/| `enabled` | `true` | Master s
 run_case floatwrong
 expect "$out" "a float default that really differs is still flagged" 'config-default.*`ratio`.*1\.5'
 
+# #11082: a string naming a config with an empty path ("acme.{$key}") was
+# taken as a read of the whole config, and silently hid every dead key in it.
+make_repo "$SCRATCH/blind"
+sed -i 's/public function on(): bool { return config(.acme.enabled.); }/&\n    public function any(string $k): mixed { return config("acme.{$k}"); }/' "$SCRATCH/blind/packages/acme/src/Acme.php"
+sed -i "s/config('acme.enabled')/true/" "$SCRATCH/blind/packages/acme/src/Acme.php"
+run_case blind
+expect "$out" "config-blind: an empty-path dynamic read is named, with its line" 'src/Acme\.php:[0-9]+ .*config-blind.*acme'
+expect "$out" "…and no longer hides the dead key behind it" 'config-dead.*`enabled`'
+[[ $status -ne 0 ]] && pass "…and fails the run" || fail "…and fails the run" "exit $status"
+
+make_repo "$SCRATCH/blindmarked"
+sed -i 's/public function on(): bool { return config(.acme.enabled.); }/&\n    \/\/ check-docs: ignore — reads whichever key the caller names\n    public function any(string $k): mixed { return config("acme.{$k}"); }/' "$SCRATCH/blindmarked/packages/acme/src/Acme.php"
+run_case blindmarked
+refuse "$out" "a marked whole-config read is not a finding" 'config-blind'
+expect "$out" "…and is listed among the ignored" 'ignored .*src/Acme\.php:[0-9]+ .*reads whichever key'
+[[ $status -eq 0 ]] && pass "…and the run passes" || fail "…and the run passes" "exit $status: $out"
+
 make_repo "$SCRATCH/unread"
 sed -i "s/config('acme.enabled')/true/" "$SCRATCH/unread/packages/acme/src/Acme.php"
 run_case unread
