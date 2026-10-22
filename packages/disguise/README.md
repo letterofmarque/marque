@@ -76,7 +76,7 @@ every route here, and a torrent carrying a `min_role` is invisible to guests:
   filter a collection. Restricted torrents simply don't appear.
 - **Detail pages and downloads** go through the `view` policy. A guest hitting a restricted
   torrent's URL directly gets a 403.
-- **Downloads are gated exactly as tightly as viewing**, never more loosely. Each download
+- **Downloads are gated at least as tightly as viewing**, never more loosely. Each download
   is built for the viewer: the installed tracker's announce URL (hound's open URL for
   everyone) and a `comment` linking the torrent's page, around the untouched info
   dictionary. Uploads meet the tracker's private-flag rule before anything is stored, and

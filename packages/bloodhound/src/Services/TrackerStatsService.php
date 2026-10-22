@@ -26,9 +26,9 @@ use Marque\Trove\Support\TrackerStats;
  * nothing here depends on HasTrackerStats being applied to the consumer's User
  * model — the columns are bloodhound's, the trait is only a convenience.
  *
- * Deliberately does not consult ratio_mode. Nothing does (job #10732), the
- * figures accumulate identically in every mode, and reporting a distinction
- * the data does not have would invent behaviour rather than expose it.
+ * The figures are the same in every ratio_mode: the mode decides only what
+ * is enforced. The member's standing against the rule is reported beside
+ * them, as RatioEnforcer last decided it (#10732).
  */
 class TrackerStatsService implements TrackerStatsInterface
 {

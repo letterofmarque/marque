@@ -229,7 +229,7 @@ php artisan vendor:publish --tag=taxonomy-config
 Packages follow [Semantic Versioning](https://semver.org) and are versioned
 independently, so packages sit on different majors (usarrs on 8, threepio on 4) and that is normal.
 
-Most people want a caret on the current major (`^8.4` for usarrs today), which is what `composer require` gives you by default: new
+Most people want a caret on the current major (`^8.5` for usarrs today), which is what `composer require` gives you by default: new
 features and fixes automatically, never a breaking change. Minor releases are cut
 frequently, so you should not need to track `dev-main` to get a finished feature.
 

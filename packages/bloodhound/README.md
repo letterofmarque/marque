@@ -249,13 +249,15 @@ key formats are disjoint first.
 4. The peer's record read from Redis, once, along with the torrent's live peers. A peer ID
    live in the swarm for another member is refused here: two members cannot share one,
    and letting the second through would overwrite or remove the first's record.
-5. Anti-cheat judges the announce against that record.
-6. The credit computed from the same record, and the ledger row written.
-7. Only then Redis updated: the peer's record, the swarm counters and sets.
-8. Bencoded peer list returned to the client. Within a minute or two
+5. A leech from a member whose downloading is paused by the ratio rule is refused here,
+   unless it's a torrent they're already in (see [Ratio enforcement](#ratio-enforcement)).
+6. Anti-cheat judges the announce against that record.
+7. The credit computed from the same record, and the ledger row written.
+8. Only then Redis updated: the peer's record, the swarm counters and sets.
+9. Bencoded peer list returned to the client. Within a minute or two
    `bloodhound:aggregate-ledger` adds the row to the member's totals.
 
-A refusal at step 3, 4 or 5 writes a flagged ledger row and stops: nothing is credited
+A refusal at step 3, 4, 5 or 6 writes a flagged ledger row and stops: nothing is credited
 and Redis is not touched. A refusal at step 1 (a bad announce key, an unknown torrent,
 missing or invalid parameters, an out-of-range port) or step 2 writes no row: there is no
 member and torrent to record it against, or the tracker itself is refusing.
@@ -355,7 +357,7 @@ Each kind of announce:
 - **`stopped`**: credits the bytes and seconds since the previous announce, against the
   record it removes. The protocol sends final counters on a stop, so they count. The
   session then ends; nothing is kept for it.
-- **A refused announce** (client validation or anti-cheat): credits nothing and changes
+- **A refused announce** (client validation, the ratio rule or anti-cheat): credits nothing and changes
   nothing in Redis. The next accepted announce is measured from the last accepted one, so
   its bytes are credited in full; its seconds are capped as usual.
 - **A speed forfeit**: the direction over the cap credits 0, the other direction and the
@@ -1026,7 +1028,7 @@ Use `marque/disguise:^5.3` in place of guise where that is your frontend.
 `bloodhound:enforce-ratio` is scheduled for you, so it needs the scheduler, like
 everything else here. To see who it will watch before it runs, ask the database for members
 whose `uploaded` is below `min_ratio` times `downloaded`, with `downloaded` at or above the
-grace allowance.
+grace allowance and `role` below `enforcement.exempt_role`.
 
 ## Upgrading from 7.x to 8.0
 
