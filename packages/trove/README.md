@@ -328,6 +328,11 @@ Ratio enforcement isn't configured here. It belongs to the tracker: see bloodhou
 [Ratio enforcement](../bloodhound/README.md#ratio-enforcement). trove carries the
 outcome, as `TrackerStats::$standing` and the download gate.
 
+A config published before 2.0.0 may still set `ratio_mode`, `min_ratio` and
+`min_seedtime` (`TROVE_RATIO_MODE`, `TROVE_MIN_RATIO`, `TROVE_MIN_SEEDTIME`). They are
+ignored, and from 4.10.0 a warning is logged once a day naming each one, the bloodhound key
+that replaced it and the value actually in effect. Delete them from `config/trove.php`.
+
 ## Migrations
 
 Trove creates:

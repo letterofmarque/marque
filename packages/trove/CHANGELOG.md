@@ -7,6 +7,17 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+### Added
+
+- **A published config still setting trove's old ratio keys is reported**, once a day.
+  `ratio_mode`, `min_ratio` and `min_seedtime` (`TROVE_*`) moved to bloodhound in 2.0.0,
+  and nothing has read them in trove since. The warning names the bloodhound key and env
+  var, the value your config sets and the value in effect, or says no tracker installed
+  reads one (#11101). twentyt's dashboard had judged members against its stale `min_ratio` while
+  bloodhound held their real standing, with nothing said.
+
 ## [4.9.0] — 2026-10-22
 
 > A contract for a tracker's hit-and-run obligations, so a frontend can show a member what they owe seeding on.
