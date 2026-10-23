@@ -15,7 +15,7 @@ Built by [Letter Of Marque Software](https://lom.software).
 | [marque/guise](packages/guise) | Livewire web frontend (authenticated) |
 | [marque/threepio](packages/threepio) | BitTorrent protocol primitives |
 | [marque/hound](packages/hound) | Public BitTorrent tracker (no auth) |
-| [marque/deck](packages/deck) | App layout shell (navigation, theming) |
+| [marque/deck](packages/deck) | App layout shell (navigation, shared Blade components) |
 | [marque/disguise](packages/disguise) | Public web frontend (browse without login) |
 | [marque/usarrs](packages/usarrs) | Auth, user profiles, invites, admin |
 | [marque/squidink](packages/squidink) | Format-agnostic text pipeline (Markdown, BBCode → HTML) |
@@ -161,7 +161,7 @@ composer require marque/skipper
 ### Trove (Core)
 - Role-based access control (user, uploader, moderator, admin)
 - Torrent model with file parsing and info_hash extraction
-- User ratio tracking (uploaded, downloaded, seedtime)
+- Tracker stats contract, so frontends can show a member's figures and standing (bloodhound fills it)
 - Configurable policies for torrent management
 
 ### Bloodhound (Tracker)
