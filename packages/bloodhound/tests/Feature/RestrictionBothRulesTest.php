@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Redis;
 use Marque\Bloodhound\Events\MemberRestricted;
 use Marque\Bloodhound\Events\StandingRestored;
 use Marque\Bloodhound\Models\HitAndRunStrike;
+use Marque\Bloodhound\Services\HitAndRunEnforcer;
 use Marque\Bloodhound\Services\RatioEnforcer;
 use Marque\Bloodhound\Tests\TestUser;
 use Marque\Trove\Enums\StandingState;
@@ -31,6 +32,14 @@ beforeEach(function () {
         'bloodhound.anti_cheat.enabled' => false,
     ]);
     Event::fake([MemberRestricted::class, StandingRestored::class]);
+
+    // The rule starts counting the first time it runs, and only strikes since
+    // then count. Started a day back, as on a tracker already running it: a
+    // strike planted at now() before the first run otherwise fell a second
+    // short when the clock ticked over in between (nightly, MySQL, 2026-10-22).
+    $this->travelTo(now()->subDay());
+    app(HitAndRunEnforcer::class)->since();
+    $this->travelBack();
 
     $this->member = makeTrackerUser('bothbothbothbothbothbothbothboth', 'both@example.com');
     $this->member->forceFill(['uploaded' => 10 * BOTH_GIB, 'downloaded' => 10 * BOTH_GIB])->save();
