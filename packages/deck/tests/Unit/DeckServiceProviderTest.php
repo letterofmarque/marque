@@ -54,4 +54,15 @@ describe('DeckServiceProvider', function () {
 
         expect($html)->toBeString();
     });
+
+    it('sets a text colour on the body for both modes', function () {
+        // #11099: the body set a dark background and no text colour, and
+        // preflight sets none either, so anything without its own colour
+        // class was browser-default black on zinc-800 (the announce key).
+        $this->withoutVite();
+
+        $html = view('deck::layouts.app', ['slot' => 'content'])->render();
+
+        expect($html)->toMatch('/<body class="[^"]*\\btext-zinc-900\\b[^"]*\\bdark:text-zinc-100\\b/');
+    });
 });

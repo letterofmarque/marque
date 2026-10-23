@@ -8,6 +8,15 @@ those versions describe the package under its former names.*
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
+## [Unreleased]
+
+### Fixed
+
+- **The layout's `<body>` sets a text colour in both modes** (#11099): `text-zinc-900`,
+  and `dark:text-zinc-100` on the dark background. It set a background and no colour, and
+  Tailwind's preflight sets none, so any text without its own colour class was the
+  browser's default black on `zinc-800`. usarrs' announce key was unreadable.
+
 ## [2.0.1] — 2026-10-21
 
 > A nav entry whose route no longer exists is left out, instead of failing every page with RouteNotFoundException.

@@ -10,7 +10,7 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 </head>
-<body class="min-h-screen bg-white dark:bg-zinc-800">
+<body class="min-h-screen bg-white text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100">
     <div class="flex min-h-screen flex-col">
         {{-- Navigation --}}
         <livewire:deck-navigation />

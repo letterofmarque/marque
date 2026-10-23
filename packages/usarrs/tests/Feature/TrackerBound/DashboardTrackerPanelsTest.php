@@ -198,6 +198,17 @@ it('lets the key row wrap and the key break, so a narrow card clips nothing', fu
         ->assertSeeHtml('break-all');
 });
 
+// #11099: the key set a background in both modes and no text colour, so under
+// a layout with no body colour it was black on zinc-800. It carries its own,
+// so it reads inside any layout, an app's own included.
+it('gives the key its own text colour in both modes, not whatever it inherits', function () {
+    $this->actingAs($this->user);
+
+    Livewire::test(AnnounceKeyPanel::class)
+        ->assertSeeHtml('text-zinc-900')
+        ->assertSeeHtml('dark:text-zinc-100');
+});
+
 it('omits the announce key panel when the operator hides announce keys', function () {
     config()->set('usarrs.profile.show_announce_key', false);
 

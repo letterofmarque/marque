@@ -7,6 +7,15 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+### Fixed
+
+- **The announce key has its own text colour in both modes** (#11099). It set a
+  background in each and no colour, so under a layout with no body colour, deck's included
+  until 2.0.2, it was black on `zinc-800`. It now reads inside any layout, an app's own
+  included.
+
 ## [8.6.0] — 2026-10-22
 
 > Members see what they owe seeding on under the tracker's hit-and-run rule, and their strikes.
