@@ -8,7 +8,9 @@ those versions describe the package under its former names.*
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
-## [Unreleased]
+## [2.1.0] — 2026-10-24
+
+> The footer renders items registered with trove, so an app adds build info or links without publishing and copying the footer.
 
 ### Added
 

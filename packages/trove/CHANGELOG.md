@@ -7,7 +7,9 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [Unreleased]
+## [4.11.0] — 2026-10-24
+
+> A footer item registry, so an app or package can add a line to the page footer without copying the shell's view.
 
 ### Added
 
