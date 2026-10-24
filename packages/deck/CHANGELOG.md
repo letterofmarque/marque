@@ -8,6 +8,20 @@ those versions describe the package under its former names.*
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
+## [Unreleased]
+
+### Added
+
+- **The footer renders items registered with trove's `FooterItemRegistry`** (#11100), between
+  the copyright and "Powered by", ordered by position. An app adds build info, rules links
+  or site stats from its own provider, instead of publishing and owning a copy of the
+  footer. An item whose `visible` closure declines for the viewer is left out of the page,
+  not hidden in it. A footer with nothing registered renders as before.
+
+### Changed
+
+- **Requires `marque/trove ^4.11`**, for the registry.
+
 ## [2.0.2] — 2026-10-23
 
 > The layout sets a text colour in both modes, so text without its own colour is no longer black on the dark background.

@@ -113,6 +113,26 @@ method and URI as a package's, which replaces the package's route and its name.
 top-level link evaluated per request; an admin screen is a routed panel entry with a role
 floor. Same idea, different lifecycles, deliberately not one abstraction.
 
+## Footer
+
+The footer shows the copyright line, then whatever apps and packages have registered with
+trove's `FooterItemRegistry`, then "Powered by Marque". To add a line (build info, rules or
+DMCA links, site stats), register a Blade view from your own service provider instead of
+publishing and copying `deck::components.footer`:
+
+```php
+$this->app->make(FooterItemRegistry::class)->register(new FooterItem(
+    identifier: 'acme-rules',
+    view: 'acme::footer.rules',
+    position: 20,
+));
+```
+
+Visibility is decided per request, on the server, so an item whose `visible` closure
+declines is absent from the page. See [trove's Footer items](../trove/README.md#footer-items)
+for the full contract. `show_footer` (`false`) still hides the whole footer. Since 2.1.0;
+requires `marque/trove ^4.11`.
+
 ## Styling
 
 Components use Tailwind utility classes with `dark:` variants throughout. Tailwind 4

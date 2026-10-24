@@ -15,6 +15,7 @@ use Marque\Trove\Models\Torrent;
 use Marque\Trove\Policies\TorrentPolicy;
 use Marque\Trove\Registry\AdminScreenRegistry;
 use Marque\Trove\Registry\DashboardPanelRegistry;
+use Marque\Trove\Registry\FooterItemRegistry;
 use Marque\Trove\Registry\NavRegistry;
 use Marque\Trove\Services\TorrentService;
 use Throwable;
@@ -33,6 +34,7 @@ class TroveServiceProvider extends ServiceProvider
         $this->app->singleton(AdminScreenRegistry::class);
         $this->app->singleton(NavRegistry::class);
         $this->app->singleton(DashboardPanelRegistry::class);
+        $this->app->singleton(FooterItemRegistry::class);
     }
 
     public function boot(): void

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Marque\Trove\Registry\AdminScreenRegistry;
+use Marque\Trove\Registry\FooterItemRegistry;
 use Marque\Trove\Registry\NavItem;
 use Marque\Trove\Registry\NavRegistry;
 
@@ -14,6 +15,10 @@ describe('registry container bindings', function () {
 
     it('binds NavRegistry as a singleton', function () {
         expect(app(NavRegistry::class))->toBe(app(NavRegistry::class));
+    });
+
+    it('binds FooterItemRegistry as a singleton', function () {
+        expect(app(FooterItemRegistry::class))->toBe(app(FooterItemRegistry::class));
     });
 
     // The property every tenant depends on: a package registers in its own

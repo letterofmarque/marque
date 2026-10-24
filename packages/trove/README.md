@@ -314,6 +314,40 @@ parameters and public methods — follow trove's semver from 4.3, alongside the 
 admin-screen registries (see [VERSIONING.md](../../VERSIONING.md)). The dashboard page that
 renders them, and usarrs's own panels on it, version with usarrs.
 
+## Footer items
+
+An app or package adds to the page footer by registering a Blade view, so adding a line
+never means publishing and copying the shell's footer (which then silently stays behind
+whenever the shell changes it). `marque/deck` renders them between its copyright and
+"Powered by" line, from 2.1.0.
+
+```php
+use Marque\Trove\Registry\FooterItem;
+use Marque\Trove\Registry\FooterItemRegistry;
+
+public function boot(): void
+{
+    $this->app->make(FooterItemRegistry::class)->register(new FooterItem(
+        identifier: 'acme-build',
+        view: 'acme::footer.build',
+        position: 50,
+        // Per request, against the viewer; null for a guest. Omit it to show the
+        // item to everyone, guests included.
+        visible: fn (?object $user): bool => $user?->id === (int) config('acme.owner_id'),
+    ));
+}
+```
+
+It names a view, not a Livewire component: the footer is on every page and is usually
+static text. A view that needs interactivity can `@livewire` a component itself. An item
+whose closure declines is left out of the page, not hidden in it, so an owner-only line
+never reaches anyone else's page source.
+
+`FooterItem::forRole()` and `FooterItem::verifiedOnly()` work as they do on
+`DashboardPanel`. Items are ordered by `position`, then identifier, and a duplicate
+`identifier` throws. `FooterItem` and `FooterItemRegistry` follow trove's semver from 4.11,
+like the other registries.
+
 ## Configuration
 
 Published to `config/trove.php`:

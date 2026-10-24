@@ -7,6 +7,17 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+### Added
+
+- **`FooterItemRegistry` and `FooterItem`**, the fourth surface registry (#11100). An app or
+  package adds a line to the page footer by registering a Blade view, with a `position` and
+  an optional per-request `visible` closure (asked with null for a guest), plus `forRole()`
+  and `verifiedOnly()` as on `DashboardPanel`. Adding to the footer no longer means
+  publishing and copying the shell's view. A duplicate identifier throws. deck 2.1.0 renders
+  it.
+
 ## [4.10.0] — 2026-10-23
 
 > A published config still setting the ratio keys trove dropped in 2.0.0 is reported, with the bloodhound value actually in effect.

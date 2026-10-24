@@ -152,10 +152,12 @@ contexts. They also share almost nothing worth extracting — hold an array, pus
 filtered — so there is no base class. Per Pattern 4's own test, a third registry is the
 trigger to look for a shared parent, not the second.
 
-That third registry exists: `DashboardPanelRegistry` (trove 4.3). All three share
-`register()` (a duplicate identifier throws), `all()` and `find()`. They differ in
-`visibleTo()`: nav and dashboard panels take a user, admin screens take a `Role`. Whether
-the shared half earns a parent class hasn't been decided. A parent that keeps every
+That third registry exists: `DashboardPanelRegistry` (trove 4.3), and a fourth,
+`FooterItemRegistry` (trove 4.11, #11100), which names a Blade view rather than a component
+and answers for guests too. All four share `register()` (a duplicate identifier throws),
+`all()` and `find()`. They differ in `visibleTo()`: nav items, dashboard panels and footer
+items take a user, admin screens take a `Role`. Whether the shared half earns a parent
+class hasn't been decided. A parent that keeps every
 existing signature is a minor on trove; one that changes or removes any of them is a
 major (VERSIONING.md, "The surface registries").
 
