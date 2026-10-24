@@ -138,7 +138,7 @@ package a contributor can rely on being present. Putting the contract in `skippe
 instead would force every contributing package to depend on the renderer, i.e. exactly the
 coupling the arrangement exists to avoid.
 
-### Three registries, and no shared base class (yet)
+### Four registries, and no shared base class (yet)
 
 `NavRegistry` and `AdminScreenRegistry` look similar and behave differently:
 
@@ -202,4 +202,4 @@ tenant, and its second tenant needed nothing (Spec #108 OQ2).
 3. Views: guard the *inclusion* of optional-package UI at the parent template, never inside the optional package's own view. If a view must render either way, own its markup rather than referencing the optional package's components.
 4. Models: never add an optional package's trait to a model owned by a mandatory package. Give the optional package a service entry point that works against a bare `Model` (morph class + key), and let the *consuming, optional-aware* package do the wiring.
 5. Before shipping the wiring: is this the *second* time this shape of integration has been built? If so, stop and check whether it belongs as an attachment point in `deck`/`trove` instead of a second hand-copy (Pattern 4).
-6. Contributing a nav entry or an admin screen? Don't invent a mechanism — register with the trove registries (Pattern 5). Depend on trove, never on the renderer.
+6. Contributing a nav entry, an admin screen, a dashboard panel or a footer item? Don't invent a mechanism — register with the trove registries (Pattern 5). Depend on trove, never on the renderer.

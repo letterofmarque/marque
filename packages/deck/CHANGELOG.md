@@ -18,7 +18,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md).
   the copyright and "Powered by", ordered by position. An app adds build info, rules links
   or site stats from its own provider, instead of publishing and owning a copy of the
   footer. An item whose `visible` closure declines for the viewer is left out of the page,
-  not hidden in it. A footer with nothing registered renders as before.
+  not hidden in it. With nothing registered it shows the same two lines, which can now wrap
+  onto two rows on a narrow screen.
 
 ### Changed
 
