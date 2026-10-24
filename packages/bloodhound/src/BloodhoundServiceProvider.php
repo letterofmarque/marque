@@ -37,6 +37,7 @@ use Marque\Bloodhound\Services\AnnounceService;
 use Marque\Bloodhound\Services\AntiCheatService;
 use Marque\Bloodhound\Services\ClientValidationService;
 use Marque\Bloodhound\Services\RatioDownloadGate;
+use Marque\Bloodhound\Services\RatioEnforcer;
 use Marque\Bloodhound\Services\RedisDurability;
 use Marque\Bloodhound\Services\Seedboxes;
 use Marque\Bloodhound\Services\SeedingObligations;
@@ -58,6 +59,7 @@ class BloodhoundServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/bloodhound.php', 'bloodhound');
+        $this->fillEnforcementDefaults();
 
         // Register services as singletons
         $this->app->singleton(ClientValidationService::class);
@@ -258,10 +260,12 @@ class BloodhoundServiceProvider extends ServiceProvider
         }
 
         // Deprecated in 9.2.0 and still honoured, so this says the number in
-        // effect rather than calling it ignored.
+        // effect rather than calling it ignored. The 9.0/9.1 default that every
+        // config published then carries is not a choice anyone made, and is
+        // ignored without a word (RatioEnforcer::graceBytes()).
         $graceBytes = Arr::get($bloodhound, 'enforcement.grace_bytes');
 
-        if (is_numeric($graceBytes)) {
+        if (is_numeric($graceBytes) && (int) $graceBytes !== RatioEnforcer::OLD_DEFAULT_GRACE_BYTES) {
             $gb = round((int) $graceBytes / 1024 ** 3, 2);
             $warnings[] = "bloodhound.enforcement.grace_bytes is deprecated since 9.2.0 and still honoured: your config says {$graceBytes} bytes ({$gb} GB). "
                 .'Set enforcement.grace_gb (BLOODHOUND_RATIO_GRACE_GB) to the number of GB instead, and remove grace_bytes.';
@@ -279,6 +283,31 @@ class BloodhoundServiceProvider extends ServiceProvider
             foreach ($warnings as $warning) {
                 Log::warning($warning);
             }
+        }
+    }
+
+    /**
+     * Give a published `enforcement` block the keys it lacks, from the shipped
+     * config, env vars included.
+     *
+     * The merge is top-level only, so a config published on 9.0 or 9.1 has an
+     * `enforcement` block without grace_gb, and BLOODHOUND_RATIO_GRACE_GB would
+     * do nothing until the operator edited the file. That would leave the one
+     * setting 9.2 added for operators out of reach of most of them. A key the
+     * file does set always wins. Skipped when the config is cached, as
+     * mergeConfigFrom is: the cache already holds the filled block.
+     */
+    private function fillEnforcementDefaults(): void
+    {
+        if ($this->app->configurationIsCached()) {
+            return;
+        }
+
+        $shipped = require __DIR__.'/../config/bloodhound.php';
+        $published = config('bloodhound.enforcement');
+
+        if (is_array($published)) {
+            config(['bloodhound.enforcement' => $published + $shipped['enforcement']]);
         }
     }
 

@@ -43,6 +43,9 @@ use Marque\Trove\Support\TrackerStanding;
  */
 class RatioEnforcer
 {
+    /** grace_bytes as 9.0 and 9.1 shipped it, and so every config published then: 5 GiB. */
+    public const OLD_DEFAULT_GRACE_BYTES = 5 * 1024 ** 3;
+
     public function __construct(
         private readonly PeerService $peers,
         private readonly HitAndRunEnforcer $hitAndRun,
@@ -391,15 +394,20 @@ class RatioEnforcer
 
     /**
      * The grace allowance in bytes. Set in GB (grace_gb), as the tracker
-     * displays sizes: 1024-based. grace_bytes, the pre-9.2 setting, still wins
-     * when set, so a tracker that set it keeps its number; it's reported as
-     * deprecated. A grace_gb that isn't a number falls back to the default.
+     * displays sizes: 1024-based. A grace_gb that isn't a number falls back to
+     * the default.
+     *
+     * grace_bytes, the pre-9.2 setting, still wins when an operator chose it,
+     * so their number doesn't move; it's reported as deprecated. Its 9.0/9.1
+     * default, which every config published then carries, is not a choice and
+     * is ignored: it equals grace_gb's default, so nothing moves either way,
+     * and BLOODHOUND_RATIO_GRACE_GB works without editing the file.
      */
     private function graceBytes(): int
     {
         $bytes = config('bloodhound.enforcement.grace_bytes');
 
-        if (is_numeric($bytes)) {
+        if (is_numeric($bytes) && (int) $bytes !== self::OLD_DEFAULT_GRACE_BYTES) {
             return max(0, (int) $bytes);
         }
 

@@ -137,7 +137,8 @@ return [
     //                 ebooks); scale it to a few typical torrents of what your
     //                 tracker carries.
     // 'grace_bytes' - deprecated since 9.2.0: the same allowance in bytes.
-    //                 Still honoured when set, and then it wins; use grace_gb.
+    //                 A value you set wins over grace_gb; the old 5 GiB default
+    //                 is ignored. Use grace_gb.
     // 'exempt_role' - this role and above are never watched or restricted
     //                 (trove roles: user, uploader, moderator, admin). An admin
     //                 can also exempt one member: bloodhound:standing exempt.

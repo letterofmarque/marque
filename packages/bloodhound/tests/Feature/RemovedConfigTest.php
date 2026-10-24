@@ -147,6 +147,33 @@ test('a grace_bytes still set is reported as deprecated, with the GB it amounts 
         && str_contains($message, 'BLOODHOUND_RATIO_GRACE_GB'));
 });
 
+test('a grace_bytes at the 9.0/9.1 default is not reported: nobody chose it', function () {
+    Log::spy();
+    config(['bloodhound.enforcement.grace_bytes' => 5 * 1024 ** 3]);
+
+    checkRemovedConfig();
+
+    Log::shouldNotHaveReceived('warning');
+});
+
+// The merge is top-level, so a config published on 9.0/9.1 has an enforcement
+// block with no grace_gb. Its keys are filled from the shipped config, env var
+// included, and a key the file sets still wins.
+test('an enforcement block published before 9.2 gets grace_gb, from BLOODHOUND_RATIO_GRACE_GB', function () {
+    putenv('BLOODHOUND_RATIO_GRACE_GB=20');
+    config(['bloodhound.enforcement' => ['watch_days' => 7, 'grace_bytes' => 5 * 1024 ** 3, 'exempt_role' => 'admin']]);
+
+    try {
+        (fn () => $this->fillEnforcementDefaults())->call(new BloodhoundServiceProvider(app()));
+    } finally {
+        putenv('BLOODHOUND_RATIO_GRACE_GB');
+    }
+
+    expect((int) config('bloodhound.enforcement.grace_gb'))->toBe(20)
+        ->and(config('bloodhound.enforcement.watch_days'))->toBe(7)
+        ->and(config('bloodhound.enforcement.exempt_role'))->toBe('admin');
+});
+
 test('the shipped config carries grace_gb 5 and no grace_bytes', function () {
     expect(config('bloodhound.enforcement.grace_gb'))->toBe(5)
         ->and(config('bloodhound.enforcement.grace_bytes'))->toBeNull();

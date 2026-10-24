@@ -220,6 +220,17 @@ describe('who is never watched', function () {
         expect(standingOf($member))->toBe(StandingState::Ok);
     });
 
+    // Every config published on 9.0 or 9.1 carries grace_bytes at its 5 GiB
+    // default. That isn't a choice, so it must not shadow grace_gb.
+    it('ignores a grace_bytes at the 9.0/9.1 default, so grace_gb applies', function () {
+        config(['bloodhound.enforcement.grace_gb' => 20, 'bloodhound.enforcement.grace_bytes' => 5 * GIB]);
+        $member = member(uploaded: 0, downloaded: 10 * GIB);
+
+        enforce();
+
+        expect(standingOf($member))->toBe(StandingState::Ok);
+    });
+
     it('treats staff at or above the exempt role as exempt', function () {
         $moderator = member(uploaded: 0, downloaded: 50 * GIB, role: 'moderator');
         $admin = member(uploaded: 0, downloaded: 50 * GIB, role: 'admin');

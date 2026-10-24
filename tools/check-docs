@@ -315,7 +315,9 @@ function leafKeys(array $values, string $prefix = ''): array
  * Every config path any package reads, per config name. A read of a parent
  * (`config('bloodhound.routes')`) or a dynamic key (`"bloodhound.routes.{$x}"`)
  * counts as reading everything beneath it — generous on purpose, because a
- * false "nothing reads this" would teach people to ignore the check.
+ * false "nothing reads this" would teach people to ignore the check. A read
+ * with no key at all after the name ("acme.{$key}") is not counted that way:
+ * it is a config-blind finding unless the line is marked (#11082).
  *
  * @return array<string, array<string, true>>
  */

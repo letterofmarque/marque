@@ -22,9 +22,18 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ### Deprecated
 
-- **`enforcement.grace_bytes`** (`BLOODHOUND_RATIO_GRACE_BYTES`). It still works, and wins
-  over `grace_gb` when set, so upgrading changes nobody's number. It's logged as deprecated
-  once a day, with the GB it amounts to. Move it to `grace_gb`.
+- **`enforcement.grace_bytes`** (`BLOODHOUND_RATIO_GRACE_BYTES`). A value you set still
+  wins over `grace_gb`, so upgrading changes nobody's number, and it's logged as deprecated
+  once a day with the GB it amounts to. Move it to `grace_gb`. The 5 GiB default that every
+  config published on 9.0 or 9.1 carries is ignored, without a warning: it equals
+  `grace_gb`'s default.
+
+### Changed
+
+- **A published `enforcement` block gets the keys it lacks** from the shipped config,
+  environment variables included, so `BLOODHOUND_RATIO_GRACE_GB` works with a config
+  published before 9.2 without editing it. Keys the file sets still win. The rest of the
+  config still merges at the top level only.
 
 ## [9.1.0] — 2026-10-22
 

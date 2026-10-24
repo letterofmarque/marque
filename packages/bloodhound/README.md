@@ -605,9 +605,12 @@ Decimals are fine (`2.5`), and `0` enforces from the first byte. A value that is
 number falls back to 5.
 
 Before 9.2.0 it was set in bytes, as `enforcement.grace_bytes` (`BLOODHOUND_RATIO_GRACE_BYTES`).
-That still works, and wins over `grace_gb` when set, so an upgrade doesn't move anyone's
-number. It's logged as deprecated once a day, with the GB it amounts to. Move it to
-`grace_gb` and remove it.
+A config published on 9.0 or 9.1 still has that line, at its 5 GiB default. That default
+isn't a choice anyone made, so it's ignored: `grace_gb`'s default is the same 5 GB, and
+`BLOODHOUND_RATIO_GRACE_GB` works without editing the file. Any other `grace_bytes` value
+is one you set, so it still wins over `grace_gb` and your number doesn't move on upgrade.
+It's logged as deprecated once a day, with the GB it amounts to. Move it to `grace_gb`
+and remove the line.
 
 ## Hit-and-run
 
@@ -665,7 +668,9 @@ file at the top level only. A top-level key missing from your file comes from th
 config, environment variable and all. A published block, such as `anti_cheat`, replaces
 the shipped one whole: a key missing from it falls back to the default in code, which is
 the same as the shipped default, but its environment variable does nothing until the key
-is in your file.
+is in your file. `enforcement` is the exception, from 9.2.0: keys missing from a published
+`enforcement` block are filled from the shipped config, environment variables included, so
+`grace_gb` reaches a config published before it existed.
 
 ### Uploads: the private flag
 
@@ -1070,6 +1075,19 @@ This is a Bloodhound feature and has no equivalent in [marque/hound](https://pac
 | `bloodhound:backfill-ledger` | — | Once, after upgrading from 7.x: credits pre-8.0 history its time and stopped bytes |
 | `bloodhound:record-pruned-history` | — | Once, if needed: accounts for rows a pre-8.0 prune deleted without carrying them |
 
+## Upgrading to 9.2
+
+Nothing to do. The ratio grace allowance is now set in GB, as `enforcement.grace_gb`
+(`BLOODHOUND_RATIO_GRACE_GB`, default 5), and nobody's number moves:
+
+- A config published on 9.0 or 9.1 has `grace_bytes` at its 5 GiB default. It's ignored,
+  and `grace_gb` is filled in for you, so the env var works without editing the file.
+- A `grace_bytes` you set to anything else still wins, and is logged once a day as
+  deprecated. Replace it with `grace_gb` (in GB, as sizes are shown on the tracker) when
+  convenient.
+
+See [Ratio enforcement](#ratio-enforcement) for how to size it for what your tracker carries.
+
 ## Upgrading from 8.x to 9.0
 
 Two defaults change, and both are things your members will notice.
@@ -1083,7 +1101,7 @@ recover. Decide before you upgrade:
   shows each member's standing (usarrs 8.5), and the `RatioWatchStarted` event is there to
   email from.
 - **Check the numbers.** `min_ratio`, `enforcement.watch_days` (14),
-  `enforcement.grace_gb` (5) and `enforcement.exempt_role` (moderator) are all
+  `enforcement.grace_gb` (5; `grace_bytes` before 9.2) and `enforcement.exempt_role` (moderator) are all
   configurable; see [Ratio enforcement](#ratio-enforcement).
 - **Exempt anyone who should be:** `bloodhound:standing exempt <id> --reason=...`.
 - **Or don't enforce at all:** set `BLOODHOUND_RATIO_MODE=off`. The figures are still
@@ -1098,7 +1116,7 @@ catch that refusal and would answer 500, so bloodhound 9 declares a `conflict` w
 Upgrade together:
 
 ```bash
-composer require marque/bloodhound:^9.0 marque/trove:^4.8 marque/guise:^5.3 marque/usarrs:^8.5 -W
+composer require marque/bloodhound:^9.0 marque/trove:^4.9 marque/guise:^5.3 marque/usarrs:^8.5 -W
 php artisan migrate        # creates member_standings
 ```
 
