@@ -52,6 +52,38 @@ test('a valid signed verification link marks the user verified and fires Verifie
     Event::assertDispatched(Verified::class);
 });
 
+// #11102: it ended on intended('/'), the one post-auth redirect that ignored
+// usarrs.home, so an app whose '/' is a splash page sent a freshly verified
+// member there.
+test('with nothing intended, verifying lands on usarrs.home', function () {
+    config(['usarrs.home' => '/dashboard']);
+    $user = TestUser::factory()->unverified()->create();
+
+    $url = URL::temporarySignedRoute('verification.verify', now()->addMinutes(60), [
+        'id' => $user->getKey(),
+        'hash' => sha1($user->getEmailForVerification()),
+    ]);
+
+    $this->actingAs($user)->get($url)->assertRedirect(url('/dashboard'));
+});
+
+test('verifying returns to the page the verified middleware turned the member away from', function () {
+    config(['usarrs.home' => '/dashboard']);
+    $user = TestUser::factory()->unverified()->create();
+
+    Route::middleware(['web', 'auth', 'verified'])
+        ->get('/test-verified-only', fn () => 'ok');
+
+    $this->actingAs($user)->get('/test-verified-only')->assertRedirect(route('verification.notice'));
+
+    $url = URL::temporarySignedRoute('verification.verify', now()->addMinutes(60), [
+        'id' => $user->getKey(),
+        'hash' => sha1($user->getEmailForVerification()),
+    ]);
+
+    $this->actingAs($user)->get($url)->assertRedirect(url('/test-verified-only'));
+});
+
 test('a verified user hitting the signed link again does not re-fire Verified', function () {
     Event::fake([Verified::class]);
 

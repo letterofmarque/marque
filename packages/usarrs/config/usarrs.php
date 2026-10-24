@@ -126,8 +126,8 @@ return [
 
     'prefix' => env('USARRS_PREFIX', ''),
 
-    // Where a login lands when the user wasn't sent to it from another page
-    // (that page always wins). A path or a URL. '/dashboard' sends members to
+    // Where a login, registration or email verification lands when the user
+    // wasn't sent to it from another page (that page always wins). A path or a URL. '/dashboard' sends members to
     // usarrs' dashboard; the default keeps the app's own '/' (#11070).
     'home' => env('USARRS_HOME', '/'),
 

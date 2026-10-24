@@ -8,6 +8,7 @@ use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Marque\Usarrs\Auth\LoginCompletion;
 
 /**
  * job #10602 Gap 7: Fortify's own /email/verify routes are suppressed
@@ -59,7 +60,10 @@ class EmailVerificationController
             event(new Verified($user));
         }
 
-        return redirect()->intended('/')->with('status', __('Email verified.'));
+        // Back to the page the verified middleware turned them away from,
+        // else usarrs.home like every sign-in. '/' always sent a member of an
+        // app whose '/' is a splash page there instead (#11102).
+        return redirect()->intended(LoginCompletion::home())->with('status', __('Email verified.'));
     }
 
     public function send(Request $request): RedirectResponse

@@ -416,7 +416,9 @@ Dashboard entry is added to the navigation for signed-in users, and `marque:inst
 offers it as the home page (the default for a private tracker), since `marque/marque`
 1.0.0. Login lands on the page the user was sent to log in from, else on `usarrs.home`
 (`USARRS_HOME`, default `/`). Set it to `/dashboard` to send members there when your `/`
-is a splash page.
+is a splash page. Every sign-in follows it, as do registration, password confirmation and
+email verification. The one exception is connecting a provider while already signed in,
+which returns to the profile page.
 
 **Does your app have its own `/dashboard`?** Laravel's starter kits ship one:
 `Route::get('dashboard', ...)->name('dashboard')`. Your app's routes load after usarrs', and
