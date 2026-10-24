@@ -131,7 +131,10 @@ return [
     //                 before new downloading is paused.
     // 'grace_bytes' - nothing is enforced until a member has downloaded this
     //                 much, or every new member's first download would put
-    //                 them on watch. 5 GiB by default.
+    //                 them on watch. Their ratio is still recorded and shown.
+    //                 5 GiB by default, which suits small content (music,
+    //                 ebooks); scale it to a few typical torrents of what
+    //                 your tracker carries. In bytes: 20 GiB is 21474836480.
     // 'exempt_role' - this role and above are never watched or restricted
     //                 (trove roles: user, uploader, moderator, admin). An admin
     //                 can also exempt one member: bloodhound:standing exempt.

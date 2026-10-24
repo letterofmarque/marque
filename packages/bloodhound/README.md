@@ -589,7 +589,23 @@ before copying thresholds from another tracker:
 - nothing is counted across a `stopped`;
 - anti-cheat forfeits over-cap bytes.
 
-The grace allowance keeps every new member's first download from putting them on watch.
+**The grace allowance** (`enforcement.grace_bytes`, `BLOODHOUND_RATIO_GRACE_BYTES`) is how
+much a member downloads before the ratio rule applies to them at all. Until then their
+ratio is recorded and shown on their dashboard as usual, but nothing is enforced, so a new
+member's first downloads can't put them on watch.
+
+Set it for what your tracker carries; no single default suits every tracker. The 5 GiB
+default is dozens of albums on a music tracker, but on an HD film or sports tracker it can
+be less than one torrent, so the grace is gone before a new member has finished their first
+download. A few typical torrents' worth is a reasonable start. The value is in bytes:
+
+| Grace | `BLOODHOUND_RATIO_GRACE_BYTES` |
+|---|---|
+| 5 GiB (default) | `5368709120` |
+| 20 GiB | `21474836480` |
+| 50 GiB | `53687091200` |
+
+`0` enforces from the first byte.
 
 ## Hit-and-run
 
