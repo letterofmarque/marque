@@ -23,7 +23,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 ### Deprecated
 
 - **`enforcement.grace_bytes`** (`BLOODHOUND_RATIO_GRACE_BYTES`). A value you set still
-  wins over `grace_gb`, so upgrading changes nobody's number, and it's logged as deprecated
+  wins over `grace_gb`, read as 9.1 read it (an empty value is 0), so upgrading changes
+  nobody's number, and it's logged as deprecated
   once a day with the GB it amounts to. Move it to `grace_gb`. The 5 GiB default that every
   config published on 9.0 or 9.1 carries is ignored, without a warning: it equals
   `grace_gb`'s default.

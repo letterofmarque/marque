@@ -265,9 +265,10 @@ class BloodhoundServiceProvider extends ServiceProvider
         // ignored without a word (RatioEnforcer::graceBytes()).
         $graceBytes = Arr::get($bloodhound, 'enforcement.grace_bytes');
 
-        if (is_numeric($graceBytes) && (int) $graceBytes !== RatioEnforcer::OLD_DEFAULT_GRACE_BYTES) {
-            $gb = round((int) $graceBytes / 1024 ** 3, 2);
-            $warnings[] = "bloodhound.enforcement.grace_bytes is deprecated since 9.2.0 and still honoured: your config says {$graceBytes} bytes ({$gb} GB). "
+        if (RatioEnforcer::graceBytesChosen($graceBytes)) {
+            $gb = round(max(0, (int) $graceBytes) / 1024 ** 3, 2);
+            $said = json_encode($graceBytes);
+            $warnings[] = "bloodhound.enforcement.grace_bytes is deprecated since 9.2.0 and still honoured: your config says {$said} bytes ({$gb} GB). "
                 .'Set enforcement.grace_gb (BLOODHOUND_RATIO_GRACE_GB) to the number of GB instead, and remove grace_bytes.';
         }
 

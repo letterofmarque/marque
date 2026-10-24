@@ -147,6 +147,15 @@ test('a grace_bytes still set is reported as deprecated, with the GB it amounts 
         && str_contains($message, 'BLOODHOUND_RATIO_GRACE_GB'));
 });
 
+test('an empty grace_bytes is reported too, as the 0 it amounts to', function () {
+    Log::spy();
+    config(['bloodhound.enforcement.grace_bytes' => '']);
+
+    checkRemovedConfig();
+
+    Log::shouldHaveReceived('warning')->once()->withArgs(fn ($message) => str_contains($message, 'grace_bytes is deprecated') && str_contains($message, '(0 GB)'));
+});
+
 test('a grace_bytes at the 9.0/9.1 default is not reported: nobody chose it', function () {
     Log::spy();
     config(['bloodhound.enforcement.grace_bytes' => 5 * 1024 ** 3]);

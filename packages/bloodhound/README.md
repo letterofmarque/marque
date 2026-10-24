@@ -801,7 +801,7 @@ it again for the same download, so time decides what counts as a new completion.
 | `min_seedtime` | `259200` (72h) | Hit-and-run: the seeding each torrent is owed |
 | `enforcement.watch_days` | `14` | How long a member below `min_ratio` has to recover before new downloading is paused |
 | `enforcement.grace_gb` | `5` | Nothing is enforced until a member has downloaded this many GB (1024-based, as sizes are shown) |
-| `enforcement.grace_bytes` | `null` | Deprecated since 9.2.0: the same allowance in bytes. Wins over `grace_gb` when set |
+| `enforcement.grace_bytes` | `null` | Deprecated since 9.2.0: the same allowance in bytes. Wins over `grace_gb` when set to anything but the old 5 GiB default |
 | `enforcement.exempt_role` | `moderator` | This trove role and above are never watched or restricted, by either rule |
 | `hit_and_run.enabled` | `false` | Run hit-and-run beside the ratio rule under `full` |
 | `hit_and_run.ratio` | `1.0` | A ratio on the torrent that also meets it; null for time only |
@@ -1082,9 +1082,11 @@ Nothing to do. The ratio grace allowance is now set in GB, as `enforcement.grace
 
 - A config published on 9.0 or 9.1 has `grace_bytes` at its 5 GiB default. It's ignored,
   and `grace_gb` is filled in for you, so the env var works without editing the file.
-- A `grace_bytes` you set to anything else still wins, and is logged once a day as
-  deprecated. Replace it with `grace_gb` (in GB, as sizes are shown on the tracker) when
-  convenient.
+- A `grace_bytes` you set to anything else still wins, read as 9.1 read it (an empty
+  value is 0), and is logged once a day as deprecated. Replace it with `grace_gb` (in GB,
+  as sizes are shown on the tracker) when convenient.
+- If you cache config, run `php artisan config:cache` again after upgrading. A cache built
+  on 9.1 has no `grace_gb`, so `BLOODHOUND_RATIO_GRACE_GB` isn't read until it's rebuilt.
 
 See [Ratio enforcement](#ratio-enforcement) for how to size it for what your tracker carries.
 

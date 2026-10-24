@@ -231,6 +231,17 @@ describe('who is never watched', function () {
         expect(standingOf($member))->toBe(StandingState::Ok);
     });
 
+    // 9.1 read an empty BLOODHOUND_RATIO_GRACE_BYTES= as a grace of 0. It must
+    // still mean 0, not fall through to grace_gb's 5 GB.
+    it('reads an empty or non-numeric grace_bytes as 9.1 did: 0', function () {
+        config(['bloodhound.enforcement.grace_bytes' => '']);
+        $member = member(uploaded: 0, downloaded: 1);
+
+        enforce();
+
+        expect(standingOf($member))->toBe(StandingState::Watch);
+    });
+
     it('treats staff at or above the exempt role as exempt', function () {
         $moderator = member(uploaded: 0, downloaded: 50 * GIB, role: 'moderator');
         $admin = member(uploaded: 0, downloaded: 50 * GIB, role: 'admin');

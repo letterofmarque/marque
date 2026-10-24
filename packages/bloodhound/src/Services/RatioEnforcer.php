@@ -398,22 +398,33 @@ class RatioEnforcer
      * the default.
      *
      * grace_bytes, the pre-9.2 setting, still wins when an operator chose it,
-     * so their number doesn't move; it's reported as deprecated. Its 9.0/9.1
-     * default, which every config published then carries, is not a choice and
-     * is ignored: it equals grace_gb's default, so nothing moves either way,
-     * and BLOODHOUND_RATIO_GRACE_GB works without editing the file.
+     * read exactly as 9.1 read it (an empty or non-numeric value is 0), so
+     * their number doesn't move; it's reported as deprecated. Only null is
+     * "not set". Its 9.0/9.1 default, which every config published then
+     * carries, is not a choice and is ignored: it equals grace_gb's default,
+     * so nothing moves either way, and BLOODHOUND_RATIO_GRACE_GB works without
+     * editing the file.
      */
     private function graceBytes(): int
     {
         $bytes = config('bloodhound.enforcement.grace_bytes');
 
-        if (is_numeric($bytes) && (int) $bytes !== self::OLD_DEFAULT_GRACE_BYTES) {
+        if (self::graceBytesChosen($bytes)) {
             return max(0, (int) $bytes);
         }
 
         $gb = config('bloodhound.enforcement.grace_gb', 5);
 
         return max(0, (int) round((is_numeric($gb) ? (float) $gb : 5.0) * 1024 ** 3));
+    }
+
+    /**
+     * Whether a grace_bytes value is one an operator chose: set (not null),
+     * and not the 9.0/9.1 default every config published then carries.
+     */
+    public static function graceBytesChosen(mixed $bytes): bool
+    {
+        return $bytes !== null && ! (is_numeric($bytes) && (int) $bytes === self::OLD_DEFAULT_GRACE_BYTES);
     }
 
     private function watchDays(): int
