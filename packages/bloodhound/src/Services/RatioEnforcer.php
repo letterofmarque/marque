@@ -389,9 +389,23 @@ class RatioEnforcer
         return max(1, (int) config('bloodhound.hit_and_run.max_strikes', 3));
     }
 
+    /**
+     * The grace allowance in bytes. Set in GB (grace_gb), as the tracker
+     * displays sizes: 1024-based. grace_bytes, the pre-9.2 setting, still wins
+     * when set, so a tracker that set it keeps its number; it's reported as
+     * deprecated. A grace_gb that isn't a number falls back to the default.
+     */
     private function graceBytes(): int
     {
-        return max(0, (int) config('bloodhound.enforcement.grace_bytes', 5 * 1024 ** 3));
+        $bytes = config('bloodhound.enforcement.grace_bytes');
+
+        if (is_numeric($bytes)) {
+            return max(0, (int) $bytes);
+        }
+
+        $gb = config('bloodhound.enforcement.grace_gb', 5);
+
+        return max(0, (int) round((is_numeric($gb) ? (float) $gb : 5.0) * 1024 ** 3));
     }
 
     private function watchDays(): int

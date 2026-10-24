@@ -540,7 +540,7 @@ how a member recovers.
 | Standing | When | What it means |
 |---|---|---|
 | ok | at or above `min_ratio`, or under the grace allowance | nothing |
-| watch | below `min_ratio`, having downloaded at least `enforcement.grace_bytes` | a deadline `enforcement.watch_days` away (14). Nothing is refused yet |
+| watch | below `min_ratio`, having downloaded at least `enforcement.grace_gb` | a deadline `enforcement.watch_days` away (14). Nothing is refused yet |
 | restricted | still below at the deadline, or `hit_and_run.max_strikes` active [hit-and-run](#hit-and-run) strikes | new leeching refused (below) |
 | exempt | role at or above `enforcement.exempt_role` (moderator), or exempted by an admin | never watched or restricted |
 
@@ -589,23 +589,25 @@ before copying thresholds from another tracker:
 - nothing is counted across a `stopped`;
 - anti-cheat forfeits over-cap bytes.
 
-**The grace allowance** (`enforcement.grace_bytes`, `BLOODHOUND_RATIO_GRACE_BYTES`) is how
-much a member downloads before the ratio rule applies to them at all. Until then their
-ratio is recorded and shown on their dashboard as usual, but nothing is enforced, so a new
-member's first downloads can't put them on watch.
+**The grace allowance** (`enforcement.grace_gb`, `BLOODHOUND_RATIO_GRACE_GB`) is how many GB
+a member downloads before the ratio rule applies to them at all. Until then their ratio is
+recorded and shown on their dashboard as usual, but nothing is enforced, so a new member's
+first downloads can't put them on watch.
 
-Set it for what your tracker carries; no single default suits every tracker. The 5 GiB
+Set it for what your tracker carries; no single default suits every tracker. The 5 GB
 default is dozens of albums on a music tracker, but on an HD film or sports tracker it can
 be less than one torrent, so the grace is gone before a new member has finished their first
-download. A few typical torrents' worth is a reasonable start. The value is in bytes:
+download. A few typical torrents' worth is a reasonable start: `BLOODHOUND_RATIO_GRACE_GB=20`.
 
-| Grace | `BLOODHOUND_RATIO_GRACE_BYTES` |
-|---|---|
-| 5 GiB (default) | `5368709120` |
-| 20 GiB | `21474836480` |
-| 50 GiB | `53687091200` |
+It's GB as the tracker shows sizes to members (1024 MB, the same unit as a torrent's size
+and a member's downloaded figure), so 20 here is what a member sees as 20 GB downloaded.
+Decimals are fine (`2.5`), and `0` enforces from the first byte. A value that isn't a
+number falls back to 5.
 
-`0` enforces from the first byte.
+Before 9.2.0 it was set in bytes, as `enforcement.grace_bytes` (`BLOODHOUND_RATIO_GRACE_BYTES`).
+That still works, and wins over `grace_gb` when set, so an upgrade doesn't move anyone's
+number. It's logged as deprecated once a day, with the GB it amounts to. Move it to
+`grace_gb` and remove it.
 
 ## Hit-and-run
 
@@ -793,7 +795,8 @@ it again for the same download, so time decides what counts as a new completion.
 | `min_ratio` | `0.5` | The ratio `full` enforces |
 | `min_seedtime` | `259200` (72h) | Hit-and-run: the seeding each torrent is owed |
 | `enforcement.watch_days` | `14` | How long a member below `min_ratio` has to recover before new downloading is paused |
-| `enforcement.grace_bytes` | 5 GiB | Nothing is enforced until a member has downloaded this much |
+| `enforcement.grace_gb` | `5` | Nothing is enforced until a member has downloaded this many GB (1024-based, as sizes are shown) |
+| `enforcement.grace_bytes` | `null` | Deprecated since 9.2.0: the same allowance in bytes. Wins over `grace_gb` when set |
 | `enforcement.exempt_role` | `moderator` | This trove role and above are never watched or restricted, by either rule |
 | `hit_and_run.enabled` | `false` | Run hit-and-run beside the ratio rule under `full` |
 | `hit_and_run.ratio` | `1.0` | A ratio on the torrent that also meets it; null for time only |
@@ -1080,7 +1083,7 @@ recover. Decide before you upgrade:
   shows each member's standing (usarrs 8.5), and the `RatioWatchStarted` event is there to
   email from.
 - **Check the numbers.** `min_ratio`, `enforcement.watch_days` (14),
-  `enforcement.grace_bytes` (5 GiB) and `enforcement.exempt_role` (moderator) are all
+  `enforcement.grace_gb` (5) and `enforcement.exempt_role` (moderator) are all
   configurable; see [Ratio enforcement](#ratio-enforcement).
 - **Exempt anyone who should be:** `bloodhound:standing exempt <id> --reason=...`.
 - **Or don't enforce at all:** set `BLOODHOUND_RATIO_MODE=off`. The figures are still

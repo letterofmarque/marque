@@ -10,6 +10,7 @@ changelogs — edit those, not this.*
 
 ## 2026-10-24
 
+- **[bloodhound 9.2.0](packages/bloodhound/CHANGELOG.md)** — The ratio grace allowance is set in GB, the same 1024-based GB the tracker shows members, instead of in bytes.
 - **[deck 2.1.0](packages/deck/CHANGELOG.md)** — The footer renders items registered with trove, so an app adds build info or links without publishing and copying the footer.
 - **[trove 4.11.0](packages/trove/CHANGELOG.md)** — A footer item registry, so an app or package can add a line to the page footer without copying the shell's view.
 - **[usarrs 8.6.2](packages/usarrs/CHANGELOG.md)** — Verifying an email address lands on usarrs.home, not always on /.

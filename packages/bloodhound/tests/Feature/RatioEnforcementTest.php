@@ -45,7 +45,8 @@ beforeEach(function () {
         'bloodhound.ratio_mode' => 'full',
         'bloodhound.min_ratio' => 0.5,
         'bloodhound.enforcement.watch_days' => 14,
-        'bloodhound.enforcement.grace_bytes' => 5 * GIB,
+        'bloodhound.enforcement.grace_gb' => 5,
+        'bloodhound.enforcement.grace_bytes' => null,
         'bloodhound.enforcement.exempt_role' => 'moderator',
     ]);
     Event::fake([RatioWatchStarted::class, MemberRestricted::class, StandingRestored::class]);
@@ -161,6 +162,58 @@ describe('recovering', function () {
 describe('who is never watched', function () {
     it('leaves a member alone until they have downloaded the grace allowance', function () {
         $member = member(uploaded: 0, downloaded: 4 * GIB);
+
+        enforce();
+
+        expect(standingOf($member))->toBe(StandingState::Ok);
+    });
+
+    // The allowance is set in GB as the tracker shows sizes, 1024-based, so
+    // 20 here is what a member sees as 20 GB downloaded.
+    it('reads the grace in GB, 1024-based, decimals included', function () {
+        config(['bloodhound.enforcement.grace_gb' => 2.5]);
+        $under = member(uploaded: 0, downloaded: (int) (2.5 * GIB) - 1);
+        $at = member(uploaded: 0, downloaded: (int) (2.5 * GIB));
+
+        enforce();
+
+        expect(standingOf($under))->toBe(StandingState::Ok)
+            ->and(standingOf($at))->toBe(StandingState::Watch);
+    });
+
+    it('falls back to 5 GB when grace_gb is unset', function () {
+        config(['bloodhound.enforcement.grace_gb' => null]);
+        $under = member(uploaded: 0, downloaded: 5 * GIB - 1);
+        $at = member(uploaded: 0, downloaded: 5 * GIB);
+
+        enforce();
+
+        expect(standingOf($under))->toBe(StandingState::Ok)
+            ->and(standingOf($at))->toBe(StandingState::Watch);
+    });
+
+    it('falls back to 5 GB when grace_gb is not a number', function () {
+        config(['bloodhound.enforcement.grace_gb' => '20GB']);
+        $member = member(uploaded: 0, downloaded: 6 * GIB);
+
+        enforce();
+
+        expect(standingOf($member))->toBe(StandingState::Watch);
+    });
+
+    it('enforces from the first byte with a grace of 0', function () {
+        config(['bloodhound.enforcement.grace_gb' => 0]);
+        $member = member(uploaded: 0, downloaded: 1);
+
+        enforce();
+
+        expect(standingOf($member))->toBe(StandingState::Watch);
+    });
+
+    // Before 9.2 it was set in bytes. A tracker that set it keeps its number.
+    it('still honours a grace_bytes that is set, over grace_gb', function () {
+        config(['bloodhound.enforcement.grace_gb' => 5, 'bloodhound.enforcement.grace_bytes' => 20 * GIB]);
+        $member = member(uploaded: 0, downloaded: 10 * GIB);
 
         enforce();
 

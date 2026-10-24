@@ -106,7 +106,7 @@ return [
     | mode decides what is enforced.
     |
     | 'full'     - a minimum ratio (the default). A member below min_ratio who
-    |              has downloaded at least enforcement.grace_bytes goes on
+    |              has downloaded at least enforcement.grace_gb goes on
     |              watch for enforcement.watch_days; still below at the end,
     |              new downloading is paused until they recover. Seeding never
     |              is. Judged hourly by bloodhound:enforce-ratio.
@@ -129,18 +129,22 @@ return [
     //
     // 'watch_days'  - how long a member below min_ratio has to recover
     //                 before new downloading is paused.
-    // 'grace_bytes' - nothing is enforced until a member has downloaded this
-    //                 much, or every new member's first download would put
+    // 'grace_gb'    - nothing is enforced until a member has downloaded this
+    //                 many GB, or every new member's first download would put
     //                 them on watch. Their ratio is still recorded and shown.
-    //                 5 GiB by default, which suits small content (music,
-    //                 ebooks); scale it to a few typical torrents of what
-    //                 your tracker carries. In bytes: 20 GiB is 21474836480.
+    //                 GB as the tracker displays sizes (1024 MB); decimals are
+    //                 fine. 5 by default, which suits small content (music,
+    //                 ebooks); scale it to a few typical torrents of what your
+    //                 tracker carries.
+    // 'grace_bytes' - deprecated since 9.2.0: the same allowance in bytes.
+    //                 Still honoured when set, and then it wins; use grace_gb.
     // 'exempt_role' - this role and above are never watched or restricted
     //                 (trove roles: user, uploader, moderator, admin). An admin
     //                 can also exempt one member: bloodhound:standing exempt.
     'enforcement' => [
         'watch_days' => env('BLOODHOUND_RATIO_WATCH_DAYS', 14),
-        'grace_bytes' => env('BLOODHOUND_RATIO_GRACE_BYTES', 5 * 1024 ** 3),
+        'grace_gb' => env('BLOODHOUND_RATIO_GRACE_GB', 5),
+        'grace_bytes' => env('BLOODHOUND_RATIO_GRACE_BYTES'),
         'exempt_role' => env('BLOODHOUND_RATIO_EXEMPT_ROLE', 'moderator'),
     ],
 

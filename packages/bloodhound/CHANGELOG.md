@@ -7,6 +7,25 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [9.2.0] — 2026-10-24
+
+> The ratio grace allowance is set in GB, the same 1024-based GB the tracker shows members, instead of in bytes.
+
+### Added
+
+- **`enforcement.grace_gb`** (`BLOODHOUND_RATIO_GRACE_GB`, default `5`): how many GB a
+  member downloads before the ratio rule applies to them. Their ratio is still recorded
+  and shown until then. It's GB as sizes are shown on the tracker (1024 MB), so 20 is what
+  a member sees as 20 GB downloaded. Decimals are fine, and `0` enforces from the first
+  byte. The README says how to size it for what the tracker carries: 5 GB is dozens of
+  albums, but on an HD or sports tracker it can be less than one torrent.
+
+### Deprecated
+
+- **`enforcement.grace_bytes`** (`BLOODHOUND_RATIO_GRACE_BYTES`). It still works, and wins
+  over `grace_gb` when set, so upgrading changes nobody's number. It's logged as deprecated
+  once a day, with the GB it amounts to. Move it to `grace_gb`.
+
 ## [9.1.0] — 2026-10-22
 
 > Hit-and-run: a torrent downloaded is owed 72 hours of seeding or 1:1 on it; away while short, a pre-warning then a strike; three strikes pause new downloading. Off until you turn it on.

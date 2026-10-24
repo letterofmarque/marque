@@ -133,6 +133,25 @@ test('the retired logging and queue blocks are reported as ignored', function ()
     Log::shouldHaveReceived('warning')->withArgs(fn ($message) => str_contains($message, 'bloodhound.queue'));
 });
 
+// 9.2.0: the grace is set in GB. grace_bytes is still honoured, so it's
+// reported with the number in effect, not as ignored.
+test('a grace_bytes still set is reported as deprecated, with the GB it amounts to', function () {
+    Log::spy();
+    config(['bloodhound.enforcement.grace_bytes' => 20 * 1024 ** 3]);
+
+    checkRemovedConfig();
+
+    Log::shouldHaveReceived('warning')->once()->withArgs(fn ($message) => str_contains($message, 'grace_bytes is deprecated')
+        && str_contains($message, 'still honoured')
+        && str_contains($message, '20 GB')
+        && str_contains($message, 'BLOODHOUND_RATIO_GRACE_GB'));
+});
+
+test('the shipped config carries grace_gb 5 and no grace_bytes', function () {
+    expect(config('bloodhound.enforcement.grace_gb'))->toBe(5)
+        ->and(config('bloodhound.enforcement.grace_bytes'))->toBeNull();
+});
+
 test('the package\'s own config reports nothing', function () {
     Log::spy();
 

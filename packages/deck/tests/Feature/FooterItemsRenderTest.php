@@ -54,6 +54,17 @@ describe('footer items', function () {
             ->not->toContain('data-footer-item="build"');
     });
 
+    // From the independent /check of #11100: a guest is a viewer the closure
+    // answers for (null), and a declined item must be absent from their page too.
+    it('leaves out an item whose closure declines a guest', function () {
+        app(FooterItemRegistry::class)->register(new FooterItem('build', 'probe::footer.build', visible: fn (?object $user): bool => $user !== null));
+        app(FooterItemRegistry::class)->register(new FooterItem('rules', 'probe::footer.rules'));
+
+        expect(renderLayout())->not->toContain('Build abc123')
+            ->not->toContain('data-footer-item="build"')
+            ->toContain('Rules');
+    });
+
     it('shows an item with no visibility rule to a guest', function () {
         app(FooterItemRegistry::class)->register(new FooterItem('rules', 'probe::footer.rules'));
 

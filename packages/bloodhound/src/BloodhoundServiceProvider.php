@@ -257,6 +257,16 @@ class BloodhoundServiceProvider extends ServiceProvider
             }
         }
 
+        // Deprecated in 9.2.0 and still honoured, so this says the number in
+        // effect rather than calling it ignored.
+        $graceBytes = Arr::get($bloodhound, 'enforcement.grace_bytes');
+
+        if (is_numeric($graceBytes)) {
+            $gb = round((int) $graceBytes / 1024 ** 3, 2);
+            $warnings[] = "bloodhound.enforcement.grace_bytes is deprecated since 9.2.0 and still honoured: your config says {$graceBytes} bytes ({$gb} GB). "
+                .'Set enforcement.grace_gb (BLOODHOUND_RATIO_GRACE_GB) to the number of GB instead, and remove grace_bytes.';
+        }
+
         if (config()->has('bloodhound.logging')) {
             $warnings[] = 'bloodhound.logging was replaced by bloodhound.announce_log in 4.1.0 and is ignored.';
         }

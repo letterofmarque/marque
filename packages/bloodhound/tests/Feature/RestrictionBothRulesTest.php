@@ -26,7 +26,7 @@ beforeEach(function () {
         'bloodhound.ratio_mode' => 'full',
         'bloodhound.min_ratio' => 0.5,
         'bloodhound.enforcement.watch_days' => 14,
-        'bloodhound.enforcement.grace_bytes' => 5 * BOTH_GIB,
+        'bloodhound.enforcement.grace_gb' => 5,
         'bloodhound.hit_and_run.enabled' => true,
         'bloodhound.hit_and_run.max_strikes' => 3,
         'bloodhound.anti_cheat.enabled' => false,
