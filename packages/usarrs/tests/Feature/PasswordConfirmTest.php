@@ -76,3 +76,16 @@ test('confirming returns the user to the page that asked for it (Job #141 review
         ->call('confirm')
         ->assertRedirect(url('/test-confirm-only'));
 });
+
+// TouchUp #48: with nothing asking for the confirmation, it falls back to
+// usarrs.home, like every sign-in, not to a hard-coded '/'.
+test('with nothing intended, confirming lands on usarrs.home', function () {
+    config(['usarrs.home' => '/dashboard']);
+    $user = TestUser::factory()->create(['password' => bcrypt('correct-password')]);
+
+    Livewire::actingAs($user)
+        ->test(PasswordConfirm::class)
+        ->set('password', 'correct-password')
+        ->call('confirm')
+        ->assertRedirect(url('/dashboard'));
+});

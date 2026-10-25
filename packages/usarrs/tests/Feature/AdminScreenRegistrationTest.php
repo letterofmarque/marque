@@ -33,12 +33,6 @@ describe('usarrs admin screen registration', function () {
             ->and($registry->allows('usarrs-users', Role::User))->toBeFalse();
     });
 
-    it('does not register when the admin surface is disabled', function () {
-        // Registration happens in boot(), so the config has to be set before
-        // the app is created — see the dedicated AdminDisabled test group.
-        expect(config('usarrs.admin.enabled'))->toBeTrue();
-    });
-
     it('groups the screen sensibly', function () {
         expect(app(AdminScreenRegistry::class)->find('usarrs-users')->group)
             ->toBe('Users');

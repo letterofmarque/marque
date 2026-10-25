@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Marque\Usarrs\Tests\AdminDisabledTestCase;
 use Marque\Usarrs\Tests\DashboardPathTestCase;
 use Marque\Usarrs\Tests\ManageAuthDisabledTestCase;
 use Marque\Usarrs\Tests\PasskeysEnabledTestCase;
@@ -23,7 +24,7 @@ pest()->extend(TestCase::class)->in(
     'Unit',
     ...array_filter(
         glob(__DIR__.'/Feature/*'),
-        fn (string $path) => ! in_array(basename($path), ['ManageAuthDisabled', 'TrackerBound', 'SeedboxesBound', 'ThirdParty', 'SocialiteDriver', 'PasskeysEnabled', 'Prefixed', 'DashboardPath'], true),
+        fn (string $path) => ! in_array(basename($path), ['ManageAuthDisabled', 'TrackerBound', 'SeedboxesBound', 'ThirdParty', 'SocialiteDriver', 'PasskeysEnabled', 'Prefixed', 'DashboardPath', 'AdminDisabled'], true),
     ),
 );
 
@@ -47,3 +48,7 @@ pest()->extend(SocialiteDriverTestCase::class)->in('Feature/SocialiteDriver');
 pest()->extend(PasskeysEnabledTestCase::class)->in('Feature/PasskeysEnabled');
 pest()->extend(PrefixedTestCase::class)->in('Feature/Prefixed');
 pest()->extend(DashboardPathTestCase::class)->in('Feature/DashboardPath');
+
+// admin.enabled=false before boot, so usarrs' admin registrations are decided
+// the way they would be on an install that turned the admin surface off (#10793).
+pest()->extend(AdminDisabledTestCase::class)->in('Feature/AdminDisabled');
