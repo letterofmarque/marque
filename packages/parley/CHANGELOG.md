@@ -19,10 +19,11 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md).
 - **`CommentThread` extends parley's own base component** (`Marque\Parley\Livewire\Component`,
   itself a Livewire component), for that redirect. An app that subclasses it gains three
   protected helpers, all prefixed `parley`.
-- **The README's claim that authors can always edit their own posts was wrong.** With
-  `moderation.lock_blocks_edits` on, nobody can edit a locked thread's posts, moderators
-  included, until it is unlocked. The config comment's "everyone but a moderator" is
-  corrected too. The behaviour is unchanged.
+- **The README and config said authors can always edit their own posts; that was wrong.**
+  With `moderation.lock_blocks_edits` on, nobody can edit or delete a locked thread's posts,
+  moderators included, until it is unlocked (the thread itself can still be deleted). The
+  config comments' "always" and "everyone but a moderator" are corrected too. The behaviour
+  is unchanged.
 
 ## [3.0.0] — 2026-09-11
 

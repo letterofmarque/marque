@@ -146,9 +146,10 @@ Pin, lock and soft-delete, keyed off `marque/trove`'s roles:
 ],
 ```
 
-Authors can edit and delete their own posts and threads, unless
-`moderation.lock_blocks_edits` is on and the thread is locked: then nobody can, moderators
-included, until it is unlocked. Pin and lock are
+Authors can edit and delete their own posts and threads. With
+`moderation.lock_blocks_edits` on, nobody can edit or delete a locked thread's posts,
+moderators included, until it is unlocked; the thread itself can still be deleted. Pin and
+lock are
 moderator-only regardless of ownership. Locking a thread is enforced at the service layer
 (`ThreadLockedException`), not just hidden in the UI, so it holds against any caller — a
 REST endpoint, a queued job, a script — not only the component that greys out its submit

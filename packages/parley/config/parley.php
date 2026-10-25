@@ -109,7 +109,8 @@ return [
     |--------------------------------------------------------------------------
     |
     | Which trove role may moderate: pin, lock, and soft-delete other people's
-    | posts. Authors can always edit and delete their own.
+    | posts. Authors can edit and delete their own, unless lock_blocks_edits
+    | is on and the thread is locked.
     |
     | Stored as the enum's string value rather than a Role instance, because
     | `php artisan config:cache` serialises config to a PHP file and an enum
@@ -122,7 +123,7 @@ return [
     | (the default) means lock only stops NEW posts and replies — an author
     | can still edit or delete their own existing words, "locked" reads as
     | "no new discussion" rather than "frozen". true makes a locked thread's
-    | content immutable to everyone, moderators included (unlock it to edit),
+    | posts immutable to everyone, moderators included (unlock it to edit),
     | which suits a deployment
     | that uses locking to archive/freeze a thread rather than just to stop
     | it growing. This is a site-owner policy call, not something Marque

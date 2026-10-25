@@ -14,7 +14,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 ### Fixed
 
 - **The torrent index renders for a guest** (#10562). `guise.middleware` is configurable,
-  so an app can drop `auth` and let guests see the listing. The upload button's check
+  so an app can drop `auth` and `verified` and let guests see the listing. The upload button's check
   called `isUploader()` on a null user and threw; a guest now just doesn't see the button.
 
 ## [5.3.0] — 2026-10-22
