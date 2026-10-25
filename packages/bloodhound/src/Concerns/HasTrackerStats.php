@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Marque\Bloodhound\Concerns;
 
 use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Illuminate\Support\Number;
 use Marque\Trove\Contracts\TrackerStatsInterface;
 use Marque\Trove\Contracts\UserInterface;
 
@@ -182,13 +181,23 @@ trait HasTrackerStats
     }
 
     /**
-     * Format bytes to human-readable string, exactly as the dashboard shows the
-     * same figure (Number::fileSize, 1024-based), to two decimals. It used to
-     * pick the unit by counting decimal digits, which switched units at a
-     * different point near each boundary (#11105).
+     * Format bytes to human-readable string, to two decimals, in the unit the
+     * dashboard picks for the same figure: Number::fileSize's rule, 1024-based,
+     * moving up a unit past 0.9 of the next. It used to count decimal digits,
+     * which switched units at a different point near each boundary (#11105).
+     *
+     * The rule is copied, not called: Number::fileSize needs the intl
+     * extension, which bloodhound doesn't require, and this never did.
      */
     private function formatBytes(int $bytes): string
     {
-        return Number::fileSize($bytes, 2);
+        $units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB'];
+        $value = (float) $bytes;
+
+        for ($i = 0; abs($value) / 1024 > 0.9 && $i < count($units) - 1; $i++) {
+            $value /= 1024;
+        }
+
+        return sprintf('%.2f %s', $value, $units[$i]);
     }
 }

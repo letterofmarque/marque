@@ -7,6 +7,16 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [5.3.1] — 2026-10-25
+
+> The torrent list no longer fails for a guest when an app lets guests reach it.
+
+### Fixed
+
+- **The torrent index renders for a guest** (#10562). `guise.middleware` is configurable,
+  so an app can drop `auth` and let guests see the listing. The upload button's check
+  called `isUploader()` on a null user and threw; a guest now just doesn't see the button.
+
 ## [5.3.0] — 2026-10-22
 
 > A download the tracker refuses is a 403 with the reason, never a 500.

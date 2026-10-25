@@ -3,8 +3,9 @@
 declare(strict_types=1);
 
 // #11105: the unit was picked by counting decimal digits, so near each unit
-// boundary the same figure could read differently here and on the dashboard,
-// which uses Number::fileSize. It now says exactly what the dashboard says.
+// boundary the same figure could read in a different unit here and on the
+// dashboard (Number::fileSize). It now picks the dashboard's unit, without
+// needing intl as Number::fileSize does.
 
 use Illuminate\Support\Number;
 use Marque\Bloodhound\Tests\FillableTrackerUser;

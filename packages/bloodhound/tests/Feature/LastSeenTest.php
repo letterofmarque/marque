@@ -133,3 +133,24 @@ it('stamps a pair known only from carried history with the carry, the oldest sta
     expect($row->created_at->getTimestamp())->toBe(Carbon::parse('2026-10-01 00:00:00')->getTimestamp())
         ->and(lastSeen($this))->toBe(Carbon::parse('2026-10-01 00:00:00')->getTimestamp());
 });
+
+// From the 9.3 read-through: the carry's own stamp is when the prune ran,
+// which can be after hit-and-run began even though the activity was long
+// before. All carried history predates the oldest row left in the ledger.
+it('bounds a carried pair by the oldest row left in the ledger, not the prune date', function () {
+    seenRow($this, '2026-09-01 08:00:00');
+    $other = Torrent::create(['name' => 'Old', 'info_hash' => str_repeat('6', 40), 'size' => 1_000, 'user_id' => $this->member->id]);
+
+    $this->travelTo('2026-11-20 00:00:00');
+    LedgerCarry::query()->create([
+        'user_id' => $this->member->id, 'torrent_id' => $other->id,
+        'uploaded' => 0, 'downloaded' => 0, 'seedtime' => 600, 'leechtime' => 0,
+    ]);
+
+    $this->travelTo('2026-12-01 00:00:00');
+    app(LedgerRebuilder::class)->rebuild();
+
+    $row = TorrentUser::query()->where('user_id', $this->member->id)->where('torrent_id', $other->id)->first();
+
+    expect($row->created_at->getTimestamp())->toBe(Carbon::parse('2026-09-01 08:00:00')->getTimestamp());
+});

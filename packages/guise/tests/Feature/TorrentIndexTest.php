@@ -64,3 +64,12 @@ test('torrent index shows empty state when no torrents', function () {
         ->assertOk()
         ->assertSee('No torrents found');
 });
+
+// #10562: guise.middleware is configurable, so an app can drop 'auth' and let
+// guests see the listing. The upload check called isUploader() on null and
+// threw; a guest now just doesn't see the button.
+test('the index renders for a guest, without the upload button', function () {
+    Livewire::test(Index::class)
+        ->assertOk()
+        ->assertDontSee(route('torrents.upload'));
+});

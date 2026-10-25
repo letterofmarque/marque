@@ -141,13 +141,20 @@ class LedgerRebuilder
             ->when($userId !== null, fn ($q) => $q->where('user_id', $userId))
             ->get();
 
+        // A prune deletes the oldest rows first, so all carried history is
+        // older than the oldest row still in the ledger. That bounds when a
+        // carried pair's activity began better than the carry's own stamp,
+        // which is when the prune ran, and can be long after the activity.
+        $oldestLeft = self::timestamp(AnnounceLog::query()->min('created_at'));
+
         foreach ($carried as $carry) {
-            // Carried history is older than any row that survived the prune,
-            // but the carry only records when it was carried. That is the
-            // oldest stamp left for a pair known only from it. last_seen
-            // takes it only when nothing in the ledger is newer, which errs
-            // towards less time away, never more.
-            $stamp($carry->user_id, $carry->torrent_id, $carry->created_at?->getTimestamp(), null);
+            // created_at: the earlier of that bound and when it was first
+            // carried. last_seen takes when it was last carried, only when
+            // nothing in the ledger is newer, which errs towards less time
+            // away, never more.
+            $carriedAt = $carry->created_at?->getTimestamp();
+            $began = $oldestLeft !== null && $carriedAt !== null ? min($oldestLeft, $carriedAt) : ($oldestLeft ?? $carriedAt);
+            $stamp($carry->user_id, $carry->torrent_id, $began, null);
             $stamps[$carry->user_id.':'.$carry->torrent_id]['last'] ??= $carry->updated_at?->getTimestamp();
             $add($carry->user_id, $carry->torrent_id, [
                 'uploaded' => $carry->uploaded,
@@ -211,8 +218,9 @@ class LedgerRebuilder
                 'seedtime' => $seedtime,
                 'leechtime' => $leechtime,
                 'times_completed' => 0,
-                // As the aggregator stamps a row it creates: from the ledger,
-                // not from today (TouchUp #58).
+                // From the ledger, not from today (TouchUp #58): when the
+                // pair's activity began, close to when the aggregator would
+                // have folded it. last_seen as the aggregator sets it.
                 'created_at' => $stamps['first'] !== null ? Carbon::createFromTimestamp($stamps['first'], config('app.timezone')) : now(),
                 'updated_at' => now(),
             ];

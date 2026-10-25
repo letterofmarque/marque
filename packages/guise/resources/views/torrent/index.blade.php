@@ -1,7 +1,7 @@
 <div class="flex h-full w-full flex-1 flex-col gap-4">
     <div class="flex items-center justify-between">
         <x-deck::heading size="xl">{{ __('Torrents') }}</x-deck::heading>
-        @if (auth()->user()->isUploader())
+        @if (auth()->user()?->isUploader())
             <x-deck::button variant="primary" :href="route('torrents.upload')" icon="plus" wire:navigate>
                 {{ __('Upload') }}
             </x-deck::button>

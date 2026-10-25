@@ -7,26 +7,36 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [9.2.1] — 2026-10-25
+## [9.3.0] — 2026-10-25
 
-> A rebuilt row keeps when its activity began, so hit-and-run can't mistake old activity for new; sizes read exactly as the dashboard shows them; an exemption names who granted it.
+> A rebuilt row keeps when its activity began, so hit-and-run doesn't mistake old activity for new; the size helpers pick the dashboard's unit; an exemption's --by must name a real user, and will be required from 10.0.
 
 ### Fixed
 
 - **A row the rebuild re-creates is stamped from the ledger, not from today** (TouchUp #58).
-  `bloodhound:rebuild-totals` re-creates a missing `torrent_user` row. It used to stamp it
+  `bloodhound:rebuild-totals` re-creates a missing `torrent_user` row, and used to stamp it
   `now()`. Hit-and-run counts rows created since the rule began, so activity from before
-  the rule could become a new obligation, and the away clock restarted from today. The
-  row now gets the pair's first ledger row's time as `created_at`, and its newest row's
-  time as `last_seen`, as the aggregator stamps a row it creates. A pair known only from
-  carried (pruned) history takes the carry's time, the oldest stamp left.
-- **`getUploadedForHumans()` / `getDownloadedForHumans()` say exactly what the dashboard
-  says** (#11105): `Number::fileSize`, 1024-based, to two decimals. They picked the unit by
-  counting decimal digits, which switched units at a different point near each boundary
-  (950 × 1024 bytes read "950.00 KB" where the dashboard said "0.93 MB").
-- **`bloodhound:standing exempt` refuses a `--by` that names no user** (TouchUp #57). Left
-  out, it still exempts, with a warning that `--by` will be required from bloodhound 10,
-  so the audit trail names who granted every exemption.
+  the rule could become a new obligation, and the away clock restarted from today. Now:
+  - `created_at` is when the pair's activity began: its first ledger row's time.
+  - `last_seen` is its newest ledger row's time, as the aggregator sets it.
+  - A pair known only from carried (pruned) history has no ledger rows. A prune deletes
+    the oldest rows first, so its `created_at` is bounded by the oldest row still in the
+    ledger, or by when it was first carried if that's earlier. `last_seen` is when it was
+    last carried. That errs towards less time away, never more.
+- **`getUploadedForHumans()` / `getDownloadedForHumans()` pick the same unit as the
+  dashboard** (#11105). That's `Number::fileSize`'s rule: 1024-based, moving up a unit past
+  0.9 of the next. Figures still show two decimals. The helpers used to pick the unit by
+  counting decimal digits, which switched units at a different point near each boundary:
+  950 × 1024 bytes read "950.00 KB" where the dashboard said "1 MB", and now reads
+  "0.93 MB". The rule is copied, not called, so the helpers still don't need the intl
+  extension.
+- **`bloodhound:standing exempt` refuses a `--by` that names no user** (TouchUp #57).
+
+### Deprecated
+
+- **Leaving out `--by` on `bloodhound:standing exempt`.** It still exempts, with a warning,
+  and records no admin. `--by` will be required from bloodhound 10, so that every
+  exemption names who granted it.
 
 ## [9.2.0] — 2026-10-24
 
