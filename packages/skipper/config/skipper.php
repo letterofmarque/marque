@@ -27,8 +27,10 @@ return [
     |--------------------------------------------------------------------------
     |
     | The panel and the screens it routes live under this, /admin by default.
-    | A screen's `path` loses its first segment and takes this prefix: with
-    | 'staff', a screen declared at admin/clients is served at /staff/clients.
+    | A screen's `path` loses its first segment (unless it has only one) and
+    | takes this prefix: with 'staff', a screen declared at admin/clients is
+    | served at /staff/clients. A screen whose package binds its own route is
+    | served there, never by skipper.
     |
     */
 

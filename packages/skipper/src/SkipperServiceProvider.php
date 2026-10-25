@@ -59,15 +59,15 @@ class SkipperServiceProvider extends ServiceProvider
      * so the registry is complete, and it is still early enough for
      * `route:cache` to serialise what it registers.
      *
-     * The catch-all in routes/web.php already makes screens reachable; these
-     * aliases exist so consumers can write `route('admin.taxonomy')` rather
+     * The catch-all registered after them (registerCatchAll) already makes
+     * screens reachable; these aliases exist so consumers can write `route('admin.taxonomy')` rather
      * than `route('admin.screen', ['screen' => 'taxonomy'])`.
      */
     protected function registerScreenAliases(): void
     {
         $this->app->booted(function (): void {
             $middleware = config('skipper.middleware', ['web', 'auth', 'verified']);
-            $prefix = config('skipper.prefix', 'admin');
+            $prefix = trim((string) config('skipper.prefix', 'admin'), '/');
 
             $bound = collect(Route::getRoutes()->getRoutes())
                 ->map(fn ($route): string => $route->uri())
@@ -81,7 +81,11 @@ class SkipperServiceProvider extends ServiceProvider
                 // route at the same URI silently REPLACED that name — published
                 // API disappearing with no error anywhere. The package's own
                 // route is the canonical one; the panel just links to it.
-                if (in_array($uri, $bound, true)) {
+                // The screen's own declared path counts too: under a non-default
+                // prefix, admin/users bound by usarrs is not prefix/users, and
+                // generating that would serve usarrs' screen without usarrs'
+                // middleware (#11108).
+                if (in_array($uri, $bound, true) || in_array(trim($screen->path, '/'), $bound, true)) {
                     continue;
                 }
 
@@ -104,7 +108,11 @@ class SkipperServiceProvider extends ServiceProvider
      * catch-all came before any package that loaded its routes later, and
      * answered that package's own path (usarrs' admin/users) itself: skipper's
      * minimumRole ran in place of the package's own middleware and checks.
-     * Here every provider's routes are in, and a path someone bound is theirs.
+     * Here every provider's register()/boot() routes and route files are in,
+     * and a path someone bound is theirs. A route a provider adds from its own
+     * later booted() callback is not seen, and can still lose to this. The
+     * controller also refuses a screen whose own path is bound elsewhere, by
+     * whatever URL reached it.
      */
     private function registerCatchAll(array $middleware, string $prefix): void
     {

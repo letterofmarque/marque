@@ -239,6 +239,16 @@ describe('a package route that loads after skipper', function () {
             ->assertSee('package own route');
     });
 
+    // From the read-through of the fix: the catch-all served the screen by its
+    // identifier, which isn't a bound path, without the package's middleware.
+    it('is not served by skipper under its identifier either', function () {
+        app(AdminScreenRegistry::class)->register(new AdminScreen('vendor-owned', 'Owned', 'skipper-test-screen', 'admin/owned', Role::Admin));
+
+        $admin = TestUser::factory()->create(['role' => Role::Admin->value]);
+
+        $this->actingAs($admin)->get('/admin/vendor-owned')->assertNotFound();
+    });
+
     it('still leaves every other screen to the catch-all', function () {
         app(AdminScreenRegistry::class)->register(new AdminScreen('late', 'Late', 'skipper-test-screen', 'admin/late', Role::Admin));
 

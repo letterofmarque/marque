@@ -48,7 +48,7 @@ $this->app->make(AdminScreenRegistry::class)->register(new AdminScreen(
 | `identifier` | Unique across all packages. The route name is derived as `admin.<identifier>`, unless your package binds its own route at that path (see below) |
 | `label` | What the panel shows |
 | `component` | The Livewire component that renders the screen |
-| `path` | Where it lives, relative to the panel: the first segment stands for the panel prefix and is replaced by `skipper.prefix` (`admin/clients` is served at `/staff/clients` with the prefix `staff`) |
+| `path` | Where it lives, relative to the panel: the first segment stands for the panel prefix and is replaced by `skipper.prefix` (`admin/clients` is served at `/staff/clients` with the prefix `staff`); a single-segment path is used as-is under the prefix |
 | `minimumRole` | The floor. Enforced on the listing **and** on the request |
 | `icon` | Optional, rendered from `deck`'s icon set, which is small: `arrow-left`, `arrow-down-tray`, `magnifying-glass`, `pencil`, `plus`. Any other name renders nothing |
 | `group` | Optional heading. Ungrouped screens fall under `skipper.default_group` |
@@ -62,14 +62,17 @@ Registration is legal any time up to `booted`, so it does not matter whether you
 boots before or after skipper's.
 
 **A package can serve the screen from its own route.** If a route is already bound at the
-screen's path, skipper doesn't generate one: the panel links to the package's route, and
-that route keeps its own name and answers its own path, with its own middleware and
-authorisation. usarrs does this, serving `admin/users` as `admin.users.index`. Skipper
-registers its routes once every provider has booted, and keeps its `admin/{screen}`
-catch-all off any path already bound under the prefix, so your route wins whatever order
-the providers load in, cached or not. Skipper's request-time `minimumRole` check (below)
-applies only to the routes skipper generates, so a package that binds its own route must
-protect it itself.
+screen's declared path, skipper doesn't generate one, under any prefix: the panel links to
+the package's route, and that route keeps its own name and answers its own path, with its
+own middleware and authorisation. usarrs does this, serving `admin/users` as
+`admin.users.index`. Skipper never serves such a screen itself, by its identifier or any
+other URL; those answer 404. Skipper registers its screen routes once every provider has
+booted, last, and keeps its `admin/{screen}` catch-all off any path already bound under the
+prefix. So a route bound in a provider's `register()` or `boot()`, or in a route file, wins
+whatever order the providers load in, cached or not. A route a provider adds from its own
+`booted()` callback comes too late for that. The package's route is the only way to its
+screen, so the package must protect it itself; skipper's `minimumRole` check (below)
+covers only the screens skipper serves.
 
 ## Stability
 
@@ -106,7 +109,7 @@ php artisan vendor:publish --tag=skipper-config
 | Key | Default | Notes |
 |---|---|---|
 | `middleware` | `['web', 'auth', 'verified']` | Who gets through the door. Authorisation is separate |
-| `prefix` | `admin` | Where the panel and the screens it routes live. A screen's `path` loses its first segment and takes this prefix |
+| `prefix` | `admin` | Where the panel and the screens it routes live. A screen's `path` loses its first segment (unless it has only one) and takes this prefix |
 | `title` | `Administration` | Panel heading |
 | `layout` | `deck::layouts.app` | Point at your own to reshape the chrome |
 | `default_group` | `General` | Heading for screens that declare no group |

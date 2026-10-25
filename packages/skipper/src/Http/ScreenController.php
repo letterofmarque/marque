@@ -38,6 +38,15 @@ class ScreenController
             throw new NotFoundHttpException("No admin screen [{$screen}].");
         }
 
+        // A screen whose package binds its own route is that route's to serve,
+        // with the package's own middleware and checks. Skipper refuses it by
+        // any URL that reached the catch-all or an alias instead: its
+        // identifier, or the prefixed path under a non-default prefix (#11108).
+        // Asked per request, when the route table is complete, cached or not.
+        if ($this->servedByItsOwnRoute($entry)) {
+            throw new NotFoundHttpException("Admin screen [{$screen}] is served at its own route.");
+        }
+
         if (! $entry->allows($this->viewerRole($request))) {
             // 403 rather than a redirect to the panel: a redirect reads as
             // "that worked" and hides the refusal from anything automated.
@@ -70,6 +79,22 @@ class ScreenController
         }
 
         return null;
+    }
+
+    /**
+     * Whether a route other than skipper's binds the screen's declared path.
+     */
+    private function servedByItsOwnRoute(AdminScreen $entry): bool
+    {
+        $declared = trim($entry->path, '/');
+
+        foreach (app('router')->getRoutes()->getRoutes() as $route) {
+            if (trim($route->uri(), '/') === $declared && $route->getControllerClass() !== self::class) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

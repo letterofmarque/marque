@@ -9,6 +9,7 @@
              is what broke threepio's CI (docs/new-package.md). -->
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
+            <directory>tests/StaffPrefix</directory>
         </testsuite>
     </testsuites>
     <source>
