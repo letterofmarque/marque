@@ -14,6 +14,7 @@ changelogs — edit those, not this.*
 - **[guise 5.3.1](packages/guise/CHANGELOG.md)** — The torrent list no longer fails for a guest when an app lets guests reach it.
 - **[parley 3.0.1](packages/parley/CHANGELOG.md)** — A guest who reaches posting a thread or comment is sent to log in, not shown a bare 403.
 - **[skipper 1.0.1](packages/skipper/CHANGELOG.md)** — The admin panel answers 403 to a member no registered screen admits, and a package's own admin route always answers its own path.
+- **[taxonomy 1.1.1](packages/taxonomy/CHANGELOG.md)** — The upload form now checks who is classifying: only the torrent's uploader or a moderator can, where before anyone who reached the form could.
 
 ## 2026-10-24
 

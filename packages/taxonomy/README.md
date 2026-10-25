@@ -233,6 +233,17 @@ app(ClassifiesTorrents::class)->classify(
 The declared ranges are enforced here, not just in the form. A path may not skip a level —
 there is no "week 12" independent of which season's week 12 it is.
 
+### The upload form
+
+`<livewire:taxonomy-classifier-form :torrent="$torrent" />` is the cascade: pick a content
+type, then each level in turn, with the next level offered once its parent is chosen. It
+needs `livewire/livewire`.
+
+The form authorises against the torrent itself, with trove's `TorrentPolicy::update`: its
+uploader, or a moderator or above. It checks on mount and again on save, so it doesn't rely
+on the page you embed it in being gated. Anyone else gets a 403. The `Classifier` service
+does no authorisation of its own: code that calls it directly decides who may classify.
+
 ### The grouping key
 
 One nullable identifier meaning "these torrents are the same underlying thing" — four

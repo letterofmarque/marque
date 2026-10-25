@@ -5,6 +5,19 @@ All notable changes to `marque/taxonomy` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] — 2026-10-25
+
+> The upload form now checks who is classifying: only the torrent's uploader or a moderator can, where before anyone who reached the form could.
+
+### Fixed
+
+- **`ClassifierForm` authorises against the torrent (#11109).** It asked nobody before:
+  any member who could reach a page embedding the form, for a torrent that wasn't theirs,
+  could reclassify it, unless the app's own route happened to check. It now requires
+  trove's `TorrentPolicy::update` (the uploader, or a moderator or above) on mount and on
+  save, and answers 403 otherwise, guests included. The `Classifier` service is unchanged:
+  direct callers still decide who may classify.
+
 ## [1.1.0] — 2026-09-11
 
 > The admin screen is now reachable — it registers itself, so installing the panel lists it automatically.

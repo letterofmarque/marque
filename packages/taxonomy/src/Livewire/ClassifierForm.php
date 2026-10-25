@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Marque\Taxonomy\Livewire;
 
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Marque\Taxonomy\Definitions\ContentType;
@@ -54,6 +55,11 @@ class ClassifierForm extends Component
 
     public function mount(Torrent $torrent): void
     {
+        // The form guards itself rather than trusting the page that embeds it:
+        // an app that drops it on a page any member can reach would otherwise
+        // let them reclassify torrents that aren't theirs (#11109).
+        Gate::authorize('update', $torrent);
+
         $this->torrent = $torrent;
 
         // Reopening a classified torrent shows what it already is. An empty
@@ -210,6 +216,10 @@ class ClassifierForm extends Component
 
     public function save(): void
     {
+        // Again on save: a Livewire action is a request of its own, and the
+        // member's standing can change between loading the form and saving it.
+        Gate::authorize('update', $this->torrent);
+
         $type = $this->definition();
 
         if ($type === null) {

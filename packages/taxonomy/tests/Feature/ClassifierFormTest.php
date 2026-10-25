@@ -28,6 +28,9 @@ beforeEach(function () {
 
     $this->user = TestUser::create(['name' => 'u', 'email' => 'u@example.com', 'password' => 'x']);
 
+    // The torrent's owner, who may classify it.
+    $this->actingAs($this->user);
+
     $this->torrent = Torrent::create([
         'info_hash' => str_repeat('a', 40),
         'name' => 'Eagles at Cowboys',
@@ -297,5 +300,56 @@ describe('saving', function () {
             ->assertSet('contentType', 'nfl_game')
             ->assertSet('path.season', '2006')
             ->assertSet('path.week', '13');
+    });
+});
+
+describe('who may classify', function () {
+    // #11109: the form asked nobody. Any member who could reach a page
+    // embedding it could reclassify a torrent that wasn't theirs.
+    beforeEach(function () {
+        $this->member = TestUser::create(['name' => 'm', 'email' => 'm@example.com', 'password' => 'x']);
+    });
+
+    it('refuses to open for a member who does not own the torrent', function () {
+        $this->actingAs($this->member);
+
+        Livewire::test(ClassifierForm::class, ['torrent' => $this->torrent])
+            ->assertForbidden();
+    });
+
+    it('refuses to open for a guest', function () {
+        auth()->logout();
+
+        Livewire::test(ClassifierForm::class, ['torrent' => $this->torrent])
+            ->assertForbidden();
+    });
+
+    it('refuses to save once the member may no longer edit the torrent', function () {
+        $component = Livewire::test(ClassifierForm::class, ['torrent' => $this->torrent])
+            ->set('contentType', 'nfl_game')
+            ->set('path.season', '2006')
+            ->set('path.week', '12');
+
+        // Ownership moves between opening the form and saving it.
+        $this->torrent->update(['user_id' => $this->member->id]);
+
+        $component->call('save')->assertForbidden();
+
+        expect($this->torrent->taxonomyClassifications()->count())->toBe(0);
+    });
+
+    it('lets a moderator classify a torrent that is not theirs', function () {
+        $moderator = TestUser::create(['name' => 'mod', 'email' => 'mod@example.com', 'password' => 'x', 'role' => 'moderator']);
+        $this->actingAs($moderator);
+
+        Livewire::test(ClassifierForm::class, ['torrent' => $this->torrent])
+            ->set('contentType', 'nfl_game')
+            ->set('path.season', '2006')
+            ->set('path.week', '12')
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertDispatched('taxonomy-classified');
+
+        expect($this->torrent->taxonomyClassifications()->count())->toBe(1);
     });
 });
