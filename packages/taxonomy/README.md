@@ -296,7 +296,7 @@ write, rather than trusting whatever middleware the surrounding route happens to
 
 - PHP 8.3+
 - Laravel 13+
-- `marque/trove` 4.0+
+- `marque/trove` 4.2+
 
 Runs on SQLite, MySQL, MariaDB and PostgreSQL — the full suite is exercised against all
 four, not merely claimed.

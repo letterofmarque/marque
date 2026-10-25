@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so a bad file makes every request that reads them fail until it is fixed. The message
   now says that, and so do the README and the code comments. The all-or-nothing part
   was always true: nothing is half-applied.
+- **Requires `marque/trove` ^4.2, not ^4.0.** Since 1.1.0 taxonomy has registered its
+  admin screen through trove's `AdminScreenRegistry`, which arrived in trove 4.2. So with
+  Livewire installed it failed at boot on trove 4.0 or 4.1, and the declared floor was never
+  true. Raising it in a patch breaks nobody: an install on trove 4.0 or 4.1 resolves to
+  taxonomy 1.1.0 as before.
 - **README corrections.** A YAML edit that removes a level deletes nothing on load: its
   terms and classifications stay, pointing at a level no longer declared. Facets are always
   many-valued, with no single-valued option. And the Validator checks no cross-references,
