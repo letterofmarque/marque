@@ -352,9 +352,10 @@ describe('the command', function () {
     });
 
     it('exempts, shows and unexempts through bloodhound:standing', function () {
+        $admin = member(uploaded: 0, downloaded: 0, role: 'admin');
         $member = member(uploaded: 0, downloaded: 50 * GIB);
 
-        $this->artisan('bloodhound:standing', ['action' => 'exempt', 'user' => $member->id, '--reason' => 'Donor', '--by' => 1])
+        $this->artisan('bloodhound:standing', ['action' => 'exempt', 'user' => $member->id, '--reason' => 'Donor', '--by' => $admin->id])
             ->assertSuccessful();
         $this->artisan('bloodhound:standing', ['action' => 'show', 'user' => $member->id])
             ->expectsOutputToContain('exempt')
@@ -364,6 +365,39 @@ describe('the command', function () {
             ->assertSuccessful();
 
         expect(MemberStanding::query()->where('user_id', $member->id)->value('exempted_at'))->toBeNull();
+    });
+
+    // TouchUp #57: who granted an exemption belongs on record. Required from
+    // 10.0; the 9.x docs showed it optional, so for now leaving it out warns.
+    it('warns, and still exempts, when --by is left out', function () {
+        $member = member(uploaded: 0, downloaded: 50 * GIB);
+
+        $this->artisan('bloodhound:standing', ['action' => 'exempt', 'user' => $member->id, '--reason' => 'Donor'])
+            ->expectsOutputToContain('required from bloodhound 10')
+            ->assertSuccessful();
+
+        expect(MemberStanding::query()->where('user_id', $member->id)->value('exempted_at'))->not->toBeNull();
+    });
+
+    it('refuses a --by that names no user, and records nothing', function () {
+        $member = member(uploaded: 0, downloaded: 50 * GIB);
+
+        foreach (['999999', 'admin'] as $by) {
+            $this->artisan('bloodhound:standing', ['action' => 'exempt', 'user' => $member->id, '--reason' => 'Donor', '--by' => $by])
+                ->assertFailed();
+        }
+
+        expect(MemberStanding::query()->where('user_id', $member->id)->whereNotNull('exempted_at')->exists())->toBeFalse();
+    });
+
+    it('records the admin a valid --by names', function () {
+        $admin = member(uploaded: 0, downloaded: 0, role: 'admin');
+        $member = member(uploaded: 0, downloaded: 50 * GIB);
+
+        $this->artisan('bloodhound:standing', ['action' => 'exempt', 'user' => $member->id, '--reason' => 'Donor', '--by' => $admin->id])
+            ->assertSuccessful();
+
+        expect(MemberStanding::query()->where('user_id', $member->id)->value('exempted_by'))->toBe($admin->id);
     });
 
     it('refuses an exemption without a reason', function () {

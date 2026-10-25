@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Marque\Bloodhound\Concerns;
 
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Support\Number;
 use Marque\Trove\Contracts\TrackerStatsInterface;
 use Marque\Trove\Contracts\UserInterface;
 
@@ -181,13 +182,13 @@ trait HasTrackerStats
     }
 
     /**
-     * Format bytes to human-readable string.
+     * Format bytes to human-readable string, exactly as the dashboard shows the
+     * same figure (Number::fileSize, 1024-based), to two decimals. It used to
+     * pick the unit by counting decimal digits, which switched units at a
+     * different point near each boundary (#11105).
      */
     private function formatBytes(int $bytes): string
     {
-        $units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
-        $factor = floor((strlen((string) $bytes) - 1) / 3);
-
-        return sprintf('%.2f %s', $bytes / pow(1024, $factor), $units[$factor] ?? 'B');
+        return Number::fileSize($bytes, 2);
     }
 }

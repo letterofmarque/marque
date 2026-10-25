@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Marque\Bloodhound\Services;
 
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Marque\Bloodhound\Models\AnnounceLog;
 use Marque\Bloodhound\Models\LedgerCarry;
 use Marque\Bloodhound\Models\LedgerCursor;
@@ -87,11 +89,31 @@ class LedgerRebuilder
             ->where('id', '<=', $watermark)
             ->when($userId !== null, fn ($q) => $q->where('user_id', $userId))
             ->groupBy('user_id', 'torrent_id')
-            ->selectRaw('user_id, torrent_id, SUM(upload_delta) as up, SUM(download_delta) as down, SUM(seed_seconds) as seed, SUM(leech_seconds) as leech')
+            ->selectRaw('user_id, torrent_id, SUM(upload_delta) as up, SUM(download_delta) as down, SUM(seed_seconds) as seed, SUM(leech_seconds) as leech, MIN(created_at) as first_at, MAX(created_at) as last_at')
             ->get();
 
         /** @var array<string, array{user_id: int, torrent_id: int, uploaded: int, downloaded: int, seedtime: int, leechtime: int}> $totals */
         $totals = [];
+
+        // When each pair's activity began and was last seen, for a row the
+        // rebuild has to re-create (TouchUp #58). Stamping it now() would make
+        // old activity look new to hit-and-run, which counts only rows created
+        // since the rule began, and restart the away clock from today.
+        /** @var array<string, array{first: int|null, last: int|null}> $stamps */
+        $stamps = [];
+
+        $stamp = function (int $user, int $torrent, ?int $first, ?int $last) use (&$stamps): void {
+            $key = $user.':'.$torrent;
+            $stamps[$key] ??= ['first' => null, 'last' => null];
+
+            if ($first !== null) {
+                $stamps[$key]['first'] = $stamps[$key]['first'] === null ? $first : min($stamps[$key]['first'], $first);
+            }
+
+            if ($last !== null) {
+                $stamps[$key]['last'] = $stamps[$key]['last'] === null ? $last : max($stamps[$key]['last'], $last);
+            }
+        };
 
         $add = function (int $user, int $torrent, array $amounts) use (&$totals): void {
             $key = $user.':'.$torrent;
@@ -103,6 +125,7 @@ class LedgerRebuilder
         };
 
         foreach ($perTorrent as $row) {
+            $stamp((int) $row->user_id, (int) $row->torrent_id, self::timestamp($row->first_at), self::timestamp($row->last_at));
             $add((int) $row->user_id, (int) $row->torrent_id, [
                 'uploaded' => (int) $row->up,
                 'downloaded' => (int) $row->down,
@@ -119,6 +142,13 @@ class LedgerRebuilder
             ->get();
 
         foreach ($carried as $carry) {
+            // Carried history is older than any row that survived the prune,
+            // but the carry only records when it was carried. That is the
+            // oldest stamp left for a pair known only from it. last_seen
+            // takes it only when nothing in the ledger is newer, which errs
+            // towards less time away, never more.
+            $stamp($carry->user_id, $carry->torrent_id, $carry->created_at?->getTimestamp(), null);
+            $stamps[$carry->user_id.':'.$carry->torrent_id]['last'] ??= $carry->updated_at?->getTimestamp();
             $add($carry->user_id, $carry->torrent_id, [
                 'uploaded' => $carry->uploaded,
                 'downloaded' => $carry->downloaded,
@@ -137,6 +167,7 @@ class LedgerRebuilder
                 $total['downloaded'],
                 $total['seedtime'],
                 $total['leechtime'],
+                $stamps[$total['user_id'].':'.$total['torrent_id']] ?? ['first' => null, 'last' => null],
             );
 
             $perUser[$total['user_id']] ??= ['uploaded' => 0, 'downloaded' => 0, 'seedtime' => 0, 'leechtime' => 0];
@@ -154,7 +185,10 @@ class LedgerRebuilder
         }
     }
 
-    protected function writeTorrentUser(int $userId, int $torrentId, int $uploaded, int $downloaded, int $seedtime, int $leechtime): void
+    /**
+     * @param  array{first: int|null, last: int|null}  $stamps  When the pair's activity began and was last seen.
+     */
+    protected function writeTorrentUser(int $userId, int $torrentId, int $uploaded, int $downloaded, int $seedtime, int $leechtime, array $stamps = ['first' => null, 'last' => null]): void
     {
         $existing = DB::table('torrent_user')
             ->where('user_id', $userId)
@@ -169,7 +203,7 @@ class LedgerRebuilder
                 return;
             }
 
-            DB::table('torrent_user')->insert([
+            $row = [
                 'user_id' => $userId,
                 'torrent_id' => $torrentId,
                 'uploaded' => $uploaded,
@@ -177,9 +211,17 @@ class LedgerRebuilder
                 'seedtime' => $seedtime,
                 'leechtime' => $leechtime,
                 'times_completed' => 0,
-                'created_at' => now(),
+                // As the aggregator stamps a row it creates: from the ledger,
+                // not from today (TouchUp #58).
+                'created_at' => $stamps['first'] !== null ? Carbon::createFromTimestamp($stamps['first'], config('app.timezone')) : now(),
                 'updated_at' => now(),
-            ]);
+            ];
+
+            if (Schema::hasColumn('torrent_user', 'last_seen')) {
+                $row['last_seen'] = $stamps['last'];
+            }
+
+            DB::table('torrent_user')->insert($row);
 
             return;
         }
@@ -197,6 +239,15 @@ class LedgerRebuilder
                 'leechtime' => $leechtime,
                 'updated_at' => now(),
             ]);
+    }
+
+    /**
+     * A MIN/MAX of created_at as each engine returns it (a string, in the
+     * app's timezone, as Eloquent wrote it), as a Unix timestamp.
+     */
+    private static function timestamp(mixed $value): ?int
+    {
+        return $value === null ? null : Carbon::parse((string) $value, config('app.timezone'))->getTimestamp();
     }
 
     /**

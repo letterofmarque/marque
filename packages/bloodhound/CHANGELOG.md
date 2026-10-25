@@ -7,6 +7,27 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [9.2.1] — 2026-10-25
+
+> A rebuilt row keeps when its activity began, so hit-and-run can't mistake old activity for new; sizes read exactly as the dashboard shows them; an exemption names who granted it.
+
+### Fixed
+
+- **A row the rebuild re-creates is stamped from the ledger, not from today** (TouchUp #58).
+  `bloodhound:rebuild-totals` re-creates a missing `torrent_user` row. It used to stamp it
+  `now()`. Hit-and-run counts rows created since the rule began, so activity from before
+  the rule could become a new obligation, and the away clock restarted from today. The
+  row now gets the pair's first ledger row's time as `created_at`, and its newest row's
+  time as `last_seen`, as the aggregator stamps a row it creates. A pair known only from
+  carried (pruned) history takes the carry's time, the oldest stamp left.
+- **`getUploadedForHumans()` / `getDownloadedForHumans()` say exactly what the dashboard
+  says** (#11105): `Number::fileSize`, 1024-based, to two decimals. They picked the unit by
+  counting decimal digits, which switched units at a different point near each boundary
+  (950 × 1024 bytes read "950.00 KB" where the dashboard said "0.93 MB").
+- **`bloodhound:standing exempt` refuses a `--by` that names no user** (TouchUp #57). Left
+  out, it still exempts, with a warning that `--by` will be required from bloodhound 10,
+  so the audit trail names who granted every exemption.
+
 ## [9.2.0] — 2026-10-24
 
 > The ratio grace allowance is set in GB, the same 1024-based GB the tracker shows members, instead of in bytes.

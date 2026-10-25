@@ -571,7 +571,10 @@ php artisan bloodhound:standing show 42
 php artisan bloodhound:standing unexempt 42     # judged again at the next run
 ```
 
-Exempting lifts a watch or restriction at once.
+Exempting lifts a watch or restriction at once. `--by` is the deciding admin's user id, so
+the audit trail names who granted it. A `--by` that names no user is refused. Leaving it
+out still works in 9.x, with a warning, and the exemption records no admin. It will be
+required from bloodhound 10.
 
 **Telling members.** Each change fires an event, and the member's standing is in
 `statsFor()` (trove's `TrackerStats::$standing`), which usarrs shows on the dashboard.
@@ -1105,7 +1108,7 @@ recover. Decide before you upgrade:
 - **Check the numbers.** `min_ratio`, `enforcement.watch_days` (14),
   `enforcement.grace_gb` (5; `grace_bytes` before 9.2) and `enforcement.exempt_role` (moderator) are all
   configurable; see [Ratio enforcement](#ratio-enforcement).
-- **Exempt anyone who should be:** `bloodhound:standing exempt <id> --reason=...`.
+- **Exempt anyone who should be:** `bloodhound:standing exempt <id> --reason=... --by=<your id>`.
 - **Or don't enforce at all:** set `BLOODHOUND_RATIO_MODE=off`. The figures are still
   recorded.
 

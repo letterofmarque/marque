@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Carbon;
 use Marque\Bloodhound\Models\AnnounceLog;
+use Marque\Bloodhound\Models\LedgerCarry;
 use Marque\Bloodhound\Models\TorrentUser;
 use Marque\Bloodhound\Services\LedgerAggregator;
 use Marque\Bloodhound\Services\LedgerRebuilder;
@@ -97,4 +98,38 @@ it('is not set by credit that is not a ledger row (carry)', function () {
     ]]);
 
     expect(lastSeen($this))->toBeNull();
+});
+
+// TouchUp #58: a row the rebuild has to re-create was stamped now(), so to
+// hit-and-run (which counts rows created since the rule began) old activity
+// looked new, and the away clock restarted from today.
+it('stamps a row the rebuild re-creates from the ledger, not from today', function () {
+    seenRow($this, '2026-11-01 10:00:00');
+    seenRow($this, '2026-11-03 12:00:00');
+    app(LedgerAggregator::class)->run();
+    TorrentUser::query()->where('user_id', $this->member->id)->delete();
+
+    $this->travelTo('2026-12-01 00:00:00');
+    app(LedgerRebuilder::class)->rebuild();
+
+    $row = TorrentUser::query()->where('user_id', $this->member->id)->where('torrent_id', $this->torrent->id)->first();
+
+    expect($row->created_at->getTimestamp())->toBe(Carbon::parse('2026-11-01 10:00:00')->getTimestamp())
+        ->and(lastSeen($this))->toBe(Carbon::parse('2026-11-03 12:00:00')->getTimestamp());
+});
+
+it('stamps a pair known only from carried history with the carry, the oldest stamp left', function () {
+    $this->travelTo('2026-10-01 00:00:00');
+    LedgerCarry::query()->create([
+        'user_id' => $this->member->id, 'torrent_id' => $this->torrent->id,
+        'uploaded' => 0, 'downloaded' => 0, 'seedtime' => 600, 'leechtime' => 0,
+    ]);
+
+    $this->travelTo('2026-12-01 00:00:00');
+    app(LedgerRebuilder::class)->rebuild();
+
+    $row = TorrentUser::query()->where('user_id', $this->member->id)->where('torrent_id', $this->torrent->id)->first();
+
+    expect($row->created_at->getTimestamp())->toBe(Carbon::parse('2026-10-01 00:00:00')->getTimestamp())
+        ->and(lastSeen($this))->toBe(Carbon::parse('2026-10-01 00:00:00')->getTimestamp());
 });
