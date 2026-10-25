@@ -50,7 +50,7 @@ final class ValidateCommand extends Command
             }
 
             $this->newLine();
-            $this->line('  No definitions were loaded. The tracker keeps running on its previous ones.');
+            $this->line('  No definitions were loaded, and nothing was half-applied. Every request that reads definitions will fail until this is fixed.');
 
             return self::FAILURE;
         }

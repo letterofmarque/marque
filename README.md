@@ -203,8 +203,8 @@ composer require marque/skipper
   cannot collide, and neither uploader sees the other's fields
 - Levels are typed dimensions rather than tree nodes, so "all 2006 games" and "all week 12
   games" are single queries spanning every league
-- Definitions are parsed at runtime, never into migrations — a bad file leaves the tracker
-  running on its previous definitions rather than half-applying a schema change
+- Definitions are parsed at runtime, never into migrations — a bad file fails the whole load
+  rather than half-applying a schema change; `marque:taxonomy:validate` checks before you deploy
 - A version bump with no declared migration path is refused, not warned about; a declared
   `rename_level` preserves every existing classification through a rename
 - Classification data is never deleted by a definition edit — orphaned rows remain and are

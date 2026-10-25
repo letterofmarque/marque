@@ -99,7 +99,7 @@ regardless of how small the fix looks.
 **The surface registries.** `Marque\Trove\Registry\` — `AdminScreen`, `AdminScreenRegistry`,
 `NavItem`, `NavRegistry`, `DashboardPanel`, `DashboardPanelRegistry`, `FooterItem`,
 `FooterItemRegistry`, their constructor parameters and public methods — is **public API
-from trove 4.x** (the dashboard pair from 4.3, the footer pair from 4.11), because
+from trove 4.2** (the dashboard pair from 4.3, the footer pair from 4.11), because
 third-party packages register admin screens, navigation entries, dashboard panels and footer
 items against it. Adding an optional constructor parameter or a new method is **minor**; changing
 or removing one is **major on trove**, the mandatory package and so the most expensive place

@@ -12,8 +12,9 @@ use RuntimeException;
  * Thrown rather than logged-and-skipped deliberately. A half-loaded taxonomy
  * breaks a catalogue in a way an admin cannot diagnose — torrents classified
  * under a level that has silently stopped existing. Refusing the whole load
- * leaves the tracker running on its previous definitions, which is a state
- * someone can actually reason about.
+ * changes nothing in the catalogue, which is a state someone can actually
+ * reason about. Nothing falls back to the last good load: every request that
+ * reads definitions throws this until the file is fixed.
  *
  * The message always names the file, because "your taxonomy is broken" without
  * a filename is the same problem one level up.

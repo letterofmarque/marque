@@ -89,7 +89,7 @@ if (class_exists(\Marque\Parley\Contracts\ThreadServiceInterface::class)) {
 
 The 2026-08-20 cross-package review found the same pattern hand-copied across packages more than once, each copy drifting slightly because there was nothing to copy *from* — only sibling packages to reverse-engineer:
 
-- `providerIsLoaded()` optional-detection existed correctly in guise→parley, but `id` (now `ise`)'s own nav component (deciding whether to render guise/disguise/usarrs nav items) still used `class_exists()` — the exact anti-pattern this doc's Pattern 1 exists to rule out. The package other packages are meant to copy from was itself the odd one out. **Fixed** as part of the `id`→`ise` rename (2026-08-20). Since then the hard-coded nav has gone altogether: packages register their own entries in trove's `NavRegistry`, so the shell no longer detects anyone.
+- `providerIsLoaded()` optional-detection existed correctly in guise→parley, but `id` (now `deck`)'s own nav component (deciding whether to render guise/disguise/usarrs nav items) still used `class_exists()` — the exact anti-pattern this doc's Pattern 1 exists to rule out. The package other packages are meant to copy from was itself the odd one out. **Fixed** as part of the `id`→`ise` rename (2026-08-20). Since then the hard-coded nav has gone altogether: packages register their own entries in trove's `NavRegistry`, so the shell no longer detects anyone.
 - guise, disguise, usarrs, and parley all independently wrote an identical six-line `abstract class Component extends LivewireComponent` with a `<pkg>Layout()`/`<pkg>View()` pair reading `config('<pkg>.layout', 'deck::layouts.app')`. Four hand-copies of the same idea, no shared source. Still open — see below.
 
 **The rule going forward: when a pattern gets written a second time, that is the signal to check whether it belongs one level down — as a real attachment point in the package everything already depends on (`deck` or `trove`) — not just documented more thoroughly where it sits.** Writing a better comparison of the existing copies doesn't stop a third copy from drifting; giving the third package something to `use` or `extend` does.
@@ -185,7 +185,7 @@ the package suite proves the registry, not the routing.
 
 ### The contract is public API
 
-`Marque\Trove\Registry\` follows semver on trove from 4.x onward — third-party packages are
+`Marque\Trove\Registry\` follows semver on trove from 4.2 onward — third-party packages are
 expected to register against it, and CP #588's nav test exercises a non-Marque fixture
 provider to keep that path honest. What is *not* promised is how any given shell renders the
 result; skipper's views and grouping version with skipper.

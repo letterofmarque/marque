@@ -106,7 +106,7 @@ invalid cricket innings, at the same time, on the same tracker.
 Flat vocabularies, **shared across content types**: `resolution` means the same thing
 everywhere. A definition names them; it does not define them.
 
-Facets are **many-valued** by default, because a modern rip carries a dozen subtitle tracks
+Facets are **many-valued**, because a modern rip carries a dozen subtitle tracks
 and half a dozen audio tracks. Filtering on any one value finds the torrent.
 
 ### A second domain is a second file
@@ -137,10 +137,12 @@ typo that breaks a catalogue quietly.
 php artisan marque:taxonomy:validate
 ```
 
-Every reference must resolve, no duplicate names within a type, declared types and ranges
-must be well-formed. **A definition loads completely or not at all**: one bad file fails the
-whole load, so the tracker keeps running on its previous definitions rather than a
-half-applied taxonomy. Every problem is reported at once, and the message names the file.
+No duplicate names within a type, and declared types and ranges must be well-formed.
+**A definition loads completely or not at all**: one bad file fails the whole load, so
+nothing is ever half-applied. But definitions are read on every request, so until the file
+is fixed every request that reads them (the upload form, the admin screen) errors. Run
+`marque:taxonomy:validate` before you deploy a definition change. Every problem in a file
+is reported at once, and the message names the file.
 
 Exits non-zero, so it works as a deploy gate.
 
@@ -154,10 +156,12 @@ identical.
 **Destructive changes** (removing a level, dropping a facet) are meant to need your
 confirmation, and **today they don't.** The drift report and the confirm-then-apply step
 exist, but nothing calls them on load yet. An edit to your app's YAML that removes a level
-applies as soon as it loads, with no report (#10805). Classification rows are not deleted:
-the foreign key nulls their term instead of cascading. But a classification that loses
-its term loses what it said, so treat a destructive YAML edit as a data change and back up
-first.
+applies as soon as it loads, with no report (#10805). Nothing is deleted on load: the
+terms and classifications at a removed level stay in the database, pointing at a level the
+definition no longer declares. Only an upgrade's `remove_level` deletes those terms, and
+then the foreign key nulls each classification's term instead of cascading. A classification
+that loses its term loses what it said, so treat a destructive YAML edit as a data change
+and back up first.
 
 **A version bump requires a migration path, or it is refused.** Not warned about — refused.
 The package author is the only person who knows both the old shape and the new one, so

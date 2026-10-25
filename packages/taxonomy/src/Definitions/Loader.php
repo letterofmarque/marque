@@ -23,8 +23,10 @@ use Symfony\Component\Yaml\Yaml;
  * **All or nothing.** One bad file fails the entire load. That looks harsh
  * until you consider the alternative: a tracker running a partial taxonomy,
  * with torrents classified under a level that quietly stopped existing. A
- * refusal leaves the previous definitions in force, which an admin can
- * actually reason about.
+ * refusal changes nothing in the catalogue, which an admin can actually reason
+ * about. Nothing caches the last good load, though: every request that reads
+ * definitions fails until the file is fixed, which is why
+ * `marque:taxonomy:validate` exists.
  *
  * A pure PHP seam — no framework coupling, no view layer, nothing that stops
  * this composing (Spec #83's finding).

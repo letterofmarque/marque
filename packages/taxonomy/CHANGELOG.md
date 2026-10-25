@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   trove's `TorrentPolicy::update` (the uploader, or a moderator or above) on mount and on
   save, and answers 403 otherwise, guests included. The `Classifier` service is unchanged:
   direct callers still decide who may classify.
+- **`marque:taxonomy:validate` no longer says the tracker "keeps running on its previous"
+  definitions.** Nothing keeps the last good load: definitions are read on every request,
+  so a bad file makes every request that reads them fail until it is fixed. The message
+  now says that, and so do the README and the code comments. The all-or-nothing part
+  was always true: nothing is half-applied.
+- **README corrections.** A YAML edit that removes a level deletes nothing on load: its
+  terms and classifications stay, pointing at a level no longer declared. Facets are always
+  many-valued, with no single-valued option. And the Validator checks no cross-references,
+  so a migration step naming a missing level is refused only when the upgrade runs.
 
 ## [1.1.0] — 2026-09-11
 

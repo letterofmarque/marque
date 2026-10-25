@@ -101,8 +101,8 @@ it('refuses a version bump with no migration path, without asking', function () 
     //
     // That is the stronger placement. A definition that cannot be upgraded
     // from is malformed rather than merely awkward, and refusing it at load
-    // means the tracker keeps running on its previous definitions instead of
-    // adopting a shape nobody described. The command's own refusal (see
+    // means the catalogue stays as it was instead of adopting a shape nobody
+    // described. The command's own refusal (see
     // Upgrader::apply) remains as the backstop for a path that breaks between
     // load and apply.
     ($this->shipV2)("content_type: nfl_game\nlabel: NFL Game\nversion: 2\nlevels:\n  - season: { type: year }\n");
