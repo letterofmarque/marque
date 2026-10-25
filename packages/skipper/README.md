@@ -63,12 +63,13 @@ boots before or after skipper's.
 
 **A package can serve the screen from its own route.** If a route is already bound at the
 screen's path, skipper doesn't generate one: the panel links to the package's route, and
-that route keeps its own name. usarrs does this, serving `admin/users` as
-`admin.users.index`. Which route answers that URL depends on load order: skipper's
-catch-all (`admin/{screen}`) is registered when skipper boots, so if it loads before your
-route it can answer your path itself, with skipper's `minimumRole` check in place of your
-route's own. A package that binds its own route must protect it itself, and should not
-rely on that route being the one that runs (#11108).
+that route keeps its own name and answers its own path, with its own middleware and
+authorisation. usarrs does this, serving `admin/users` as `admin.users.index`. Skipper
+registers its routes once every provider has booted, and keeps its `admin/{screen}`
+catch-all off any path already bound under the prefix, so your route wins whatever order
+the providers load in, cached or not. Skipper's request-time `minimumRole` check (below)
+applies only to the routes skipper generates, so a package that binds its own route must
+protect it itself.
 
 ## Stability
 

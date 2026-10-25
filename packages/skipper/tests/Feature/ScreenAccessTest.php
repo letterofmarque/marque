@@ -222,3 +222,29 @@ describe('screens whose package already bound the route', function () {
         expect(app('router')->has('admin.users'))->toBeTrue();
     });
 });
+
+// #11108: a package that binds its own admin route, loading after skipper,
+// must answer its own path. Skipper's catch-all used to come first and serve
+// the screen itself, with skipper's role check in place of the package's own.
+describe('a package route that loads after skipper', function () {
+    it('answers its own path, not skipper\'s catch-all', function () {
+        app(AdminScreenRegistry::class)->register(new AdminScreen('owned', 'Owned', 'skipper-test-screen', 'admin/owned', Role::Admin));
+
+        $mod = TestUser::factory()->create(['role' => Role::Moderator->value]);
+
+        // Skipper would refuse a moderator (the screen's floor is admin); the
+        // package's own route, with its own rules, is what answers.
+        $this->actingAs($mod)->get('/admin/owned')
+            ->assertOk()
+            ->assertSee('package own route');
+    });
+
+    it('still leaves every other screen to the catch-all', function () {
+        app(AdminScreenRegistry::class)->register(new AdminScreen('late', 'Late', 'skipper-test-screen', 'admin/late', Role::Admin));
+
+        $admin = TestUser::factory()->create(['role' => Role::Admin->value]);
+
+        $this->actingAs($admin)->get('/admin/late')->assertOk();
+        $this->actingAs($admin)->get('/admin/nope')->assertNotFound();
+    });
+});

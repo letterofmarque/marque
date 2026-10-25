@@ -7,7 +7,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
 ## [1.0.1] — 2026-10-25
 
-> The admin panel answers 403 to a member no registered screen admits, instead of an empty page.
+> The admin panel answers 403 to a member no registered screen admits, and a package's own admin route always answers its own path.
 
 ### Fixed
 
@@ -17,10 +17,17 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md).
   renders and says so, for the operator to see.
 - **When the screens open to someone exist but none has a route, the panel says so**,
   instead of claiming no admin screens are registered.
+- **A package's own admin route answers its own path, whatever the load order** (#11108).
+  Skipper registered its `admin/{screen}` catch-all when it booted. Laravel answers with
+  the first matching route, so a package that loaded its routes later had its path answered
+  by the catch-all. usarrs' `admin/users` was one: skipper's `minimumRole` ran in place of
+  the package's own middleware and checks. With routes cached, the catch-all could also
+  shadow skipper's own generated screen routes. The catch-all is now registered last, once
+  every provider has booted, and kept off any path already bound under the prefix.
+  Verified live and under `route:cache` in a real Laravel app.
 - **The README and config described `prefix` and `path` wrongly.** A screen's `path` loses
   its first segment and is served under `skipper.prefix`, so the prefix moves the screens
-  too, not just the panel index. The README now also says that skipper's catch-all can
-  answer a package's own admin path, depending on load order (#11108).
+  too, not just the panel index.
 
 ## [1.0.0] — 2026-09-10
 

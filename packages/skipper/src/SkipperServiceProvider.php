@@ -91,6 +91,39 @@ class SkipperServiceProvider extends ServiceProvider
                     ->defaults('screen', $screen->identifier)
                     ->name($screen->routeName());
             }
+
+            $this->registerCatchAll($middleware, $prefix);
         });
+    }
+
+    /**
+     * The `admin/{screen}` catch-all, registered last and kept off every path
+     * already bound under the prefix (#11108).
+     *
+     * Laravel answers with the first matching route. Registered in boot(), the
+     * catch-all came before any package that loaded its routes later, and
+     * answered that package's own path (usarrs' admin/users) itself: skipper's
+     * minimumRole ran in place of the package's own middleware and checks.
+     * Here every provider's routes are in, and a path someone bound is theirs.
+     */
+    private function registerCatchAll(array $middleware, string $prefix): void
+    {
+        $taken = collect(Route::getRoutes()->getRoutes())
+            ->map(fn ($route): string => $route->uri())
+            ->filter(fn (string $uri): bool => str_starts_with($uri, $prefix.'/'))
+            ->map(fn (string $uri): string => substr($uri, strlen($prefix) + 1))
+            ->reject(fn (string $segment): bool => $segment === '' || str_contains($segment, '/') || str_contains($segment, '{'))
+            ->unique()
+            ->map(fn (string $segment): string => preg_quote($segment, '#'))
+            ->values()
+            ->all();
+
+        $pattern = $taken === [] ? '[^/]+' : '(?!(?:'.implode('|', $taken).')$)[^/]+';
+
+        Route::middleware($middleware)
+            ->prefix($prefix)
+            ->get('{screen}', ScreenController::class)
+            ->where('screen', $pattern)
+            ->name('admin.screen');
     }
 }

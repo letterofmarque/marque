@@ -29,6 +29,9 @@ abstract class TestCase extends BaseTestCase
             TroveServiceProvider::class,
             DeckServiceProvider::class,
             SkipperServiceProvider::class,
+            // After skipper, which is the order that let skipper's catch-all
+            // answer a package's own route (#11108).
+            OwnRouteProvider::class,
         ];
     }
 
