@@ -26,9 +26,9 @@ return [
     | Route prefix
     |--------------------------------------------------------------------------
     |
-    | The panel lives at /admin by default. A screen's own `path` is registered
-    | as given, so this prefixes the panel index only — a package that wants its
-    | screen somewhere else says so when it registers.
+    | The panel and the screens it routes live under this, /admin by default.
+    | A screen's `path` loses its first segment and takes this prefix: with
+    | 'staff', a screen declared at admin/clients is served at /staff/clients.
     |
     */
 

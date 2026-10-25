@@ -129,4 +129,17 @@ describe('the admin panel', function () {
 
         $this->actingAs($member)->get(route('admin.index'))->assertOk();
     });
+
+    // From the 1.0.1 read-through: screens open to this viewer exist but none
+    // has a route. The empty state must not claim nothing is registered.
+    it('says the screens have no route, not that none are registered, when none is reachable', function () {
+        app(AdminScreenRegistry::class)->register(new AdminScreen('broken', 'Broken Screen', 'c', 'admin/broken'));
+
+        $admin = TestUser::factory()->create(['role' => Role::Admin->value]);
+
+        $this->actingAs($admin)->get(route('admin.index'))
+            ->assertOk()
+            ->assertSee('have no route to reach them')
+            ->assertDontSee('No admin screens are registered yet');
+    });
 });

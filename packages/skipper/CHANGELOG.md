@@ -15,6 +15,12 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md).
   already refused them, but the panel's index gave any signed-in, verified member a 200
   and an empty panel at an admin URL. With nothing registered at all, the panel still
   renders and says so, for the operator to see.
+- **When the screens open to someone exist but none has a route, the panel says so**,
+  instead of claiming no admin screens are registered.
+- **The README and config described `prefix` and `path` wrongly.** A screen's `path` loses
+  its first segment and is served under `skipper.prefix`, so the prefix moves the screens
+  too, not just the panel index. The README now also says that skipper's catch-all can
+  answer a package's own admin path, depending on load order (#11108).
 
 ## [1.0.0] — 2026-09-10
 

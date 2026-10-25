@@ -37,6 +37,12 @@ class Panel extends Component
      */
     public array $groups = [];
 
+    /**
+     * Whether screens open to this viewer exist but none has a route, so the
+     * empty state can say so rather than claim nothing is registered.
+     */
+    public bool $unroutable = false;
+
     public function mount(): void
     {
         $this->title = config('skipper.title', 'Administration');
@@ -77,6 +83,7 @@ class Panel extends Component
         ksort($grouped);
 
         $this->groups = $grouped;
+        $this->unroutable = $grouped === [] && $visible !== [];
     }
 
     public function render(): View

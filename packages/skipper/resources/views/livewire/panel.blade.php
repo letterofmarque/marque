@@ -25,12 +25,23 @@
              state, not a broken one, so say so plainly rather than showing an
              empty page. --}}
         <div class="rounded-lg border border-dashed border-zinc-300 px-6 py-10 text-center dark:border-zinc-700">
-            <x-deck::text class="text-zinc-500 dark:text-zinc-400">
-                {{ __('No admin screens are registered yet.') }}
-            </x-deck::text>
-            <x-deck::text class="mt-1 text-sm text-zinc-400 dark:text-zinc-500">
-                {{ __('Packages that provide admin screens will appear here once installed.') }}
-            </x-deck::text>
+            @if ($unroutable)
+                {{-- Screens open to this viewer are registered, but none has a
+                     route bound: a package's misconfiguration, not an empty install. --}}
+                <x-deck::text class="text-zinc-500 dark:text-zinc-400">
+                    {{ __('The admin screens open to you have no route to reach them.') }}
+                </x-deck::text>
+                <x-deck::text class="mt-1 text-sm text-zinc-400 dark:text-zinc-500">
+                    {{ __('A package registered them without binding their routes. Check the packages that provide them.') }}
+                </x-deck::text>
+            @else
+                <x-deck::text class="text-zinc-500 dark:text-zinc-400">
+                    {{ __('No admin screens are registered yet.') }}
+                </x-deck::text>
+                <x-deck::text class="mt-1 text-sm text-zinc-400 dark:text-zinc-500">
+                    {{ __('Packages that provide admin screens will appear here once installed.') }}
+                </x-deck::text>
+            @endif
         </div>
     @endforelse
 </div>

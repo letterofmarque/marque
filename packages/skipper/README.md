@@ -48,7 +48,7 @@ $this->app->make(AdminScreenRegistry::class)->register(new AdminScreen(
 | `identifier` | Unique across all packages. The route name is derived as `admin.<identifier>`, unless your package binds its own route at that path (see below) |
 | `label` | What the panel shows |
 | `component` | The Livewire component that renders the screen |
-| `path` | Where it lives |
+| `path` | Where it lives, relative to the panel: the first segment stands for the panel prefix and is replaced by `skipper.prefix` (`admin/clients` is served at `/staff/clients` with the prefix `staff`) |
 | `minimumRole` | The floor. Enforced on the listing **and** on the request |
 | `icon` | Optional, rendered from `deck`'s icon set, which is small: `arrow-left`, `arrow-down-tray`, `magnifying-glass`, `pencil`, `plus`. Any other name renders nothing |
 | `group` | Optional heading. Ungrouped screens fall under `skipper.default_group` |
@@ -63,10 +63,12 @@ boots before or after skipper's.
 
 **A package can serve the screen from its own route.** If a route is already bound at the
 screen's path, skipper doesn't generate one: the panel links to the package's route, and
-that route keeps its own name and its own authorisation. usarrs does this, serving
-`admin/users` as `admin.users.index`. Skipper's request-time `minimumRole` check (below)
-only applies to routes skipper generated, so a package that binds its own route must
-protect it itself.
+that route keeps its own name. usarrs does this, serving `admin/users` as
+`admin.users.index`. Which route answers that URL depends on load order: skipper's
+catch-all (`admin/{screen}`) is registered when skipper boots, so if it loads before your
+route it can answer your path itself, with skipper's `minimumRole` check in place of your
+route's own. A package that binds its own route must protect it itself, and should not
+rely on that route being the one that runs (#11108).
 
 ## Stability
 
@@ -90,7 +92,9 @@ to any role at or above its floor.
 
 The panel itself (`/admin`) answers 403 to someone no registered screen admits, the same as
 each screen does, rather than showing them an empty page at an admin URL. With nothing
-registered at all, it renders and says so: that's an install to finish, not a refusal.
+registered at all, it renders and says so: that's an install to finish, not a refusal. If
+the screens open to someone are registered but none has a route bound, the panel says that
+instead.
 
 ## Config
 
@@ -101,7 +105,7 @@ php artisan vendor:publish --tag=skipper-config
 | Key | Default | Notes |
 |---|---|---|
 | `middleware` | `['web', 'auth', 'verified']` | Who gets through the door. Authorisation is separate |
-| `prefix` | `admin` | Where the panel index lives |
+| `prefix` | `admin` | Where the panel and the screens it routes live. A screen's `path` loses its first segment and takes this prefix |
 | `title` | `Administration` | Panel heading |
 | `layout` | `deck::layouts.app` | Point at your own to reshape the chrome |
 | `default_group` | `General` | Heading for screens that declare no group |
