@@ -5,6 +5,17 @@ All notable changes to `marque/skipper` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
+## [1.0.1] — 2026-10-25
+
+> The admin panel answers 403 to a member no registered screen admits, instead of an empty page.
+
+### Fixed
+
+- **`/admin` answers 403 to a member no registered screen admits** (#10697). Each screen
+  already refused them, but the panel's index gave any signed-in, verified member a 200
+  and an empty panel at an admin URL. With nothing registered at all, the panel still
+  renders and says so, for the operator to see.
+
 ## [1.0.0] — 2026-09-10
 
 > The admin panel — renders the admin screens packages register, and depends on none of them.

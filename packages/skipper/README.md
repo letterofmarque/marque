@@ -88,6 +88,10 @@ a screen — without the second check, a moderator reaches an admin screen by ty
 Roles come from trove (`user` → `uploader` → `moderator` → `admin`), and a screen is visible
 to any role at or above its floor.
 
+The panel itself (`/admin`) answers 403 to someone no registered screen admits, the same as
+each screen does, rather than showing them an empty page at an admin URL. With nothing
+registered at all, it renders and says so: that's an install to finish, not a refusal.
+
 ## Config
 
 ```bash

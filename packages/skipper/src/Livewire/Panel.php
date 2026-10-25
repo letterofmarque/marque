@@ -45,8 +45,15 @@ class Panel extends Component
         $default = config('skipper.default_group', 'General');
 
         $grouped = [];
+        $visible = $registry->visibleTo($this->viewerRole());
 
-        foreach ($registry->visibleTo($this->viewerRole()) as $screen) {
+        // Screens are registered and this viewer may open none of them: the
+        // same 403 each screen gives them (#10697), not a 200 with an empty
+        // panel at an admin URL. With nothing registered at all the panel
+        // still renders and says so: that is the operator's to see.
+        abort_if($visible === [] && $registry->all() !== [], 403, 'No admin screen is open to your role.');
+
+        foreach ($visible as $screen) {
             // A package can register a screen and forget to bind its route.
             // Dropping it here rather than in the template matters: Livewire
             // serialises these properties into a wire:snapshot attribute in the

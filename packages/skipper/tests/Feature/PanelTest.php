@@ -103,4 +103,30 @@ describe('the admin panel', function () {
             ->assertSee('Real Screen')
             ->assertDontSee('Broken Screen');
     });
+
+    // #10697: a member whom no registered screen admits got a 200 and an empty
+    // panel at /admin, while each screen itself answered them 403.
+    it('answers 403 to a member no registered screen admits, as the screens do', function () {
+        app(AdminScreenRegistry::class)->register(new AdminScreen('mod-ok', 'Mod OK', 'c', 'admin/y', Role::Moderator));
+
+        $member = TestUser::factory()->create(['role' => Role::User->value]);
+
+        $this->actingAs($member)->get(route('admin.index'))->assertForbidden();
+    });
+
+    it('still renders for that member\'s betters', function () {
+        app(AdminScreenRegistry::class)->register(new AdminScreen('mod-ok', 'Mod OK', 'c', 'admin/y', Role::Moderator));
+
+        $mod = TestUser::factory()->create(['role' => Role::Moderator->value]);
+
+        $this->actingAs($mod)->get(route('admin.index'))->assertOk()->assertSee('Mod OK');
+    });
+
+    // Nothing registered is the operator's misconfiguration to see, not a
+    // refusal: the panel says so, for anyone who reaches it.
+    it('still renders with nothing registered, even for a plain member', function () {
+        $member = TestUser::factory()->create(['role' => Role::User->value]);
+
+        $this->actingAs($member)->get(route('admin.index'))->assertOk();
+    });
 });

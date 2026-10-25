@@ -13,6 +13,7 @@ changelogs — edit those, not this.*
 - **[bloodhound 9.3.0](packages/bloodhound/CHANGELOG.md)** — A rebuilt row keeps when its activity began, so hit-and-run doesn't take old activity for new; the size helpers pick the dashboard's unit; an exemption's --by must name a real user, and will be required from 10.0.
 - **[guise 5.3.1](packages/guise/CHANGELOG.md)** — The torrent list no longer fails for a guest when an app lets guests reach it.
 - **[parley 3.0.1](packages/parley/CHANGELOG.md)** — A guest who reaches posting a thread or comment is sent to log in, not shown a bare 403.
+- **[skipper 1.0.1](packages/skipper/CHANGELOG.md)** — The admin panel answers 403 to a member no registered screen admits, instead of an empty page.
 
 ## 2026-10-24
 
