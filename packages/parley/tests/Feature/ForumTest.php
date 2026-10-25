@@ -192,10 +192,10 @@ describe('a guest reaching a member-only action', function () {
     it('is sent to log in from the new-thread page, and comes back to it after', function () {
         $category = Category::factory()->create();
 
-        Livewire::test(ThreadCreate::class, ['category' => $category])
+        Livewire::withHeaders(['Referer' => 'http://localhost/'])->test(ThreadCreate::class, ['category' => $category])
             ->assertRedirect(route('login'));
 
-        expect(session('url.intended'))->not->toBeNull();
+        expect(session('url.intended'))->toStartWith('http://localhost/');
     });
 
     it('is sent to log in when submitting a thread, and nothing is created', function () {

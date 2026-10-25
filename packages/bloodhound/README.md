@@ -991,6 +991,12 @@ long rebuild may hit `innodb_lock_wait_timeout` and fail; the next run retries. 
 leaves the cursor where it is, and leaves completion dates and counts alone, because they
 are not derivable from the rows.
 
+A per-torrent row the rebuild has to re-create is dated from the ledger, not from today,
+so hit-and-run doesn't take old activity for new. Its creation time is the pair's first
+ledger row, and when the member was last seen is its newest. A pair with carried (pruned)
+history can't be dated exactly: its creation time is bounded by the oldest row left in the
+ledger, and placed before hit-and-run began, so the rule never judges carried activity.
+
 On a development machine, rebuilding from 200,000 rows took 29 to 95 seconds depending on
 the engine.
 

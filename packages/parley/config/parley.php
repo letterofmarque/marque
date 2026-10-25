@@ -122,7 +122,8 @@ return [
     | (the default) means lock only stops NEW posts and replies — an author
     | can still edit or delete their own existing words, "locked" reads as
     | "no new discussion" rather than "frozen". true makes a locked thread's
-    | content immutable to everyone but a moderator, which suits a deployment
+    | content immutable to everyone, moderators included (unlock it to edit),
+    | which suits a deployment
     | that uses locking to archive/freeze a thread rather than just to stop
     | it growing. This is a site-owner policy call, not something Marque
     | should hardcode either way — see docs/why.md's "auth-agnostic" reasoning

@@ -34,7 +34,9 @@ php artisan vendor:publish --tag=guise-views
 
 ## Routes
 
-All routes require authentication and email verification.
+By default all routes require authentication and email verification (`guise.middleware`).
+An app that drops `auth` gets an index guests can browse, without the upload button. Upload
+and edit still refuse a guest (403), through their policies.
 
 | Route | Component | Role Required | Description |
 |-------|-----------|---------------|-------------|

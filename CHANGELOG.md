@@ -10,7 +10,7 @@ changelogs — edit those, not this.*
 
 ## 2026-10-25
 
-- **[bloodhound 9.3.0](packages/bloodhound/CHANGELOG.md)** — A rebuilt row keeps when its activity began, so hit-and-run doesn't mistake old activity for new; the size helpers pick the dashboard's unit; an exemption's --by must name a real user, and will be required from 10.0.
+- **[bloodhound 9.3.0](packages/bloodhound/CHANGELOG.md)** — A rebuilt row keeps when its activity began, so hit-and-run doesn't take old activity for new; the size helpers pick the dashboard's unit; an exemption's --by must name a real user, and will be required from 10.0.
 - **[guise 5.3.1](packages/guise/CHANGELOG.md)** — The torrent list no longer fails for a guest when an app lets guests reach it.
 - **[parley 3.0.1](packages/parley/CHANGELOG.md)** — A guest who reaches posting a thread or comment is sent to log in, not shown a bare 403.
 

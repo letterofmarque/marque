@@ -33,7 +33,7 @@ class ThreadCreate extends ParleyComponent
     {
         $this->category = $category;
 
-        if ($this->redirectGuestToLogin(url()->current())) {
+        if ($this->parleyRedirectGuestToLogin(url()->current())) {
             return;
         }
 
@@ -42,7 +42,7 @@ class ThreadCreate extends ParleyComponent
 
     public function submit(ThreadServiceInterface $threads, PostServiceInterface $posts): void
     {
-        if ($this->redirectGuestToLogin()) {
+        if ($this->parleyRedirectGuestToLogin()) {
             return;
         }
 

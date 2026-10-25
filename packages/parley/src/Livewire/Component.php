@@ -36,7 +36,7 @@ abstract class Component extends LivewireComponent
      *
      * @return bool whether the guest was sent away
      */
-    protected function redirectGuestToLogin(?string $intended = null): bool
+    protected function parleyRedirectGuestToLogin(?string $intended = null): bool
     {
         if (auth()->check() || ! Route::has('login')) {
             return false;

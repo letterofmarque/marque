@@ -11,6 +11,7 @@ use Illuminate\Support\Carbon;
 use Marque\Bloodhound\Models\AnnounceLog;
 use Marque\Bloodhound\Models\LedgerCarry;
 use Marque\Bloodhound\Models\TorrentUser;
+use Marque\Bloodhound\Services\HitAndRunEnforcer;
 use Marque\Bloodhound\Services\LedgerAggregator;
 use Marque\Bloodhound\Services\LedgerRebuilder;
 use Marque\Bloodhound\Tests\TestUser;
@@ -153,4 +154,28 @@ it('bounds a carried pair by the oldest row left in the ledger, not the prune da
     $row = TorrentUser::query()->where('user_id', $this->member->id)->where('torrent_id', $other->id)->first();
 
     expect($row->created_at->getTimestamp())->toBe(Carbon::parse('2026-09-01 08:00:00')->getTimestamp());
+});
+
+// From the 9.3 read-through: a prune after hit-and-run began can leave even
+// the ledger bound after the rule's start, for activity from before it. A
+// carried pair is dated before the rule, so it is never judged as new.
+it('dates a carried pair before hit-and-run began, so the rule never judges it', function () {
+    $this->travelTo('2026-11-01 00:00:00');
+    app(HitAndRunEnforcer::class)->since();
+
+    seenRow($this, '2026-11-10 08:00:00');
+    $other = Torrent::create(['name' => 'Pre-rule', 'info_hash' => str_repeat('7', 40), 'size' => 1_000, 'user_id' => $this->member->id]);
+
+    $this->travelTo('2026-11-20 00:00:00');
+    LedgerCarry::query()->create([
+        'user_id' => $this->member->id, 'torrent_id' => $other->id,
+        'uploaded' => 0, 'downloaded' => 1_000, 'seedtime' => 0, 'leechtime' => 0,
+    ]);
+
+    $this->travelTo('2026-12-01 00:00:00');
+    app(LedgerRebuilder::class)->rebuild();
+
+    $row = TorrentUser::query()->where('user_id', $this->member->id)->where('torrent_id', $other->id)->first();
+
+    expect($row->created_at->getTimestamp())->toBeLessThan(Carbon::parse('2026-11-01 00:00:00')->getTimestamp());
 });

@@ -103,6 +103,10 @@ all policy-gated — with an empty state and permission-aware controls. Soft-del
 render as `[deleted]` rather than disappearing, so a reply chain survives its parent's
 removal.
 
+Browsing is open to guests. A guest who reaches posting (the new-thread page, or a submit
+sent directly) is redirected to your app's `login` route and brought back afterwards. If
+there is no route named `login`, they get the policy's 403.
+
 Indentation caps at `config('parley.nesting.indent_depth')`; nesting itself has no limit in
 storage. Changing the cap is a display decision, not a migration.
 
@@ -142,7 +146,9 @@ Pin, lock and soft-delete, keyed off `marque/trove`'s roles:
 ],
 ```
 
-Authors can always edit and delete their own posts and threads. Pin and lock are
+Authors can edit and delete their own posts and threads, unless
+`moderation.lock_blocks_edits` is on and the thread is locked: then nobody can, moderators
+included, until it is unlocked. Pin and lock are
 moderator-only regardless of ownership. Locking a thread is enforced at the service layer
 (`ThreadLockedException`), not just hidden in the UI, so it holds against any caller — a
 REST endpoint, a queued job, a script — not only the component that greys out its submit

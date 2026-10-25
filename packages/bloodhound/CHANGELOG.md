@@ -9,7 +9,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [9.3.0] — 2026-10-25
 
-> A rebuilt row keeps when its activity began, so hit-and-run doesn't mistake old activity for new; the size helpers pick the dashboard's unit; an exemption's --by must name a real user, and will be required from 10.0.
+> A rebuilt row keeps when its activity began, so hit-and-run doesn't take old activity for new; the size helpers pick the dashboard's unit; an exemption's --by must name a real user, and will be required from 10.0.
 
 ### Fixed
 
@@ -17,12 +17,14 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   `bloodhound:rebuild-totals` re-creates a missing `torrent_user` row, and used to stamp it
   `now()`. Hit-and-run counts rows created since the rule began, so activity from before
   the rule could become a new obligation, and the away clock restarted from today. Now:
-  - `created_at` is when the pair's activity began: its first ledger row's time.
-  - `last_seen` is its newest ledger row's time, as the aggregator sets it.
-  - A pair known only from carried (pruned) history has no ledger rows. A prune deletes
-    the oldest rows first, so its `created_at` is bounded by the oldest row still in the
-    ledger, or by when it was first carried if that's earlier. `last_seen` is when it was
-    last carried. That errs towards less time away, never more.
+  - For a pair with only ledger rows, `created_at` is its first ledger row's time and
+    `last_seen` its newest, as the aggregator sets `last_seen`.
+  - A pair with carried (pruned) history can't be dated exactly. A prune deletes every
+    folded row older than its cutoff, so its `created_at` is bounded by the oldest row left
+    in the ledger, or by when it was first carried if that's earlier. It is also placed
+    before hit-and-run began, so the rule never judges carried activity: at worst a real
+    obligation on a re-created row is missed, and one is never made up. `last_seen` is its
+    newest ledger row, or when it was last carried, which errs towards less time away.
 - **`getUploadedForHumans()` / `getDownloadedForHumans()` pick the same unit as the
   dashboard** (#11105). That's `Number::fileSize`'s rule: 1024-based, moving up a unit past
   0.9 of the next. Figures still show two decimals. The helpers used to pick the unit by

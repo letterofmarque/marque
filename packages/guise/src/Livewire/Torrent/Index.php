@@ -34,8 +34,8 @@ class Index extends Component
 
     public function render(TorrentService $service): View
     {
-        // No viewer passed: the service defaults to the authenticated user,
-        // which is who this listing is for. These routes are behind auth.
+        // No viewer passed: the service defaults to the authenticated user, or
+        // a guest when an app has dropped auth from guise.middleware (#10562).
         $torrents = $service->list(
             search: $this->search,
             includeDead: $this->showDead,

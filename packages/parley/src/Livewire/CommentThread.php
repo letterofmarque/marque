@@ -80,7 +80,7 @@ class CommentThread extends Component
      */
     public function submit(): void
     {
-        if ($this->redirectGuestToLogin()) {
+        if ($this->parleyRedirectGuestToLogin()) {
             return;
         }
 

@@ -141,11 +141,19 @@ class LedgerRebuilder
             ->when($userId !== null, fn ($q) => $q->where('user_id', $userId))
             ->get();
 
-        // A prune deletes the oldest rows first, so all carried history is
-        // older than the oldest row still in the ledger. That bounds when a
-        // carried pair's activity began better than the carry's own stamp,
+        // A prune deletes every folded row older than its cutoff, so carried
+        // history predates the folded rows left (an unfolded row it withheld
+        // can be older, which only makes this bound earlier). That bounds when
+        // a carried pair's activity began better than the carry's own stamp,
         // which is when the prune ran, and can be long after the activity.
         $oldestLeft = self::timestamp(AnnounceLog::query()->min('created_at'));
+
+        // Still only a bound: a prune after hit-and-run began can leave it
+        // after the rule's start for activity from before it. A strike is
+        // punitive, so carried activity that can't be shown to post-date the
+        // rule is dated before it, and hit-and-run doesn't judge it. At worst
+        // a real obligation on a re-created row is missed; one is never made up.
+        $ruleBegan = self::timestamp(DB::table('ledger_cursors')->where('stream', HitAndRunEnforcer::STREAM)->value('created_at'));
 
         foreach ($carried as $carry) {
             // created_at: the earlier of that bound and when it was first
@@ -154,6 +162,11 @@ class LedgerRebuilder
             // away, never more.
             $carriedAt = $carry->created_at?->getTimestamp();
             $began = $oldestLeft !== null && $carriedAt !== null ? min($oldestLeft, $carriedAt) : ($oldestLeft ?? $carriedAt);
+
+            if ($ruleBegan !== null && $began !== null) {
+                $began = min($began, $ruleBegan - 1);
+            }
+
             $stamp($carry->user_id, $carry->torrent_id, $began, null);
             $stamps[$carry->user_id.':'.$carry->torrent_id]['last'] ??= $carry->updated_at?->getTimestamp();
             $add($carry->user_id, $carry->torrent_id, [
