@@ -31,13 +31,21 @@ class ThreadCreate extends ParleyComponent
 
     public function mount(Category $category): void
     {
-        $this->authorize('create', Thread::class);
-
         $this->category = $category;
+
+        if ($this->redirectGuestToLogin(url()->current())) {
+            return;
+        }
+
+        $this->authorize('create', Thread::class);
     }
 
     public function submit(ThreadServiceInterface $threads, PostServiceInterface $posts): void
     {
+        if ($this->redirectGuestToLogin()) {
+            return;
+        }
+
         $this->authorize('create', Thread::class);
 
         $data = $this->validate([

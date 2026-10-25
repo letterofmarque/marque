@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Locked;
-use Livewire\Component;
 use Marque\Parley\Contracts\PostServiceInterface;
 use Marque\Parley\Contracts\ThreadServiceInterface;
 use Marque\Parley\Exceptions\ThreadLockedException;
@@ -81,6 +80,10 @@ class CommentThread extends Component
      */
     public function submit(): void
     {
+        if ($this->redirectGuestToLogin()) {
+            return;
+        }
+
         $this->authorize('create', Post::class);
 
         $data = $this->validateBody();

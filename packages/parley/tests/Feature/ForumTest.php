@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\Route;
 use Livewire\Livewire;
 use Marque\Parley\Exceptions\TooManyPostsException;
+use Marque\Parley\Livewire\CommentThread;
 use Marque\Parley\Livewire\Forum\CategoryIndex;
 use Marque\Parley\Livewire\Forum\ThreadCreate;
 use Marque\Parley\Livewire\Forum\ThreadIndex;
@@ -178,4 +180,52 @@ describe('the forum, when enabled (the default)', function () {
             ->call('pin')
             ->assertForbidden();
     });
+});
+
+// #10563: browsing is open to guests, so the routes carry no 'auth', and a
+// guest reaching a member-only action got a bare 403. They are sent to log in.
+describe('a guest reaching a member-only action', function () {
+    beforeEach(function () {
+        Route::get('login', fn () => 'login')->name('login');
+    });
+
+    it('is sent to log in from the new-thread page, and comes back to it after', function () {
+        $category = Category::factory()->create();
+
+        Livewire::test(ThreadCreate::class, ['category' => $category])
+            ->assertRedirect(route('login'));
+
+        expect(session('url.intended'))->not->toBeNull();
+    });
+
+    it('is sent to log in when submitting a thread, and nothing is created', function () {
+        $category = Category::factory()->create();
+        $user = TestUser::factory()->create();
+
+        $component = Livewire::actingAs($user)->test(ThreadCreate::class, ['category' => $category]);
+        auth()->logout();
+
+        $component->set('title', 'T')->set('body', 'B')->call('submit')
+            ->assertRedirect(route('login'));
+
+        expect(Thread::query()->count())->toBe(0);
+    });
+
+    it('is sent to log in when submitting a comment, and nothing is posted', function () {
+        $thread = Thread::factory()->create();
+
+        Livewire::test(CommentThread::class, ['thread' => $thread])
+            ->set('body', 'from a guest')
+            ->call('submit')
+            ->assertRedirect(route('login'));
+
+        expect($thread->fresh()->posts()->count())->toBe(0);
+    });
+});
+
+it('still answers 403 for a guest when the app has no login route', function () {
+    $category = Category::factory()->create();
+
+    Livewire::test(ThreadCreate::class, ['category' => $category])
+        ->assertForbidden();
 });
