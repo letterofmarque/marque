@@ -9,6 +9,7 @@ use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 use Marque\Skipper\Http\ScreenController;
 use Marque\Skipper\Livewire\Panel;
+use Marque\Skipper\Support\OwnRoutes;
 use Marque\Trove\Registry\AdminScreenRegistry;
 
 /**
@@ -69,7 +70,9 @@ class SkipperServiceProvider extends ServiceProvider
             $middleware = config('skipper.middleware', ['web', 'auth', 'verified']);
             $prefix = trim((string) config('skipper.prefix', 'admin'), '/');
 
+            // Only routes that answer GET: a POST-only route serves no screen.
             $bound = collect(Route::getRoutes()->getRoutes())
+                ->filter(fn ($route): bool => in_array('GET', $route->methods(), true))
                 ->map(fn ($route): string => $route->uri())
                 ->all();
 
@@ -85,7 +88,7 @@ class SkipperServiceProvider extends ServiceProvider
                 // prefix, admin/users bound by usarrs is not prefix/users, and
                 // generating that would serve usarrs' screen without usarrs'
                 // middleware (#11108).
-                if (in_array($uri, $bound, true) || in_array(trim($screen->path, '/'), $bound, true)) {
+                if (in_array($uri, $bound, true) || in_array(ltrim(OwnRoutes::urlOf($screen), '/'), $bound, true)) {
                     continue;
                 }
 
@@ -117,6 +120,7 @@ class SkipperServiceProvider extends ServiceProvider
     private function registerCatchAll(array $middleware, string $prefix): void
     {
         $taken = collect(Route::getRoutes()->getRoutes())
+            ->filter(fn ($route): bool => in_array('GET', $route->methods(), true))
             ->map(fn ($route): string => $route->uri())
             ->filter(fn (string $uri): bool => str_starts_with($uri, $prefix.'/'))
             ->map(fn (string $uri): string => substr($uri, strlen($prefix) + 1))

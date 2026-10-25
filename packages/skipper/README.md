@@ -61,8 +61,8 @@ later.
 Registration is legal any time up to `booted`, so it does not matter whether your provider
 boots before or after skipper's.
 
-**A package can serve the screen from its own route.** If a route is already bound at the
-screen's declared path, skipper doesn't generate one, under any prefix: the panel links to
+**A package can serve the screen from its own route.** If a route that answers GET is
+already bound at the screen's declared path, skipper doesn't generate one, under any prefix: the panel links to
 the package's route, and that route keeps its own name and answers its own path, with its
 own middleware and authorisation. usarrs does this, serving `admin/users` as
 `admin.users.index`. Skipper never serves such a screen itself, by its identifier or any
@@ -70,7 +70,9 @@ other URL; those answer 404. Skipper registers its screen routes once every prov
 booted, last, and keeps its `admin/{screen}` catch-all off any path already bound under the
 prefix. So a route bound in a provider's `register()` or `boot()`, or in a route file, wins
 whatever order the providers load in, cached or not. A route a provider adds from its own
-`booted()` callback comes too late for that. The package's route is the only way to its
+`booted()` callback comes too late for that, so under the default prefix a late route at a
+path that isn't a screen can lose to the catch-all; a screen with a late route is still
+linked to it and never served by skipper. The package's route is the only way to its
 screen, so the package must protect it itself; skipper's `minimumRole` check (below)
 covers only the screens skipper serves.
 

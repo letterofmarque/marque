@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\Route;
 use Marque\Skipper\Tests\TestUser;
 use Marque\Trove\Enums\Role;
 use Marque\Trove\Registry\AdminScreen;
@@ -247,6 +248,27 @@ describe('a package route that loads after skipper', function () {
         $admin = TestUser::factory()->create(['role' => Role::Admin->value]);
 
         $this->actingAs($admin)->get('/admin/vendor-owned')->assertNotFound();
+    });
+
+    // From the final read-through: a single-segment path is relative to the
+    // panel, so a public /clients page is not that screen's route, and a
+    // POST-only route at a screen's path serves no screen.
+    it('serves a single-segment screen even when the app has a public page of the same name', function () {
+        Route::get('clients', fn () => 'public clients page');
+        app(AdminScreenRegistry::class)->register(new AdminScreen('clients-id', 'Clients', 'skipper-test-screen', 'clients', Role::Admin));
+
+        $admin = TestUser::factory()->create(['role' => Role::Admin->value]);
+
+        $this->actingAs($admin)->get('/admin/clients-id')->assertOk()->assertDontSee('public clients page');
+    });
+
+    it('serves a screen whose path has only a POST route, which serves no screen', function () {
+        Route::post('admin/postonly', fn () => 'posted');
+        app(AdminScreenRegistry::class)->register(new AdminScreen('postonly-id', 'Post only', 'skipper-test-screen', 'admin/postonly', Role::Admin));
+
+        $admin = TestUser::factory()->create(['role' => Role::Admin->value]);
+
+        $this->actingAs($admin)->get('/admin/postonly-id')->assertOk();
     });
 
     it('still leaves every other screen to the catch-all', function () {

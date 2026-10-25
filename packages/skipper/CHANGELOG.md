@@ -31,10 +31,13 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md).
     (`/staff/users`) and the panel linked to it. It no longer does, and links to the
     package's route.
   The catch-all registered first also shadowed skipper's own generated routes where one
-  screen's path segment matched another's identifier. A route a provider adds from its own
-  `booted()` callback still comes too late to be kept clear of the catch-all, but such a
-  screen is never served by skipper. Verified live and under `route:cache` in a real
-  Laravel app.
+  screen's path segment matched another's identifier. "Its own route" means a route that
+  answers GET at the screen's URL, found by asking the router, so a POST-only route doesn't
+  count and a single-segment `path` is looked up under the prefix, not at the site root.
+  A route a provider adds from its own `booted()` callback is too late to be kept clear of
+  the catch-all, so under the default prefix a late route at a path that isn't a screen can
+  be shadowed. A screen with a late route is still never served by skipper, and the panel
+  links to that route. Verified live and under `route:cache` in a real Laravel app.
 - **The README and config described `prefix` and `path` wrongly.** A screen's `path` loses
   its first segment and is served under `skipper.prefix`, so the prefix moves the screens
   too, not just the panel index.

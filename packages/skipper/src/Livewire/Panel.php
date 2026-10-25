@@ -6,6 +6,7 @@ namespace Marque\Skipper\Livewire;
 
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
+use Marque\Skipper\Support\OwnRoutes;
 use Marque\Trove\Enums\Role;
 use Marque\Trove\Registry\AdminScreen;
 use Marque\Trove\Registry\AdminScreenRegistry;
@@ -114,21 +115,14 @@ class Panel extends Component
      */
     private function urlFor(AdminScreen $screen): ?string
     {
-        $router = app('router');
-
-        if ($router->has($screen->routeName())) {
-            return route($screen->routeName());
+        // The package's own route first, when it serves the screen: an alias
+        // skipper generated before a late route appeared would answer 404
+        // (#11108). Asked per render, against the complete route table.
+        if (OwnRoutes::servedElsewhere($screen)) {
+            return url(OwnRoutes::urlOf($screen));
         }
 
-        $uri = '/'.trim($screen->path, '/');
-
-        foreach ($router->getRoutes()->getRoutes() as $route) {
-            if ('/'.trim($route->uri(), '/') === $uri) {
-                return url($uri);
-            }
-        }
-
-        return null;
+        return app('router')->has($screen->routeName()) ? route($screen->routeName()) : null;
     }
 
     /**

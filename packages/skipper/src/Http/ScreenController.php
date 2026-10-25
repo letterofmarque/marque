@@ -6,6 +6,7 @@ namespace Marque\Skipper\Http;
 
 use Illuminate\Http\Request;
 use Livewire\Livewire;
+use Marque\Skipper\Support\OwnRoutes;
 use Marque\Trove\Enums\Role;
 use Marque\Trove\Registry\AdminScreen;
 use Marque\Trove\Registry\AdminScreenRegistry;
@@ -43,7 +44,7 @@ class ScreenController
         // any URL that reached the catch-all or an alias instead: its
         // identifier, or the prefixed path under a non-default prefix (#11108).
         // Asked per request, when the route table is complete, cached or not.
-        if ($this->servedByItsOwnRoute($entry)) {
+        if (OwnRoutes::servedElsewhere($entry)) {
             throw new NotFoundHttpException("Admin screen [{$screen}] is served at its own route.");
         }
 
@@ -61,9 +62,9 @@ class ScreenController
     /**
      * Find the screen by identifier, then by declared path segment.
      *
-     * The generated alias routes on the path segment, so a package declaring
-     * `path: 'admin/users'` is reached as `users` rather than by its
-     * identifier. Both work: the identifier is the canonical handle, the
+     * The generated alias routes on the path segment, so a screen skipper
+     * serves, declared at `path: 'admin/clients'`, is reached as `clients` as
+     * well as by its identifier. Both work: the identifier is the canonical handle, the
      * segment is what the URL actually carries.
      */
     private function resolve(string $screen): ?AdminScreen
@@ -79,22 +80,6 @@ class ScreenController
         }
 
         return null;
-    }
-
-    /**
-     * Whether a route other than skipper's binds the screen's declared path.
-     */
-    private function servedByItsOwnRoute(AdminScreen $entry): bool
-    {
-        $declared = trim($entry->path, '/');
-
-        foreach (app('router')->getRoutes()->getRoutes() as $route) {
-            if (trim($route->uri(), '/') === $declared && $route->getControllerClass() !== self::class) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /**
