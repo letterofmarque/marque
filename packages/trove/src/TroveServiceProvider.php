@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 use Marque\Trove\Console\Commands\CheckInfoHashes;
+use Marque\Trove\Contracts\StaffActionsInterface;
 use Marque\Trove\Contracts\TorrentServiceInterface;
 use Marque\Trove\Models\Torrent;
 use Marque\Trove\Policies\TorrentPolicy;
@@ -18,6 +19,7 @@ use Marque\Trove\Registry\DashboardPanelRegistry;
 use Marque\Trove\Registry\FooterItemRegistry;
 use Marque\Trove\Registry\NavRegistry;
 use Marque\Trove\Services\TorrentService;
+use Marque\Trove\Support\NullStaffActions;
 use Throwable;
 
 class TroveServiceProvider extends ServiceProvider
@@ -27,6 +29,11 @@ class TroveServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/trove.php', 'trove');
 
         $this->app->bind(TorrentServiceInterface::class, TorrentService::class);
+
+        // A default that records nothing, so packages record staff actions
+        // without asking whether anything stores them. bindIf, because a store
+        // (bosun) may register before trove does; its binding must stand.
+        $this->app->bindIf(StaffActionsInterface::class, NullStaffActions::class);
 
         // Singletons because they are shared collection points: every package
         // registers into the same instance, and the panel reads that instance
