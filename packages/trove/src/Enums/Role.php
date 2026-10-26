@@ -12,6 +12,15 @@ enum Role: string
     case Admin = 'admin';
 
     /**
+     * The tracker's owner, above every admin.
+     *
+     * Only an owner grants or removes Owner and Admin, so admins can't demote
+     * each other or the owner. An owner is an admin for every other purpose:
+     * isAdmin() is true for them, and anything gated at Admin admits them.
+     */
+    case Owner = 'owner';
+
+    /**
      * Get the numeric rank for comparison.
      * Higher rank = more permissions.
      */
@@ -22,6 +31,7 @@ enum Role: string
             self::Uploader => 1,
             self::Moderator => 2,
             self::Admin => 3,
+            self::Owner => 4,
         };
     }
 

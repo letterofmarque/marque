@@ -24,11 +24,22 @@ trait HasRoles
     }
 
     /**
-     * Check if user is an admin.
+     * Check if user is an admin or above.
+     *
+     * Before trove 5 this was an exact match on Admin. It means admin-or-above
+     * now, so every "admins may" check admits the owner too.
      */
     public function isAdmin(): bool
     {
-        return $this->role === Role::Admin;
+        return $this->role->isAtLeast(Role::Admin);
+    }
+
+    /**
+     * Check if user is the tracker's owner.
+     */
+    public function isOwner(): bool
+    {
+        return $this->role === Role::Owner;
     }
 
     /**

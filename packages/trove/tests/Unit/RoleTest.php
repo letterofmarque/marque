@@ -6,11 +6,12 @@ use Marque\Trove\Enums\Role;
 
 describe('Role enum', function () {
     it('has expected cases', function () {
-        expect(Role::cases())->toHaveCount(4);
+        expect(Role::cases())->toHaveCount(5);
         expect(Role::User->value)->toBe('user');
         expect(Role::Uploader->value)->toBe('uploader');
         expect(Role::Moderator->value)->toBe('moderator');
         expect(Role::Admin->value)->toBe('admin');
+        expect(Role::Owner->value)->toBe('owner');
     });
 
     it('has correct rank ordering', function () {
@@ -18,6 +19,7 @@ describe('Role enum', function () {
         expect(Role::Uploader->rank())->toBe(1);
         expect(Role::Moderator->rank())->toBe(2);
         expect(Role::Admin->rank())->toBe(3);
+        expect(Role::Owner->rank())->toBe(4);
     });
 
     it('compares roles with isAtLeast', function () {
@@ -32,6 +34,17 @@ describe('Role enum', function () {
 
         expect(Role::User->isAtLeast(Role::User))->toBeTrue();
         expect(Role::User->isAtLeast(Role::Uploader))->toBeFalse();
+    });
+
+    it('ranks Owner above every other role', function () {
+        foreach (Role::cases() as $role) {
+            expect(Role::Owner->isAtLeast($role))->toBeTrue();
+        }
+
+        expect(Role::Owner->isHigherThan(Role::Admin))->toBeTrue();
+        expect(Role::Admin->isAtLeast(Role::Owner))->toBeFalse();
+        expect(Role::atLeast(Role::Admin))->toContain(Role::Owner);
+        expect(array_values(Role::atLeast(Role::Owner)))->toBe([Role::Owner]);
     });
 
     it('compares roles with isHigherThan', function () {
@@ -51,6 +64,7 @@ describe('Role enum', function () {
     });
 
     it('can be created from string value', function () {
+        expect(Role::from('owner'))->toBe(Role::Owner);
         expect(Role::from('admin'))->toBe(Role::Admin);
         expect(Role::from('moderator'))->toBe(Role::Moderator);
         expect(Role::from('uploader'))->toBe(Role::Uploader);

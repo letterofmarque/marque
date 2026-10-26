@@ -13,14 +13,23 @@ describe('HasRoles trait', function () {
         expect($user->role)->toBe(Role::Admin);
     });
 
-    it('checks if user is admin', function () {
+    it('checks if user is admin or above', function () {
+        $owner = TestUser::factory()->owner()->create();
         $admin = TestUser::factory()->admin()->create();
         $moderator = TestUser::factory()->moderator()->create();
         $user = TestUser::factory()->create();
 
+        // An owner is an admin too: every "admins may" check admits them.
+        expect($owner->isAdmin())->toBeTrue();
         expect($admin->isAdmin())->toBeTrue();
         expect($moderator->isAdmin())->toBeFalse();
         expect($user->isAdmin())->toBeFalse();
+    });
+
+    it('checks if user is the owner', function () {
+        expect(TestUser::factory()->owner()->create()->isOwner())->toBeTrue();
+        expect(TestUser::factory()->admin()->create()->isOwner())->toBeFalse();
+        expect(TestUser::factory()->create()->isOwner())->toBeFalse();
     });
 
     it('checks if user is moderator or higher', function () {
@@ -54,5 +63,6 @@ describe('HasRoles trait', function () {
         expect($moderator->hasRoleAtLeast(Role::Uploader))->toBeTrue();
         expect($moderator->hasRoleAtLeast(Role::Moderator))->toBeTrue();
         expect($moderator->hasRoleAtLeast(Role::Admin))->toBeFalse();
+        expect(TestUser::factory()->owner()->create()->hasRoleAtLeast(Role::Admin))->toBeTrue();
     });
 });

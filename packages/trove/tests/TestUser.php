@@ -69,4 +69,9 @@ class TestUserFactory extends Factory
     {
         return $this->state(fn () => ['role' => Role::Admin->value]);
     }
+
+    public function owner(): static
+    {
+        return $this->state(fn () => ['role' => Role::Owner->value]);
+    }
 }

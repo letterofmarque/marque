@@ -12,7 +12,12 @@ use Marque\Trove\Enums\Role;
  */
 interface UserInterface extends Authenticatable
 {
+    /**
+     * Admin or above: true for the owner too.
+     */
     public function isAdmin(): bool;
+
+    public function isOwner(): bool;
 
     public function isModerator(): bool;
 

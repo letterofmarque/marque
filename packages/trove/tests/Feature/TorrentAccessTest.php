@@ -60,7 +60,8 @@ describe('min_role listing scope', function () {
 
         expect($names(ViewerScope::guest()))->toBe(['open'])
             ->and($names(ViewerScope::user(TestUser::factory()->uploader()->create())))->toBe(['open', 'uploader only'])
-            ->and($names(ViewerScope::user(TestUser::factory()->admin()->create())))->toBe(['admin only', 'open', 'uploader only']);
+            ->and($names(ViewerScope::user(TestUser::factory()->admin()->create())))->toBe(['admin only', 'open', 'uploader only'])
+            ->and($names(ViewerScope::user(TestUser::factory()->owner()->create())))->toBe(['admin only', 'open', 'uploader only']);
     });
 
     test('search cannot be used to reach a restricted torrent', function () {
