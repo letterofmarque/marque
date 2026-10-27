@@ -6,10 +6,15 @@ namespace Marque\Bosun;
 
 use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
 use Marque\Bosun\Console\PruneCommand;
 use Marque\Bosun\Http\Middleware\StampStaffPresence;
+use Marque\Bosun\Livewire\AuditLog;
 use Marque\Bosun\Store\DatabaseStaffActions;
 use Marque\Trove\Contracts\StaffActionsInterface;
+use Marque\Trove\Enums\Role;
+use Marque\Trove\Registry\AdminScreen;
+use Marque\Trove\Registry\AdminScreenRegistry;
 
 class BosunServiceProvider extends ServiceProvider
 {
@@ -29,6 +34,10 @@ class BosunServiceProvider extends ServiceProvider
 
         $this->app->make(Router::class)->pushMiddlewareToGroup('web', StampStaffPresence::class);
 
+        Livewire::component('bosun-audit-log', AuditLog::class);
+
+        $this->registerAdminScreens();
+
         if ($this->app->runningInConsole()) {
             $this->commands([
                 PruneCommand::class,
@@ -46,5 +55,25 @@ class BosunServiceProvider extends ServiceProvider
                 __DIR__.'/../resources/views' => resource_path('views/vendor/bosun'),
             ], 'bosun-views');
         }
+    }
+
+    /**
+     * Admins and the owner only: each screen refuses anyone below Admin
+     * itself, so a lower floor here would offer a link that then 403s.
+     */
+    protected function registerAdminScreens(): void
+    {
+        $registry = $this->app->make(AdminScreenRegistry::class);
+
+        $registry->register(new AdminScreen(
+            identifier: 'bosun-audit-log',
+            label: 'Audit log',
+            component: 'bosun-audit-log',
+            path: 'admin/audit-log',
+            minimumRole: Role::Admin,
+            icon: 'clipboard-document-list',
+            group: 'Staff',
+            position: 20,
+        ));
     }
 }
