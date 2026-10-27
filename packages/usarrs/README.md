@@ -408,6 +408,14 @@ With no `actor`, the service applies the change without the staff rules. That's 
 code and the console, where whoever calls is already trusted. The last-owner rule holds
 either way.
 
+Each method also takes an optional `reason`. A ban, unban or role change made by an actor is
+recorded through trove's `StaffActionsInterface` (`usarrs.user.banned`, `usarrs.user.unbanned`,
+`usarrs.user.role_changed`), with the status or role before and after. So is revoking someone
+else's invite (`usarrs.invite.revoked`). With no store installed, the record goes nowhere.
+
+**Invites** follow the same rule: an invite is revoked by its creator, or by anyone who could
+manage the creator. So only an owner revokes an admin's or an owner's invite.
+
 ### Setting the first owner
 
 Only an owner grants Admin, so a tracker without one can never make another admin. Set the

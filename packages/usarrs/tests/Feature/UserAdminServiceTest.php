@@ -7,7 +7,7 @@ use Marque\Usarrs\Services\UserAdminService;
 use Marque\Usarrs\Tests\TestUser;
 
 beforeEach(function () {
-    $this->service = new UserAdminService;
+    $this->service = app(UserAdminService::class);
 });
 
 test('can list users', function () {

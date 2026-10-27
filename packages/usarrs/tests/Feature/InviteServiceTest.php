@@ -12,7 +12,7 @@ use Marque\Usarrs\Tests\TestUser;
 
 beforeEach(function () {
     $this->user = TestUser::factory()->create();
-    $this->service = new InviteService;
+    $this->service = app(InviteService::class);
     config()->set('usarrs.invites.enabled', true);
 });
 

@@ -6,10 +6,13 @@ namespace Marque\Usarrs\Services;
 
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Marque\Trove\Contracts\StaffActionsInterface;
 use Marque\Trove\Enums\Role;
+use Marque\Trove\Support\StaffAction;
 use Marque\Usarrs\Enums\UserStatus;
 
 /**
@@ -22,6 +25,10 @@ use Marque\Usarrs\Enums\UserStatus;
  */
 class UserAdminService
 {
+    public function __construct(
+        private readonly StaffActionsInterface $staffActions,
+    ) {}
+
     public function list(?string $search = null, ?string $role = null, ?string $status = null, int $perPage = 25): LengthAwarePaginator
     {
         $model = config('trove.user_model', 'App\\Models\\User');
@@ -37,28 +44,30 @@ class UserAdminService
             ->paginate($perPage);
     }
 
-    public function ban(Authenticatable $user, ?Authenticatable $actor = null): void
+    public function ban(Authenticatable $user, ?Authenticatable $actor = null, ?string $reason = null): void
     {
         $this->authorize($actor, 'ban', [$user]);
 
-        $user->update(['status' => UserStatus::Banned->value]);
+        $this->setStatus($user, UserStatus::Banned, 'usarrs.user.banned', $actor, $reason);
     }
 
-    public function unban(Authenticatable $user, ?Authenticatable $actor = null): void
+    public function unban(Authenticatable $user, ?Authenticatable $actor = null, ?string $reason = null): void
     {
         $this->authorize($actor, 'unban', [$user]);
 
-        $user->update(['status' => UserStatus::Active->value]);
+        $this->setStatus($user, UserStatus::Active, 'usarrs.user.unbanned', $actor, $reason);
     }
 
     /**
      * @throws AuthorizationException when the actor may not, or it would leave no owner
      */
-    public function setRole(Authenticatable $user, Role $role, ?Authenticatable $actor = null): void
+    public function setRole(Authenticatable $user, Role $role, ?Authenticatable $actor = null, ?string $reason = null): void
     {
         $this->authorize($actor, 'setRole', [$user, $role]);
 
-        DB::transaction(function () use ($user, $role): void {
+        DB::transaction(function () use ($user, $role, $actor, $reason): void {
+            $from = $user->role;
+
             if ($user->role === Role::Owner && $role !== Role::Owner) {
                 // The owner rows themselves are locked, so two owners
                 // demoting each other at once can't both see the other still
@@ -77,7 +86,40 @@ class UserAdminService
             }
 
             $user->update(['role' => $role->value]);
+
+            // Inside the transaction, so an action rolled back is never
+            // recorded as having happened.
+            $this->record($actor, 'usarrs.user.role_changed', $user, $reason, [
+                'role' => ['from' => $from instanceof Role ? $from->value : $from, 'to' => $role->value],
+            ]);
         });
+    }
+
+    protected function setStatus(Authenticatable $user, UserStatus $status, string $action, ?Authenticatable $actor, ?string $reason): void
+    {
+        DB::transaction(function () use ($user, $status, $action, $actor, $reason): void {
+            $from = $user->status;
+            $user->update(['status' => $status->value]);
+
+            $this->record($actor, $action, $user, $reason, [
+                'status' => ['from' => $from instanceof UserStatus ? $from->value : $from, 'to' => $status->value],
+            ]);
+        });
+    }
+
+    /**
+     * Only when someone acted: app code and the console pass no actor, and
+     * nobody did anything to anybody.
+     *
+     * @param  array<string, array{from: scalar|null, to: scalar|null}>  $changes
+     */
+    protected function record(?Authenticatable $actor, string $action, Authenticatable $subject, ?string $reason, array $changes): void
+    {
+        if ($actor === null || ! $subject instanceof Model) {
+            return;
+        }
+
+        $this->staffActions->record(StaffAction::of($actor, $action, $subject, $reason, $changes));
     }
 
     /**

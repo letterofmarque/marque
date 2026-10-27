@@ -14,7 +14,11 @@ interface InviteServiceInterface
 
     public function redeem(Invite $invite, Authenticatable $user): void;
 
-    public function revoke(Invite $invite): void;
+    /**
+     * With an actor, InvitePolicy::revoke is checked against them, and revoking
+     * someone else's invite is recorded as a staff action.
+     */
+    public function revoke(Invite $invite, ?Authenticatable $actor = null, ?string $reason = null): void;
 
     public function findByCode(string $code): ?Invite;
 

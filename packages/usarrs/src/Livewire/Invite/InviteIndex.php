@@ -23,13 +23,9 @@ class InviteIndex extends Component
 
     public function revoke(int $inviteId, InviteService $service): void
     {
-        $invite = Invite::findOrFail($inviteId);
-        abort_unless(
-            auth()->id() === $invite->creator_id || auth()->user()->isAdmin(),
-            403
-        );
-
-        $service->revoke($invite);
+        // InvitePolicy decides, through the service: the creator, or anyone
+        // who could manage the creator.
+        $service->revoke(Invite::findOrFail($inviteId), actor: auth()->user());
     }
 
     public function render(InviteService $service): View

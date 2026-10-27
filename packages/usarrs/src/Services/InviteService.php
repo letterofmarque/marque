@@ -6,7 +6,11 @@ namespace Marque\Usarrs\Services;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Notification;
+use Marque\Trove\Contracts\StaffActionsInterface;
+use Marque\Trove\Support\StaffAction;
 use Marque\Usarrs\Contracts\InviteServiceInterface;
 use Marque\Usarrs\Enums\InviteStatus;
 use Marque\Usarrs\Exceptions\InviteAlreadyRedeemed;
@@ -15,6 +19,10 @@ use Marque\Usarrs\Notifications\InviteNotification;
 
 class InviteService implements InviteServiceInterface
 {
+    public function __construct(
+        private readonly StaffActionsInterface $staffActions,
+    ) {}
+
     public function create(Authenticatable $creator, ?string $recipientEmail = null): Invite
     {
         $invite = Invite::create([
@@ -62,9 +70,23 @@ class InviteService implements InviteServiceInterface
         $invite->refresh();
     }
 
-    public function revoke(Invite $invite): void
+    public function revoke(Invite $invite, ?Authenticatable $actor = null, ?string $reason = null): void
     {
-        $invite->update(['status' => InviteStatus::Revoked->value]);
+        if ($actor !== null) {
+            Gate::forUser($actor)->authorize('revoke', $invite);
+        }
+
+        DB::transaction(function () use ($invite, $actor, $reason): void {
+            $from = $invite->status;
+            $invite->update(['status' => InviteStatus::Revoked->value]);
+
+            // Revoking your own invite is housekeeping, not a staff action.
+            if ($actor !== null && $actor->getAuthIdentifier() !== $invite->creator_id) {
+                $this->staffActions->record(StaffAction::of($actor, 'usarrs.invite.revoked', $invite, $reason, [
+                    'status' => ['from' => $from->value, 'to' => InviteStatus::Revoked->value],
+                ]));
+            }
+        });
     }
 
     public function findByCode(string $code): ?Invite

@@ -19,9 +19,25 @@ class InvitePolicy
         return config('usarrs.invites.enabled', false);
     }
 
+    /**
+     * Its creator, or anyone who could manage the creator (Dan, 2026-10-27).
+     *
+     * The same rule as banning or changing a role (UserPolicy): admins revoke
+     * the invites of users, uploaders and moderators, and only an owner revokes
+     * an admin's or an owner's. An invite whose creator is gone is any admin's.
+     */
     public function revoke(UserInterface $user, Invite $invite): bool
     {
-        return $user->getAuthIdentifier() === $invite->creator_id
-            || $user->isAdmin();
+        if ($user->getAuthIdentifier() === $invite->creator_id) {
+            return true;
+        }
+
+        $creator = $invite->creator;
+
+        if (! $creator instanceof UserInterface) {
+            return $user->isAdmin();
+        }
+
+        return (new UserPolicy)->promote($user, $creator);
     }
 }

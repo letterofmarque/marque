@@ -18,13 +18,23 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   included. Admins and owners are now managed by an owner alone, and only an owner grants
   Admin or Owner. Nobody bans themselves or changes their own role. The last owner can't be
   demoted (`AuthorizationException`).
-- **Requires `marque/trove` ^5.0**, for `Role::Owner`.
+- **An admin can no longer revoke an admin's or the owner's invite.** An invite is revoked
+  by its creator, or by anyone who could manage the creator (`InvitePolicy::revoke`, which
+  the invites screen now uses).
+- **`InviteServiceInterface::revoke()` takes optional `actor` and `reason`.** An
+  implementation of the interface must accept them.
+- **Requires `marque/trove` ^5.0**, for `Role::Owner` and `StaffActionsInterface`.
 
 ### Added
 
 - **`UserPolicy::setRole($user, $target, Role $role)` and `unban`.** `ban`, `unban`,
   `promote` and `setRole` hold the rules above.
-- **`UserAdminService::ban()`, `unban()` and `setRole()` take an optional `actor`.** Given
+- **Staff actions are recorded** through trove's `StaffActionsInterface`: a ban, an unban
+  and a role change made by an actor (`usarrs.user.banned`, `unbanned`, `role_changed`, with
+  the status or role before and after), and revoking someone else's invite
+  (`usarrs.invite.revoked`). With no store installed, nothing is kept. Recording happens
+  inside the change's transaction, so a change rolled back isn't recorded.
+- **`UserAdminService::ban()`, `unban()` and `setRole()` take optional `actor` and `reason`.** Given
   one, they check `UserPolicy` against it, so code calling the service gets the same answers
   as the screen. With no actor (app code, the console) the staff rules don't apply. The
   last-owner rule holds either way. It locks the owner rows, so two owners demoting each

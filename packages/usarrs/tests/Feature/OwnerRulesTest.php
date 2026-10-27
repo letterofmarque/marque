@@ -16,7 +16,7 @@ use Marque\Usarrs\Tests\TestUser;
  * themselves, and the last owner can't be demoted.
  */
 beforeEach(function () {
-    $this->service = new UserAdminService;
+    $this->service = app(UserAdminService::class);
     $this->owner = TestUser::factory()->owner()->create();
     $this->admin = TestUser::factory()->admin()->create();
     $this->moderator = TestUser::factory()->moderator()->create();
