@@ -7,14 +7,32 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [9.4.0] — 2026-10-27
+## [10.0.0] — 2026-10-27
 
-> Works with trove 5.0 as well as 4.x.
+> Exemptions and seedbox decisions are recorded as staff actions, and bloodhound:standing requires --by, as 9.x warned.
 
-### Changed
+### Breaking
 
-- **`marque/trove` widened to `^4.9|^5.0`.** Nothing here depends on what trove 5 changed: an
-  owner passes every admin check, because `isAdmin()` now means admin or above.
+- **Requires `marque/trove` ^5.0**, for `StaffActionsInterface`. An owner passes every admin
+  check, because `isAdmin()` now means admin or above.
+- **`bloodhound:standing exempt` and `unexempt` require `--by`**, the deciding admin's user
+  id. 9.x accepted `exempt` without it and warned that 10 would require it. A `--by` that
+  names no user is refused, as before.
+
+### Added
+
+- **Staff actions are recorded** through trove's `StaffActionsInterface`:
+  - an exemption granted or removed with an admin named (`bloodhound.exemption.granted` /
+    `removed`, with the reason);
+  - a seedbox approved or revoked (`bloodhound.seedbox.approved` / `revoked`, status before
+    and after).
+
+  These are staff decisions, so they're recorded whoever they're about, an admin's own
+  account included. With no store installed, nothing is kept. Each is recorded inside the
+  change's transaction.
+- **`RatioEnforcer::unexempt()` takes optional `by` and `reason`**, and
+  `bloodhound:standing unexempt` takes `--reason`. Unexempting a member who isn't exempt now
+  does nothing.
 
 ## [9.3.0] — 2026-10-25
 

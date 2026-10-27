@@ -6,6 +6,7 @@ namespace Marque\Bloodhound\Services;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Marque\Bloodhound\Events\MemberRestricted;
 use Marque\Bloodhound\Events\RatioWatchStarted;
 use Marque\Bloodhound\Events\StandingRestored;
@@ -13,8 +14,10 @@ use Marque\Bloodhound\Models\HitAndRunStrike;
 use Marque\Bloodhound\Models\MemberStanding;
 use Marque\Bloodhound\Models\TorrentUser;
 use Marque\Threepio\Services\PeerService;
+use Marque\Trove\Contracts\StaffActionsInterface;
 use Marque\Trove\Enums\Role;
 use Marque\Trove\Enums\StandingState;
+use Marque\Trove\Support\StaffAction;
 use Marque\Trove\Support\TrackerStanding;
 
 /**
@@ -49,6 +52,7 @@ class RatioEnforcer
     public function __construct(
         private readonly PeerService $peers,
         private readonly HitAndRunEnforcer $hitAndRun,
+        private readonly StaffActionsInterface $staffActions,
     ) {}
 
     /**
@@ -201,21 +205,31 @@ class RatioEnforcer
     /**
      * Take a member out of the rules, with the admin and reason on record.
      * Lifts a watch or restriction at once rather than at the next run.
+     *
+     * With an admin named (`by`), it's recorded as a staff action, whoever the
+     * member is: an admin exempting themselves is exactly what an audit is for.
      */
     public function exempt(int $userId, ?int $by, string $reason): void
     {
-        $standing = MemberStanding::query()->firstOrNew(['user_id' => $userId]);
-        $previous = StandingState::tryFrom((string) $standing->state);
+        $previous = DB::transaction(function () use ($userId, $by, $reason): ?StandingState {
+            $standing = MemberStanding::query()->firstOrNew(['user_id' => $userId]);
+            $previous = StandingState::tryFrom((string) $standing->state);
+            $wasExempt = $standing->exists && $standing->isExempted();
 
-        $standing->fill([
-            'state' => StandingState::Ok->value,
-            'watch_started_at' => null,
-            'deadline_at' => null,
-            'restricted_at' => null,
-            'exempted_at' => now(),
-            'exempted_by' => $by,
-            'exempt_reason' => $reason,
-        ])->save();
+            $standing->fill([
+                'state' => StandingState::Ok->value,
+                'watch_started_at' => null,
+                'deadline_at' => null,
+                'restricted_at' => null,
+                'exempted_at' => now(),
+                'exempted_by' => $by,
+                'exempt_reason' => $reason,
+            ])->save();
+
+            $this->record($by, 'bloodhound.exemption.granted', $userId, $reason, $wasExempt, true);
+
+            return $previous;
+        });
 
         if (in_array($previous, [StandingState::Watch, StandingState::Restricted], true)) {
             StandingRestored::dispatch($userId, $previous);
@@ -225,17 +239,39 @@ class RatioEnforcer
     /**
      * Put a member back under the rules. They are judged at the next run.
      */
-    public function unexempt(int $userId): void
+    public function unexempt(int $userId, ?int $by = null, ?string $reason = null): void
     {
-        $standing = MemberStanding::query()->where('user_id', $userId)->first();
+        DB::transaction(function () use ($userId, $by, $reason): void {
+            $standing = MemberStanding::query()->where('user_id', $userId)->first();
 
-        if ($standing === null) {
+            if ($standing === null || ! $standing->isExempted()) {
+                return;
+            }
+
+            $standing->fill(['exempted_at' => null, 'exempted_by' => null, 'exempt_reason' => null]);
+
+            $standing->state === StandingState::Ok->value ? $standing->delete() : $standing->save();
+
+            $this->record($by, 'bloodhound.exemption.removed', $userId, $reason, true, false);
+        });
+    }
+
+    private function record(?int $by, string $action, int $userId, ?string $reason, bool $from, bool $to): void
+    {
+        if ($by === null) {
             return;
         }
 
-        $standing->fill(['exempted_at' => null, 'exempted_by' => null, 'exempt_reason' => null]);
+        $userModel = config('trove.user_model', 'App\\Models\\User');
 
-        $standing->state === StandingState::Ok->value ? $standing->delete() : $standing->save();
+        $this->staffActions->record(new StaffAction(
+            actorId: $by,
+            action: $action,
+            subjectType: (new $userModel)->getMorphClass(),
+            subjectId: $userId,
+            reason: $reason,
+            changes: ['exempt' => ['from' => $from, 'to' => $to]],
+        ));
     }
 
     public function required(): float

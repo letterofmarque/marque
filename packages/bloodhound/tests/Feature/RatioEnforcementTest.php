@@ -361,22 +361,25 @@ describe('the command', function () {
             ->expectsOutputToContain('exempt')
             ->expectsOutputToContain('Donor')
             ->assertSuccessful();
-        $this->artisan('bloodhound:standing', ['action' => 'unexempt', 'user' => $member->id])
+        $this->artisan('bloodhound:standing', ['action' => 'unexempt', 'user' => $member->id, '--by' => $admin->id])
             ->assertSuccessful();
 
         expect(MemberStanding::query()->where('user_id', $member->id)->value('exempted_at'))->toBeNull();
     });
 
-    // TouchUp #57: who granted an exemption belongs on record. Required from
-    // 10.0; the 9.x docs showed it optional, so for now leaving it out warns.
-    it('warns, and still exempts, when --by is left out', function () {
+    // TouchUp #57: who granted an exemption belongs on record. 9.x warned that
+    // --by would be required from 10.0; it is.
+    it('refuses to exempt or unexempt without --by', function () {
         $member = member(uploaded: 0, downloaded: 50 * GIB);
 
         $this->artisan('bloodhound:standing', ['action' => 'exempt', 'user' => $member->id, '--reason' => 'Donor'])
-            ->expectsOutputToContain('required from bloodhound 10')
-            ->assertSuccessful();
+            ->expectsOutputToContain('--by')
+            ->assertFailed();
+        $this->artisan('bloodhound:standing', ['action' => 'unexempt', 'user' => $member->id])
+            ->expectsOutputToContain('--by')
+            ->assertFailed();
 
-        expect(MemberStanding::query()->where('user_id', $member->id)->value('exempted_at'))->not->toBeNull();
+        expect(MemberStanding::query()->where('user_id', $member->id)->value('exempted_at'))->toBeNull();
     });
 
     it('refuses a --by that names no user, and records nothing', function () {

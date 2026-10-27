@@ -17,6 +17,10 @@ use Marque\Trove\Support\StaffAction;
  * Installing a store starts the record from that day; removing it stops it.
  * Nothing else changes either way.
  *
+ * A singleton service resolves this when it records, not in its constructor:
+ * built before a store was bound, it would keep the do-nothing default for the
+ * rest of the process.
+ *
  * Record only what one person does to another's thing. Automatic enforcement
  * (a ratio watch starting, a hit-and-run strike) isn't a staff action.
  *

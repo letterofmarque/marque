@@ -6,6 +6,7 @@ namespace Marque\Bloodhound\Services;
 
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Marque\Bloodhound\Contracts\SeedboxRegistry;
 use Marque\Bloodhound\Events\SeedboxApproved;
@@ -14,8 +15,10 @@ use Marque\Bloodhound\Events\SeedboxRevoked;
 use Marque\Bloodhound\Models\Seedbox;
 use Marque\Bloodhound\Support\Network;
 use Marque\Trove\Contracts\SeedboxesInterface;
+use Marque\Trove\Contracts\StaffActionsInterface;
 use Marque\Trove\Contracts\UserInterface;
 use Marque\Trove\Support\Seedbox as SeedboxData;
+use Marque\Trove\Support\StaffAction;
 use Throwable;
 
 /**
@@ -160,13 +163,28 @@ final class Seedboxes implements SeedboxesInterface, SeedboxRegistry
 
     private function decide(int $seedboxId, string $status, UserInterface $admin): SeedboxData
     {
-        $seedbox = Seedbox::query()->findOrFail($seedboxId);
+        $seedbox = DB::transaction(function () use ($seedboxId, $status, $admin): Seedbox {
+            $seedbox = Seedbox::query()->findOrFail($seedboxId);
+            $from = $seedbox->status;
 
-        // Approving records who and when, and clears a past revocation;
-        // revoking records who and when, and keeps who approved it.
-        $seedbox->forceFill($status === SeedboxData::APPROVED
-            ? ['status' => $status, 'approved_at' => now(), 'approved_by' => $admin->getAuthIdentifier(), 'revoked_at' => null, 'revoked_by' => null]
-            : ['status' => $status, 'revoked_at' => now(), 'revoked_by' => $admin->getAuthIdentifier()])->save();
+            // Approving records who and when, and clears a past revocation;
+            // revoking records who and when, and keeps who approved it.
+            $seedbox->forceFill($status === SeedboxData::APPROVED
+                ? ['status' => $status, 'approved_at' => now(), 'approved_by' => $admin->getAuthIdentifier(), 'revoked_at' => null, 'revoked_by' => null]
+                : ['status' => $status, 'revoked_at' => now(), 'revoked_by' => $admin->getAuthIdentifier()])->save();
+
+            // A staff decision, recorded whoever's seedbox it is. Resolved here
+            // rather than injected: this service is a singleton, and a store
+            // bound after it was first built must still get the record.
+            app(StaffActionsInterface::class)->record(StaffAction::of(
+                $admin,
+                $status === SeedboxData::APPROVED ? 'bloodhound.seedbox.approved' : 'bloodhound.seedbox.revoked',
+                $seedbox,
+                changes: ['status' => ['from' => $from, 'to' => $status]],
+            ));
+
+            return $seedbox;
+        });
 
         $this->forget($seedbox->user_id);
 

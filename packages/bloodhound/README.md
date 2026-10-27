@@ -568,13 +568,13 @@ one member, with the reason and the admin on record:
 ```bash
 php artisan bloodhound:standing exempt 42 --reason="Donor" --by=1
 php artisan bloodhound:standing show 42
-php artisan bloodhound:standing unexempt 42     # judged again at the next run
+php artisan bloodhound:standing unexempt 42 --by=1     # judged again at the next run
 ```
 
-Exempting lifts a watch or restriction at once. `--by` is the deciding admin's user id, so
-the audit trail names who granted it. A `--by` that names no user is refused. Leaving it
-out still works in 9.x, with a warning, and the exemption records no admin. It will be
-required from bloodhound 10.
+Exempting lifts a watch or restriction at once. `--by`, the deciding admin's user id, is
+required for `exempt` and `unexempt`, so the audit trail names who decided. A `--by` that names
+no user is refused. Both are recorded as staff actions through trove's
+`StaffActionsInterface`, as is approving or revoking a seedbox.
 
 **Telling members.** Each change fires an event, and the member's standing is in
 `statsFor()` (trove's `TrackerStats::$standing`), which usarrs shows on the dashboard.
@@ -1075,7 +1075,7 @@ This is a Bloodhound feature and has no equivalent in [marque/hound](https://pac
 | `bloodhound:sync-swarm-counts` | Hourly | Sweeps expired peers, keeping their baselines; settles swarm counts |
 | `bloodhound:enforce-hit-and-run` | Hourly | Applies hit-and-run: pre-warns, strikes, clears strikes once seeded |
 | `bloodhound:enforce-ratio` | Hourly | Decides each member's standing from both rules: starts watches, restricts, restores |
-| `bloodhound:standing` | — | `show`, `exempt` (`--reason=`, `--by=`) or `unexempt` a member |
+| `bloodhound:standing` | — | `show`, `exempt` (`--reason=`, `--by=`) or `unexempt` (`--by=`) a member |
 | `bloodhound:check-redis` | — | Checks AOF and the eviction policy; `--recover` opens a recovery window |
 | `bloodhound:issue-keys` | — | Issues a key to every verified user without one, after an import; `--dry-run` |
 | `bloodhound:audit-ledger` | — | Checks every row's arithmetic and every peer's chain |

@@ -10,7 +10,7 @@ changelogs — edit those, not this.*
 
 ## 2026-10-27
 
-- **[bloodhound 9.4.0](packages/bloodhound/CHANGELOG.md)** — Works with trove 5.0 as well as 4.x.
+- **[bloodhound 10.0.0](packages/bloodhound/CHANGELOG.md)** — Exemptions and seedbox decisions are recorded as staff actions, and bloodhound:standing requires --by, as 9.x warned.
 - **[cennad 4.5.0](packages/cennad/CHANGELOG.md)** — Works with trove 5.0 as well as 4.x, and passes the editor to trove so a moderator's edit of someone else's torrent is recorded.
 - **[deck 2.2.0](packages/deck/CHANGELOG.md)** — Works with trove 5.0 as well as 4.x.
 - **[disguise 5.4.0](packages/disguise/CHANGELOG.md)** — Works with trove 5.0 as well as 4.x, and passes the editor to trove so a moderator's edit of someone else's torrent is recorded.

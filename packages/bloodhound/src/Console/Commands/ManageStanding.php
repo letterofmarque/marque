@@ -17,8 +17,8 @@ class ManageStanding extends Command
     protected $signature = 'bloodhound:standing
         {action : show, exempt or unexempt}
         {user : The member\'s user id}
-        {--reason= : Why they are exempt (required to exempt)}
-        {--by= : The deciding admin\'s user id (required from bloodhound 10)}';
+        {--reason= : Why (required to exempt; optional to unexempt)}
+        {--by= : The deciding admin\'s user id (required to exempt and unexempt)}';
 
     protected $description = 'Show a member\'s standing against the ratio rule, or exempt them from it';
 
@@ -69,22 +69,13 @@ class ManageStanding extends Command
             return $this->refuse('An exemption needs a reason: --reason="..."');
         }
 
-        // Who granted it, so the audit trail is never blank (TouchUp #57). A
-        // --by that names nobody is refused. Leaving it out still works, as
-        // the 9.x docs showed it, with a warning: it is required from 10.0.
-        $by = $this->option('by');
+        $by = $this->by();
 
-        if ($by !== null) {
-            $userModel = config('trove.user_model', 'App\\Models\\User');
-
-            if (! ctype_digit((string) $by) || ! $userModel::query()->whereKey((int) $by)->exists()) {
-                return $this->refuse("--by must be the deciding admin's user id; no user has id [{$by}].");
-            }
-        } else {
-            $this->warn('No --by: the exemption records no admin. Pass --by=<your user id>; it will be required from bloodhound 10.');
+        if ($by === null) {
+            return self::FAILURE;
         }
 
-        $enforcer->exempt($userId, $by === null ? null : (int) $by, $reason);
+        $enforcer->exempt($userId, $by, $reason);
         $this->info("Member {$userId} is exempt from the ratio rule.");
 
         return self::SUCCESS;
@@ -92,10 +83,42 @@ class ManageStanding extends Command
 
     private function unexempt(RatioEnforcer $enforcer, int $userId): int
     {
-        $enforcer->unexempt($userId);
+        $by = $this->by();
+
+        if ($by === null) {
+            return self::FAILURE;
+        }
+
+        $reason = trim((string) $this->option('reason'));
+        $enforcer->unexempt($userId, $by, $reason === '' ? null : $reason);
         $this->info("Member {$userId} is under the ratio rule again, judged at the next bloodhound:enforce-ratio.");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Who decided, so the audit trail is never blank (TouchUp #57). Required
+     * since bloodhound 10, as 9.x warned; a --by that names nobody is refused.
+     */
+    private function by(): ?int
+    {
+        $by = $this->option('by');
+
+        if ($by === null) {
+            $this->refuse('Name the deciding admin: --by=<your user id>.');
+
+            return null;
+        }
+
+        $userModel = config('trove.user_model', 'App\\Models\\User');
+
+        if (! ctype_digit((string) $by) || ! $userModel::query()->whereKey((int) $by)->exists()) {
+            $this->refuse("--by must be the deciding admin's user id; no user has id [{$by}].");
+
+            return null;
+        }
+
+        return (int) $by;
     }
 
     private function refuse(string $message): int
