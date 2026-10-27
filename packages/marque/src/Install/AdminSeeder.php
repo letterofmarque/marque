@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Marque\Marque\Install;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Hash;
 use Marque\Trove\Enums\Role;
 
@@ -33,12 +34,66 @@ use Marque\Trove\Enums\Role;
  */
 final class AdminSeeder
 {
+    /** An admin or owner already exists, and so does an owner: nothing to do. */
+    public const EXISTS = 'exists';
+
+    /** Admins exist but nobody is the owner, so nobody can grant Admin. */
+    public const EXISTS_WITHOUT_OWNER = 'exists_without_owner';
+
+    /** Someone already has the address, without being an admin. */
+    public const EMAIL_TAKEN = 'email_taken';
+
+    /** Created, and the owner. */
+    public const CREATED = 'created';
+
+    /** Created, but the role didn't stick: the account is not the owner. */
+    public const ROLE_NOT_SET = 'role_not_set';
+
+    /**
+     * Create the owner account, unless an admin already exists or the address
+     * is taken. Says what happened; FinishInstallCommand says it to the operator.
+     *
+     * @param  class-string<Model>  $users  the app's user model
+     */
+    public function seed(string $users, string $name, string $email): string
+    {
+        if ($this->adminExists(fn (): int => $users::query()->whereIn('role', $this->adminRoles())->count())) {
+            return $this->ownerMissing(fn (): int => $users::query()->where('role', $this->role())->count())
+                ? self::EXISTS_WITHOUT_OWNER
+                : self::EXISTS;
+        }
+
+        if ($users::query()->where('email', $email)->exists()) {
+            return self::EMAIL_TAKEN;
+        }
+
+        $owner = $users::query()->create($this->attributesFor($name, $email));
+
+        // Assigned rather than mass-assigned: stock Laravel's User declares
+        // #[Fillable] without `role`, so passing it to create() drops it
+        // silently and yields an "admin" that is not one.
+        $owner->role = $this->role();
+        $owner->save();
+
+        return $owner->fresh()?->isOwner() ? self::CREATED : self::ROLE_NOT_SET;
+    }
+
     /**
      * @param  callable(): int  $count  how many admins already exist
      */
     public function adminExists(callable $count): bool
     {
         return $count() > 0;
+    }
+
+    /**
+     * The first account at Admin or above, owner included.
+     *
+     * @param  class-string<Model>  $users
+     */
+    public function firstAdmin(string $users): ?Model
+    {
+        return $users::query()->whereIn('role', $this->adminRoles())->first();
     }
 
     /**

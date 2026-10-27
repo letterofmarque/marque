@@ -64,10 +64,10 @@ abstract class TestCase extends BaseTestCase
     {
         $app['config']->set('app.key', 'base64:'.base64_encode(random_bytes(32)));
 
-        // No database is touched by this package's own suite: it ships no
-        // migrations and no models. The connection is still declared so a
-        // cross-engine run (DB_CONNECTION=mysql ...) has somewhere to point
-        // rather than failing on a missing config key.
+        // This package ships no migrations and no models. One test touches
+        // the database (AdminSeedingTest, which builds its own users table),
+        // so the connection follows a cross-engine run (DB_CONNECTION=mysql ...)
+        // like every other package's.
         $app['config']->set('database.default', 'testing');
         $app['config']->set('database.connections.testing', match (env('DB_CONNECTION', 'sqlite')) {
             'mysql' => [

@@ -108,33 +108,25 @@ class FinishInstallCommand extends Command
             return;
         }
 
-        $seeder = new AdminSeeder;
+        $outcome = (new AdminSeeder)->seed($users, $this->adminName, $this->adminEmail);
 
-        if ($seeder->adminExists(fn (): int => $users::query()->whereIn('role', $seeder->adminRoles())->count())) {
+        if ($outcome === AdminSeeder::EXISTS || $outcome === AdminSeeder::EXISTS_WITHOUT_OWNER) {
             $this->components->task('An admin already exists — leaving it alone');
 
-            if ($seeder->ownerMissing(fn (): int => $users::query()->where('role', $seeder->role())->count())) {
+            if ($outcome === AdminSeeder::EXISTS_WITHOUT_OWNER) {
                 $this->components->warn('No one is the owner, and only an owner can grant Admin. Make one: php artisan usarrs:owner <email>');
             }
 
             return;
         }
 
-        if ($users::query()->where('email', $this->adminEmail)->exists()) {
+        if ($outcome === AdminSeeder::EMAIL_TAKEN) {
             $this->components->warn("A user with {$this->adminEmail} already exists — skipping.");
 
             return;
         }
 
-        $admin = $users::query()->create($seeder->attributesFor($this->adminName, $this->adminEmail));
-
-        // Assigned rather than mass-assigned: stock Laravel's User declares
-        // #[Fillable] without `role`, so passing it to create() drops it
-        // silently and yields an "admin" that is not one.
-        $admin->role = $seeder->role();
-        $admin->save();
-
-        if (! $admin->isOwner()) {
+        if ($outcome === AdminSeeder::ROLE_NOT_SET) {
             $this->components->error('The admin account was created but could not be made the owner.');
             $this->line('  Set it by hand: php artisan usarrs:owner '.$this->adminEmail);
 
@@ -272,7 +264,7 @@ class FinishInstallCommand extends Command
             return null;
         }
 
-        return $users::query()->whereIn('role', (new AdminSeeder)->adminRoles())->first();
+        return (new AdminSeeder)->firstAdmin($users);
     }
 
     /**
