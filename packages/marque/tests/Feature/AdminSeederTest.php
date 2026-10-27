@@ -99,8 +99,25 @@ final class AdminSeederTest extends TestCase
         $this->assertArrayNotHasKey('role', $attributes);
     }
 
-    public function test_the_role_is_exposed_separately(): void
+    public function test_the_first_account_is_seeded_as_the_owner(): void
     {
-        $this->assertSame('admin', (new AdminSeeder)->role());
+        // Only an owner grants Admin. A first account seeded as a plain admin
+        // would leave nobody able to make another one.
+        $this->assertSame('owner', (new AdminSeeder)->role());
+    }
+
+    public function test_an_owner_counts_as_an_existing_admin(): void
+    {
+        // Looking for 'admin' alone would miss the owner this seeds, and a
+        // second install run would seed another.
+        $this->assertSame(['admin', 'owner'], (new AdminSeeder)->adminRoles());
+    }
+
+    public function test_an_install_with_admins_but_no_owner_is_reported(): void
+    {
+        $seeder = new AdminSeeder;
+
+        $this->assertTrue($seeder->ownerMissing(fn (): int => 0));
+        $this->assertFalse($seeder->ownerMissing(fn (): int => 1));
     }
 }

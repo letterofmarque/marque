@@ -5,9 +5,14 @@ declare(strict_types=1);
 namespace Marque\Marque\Install;
 
 use Illuminate\Support\Facades\Hash;
+use Marque\Trove\Enums\Role;
 
 /**
  * Creates the first admin — without anybody choosing a password.
+ *
+ * Seeded as the tracker's **owner** (trove 5): an admin who can also grant
+ * Admin. Only an owner can, so a first account seeded as a plain admin would
+ * leave an install where nobody can ever make another admin.
  *
  * A fresh install has no admin and no way to make one: `role` defaults to
  * 'user', and no package ships a command to promote anybody, so the first
@@ -34,6 +39,28 @@ final class AdminSeeder
     public function adminExists(callable $count): bool
     {
         return $count() > 0;
+    }
+
+    /**
+     * The role values that count as an admin: Admin and above, so an owner
+     * counts. A lookup for 'admin' alone would miss the owner this seeds.
+     *
+     * @return list<string>
+     */
+    public function adminRoles(): array
+    {
+        return array_map(fn (Role $role): string => $role->value, array_values(Role::atLeast(Role::Admin)));
+    }
+
+    /**
+     * Whether an install whose admins already exist still has nobody who can
+     * grant Admin: one from before trove 5 had an Owner role.
+     *
+     * @param  callable(): int  $owners  how many owners exist
+     */
+    public function ownerMissing(callable $owners): bool
+    {
+        return $owners() === 0;
     }
 
     /**
@@ -84,6 +111,6 @@ final class AdminSeeder
      */
     public function role(): string
     {
-        return 'admin';
+        return Role::Owner->value;
     }
 }

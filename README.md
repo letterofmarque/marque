@@ -77,7 +77,8 @@ already done. It still asks the site name and whether to create an admin.
 **You will need a mailer configured first.** Registration, password reset and
 invites all need one, and the installer sets up your admin account by emailing
 you a link to choose a password — so without mail you would end up with an
-account you could never sign in as. The installer refuses to start while
+account you could never sign in as. That account is the tracker's owner: an admin
+who can also grant Admin, which nobody else can. The installer refuses to start while
 `MAIL_MAILER` is `log`, `array` or unset, or `smtp` with no host. It checks the
 setting, not that mail actually arrives.
 

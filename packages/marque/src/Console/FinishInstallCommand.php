@@ -110,8 +110,12 @@ class FinishInstallCommand extends Command
 
         $seeder = new AdminSeeder;
 
-        if ($seeder->adminExists(fn (): int => $users::query()->where('role', 'admin')->count())) {
+        if ($seeder->adminExists(fn (): int => $users::query()->whereIn('role', $seeder->adminRoles())->count())) {
             $this->components->task('An admin already exists — leaving it alone');
+
+            if ($seeder->ownerMissing(fn (): int => $users::query()->where('role', $seeder->role())->count())) {
+                $this->components->warn('No one is the owner, and only an owner can grant Admin. Make one: php artisan usarrs:owner <email>');
+            }
 
             return;
         }
@@ -130,14 +134,14 @@ class FinishInstallCommand extends Command
         $admin->role = $seeder->role();
         $admin->save();
 
-        if (! $admin->isAdmin()) {
-            $this->components->error('The admin account was created but could not be given the admin role.');
-            $this->line('  Set it by hand: UPDATE users SET role = \'admin\' WHERE email = \''.$this->adminEmail.'\';');
+        if (! $admin->isOwner()) {
+            $this->components->error('The admin account was created but could not be made the owner.');
+            $this->line('  Set it by hand: php artisan usarrs:owner '.$this->adminEmail);
 
             return;
         }
 
-        $this->components->task("Admin account created for {$this->adminEmail}");
+        $this->components->task("Admin account created for {$this->adminEmail}, as the owner");
 
         $status = Password::sendResetLink(['email' => $this->adminEmail]);
 
@@ -268,7 +272,7 @@ class FinishInstallCommand extends Command
             return null;
         }
 
-        return $users::query()->where('role', 'admin')->first();
+        return $users::query()->whereIn('role', (new AdminSeeder)->adminRoles())->first();
     }
 
     /**
