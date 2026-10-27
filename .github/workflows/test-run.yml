@@ -60,6 +60,7 @@ jobs:
           - parley
           - taxonomy
           - skipper
+          - bosun
           - marque
 
     name: ${{ matrix.package }} (${{ matrix.database }}, PHP ${{ matrix.php }}, ${{ matrix.dependencies }})

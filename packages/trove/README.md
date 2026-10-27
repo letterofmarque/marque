@@ -407,8 +407,7 @@ passes every admin check.
 ## Staff actions
 
 Record what staff do through `StaffActionsInterface`. trove binds one that does nothing, so
-record unconditionally. Installing a store starts the record from that day. Bosun, the planned
-staff management package, will be one.
+record unconditionally. Installing a store such as `marque/bosun` starts the record from that day.
 
 ```php
 use Marque\Trove\Contracts\StaffActionsInterface;

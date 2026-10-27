@@ -115,7 +115,7 @@ the other.
 `Marque\Trove\Support\StaffAction` value object (its constructor parameters, `of()` and
 `package()`), and the failure rules the interface's docblock sets out (fail open, or fail
 closed on purpose) are **public API from trove 5.0**. Every package records through it, and a
-store implements it (bosun, the planned staff management package). The same rules as the registries apply: an
+store such as `marque/bosun` implements it. The same rules as the registries apply: an
 optional parameter or a new method is **minor**, and changing or removing one is **major on
 trove**. Which actions a package records, and their names, version with that package. A
 renamed action is a breaking change for anyone filtering on it.
@@ -145,7 +145,7 @@ technical reason.
 
 The cost is that **the test suite is pinned to Pest 4**, because Pest 5 requires PHP 8.4.
 Adopting any Pest 5 feature means raising the PHP floor back to 8.4, which is a MAJOR for
-all fourteen packages. The suite uses only long-standing Pest features (`it`, `test`,
+all fifteen packages. The suite uses only long-standing Pest features (`it`, `test`,
 `expect`, `describe`, `beforeEach`, `afterEach`, datasets via `->with()` and `dataset()`,
 `->throws()`, `uses()` and `pest()->extend()`), none of them Pest 5-only, so nothing is lost today. But TIA
 (test-impact analysis), the agent browser plugin, built-in Rector and agent evals are all

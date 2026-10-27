@@ -31,8 +31,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 - **`StaffActionsInterface::record(StaffAction)`**, where staff actions are recorded: a
   ban, a role change, a torrent edited by someone who isn't its uploader. trove binds
   `NullStaffActions`, which does nothing, so packages record unconditionally and never ask
-  whether a store is installed. Bosun, the planned staff management package, will store
-  them. A store bound before or after
+  whether a store is installed. `marque/bosun` stores them. A store bound before or after
   trove keeps its binding.
 - **`StaffAction`**: who (`actorId`), what (`action`, named `<package>.<subject>.<verb>`,
   e.g. `usarrs.user.role_changed`), to which record (`subjectType`, `subjectId`), why

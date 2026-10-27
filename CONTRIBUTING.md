@@ -95,7 +95,7 @@ A change spanning multiple packages is fine as one branch.
 
 ## Monorepo Structure
 
-Marque is a monorepo. All fourteen packages live in `packages/` and are split to
+Marque is a monorepo. All fifteen packages live in `packages/` and are split to
 individual read-only repos on push to `main`:
 
 ```
@@ -131,7 +131,7 @@ Those are generated mirrors — issues and pull requests are turned off on all o
 **PHP 8.3 is the floor deliberately**, matching Laravel 13's own. One consequence worth
 knowing before you touch `composer.json`: the test suite is pinned to **Pest 4**, because
 Pest 5 requires PHP 8.4 and adopting it would raise the floor for every consumer — a MAJOR
-across all fourteen packages. See [VERSIONING.md](VERSIONING.md#dependencies-and-floors) for
+across all fifteen packages. See [VERSIONING.md](VERSIONING.md#dependencies-and-floors) for
 the full reasoning and the transitive traps that go with it.
 
 ### Clone and Install

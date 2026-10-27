@@ -47,6 +47,8 @@ jobs:
             repo_name: 'taxonomy'
           - local_path: 'packages/skipper'
             repo_name: 'skipper'
+          - local_path: 'packages/bosun'
+            repo_name: 'bosun'
           # Splits to letterofmarque/installer, not .../marque — that name is
           # the monorepo itself, and the split action would overwrite it with
           # package-only history. The Packagist name stays marque/marque.

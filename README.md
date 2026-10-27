@@ -22,6 +22,7 @@ Built by [Letter Of Marque Software](https://lom.software).
 | [marque/parley](packages/parley) | Polymorphic threaded discussion (torrent comments + forum) |
 | [marque/taxonomy](packages/taxonomy) | Declarative content-type engine (YAML-defined levels + facets) |
 | [marque/skipper](packages/skipper) | Admin panel — renders the admin screens packages register |
+| [marque/bosun](packages/bosun) | Staff management — the staff action log, staff presence, Staff and Audit log screens |
 
 ## Requirements
 
@@ -155,12 +156,16 @@ composer require marque/taxonomy
 
 # Admin panel — lists the admin screens your installed packages register
 composer require marque/skipper
+
+# Staff management — who did what, the owner's Staff and Audit log screens
+composer require marque/bosun
 ```
 
 ## Features
 
 ### Trove (Core)
-- Role-based access control (user, uploader, moderator, admin)
+- Role-based access control (user, uploader, moderator, admin, owner)
+- A staff actions contract every package records through (bosun stores them)
 - Torrent model with file parsing and info_hash extraction
 - Tracker stats contract, so frontends can show a member's figures and standing (bloodhound fills it)
 - Configurable policies for torrent management
@@ -210,6 +215,14 @@ composer require marque/skipper
   `rename_level` preserves every existing classification through a rename
 - Classification data is never deleted by a definition edit — orphaned rows remain and are
   recoverable, enforced by foreign keys rather than by convention
+
+### Bosun (Staff)
+- A record of every staff action across the suite (bans, role changes, torrent edits,
+  forum moderation, catalogue edits): who, what, to which record, why and what changed
+- Fails open: a record that can't be stored never blocks the staff action
+- The Staff screen: staff by role, actions over 7/30/90 days, last seen, and role changes
+  with a required reason under the owner rules
+- The Audit log: every staff action, filterable by staff member, action, subject and date
 - Cascading upload form and an admin screen that populates declared levels but deliberately
   cannot create or remove one
 - Ships no domain vocabulary at all; your app declares its own levels and facets in YAML
