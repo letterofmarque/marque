@@ -7,15 +7,22 @@ namespace Marque\Trove\Services;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Marque\Threepio\Support\Bencode;
+use Marque\Trove\Contracts\StaffActionsInterface;
 use Marque\Trove\Contracts\TorrentServiceInterface;
 use Marque\Trove\Exceptions\TorrentRefused;
 use Marque\Trove\Models\Torrent;
+use Marque\Trove\Support\StaffAction;
 use Marque\Trove\Support\ViewerScope;
 
 class TorrentService implements TorrentServiceInterface
 {
+    public function __construct(
+        private readonly StaffActionsInterface $staffActions,
+    ) {}
+
     /**
      * Get paginated list of torrents.
      *
@@ -126,29 +133,70 @@ class TorrentService implements TorrentServiceInterface
     /**
      * Update a torrent.
      *
+     * Pass whoever is editing as `actor`: when it isn't the uploader, the edit
+     * is a staff action and is recorded, with the fields that moved.
+     *
      * @param  array{name?: string, description?: string|null}  $data
      */
-    public function update(Torrent $torrent, array $data): Torrent
+    public function update(Torrent $torrent, array $data, ?Authenticatable $actor = null, ?string $reason = null): Torrent
     {
-        $torrent->update([
-            'name' => $data['name'] ?? $torrent->name,
-            'description' => array_key_exists('description', $data) ? $data['description'] : $torrent->description,
-        ]);
+        DB::transaction(function () use ($torrent, $data, $actor, $reason): void {
+            $torrent->fill([
+                'name' => $data['name'] ?? $torrent->name,
+                'description' => array_key_exists('description', $data) ? $data['description'] : $torrent->description,
+            ]);
+
+            $changes = [];
+
+            foreach ($torrent->getDirty() as $field => $to) {
+                $changes[$field] = ['from' => $torrent->getOriginal($field), 'to' => $to];
+            }
+
+            $torrent->save();
+
+            if ($changes !== [] && $this->actedOnAnothers($actor, $torrent)) {
+                $this->staffActions->record(StaffAction::of($actor, 'trove.torrent.edited', $torrent, $reason, $changes));
+            }
+        });
 
         return $torrent->fresh();
     }
 
     /**
      * Delete a torrent.
+     *
+     * Deleting someone else's torrent is a staff action and is recorded, with
+     * its name, so the record still says what went. The stored .torrent file
+     * goes only once the row has, so a store that refuses the record can't
+     * leave a torrent without its file.
      */
-    public function delete(Torrent $torrent): bool
+    public function delete(Torrent $torrent, ?Authenticatable $actor = null, ?string $reason = null): bool
     {
-        // Delete the stored .torrent file if it exists
-        if ($torrent->torrent_file) {
+        $deleted = DB::transaction(function () use ($torrent, $actor, $reason): bool {
+            $deleted = (bool) $torrent->delete();
+
+            if ($deleted && $this->actedOnAnothers($actor, $torrent)) {
+                $this->staffActions->record(StaffAction::of($actor, 'trove.torrent.deleted', $torrent, $reason, [
+                    'name' => ['from' => $torrent->name, 'to' => null],
+                ]));
+            }
+
+            return $deleted;
+        });
+
+        if ($deleted && $torrent->torrent_file) {
             Storage::disk(config('trove.storage_disk', 'local'))->delete($torrent->torrent_file);
         }
 
-        return $torrent->delete();
+        return $deleted;
+    }
+
+    /**
+     * @phpstan-assert-if-true Authenticatable $actor
+     */
+    protected function actedOnAnothers(?Authenticatable $actor, Torrent $torrent): bool
+    {
+        return $actor !== null && $actor->getAuthIdentifier() !== $torrent->user_id;
     }
 
     /**

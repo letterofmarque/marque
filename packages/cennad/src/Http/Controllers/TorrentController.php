@@ -98,7 +98,9 @@ class TorrentController extends Controller
             'description' => 'nullable|string|max:10000',
         ]);
 
-        $updated = $this->service->update($torrent, $validated);
+        // The editor, so trove records it when it isn't the uploader's own
+        // edit. Positional: on trove 4 the extra argument is simply ignored.
+        $updated = $this->service->update($torrent, $validated, $request->user());
 
         return new TorrentResource($updated->load('user'));
     }
@@ -106,11 +108,11 @@ class TorrentController extends Controller
     /**
      * Remove the specified torrent.
      */
-    public function destroy(Torrent $torrent): JsonResponse
+    public function destroy(Request $request, Torrent $torrent): JsonResponse
     {
         $this->authorize('delete', $torrent);
 
-        $this->service->delete($torrent);
+        $this->service->delete($torrent, $request->user());
 
         return response()->json(null, 204);
     }

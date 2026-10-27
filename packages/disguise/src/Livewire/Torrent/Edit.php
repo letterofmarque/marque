@@ -38,10 +38,12 @@ class Edit extends Component
 
         $this->validate();
 
+        // The editor, so trove records it when it isn't the uploader's own
+        // edit. Positional: on trove 4 the extra argument is simply ignored.
         $service->update($this->torrent, [
             'name' => $this->name,
             'description' => $this->description ?: null,
-        ]);
+        ], auth()->user());
 
         session()->flash('status', 'Torrent updated successfully.');
 

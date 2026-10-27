@@ -9,7 +9,7 @@ use Marque\Trove\Support\ViewerScope;
 use Marque\Trove\Tests\TestUser;
 
 beforeEach(function () {
-    $this->service = new TorrentService;
+    $this->service = app(TorrentService::class);
 });
 
 describe('min_role listing scope', function () {

@@ -12,7 +12,7 @@ use Marque\Trove\Tests\TestUser;
 
 beforeEach(function () {
     $this->user = TestUser::factory()->create();
-    $this->service = new TorrentService;
+    $this->service = app(TorrentService::class);
 });
 
 describe('TorrentService', function () {

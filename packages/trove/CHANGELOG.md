@@ -22,6 +22,9 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   itself.
 - **`UserInterface` gains `isOwner()`.** A user model using `HasRoles` already has it. A
   hand-written implementation must add it.
+- **`TorrentServiceInterface::update()` and `delete()` take optional `actor` and `reason`.**
+  An implementation of the interface must accept them. `TorrentService` takes the staff
+  actions store in its constructor, so resolve it from the container rather than `new`.
 
 ### Added
 
@@ -36,6 +39,11 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   (`reason`), what moved (`changes`: `field => [from, to]`, scalars or null) and when
   (`at`, default now). `StaffAction::of($actor, $action, $model, …)` builds one from the
   models. A malformed name or change throws.
+- **A torrent edited or deleted by someone who isn't its uploader is recorded**
+  (`trove.torrent.edited` with the fields that moved, `trove.torrent.deleted` with its name),
+  when `TorrentService` is given the actor. An uploader's own edit, and an edit that changed
+  nothing, aren't. A delete now removes the stored .torrent file only after the row and its
+  record are committed.
 - The contract says what a failed record does. An implementation either **fails open**:
   it never throws, and runs its writes in a savepoint so the caller's transaction
   survives. On PostgreSQL one failed statement aborts the whole transaction, so a catch

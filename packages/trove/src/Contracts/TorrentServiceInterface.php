@@ -52,7 +52,11 @@ interface TorrentServiceInterface
     /**
      * @param  array{name?: string, description?: string|null}  $data
      */
-    public function update(Torrent $torrent, array $data): Torrent;
+    public function update(Torrent $torrent, array $data, ?Authenticatable $actor = null, ?string $reason = null): Torrent;
 
-    public function delete(Torrent $torrent): bool;
+    /**
+     * With an actor who isn't the uploader, the edit or delete is recorded
+     * as a staff action (StaffActionsInterface).
+     */
+    public function delete(Torrent $torrent, ?Authenticatable $actor = null, ?string $reason = null): bool;
 }

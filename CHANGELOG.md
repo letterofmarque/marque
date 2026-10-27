@@ -11,10 +11,10 @@ changelogs — edit those, not this.*
 ## 2026-10-27
 
 - **[bloodhound 9.4.0](packages/bloodhound/CHANGELOG.md)** — Works with trove 5.0 as well as 4.x.
-- **[cennad 4.5.0](packages/cennad/CHANGELOG.md)** — Works with trove 5.0 as well as 4.x.
+- **[cennad 4.5.0](packages/cennad/CHANGELOG.md)** — Works with trove 5.0 as well as 4.x, and passes the editor to trove so a moderator's edit of someone else's torrent is recorded.
 - **[deck 2.2.0](packages/deck/CHANGELOG.md)** — Works with trove 5.0 as well as 4.x.
-- **[disguise 5.4.0](packages/disguise/CHANGELOG.md)** — Works with trove 5.0 as well as 4.x.
-- **[guise 5.4.0](packages/guise/CHANGELOG.md)** — Works with trove 5.0 as well as 4.x.
+- **[disguise 5.4.0](packages/disguise/CHANGELOG.md)** — Works with trove 5.0 as well as 4.x, and passes the editor to trove so a moderator's edit of someone else's torrent is recorded.
+- **[guise 5.4.0](packages/guise/CHANGELOG.md)** — Works with trove 5.0 as well as 4.x, and passes the editor to trove so a moderator's edit of someone else's torrent is recorded.
 - **[hound 5.1.0](packages/hound/CHANGELOG.md)** — Works with trove 5.0 as well as 4.x.
 - **[marque 2.0.0](packages/marque/CHANGELOG.md)** — The admin account the installer creates is the tracker's owner, so a fresh install can grant Admin.
 - **[parley 3.1.0](packages/parley/CHANGELOG.md)** — Works with trove 5.0 as well as 4.x.
