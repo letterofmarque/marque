@@ -5,6 +5,15 @@ All notable changes to `marque/taxonomy` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] — 2026-10-27
+
+> Works with trove 5.0 as well as 4.x.
+
+### Changed
+
+- **`marque/trove` widened to `^4.2|^5.0`.** Nothing here depends on what trove 5 changed: an
+  owner passes every admin check, because `isAdmin()` now means admin or above.
+
 ## [1.1.1] — 2026-10-25
 
 > The upload form now checks who is classifying: only the torrent's uploader or a moderator can, where before anyone who reached the form could.

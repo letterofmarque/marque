@@ -5,6 +5,17 @@ All notable changes to `marque/skipper` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
+## [1.1.0] — 2026-10-27
+
+> Works with trove 5.0 as well as 4.x, and requires the trove 4.2 it was always built on.
+
+### Changed
+
+- **`marque/trove` is now `^4.2|^5.0`.** The widening is to 5.0: an owner passes every
+  admin screen's role floor, because floors are "this role and above". The floor moves from
+  `^4.0` to `^4.2`. Skipper has always used trove's `AdminScreenRegistry`, which arrived in
+  4.2, so it never ran on 4.0 or 4.1. An install there stays on skipper 1.0.1.
+
 ## [1.0.1] — 2026-10-25
 
 > The admin panel answers 403 to a member no registered screen admits, and a package's own admin route always answers its own path.

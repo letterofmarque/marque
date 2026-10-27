@@ -10,7 +10,7 @@ use Marque\Trove\Support\StaffAction;
  * Where staff actions are recorded: a ban, a role change, a torrent edited or
  * deleted by someone who isn't its uploader.
  *
- * Declared here and implemented by whatever stores them (marque/bosun). Unlike
+ * Declared here and implemented by whatever stores them (bosun, planned). Unlike
  * the tracker contracts, **don't ask the container whether this exists**: trove
  * binds a recorder that does nothing (NullStaffActions), so a package records
  * every staff action unconditionally and inject this like any other service.
@@ -26,7 +26,7 @@ use Marque\Trove\Support\StaffAction;
  * transaction, so a rolled-back action is never recorded. That puts two
  * obligations on an implementation, and it must say which one it meets:
  *
- * - **Fail open** (the default, and what bosun does): never throw from
+ * - **Fail open** (the default, and what bosun will do): never throw from
  *   record(), and never leave an enclosing transaction unusable. On PostgreSQL
  *   one failed statement aborts the whole transaction, so catching your own
  *   exception is not enough. Run your writes in a savepoint (DB::transaction()

@@ -5,6 +5,15 @@ All notable changes to `marque/parley` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
+## [3.1.0] — 2026-10-27
+
+> Works with trove 5.0 as well as 4.x.
+
+### Changed
+
+- **`marque/trove` widened to `^3.0|^4.0|^5.0`.** Nothing here depends on what trove 5 changed: an
+  owner passes every admin check, because `isAdmin()` now means admin or above.
+
 ## [3.0.1] — 2026-10-25
 
 > A guest who reaches posting a thread or comment is sent to log in, not shown a bare 403.

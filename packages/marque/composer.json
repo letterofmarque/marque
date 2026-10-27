@@ -52,9 +52,9 @@
     ],
     "require": {
         "php": "^8.3",
-        "marque/trove": "^4.0",
+        "marque/trove": "^5.0",
         "marque/deck": "^2.0",
-        "marque/usarrs": "^8.1",
+        "marque/usarrs": "^9.0",
         "illuminate/console": "^13.0",
         "illuminate/support": "^13.0"
     },
@@ -76,7 +76,7 @@
     },
     "extra": {
         "branch-alias": {
-            "dev-main": "1.x-dev"
+            "dev-main": "2.x-dev"
         },
         "laravel": {
             "providers": [

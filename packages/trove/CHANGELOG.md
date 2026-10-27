@@ -7,6 +7,47 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [5.0.0] — 2026-10-27
+
+> An Owner role above Admin, isAdmin() meaning admin or above, and a contract every package records its staff actions through.
+
+### Breaking
+
+- **`Role::Owner`, above Admin (rank 4).** Only an owner grants or removes Owner and Admin
+  (usarrs 9.0 enforces it), so admins can't demote each other or the owner. An app that
+  `match`es on `Role` meets a new case. Role columns are plain strings, so there is no
+  migration.
+- **`isAdmin()` means admin or above.** It was an exact match on Admin, so an owner is an
+  admin for every "admins may" check. Code that meant "exactly Admin" compares `role`
+  itself.
+- **`UserInterface` gains `isOwner()`.** A user model using `HasRoles` already has it. A
+  hand-written implementation must add it.
+
+### Added
+
+- **`StaffActionsInterface::record(StaffAction)`**, where staff actions are recorded: a
+  ban, a role change, a torrent edited by someone who isn't its uploader. trove binds
+  `NullStaffActions`, which does nothing, so packages record unconditionally and never ask
+  whether a store is installed. Bosun, the planned staff management package, will store
+  them. A store bound before or after
+  trove keeps its binding.
+- **`StaffAction`**: who (`actorId`), what (`action`, named `<package>.<subject>.<verb>`,
+  e.g. `usarrs.user.role_changed`), to which record (`subjectType`, `subjectId`), why
+  (`reason`), what moved (`changes`: `field => [from, to]`, scalars or null) and when
+  (`at`, default now). `StaffAction::of($actor, $action, $model, …)` builds one from the
+  models. A malformed name or change throws.
+- The contract says what a failed record does. An implementation either **fails open**:
+  it never throws, and runs its writes in a savepoint so the caller's transaction
+  survives. On PostgreSQL one failed statement aborts the whole transaction, so a catch
+  alone isn't enough. Or it **fails closed**, throwing on purpose to block the action.
+  trove catches nothing.
+
+### Upgrading
+
+Nobody is an owner after the upgrade. Make one: `php artisan usarrs:owner you@example.com`
+(usarrs 9.0). Then look for `match` on `Role`, and for `isAdmin()` where you meant exactly
+Admin.
+
 ## [4.11.0] — 2026-10-24
 
 > A footer item registry, so an app or package can add a line to the page footer without copying the shell's view.

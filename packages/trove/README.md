@@ -38,7 +38,8 @@ php artisan migrate
 
 - **Torrent model** - info_hash, metadata, file storage
 - **TorrentService** - CRUD, .torrent file upload/parsing, search
-- **Role system** - User, Uploader, Moderator, Admin hierarchy
+- **Role system** - User, Uploader, Moderator, Admin, Owner hierarchy
+- **Staff actions contract** - `StaffActionsInterface` and the `StaffAction` value object: where packages record what staff do (a ban, a role change, a torrent edited by someone else). Nothing to check first: with no store installed it records nothing
 - **Tracker stats contract** - `TrackerStatsInterface` and the `TrackerStats` / `TorrentStats` value objects; a tracker package (bloodhound) implements it, issuing keys and tracking bytes
 - **Seedboxes contract** - `SeedboxesInterface` and the `Seedbox` value object: members' registered seedboxes, for a frontend (usarrs) to manage without knowing the tracker. Bloodhound implements it; check `app()->bound(SeedboxesInterface::class)` first
 - **Tracker sessions contract** - `TrackerSessionsInterface` and the `TrackerSession` value object: a member's live tracker sessions and a way to end one, for a frontend (usarrs) to show. Bloodhound implements it; check `app()->bound(TrackerSessionsInterface::class)` first
@@ -80,7 +81,8 @@ on a missing class.
 `HasRoles` gives you role checks:
 
 ```php
-$user->isAdmin();
+$user->isOwner();
+$user->isAdmin();      // admin or above, so true for the owner
 $user->isModerator();
 $user->isUploader();
 $user->hasRoleAtLeast(Role::Moderator);
@@ -387,7 +389,7 @@ php artisan vendor:publish --tag=trove-migrations
 
 ## Roles
 
-Four roles with a strict hierarchy:
+Five roles with a strict hierarchy:
 
 | Role | Rank | Can Upload | Can Moderate |
 |------|------|------------|--------------|
@@ -395,6 +397,35 @@ Four roles with a strict hierarchy:
 | Uploader | 1 | Yes | No |
 | Moderator | 2 | Yes | Yes |
 | Admin | 3 | Yes | Yes |
+| Owner | 4 | Yes | Yes |
+
+The owner is an admin who also manages the other admins: only an owner grants or removes
+Owner and Admin. trove declares the role, and usarrs enforces who may give it (see its README,
+"Roles and the owner"). Anything gated at a role admits every role above it, so an owner
+passes every admin check.
+
+## Staff actions
+
+Record what staff do through `StaffActionsInterface`. trove binds one that does nothing, so
+record unconditionally. Installing a store starts the record from that day. Bosun, the planned
+staff management package, will be one.
+
+```php
+use Marque\Trove\Contracts\StaffActionsInterface;
+use Marque\Trove\Support\StaffAction;
+
+app(StaffActionsInterface::class)->record(StaffAction::of(
+    $moderator,
+    'myforum.post.hidden',          // <package>.<subject>.<verb>
+    $post,
+    reason: 'Spam',
+    changes: ['hidden' => ['from' => false, 'to' => true]],
+));
+```
+
+Record only what one person does to someone else's thing. Automatic enforcement isn't a staff
+action. Writing a store: the interface's docblock says what a failed record must do (fail open
+in a savepoint, or fail closed on purpose).
 
 ## Authorization
 

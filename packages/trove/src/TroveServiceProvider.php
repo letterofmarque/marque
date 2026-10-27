@@ -32,7 +32,7 @@ class TroveServiceProvider extends ServiceProvider
 
         // A default that records nothing, so packages record staff actions
         // without asking whether anything stores them. bindIf, because a store
-        // (bosun) may register before trove does; its binding must stand.
+        // may register before trove does; its binding must stand.
         $this->app->bindIf(StaffActionsInterface::class, NullStaffActions::class);
 
         // Singletons because they are shared collection points: every package

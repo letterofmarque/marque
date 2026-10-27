@@ -7,6 +7,15 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [5.4.0] — 2026-10-27
+
+> Works with trove 5.0 as well as 4.x.
+
+### Changed
+
+- **`marque/trove` widened to `^4.8|^5.0`.** Nothing here depends on what trove 5 changed: an
+  owner passes every admin check, because `isAdmin()` now means admin or above.
+
 ## [5.3.0] — 2026-10-22
 
 > A download the tracker refuses is a 403 with the reason, never a 500.

@@ -111,6 +111,15 @@ dashboard page that renders panels, and usarrs' own panels on it, version with u
 the renderer live in different packages precisely so committing to one does not commit us to
 the other.
 
+**The staff actions contract.** `Marque\Trove\Contracts\StaffActionsInterface`, the
+`Marque\Trove\Support\StaffAction` value object (its constructor parameters, `of()` and
+`package()`), and the failure rules the interface's docblock sets out (fail open, or fail
+closed on purpose) are **public API from trove 5.0**. Every package records through it, and a
+store implements it (bosun, the planned staff management package). The same rules as the registries apply: an
+optional parameter or a new method is **minor**, and changing or removing one is **major on
+trove**. Which actions a package records, and their names, version with that package. A
+renamed action is a breaking change for anyone filtering on it.
+
 ## Dependencies and floors
 
 Every Marque package declares the same four constraints. They are set deliberately, and

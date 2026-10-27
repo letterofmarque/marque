@@ -5,6 +5,23 @@ All notable changes to `marque/marque` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] — 2026-10-27
+
+> The admin account the installer creates is the tracker's owner, so a fresh install can grant Admin.
+
+### Changed
+
+- **The first account is seeded as the owner** (trove 5's `Role::Owner`). Only an owner
+  grants Admin, so a first account seeded as a plain admin would leave an install where
+  nobody can make another admin.
+- An existing admin is any role at Admin or above, so a rerun that finds the owner leaves
+  it alone instead of seeding a second account. An install that has admins but no owner is
+  told to run `php artisan usarrs:owner <email>`.
+
+### Breaking
+
+- **Requires `marque/trove` ^5.0 and `marque/usarrs` ^9.0.**
+
 ## [1.2.0] — 2026-10-22
 
 > A new private tracker starts with hit-and-run on.

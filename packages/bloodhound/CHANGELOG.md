@@ -7,6 +7,15 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [9.4.0] — 2026-10-27
+
+> Works with trove 5.0 as well as 4.x.
+
+### Changed
+
+- **`marque/trove` widened to `^4.9|^5.0`.** Nothing here depends on what trove 5 changed: an
+  owner passes every admin check, because `isAdmin()` now means admin or above.
+
 ## [9.3.0] — 2026-10-25
 
 > A rebuilt row keeps when its activity began, so hit-and-run doesn't take old activity for new; the size helpers pick the dashboard's unit; an exemption's --by must name a real user, and will be required from 10.0.

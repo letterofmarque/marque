@@ -7,6 +7,40 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [9.0.0] — 2026-10-27
+
+> Staff are managed from above: only an owner manages admins and grants Admin or Owner, nobody acts on themselves, the last owner can't be demoted, and usarrs:owner sets the first.
+
+### Breaking
+
+- **Admins can no longer ban, unban or change the role of another admin, or of the
+  owner.** Before, any admin could demote or ban any other admin, the tracker's owner
+  included. Admins and owners are now managed by an owner alone, and only an owner grants
+  Admin or Owner. Nobody bans themselves or changes their own role. The last owner can't be
+  demoted (`AuthorizationException`).
+- **Requires `marque/trove` ^5.0**, for `Role::Owner`.
+
+### Added
+
+- **`UserPolicy::setRole($user, $target, Role $role)` and `unban`.** `ban`, `unban`,
+  `promote` and `setRole` hold the rules above.
+- **`UserAdminService::ban()`, `unban()` and `setRole()` take an optional `actor`.** Given
+  one, they check `UserPolicy` against it, so code calling the service gets the same answers
+  as the screen. With no actor (app code, the console) the staff rules don't apply. The
+  last-owner rule holds either way. It locks the owner rows, so two owners demoting each
+  other at once can't leave nobody.
+- **`php artisan usarrs:owner {email}`** makes a user an owner. Only an owner grants
+  Admin, so a tracker with no owner can never make another admin. This sets the first.
+- The user screen offers only the roles the actor may give, hides Ban from those who may
+  not use it, refuses either when it's called directly (403), and answers 422 to a role
+  that doesn't exist.
+
+### Upgrading
+
+Run `php artisan usarrs:owner you@example.com` once after upgrading. Until someone is an
+owner, admins still manage users, uploaders and moderators, but nobody can grant or remove
+Admin.
+
 ## [8.6.2] — 2026-10-24
 
 > Verifying an email address lands on usarrs.home, not always on /.

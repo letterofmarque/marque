@@ -8,6 +8,15 @@ those versions describe the package under its former names.*
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
+## [2.2.0] — 2026-10-27
+
+> Works with trove 5.0 as well as 4.x.
+
+### Changed
+
+- **`marque/trove` widened to `^4.11|^5.0`.** Nothing here depends on what trove 5 changed: an
+  owner passes every admin check, because `isAdmin()` now means admin or above.
+
 ## [2.1.0] — 2026-10-24
 
 > The footer renders items registered with trove, so an app adds build info or links without publishing and copying the footer.
