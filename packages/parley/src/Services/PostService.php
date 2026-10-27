@@ -6,15 +6,22 @@ namespace Marque\Parley\Services;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Marque\Parley\Contracts\PostServiceInterface;
 use Marque\Parley\Exceptions\ThreadLockedException;
 use Marque\Parley\Exceptions\TooManyPostsException;
 use Marque\Parley\Models\Post;
 use Marque\Parley\Models\Thread;
+use Marque\Trove\Contracts\StaffActionsInterface;
+use Marque\Trove\Support\StaffAction;
 
 class PostService implements PostServiceInterface
 {
+    public function __construct(
+        private readonly StaffActionsInterface $staffActions,
+    ) {}
+
     public function create(Thread $thread, Authenticatable $user, string $body, ?string $format = null): Post
     {
         $this->assertNotThrottled($user);
@@ -51,31 +58,50 @@ class PostService implements PostServiceInterface
      * @throws ThreadLockedException if config('parley.moderation.lock_blocks_edits')
      *                               is true and the post's thread is locked
      */
-    public function update(Post $post, string $body, ?string $format = null): Post
+    public function update(Post $post, string $body, ?string $format = null, ?Authenticatable $actor = null, ?string $reason = null): Post
     {
         $this->assertEditable($post);
 
-        $post->update(array_filter([
-            'body' => $body,
-            'body_format' => $format,
-        ], static fn ($value): bool => $value !== null));
+        return DB::transaction(function () use ($post, $body, $format, $actor, $reason): Post {
+            $from = $post->body;
 
-        return $post;
+            $post->update(array_filter([
+                'body' => $body,
+                'body_format' => $format,
+            ], static fn ($value): bool => $value !== null));
+
+            // Someone else's post edited is moderation; the author's own isn't.
+            if ($from !== $body && $actor !== null && $actor->getAuthIdentifier() !== $post->user_id) {
+                $this->staffActions->record(StaffAction::of($actor, 'parley.post.edited', $post, $reason, [
+                    'body' => ['from' => $from, 'to' => $body],
+                ]));
+            }
+
+            return $post;
+        });
     }
 
     /**
      * @throws ThreadLockedException if config('parley.moderation.lock_blocks_edits')
      *                               is true and the post's thread is locked
      */
-    public function delete(Post $post): void
+    public function delete(Post $post, ?Authenticatable $actor = null, ?string $reason = null): void
     {
         $this->assertEditable($post);
 
-        // Soft delete only. reply_to_id on any children nulls via the FK's
-        // ON DELETE SET NULL when the row is force-deleted, but a soft delete
-        // leaves the row (and the FK) in place — children keep pointing at a
-        // trashed parent, which the renderer can still show as "[deleted]".
-        $post->delete();
+        DB::transaction(function () use ($post, $actor, $reason): void {
+            // Soft delete only. reply_to_id on any children nulls via the FK's
+            // ON DELETE SET NULL when the row is force-deleted, but a soft delete
+            // leaves the row (and the FK) in place — children keep pointing at a
+            // trashed parent, which the renderer can still show as "[deleted]".
+            $post->delete();
+
+            if ($actor !== null && $actor->getAuthIdentifier() !== $post->user_id) {
+                $this->staffActions->record(StaffAction::of($actor, 'parley.post.deleted', $post, $reason, [
+                    'body' => ['from' => $post->body, 'to' => null],
+                ]));
+            }
+        });
     }
 
     public function forThread(Thread $thread): Collection

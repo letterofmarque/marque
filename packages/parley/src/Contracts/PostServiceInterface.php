@@ -22,14 +22,14 @@ interface PostServiceInterface
      */
     public function reply(Post $parent, Authenticatable $user, string $body, ?string $format = null): Post;
 
-    public function update(Post $post, string $body, ?string $format = null): Post;
+    public function update(Post $post, string $body, ?string $format = null, ?Authenticatable $actor = null, ?string $reason = null): Post;
 
     /**
      * Soft-deletes the post. Replies are NOT cascaded — a reply chain
      * surviving its parent's removal is the point of reply_to_id nulling on
      * delete rather than cascading, see the posts migration.
      */
-    public function delete(Post $post): void;
+    public function delete(Post $post, ?Authenticatable $actor = null, ?string $reason = null): void;
 
     /**
      * The whole thread's posts, ordered for a caller that wants to build the

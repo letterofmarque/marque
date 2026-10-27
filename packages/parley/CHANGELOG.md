@@ -5,14 +5,32 @@ All notable changes to `marque/parley` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
-## [3.1.0] — 2026-10-27
+## [4.0.0] — 2026-10-27
 
-> Works with trove 5.0 as well as 4.x.
+> Moderation is recorded as staff actions: pinning and locking, and deleting or editing someone else's thread or post.
 
-### Changed
+### Breaking
 
-- **`marque/trove` widened to `^3.0|^4.0|^5.0`.** Nothing here depends on what trove 5 changed: an
-  owner passes every admin check, because `isAdmin()` now means admin or above.
+- **Requires `marque/trove` ^5.0**, for `StaffActionsInterface`. An owner passes every admin
+  check, because `isAdmin()` now means admin or above.
+- **`ThreadServiceInterface` and `PostServiceInterface` moderation methods take optional
+  `actor` and `reason`** (`update`, `delete`, `pin`, `unpin`, `lock`, `unlock`; `PostService`
+  `update` and `delete`). An implementation of either interface must accept them. Both
+  services take the staff actions store in their constructors.
+
+### Added
+
+- **Moderation is recorded** through trove's `StaffActionsInterface` when the service is
+  given the actor:
+  - pinning, unpinning, locking and unlocking, whoever does it, when the flag moves
+    (`parley.thread.pinned`, `unpinned`, `locked`, `unlocked`);
+  - retitling or deleting a thread that isn't the actor's own (`parley.thread.edited`,
+    `deleted`, keeping its title);
+  - editing or deleting a post that isn't the actor's own (`parley.post.edited`,
+    `deleted`, with the body before and after).
+
+  The thread and comment components pass the signed-in user. With no store installed,
+  nothing is kept. Each is recorded inside the change's transaction.
 
 ## [3.0.1] — 2026-10-25
 

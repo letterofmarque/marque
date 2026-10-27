@@ -42,22 +42,22 @@ interface ThreadServiceInterface
      */
     public function threadFor(Model $subject, Authenticatable $user): Thread;
 
-    public function update(Thread $thread, string $title): Thread;
+    public function update(Thread $thread, string $title, ?Authenticatable $actor = null, ?string $reason = null): Thread;
 
     /**
      * Soft-deletes the thread. Its posts are left as-is — they soft-delete
      * with it structurally, but are not force-deleted, matching the "do not
      * destroy other people's words" rule that governs post deletion too.
      */
-    public function delete(Thread $thread): void;
+    public function delete(Thread $thread, ?Authenticatable $actor = null, ?string $reason = null): void;
 
-    public function pin(Thread $thread): Thread;
+    public function pin(Thread $thread, ?Authenticatable $actor = null, ?string $reason = null): Thread;
 
-    public function unpin(Thread $thread): Thread;
+    public function unpin(Thread $thread, ?Authenticatable $actor = null, ?string $reason = null): Thread;
 
-    public function lock(Thread $thread): Thread;
+    public function lock(Thread $thread, ?Authenticatable $actor = null, ?string $reason = null): Thread;
 
-    public function unlock(Thread $thread): Thread;
+    public function unlock(Thread $thread, ?Authenticatable $actor = null, ?string $reason = null): Thread;
 
     /**
      * Forum threads in a category, pinned first then newest.

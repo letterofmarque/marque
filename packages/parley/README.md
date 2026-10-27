@@ -155,6 +155,13 @@ moderator-only regardless of ownership. Locking a thread is enforced at the serv
 REST endpoint, a queued job, a script — not only the component that greys out its submit
 button.
 
+Moderation is recorded through `marque/trove`'s `StaffActionsInterface` when the service is
+given the actor (the components pass the signed-in user): pinning and locking whoever does
+them, and deleting a thread or editing or deleting a post that isn't the actor's own
+(`parley.thread.pinned`, `unpinned`, `locked`, `unlocked`, `edited`, `deleted`;
+`parley.post.edited`, `deleted`), with what changed. The services' moderation methods take
+optional `actor` and `reason`. With no store installed, nothing is kept.
+
 ## Rate limiting
 
 **Off by default. Turn this on before any public deployment.** An unlimited post/reply

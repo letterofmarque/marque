@@ -152,7 +152,7 @@ class CommentThread extends Component
 
         $data = $this->validateBody(field: 'editingBody');
 
-        $this->postService()->update($post, $data['editingBody']);
+        $this->postService()->update($post, $data['editingBody'], actor: auth()->user());
 
         $this->reset(['editingPost', 'editingBody']);
     }
@@ -163,7 +163,7 @@ class CommentThread extends Component
 
         $this->authorize('delete', $post);
 
-        $this->postService()->delete($post);
+        $this->postService()->delete($post, actor: auth()->user());
     }
 
     public function render(): View

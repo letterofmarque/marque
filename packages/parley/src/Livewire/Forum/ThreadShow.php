@@ -32,35 +32,35 @@ class ThreadShow extends ParleyComponent
     {
         $this->authorize('pin', $this->thread);
 
-        $this->thread = $threads->pin($this->thread);
+        $this->thread = $threads->pin($this->thread, auth()->user());
     }
 
     public function unpin(ThreadServiceInterface $threads): void
     {
         $this->authorize('pin', $this->thread);
 
-        $this->thread = $threads->unpin($this->thread);
+        $this->thread = $threads->unpin($this->thread, auth()->user());
     }
 
     public function lock(ThreadServiceInterface $threads): void
     {
         $this->authorize('lock', $this->thread);
 
-        $this->thread = $threads->lock($this->thread);
+        $this->thread = $threads->lock($this->thread, auth()->user());
     }
 
     public function unlock(ThreadServiceInterface $threads): void
     {
         $this->authorize('lock', $this->thread);
 
-        $this->thread = $threads->unlock($this->thread);
+        $this->thread = $threads->unlock($this->thread, auth()->user());
     }
 
     public function delete(ThreadServiceInterface $threads): void
     {
         $this->authorize('delete', $this->thread);
 
-        $threads->delete($this->thread);
+        $threads->delete($this->thread, auth()->user());
 
         $this->redirect(route('parley.forum.categories.show', $this->thread->category), navigate: true);
     }
