@@ -9,11 +9,13 @@ use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Marque\Taxonomy\Definitions\ContentType;
 use Marque\Taxonomy\Definitions\Loader;
+use Marque\Taxonomy\Exceptions\CurationRefused;
 use Marque\Taxonomy\Models\Classification;
 use Marque\Taxonomy\Models\Facet;
 use Marque\Taxonomy\Models\FacetValue;
 use Marque\Taxonomy\Models\InstalledVersion;
 use Marque\Taxonomy\Models\Term;
+use Marque\Taxonomy\Services\Curator;
 use Marque\Taxonomy\Services\Upgrader;
 use Marque\Trove\Enums\Role;
 
@@ -172,7 +174,7 @@ class TaxonomyAdmin extends Component
         return $vocabularies;
     }
 
-    public function addTerm(): void
+    public function addTerm(Curator $curator): void
     {
         $this->authorizeAdmin();
 
@@ -184,208 +186,87 @@ class TaxonomyAdmin extends Component
             return;
         }
 
-        $level = $type->level((string) ($this->newTerm['level'] ?? ''));
+        $parent = $this->newTerm['parent'] ?? null;
 
-        // The guarantee, enforced rather than assumed: a level the definition
-        // does not declare cannot be populated, however the request arrived.
-        if ($level === null) {
-            $this->addError('newTerm.level', sprintf(
-                '"%s" is not a level of %s. Levels are declared in the definition, not added here.',
-                $this->newTerm['level'] ?? '',
-                $type->label,
-            ));
+        $done = $this->curate(fn () => $curator->addTerm(
+            $type,
+            (string) ($this->newTerm['level'] ?? ''),
+            (string) ($this->newTerm['value'] ?? ''),
+            $parent === null || $parent === '' ? null : (int) $parent,
+            auth()->user(),
+        ));
 
-            return;
+        if ($done) {
+            $this->newTerm = ['level' => '', 'value' => '', 'parent' => null];
         }
-
-        $value = trim((string) ($this->newTerm['value'] ?? ''));
-
-        if (! $level->accepts($value)) {
-            $this->addError('newTerm.value', sprintf('%s does not accept "%s".', $level->label, $value));
-
-            return;
-        }
-
-        $parentId = $this->newTerm['parent'] === null || $this->newTerm['parent'] === ''
-            ? null
-            : (int) $this->newTerm['parent'];
-
-        $parent = $parentId === null ? null : Term::find($parentId);
-
-        $exists = Term::query()
-            ->where('content_type', $type->name)
-            ->where('level', $level->name)
-            ->where('parent_key', $parent?->getKey() ?? 0)
-            ->where('value', $value)
-            ->exists();
-
-        if ($exists) {
-            $this->addError('newTerm.value', sprintf('"%s" is already there.', $value));
-
-            return;
-        }
-
-        Term::create([
-            'content_type' => $type->name,
-            'level' => $level->name,
-            'value' => $value,
-            'label' => $value,
-            'parent_id' => $parent?->getKey(),
-            'parent_key' => $parent?->getKey() ?? 0,
-            'path' => $parent?->pathForChildren() ?? '/',
-        ]);
-
-        $this->newTerm = ['level' => '', 'value' => '', 'parent' => null];
 
         unset($this->terms);
     }
 
     /**
-     * Change a term's display label.
-     *
-     * Only the label: the `value` is what classifications resolve against, so
-     * changing it would be a structural edit wearing a cosmetic hat.
+     * Change a term's display label. Only the label: see Curator::renameTerm().
      */
-    public function renameTerm(int $id, string $label): void
+    public function renameTerm(int $id, string $label, Curator $curator): void
     {
         $this->authorizeAdmin();
 
-        $term = Term::find($id);
-
-        if ($term === null) {
-            $this->addError('terms', 'That term no longer exists.');
-
-            return;
-        }
-
-        $term->update(['label' => trim($label)]);
+        $this->curate(fn () => $curator->renameTerm($id, $label, auth()->user()));
 
         unset($this->terms);
     }
 
     /**
-     * Delete a term, but only one nothing depends on.
-     *
-     * Anything with children or classifications is refused here and pointed at
-     * the definition machinery instead. This screen never silently orphans.
+     * Delete a term nothing depends on. See Curator::deleteTerm().
      */
-    public function deleteTerm(int $id): void
+    public function deleteTerm(int $id, Curator $curator): void
     {
         $this->authorizeAdmin();
 
-        $term = Term::find($id);
-
-        if ($term === null) {
-            $this->addError('terms', 'That term no longer exists.');
-
-            return;
-        }
-
-        $children = Term::where('parent_id', $term->getKey())->count();
-
-        if ($children > 0) {
-            $this->addError('terms', sprintf(
-                '"%s" has %d term(s) beneath it. Delete those first — this screen will not orphan them.',
-                $term->label ?? $term->value,
-                $children,
-            ));
-
-            return;
-        }
-
-        $classified = Classification::where('term_id', $term->getKey())->count();
-
-        if ($classified > 0) {
-            $this->addError('terms', sprintf(
-                '"%s" has %d torrent(s) classified under it. Reclassify them first, or change the definition and run marque:taxonomy:upgrade — that path reports what it will orphan before it does anything.',
-                $term->label ?? $term->value,
-                $classified,
-            ));
-
-            return;
-        }
-
-        $term->delete();
+        $this->curate(fn () => $curator->deleteTerm($id, auth()->user()));
 
         unset($this->terms);
     }
 
-    public function addFacetValue(): void
+    public function addFacetValue(Curator $curator): void
     {
         $this->authorizeAdmin();
 
-        $name = trim((string) ($this->newFacetValue['facet'] ?? ''));
-        $value = trim((string) ($this->newFacetValue['value'] ?? ''));
+        $done = $this->curate(fn () => $curator->addFacetValue(
+            (string) ($this->newFacetValue['facet'] ?? ''),
+            (string) ($this->newFacetValue['value'] ?? ''),
+            auth()->user(),
+        ));
 
-        // A vocabulary no definition declares would be structure invented
-        // here, which is the same thing as inventing a level.
-        if (! array_key_exists($name, $this->vocabularies())) {
-            $this->addError('newFacetValue.facet', sprintf(
-                'No definition declares a "%s" facet.',
-                $name,
-            ));
-
-            return;
+        if ($done) {
+            $this->newFacetValue = ['facet' => '', 'value' => ''];
         }
-
-        if ($value === '') {
-            $this->addError('newFacetValue.value', 'Give the value a name.');
-
-            return;
-        }
-
-        $facet = Facet::firstOrCreate(
-            ['name' => $name],
-            ['label' => ucfirst(str_replace('_', ' ', $name))],
-        );
-
-        if ($facet->values()->where('value', $value)->exists()) {
-            $this->addError('newFacetValue.value', sprintf('"%s" is already in %s.', $value, $name));
-
-            return;
-        }
-
-        FacetValue::create([
-            'facet_id' => $facet->getKey(),
-            'value' => $value,
-            'label' => $value,
-        ]);
-
-        $this->newFacetValue = ['facet' => '', 'value' => ''];
 
         unset($this->vocabularies);
     }
 
-    public function deleteFacetValue(int $id): void
+    public function deleteFacetValue(int $id, Curator $curator): void
     {
         $this->authorizeAdmin();
 
-        $value = FacetValue::find($id);
-
-        if ($value === null) {
-            $this->addError('facets', 'That value no longer exists.');
-
-            return;
-        }
-
-        // The schema would cascade the assignments away. That is right for a
-        // definition-driven removal with a reported count behind it (CP5), and
-        // wrong for a click on an admin screen.
-        $assigned = $value->torrentAssignmentCount();
-
-        if ($assigned > 0) {
-            $this->addError('facets', sprintf(
-                '"%s" is on %d torrent(s). Removing it here would strip it from all of them.',
-                $value->value,
-                $assigned,
-            ));
-
-            return;
-        }
-
-        $value->delete();
+        $this->curate(fn () => $curator->deleteFacetValue($id, auth()->user()));
 
         unset($this->vocabularies);
+    }
+
+    /**
+     * Run an edit, putting a refusal on the field it's about.
+     */
+    private function curate(callable $edit): bool
+    {
+        try {
+            $edit();
+        } catch (CurationRefused $refused) {
+            $this->addError($refused->field, $refused->getMessage());
+
+            return false;
+        }
+
+        return true;
     }
 
     public function render()

@@ -19,7 +19,7 @@ changelogs — edit those, not this.*
 - **[marque 2.0.0](packages/marque/CHANGELOG.md)** — The admin account the installer creates is the tracker's owner, so a fresh install can grant Admin.
 - **[parley 4.0.0](packages/parley/CHANGELOG.md)** — Moderation is recorded as staff actions: pinning and locking, and deleting or editing someone else's thread or post.
 - **[skipper 1.1.0](packages/skipper/CHANGELOG.md)** — Works with trove 5.0 as well as 4.x, and requires the trove 4.2 it was always built on.
-- **[taxonomy 1.2.0](packages/taxonomy/CHANGELOG.md)** — Works with trove 5.0 as well as 4.x.
+- **[taxonomy 2.0.0](packages/taxonomy/CHANGELOG.md)** — Edits to a catalogue's vocabulary are recorded as staff actions, and live in a Curator service the admin screen calls.
 - **[trove 5.0.0](packages/trove/CHANGELOG.md)** — An Owner role above Admin, isAdmin() meaning admin or above, and a contract every package records its staff actions through.
 - **[usarrs 9.0.0](packages/usarrs/CHANGELOG.md)** — Staff are managed from above: only an owner manages admins and grants Admin or Owner, nobody acts on themselves, the last owner can't be demoted, and usarrs:owner sets the first.
 

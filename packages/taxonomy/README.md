@@ -268,6 +268,14 @@ version bump goes through `marque:taxonomy:upgrade`, which reports what changes 
 many torrents it touches before it does anything. An edit to your app's own YAML applies on
 load, unreported (see above, #10805).
 
+The edits themselves live in `Marque\Taxonomy\Services\Curator` (`addTerm`, `renameTerm`,
+`deleteTerm`, `addFacetValue`, `deleteFacetValue`), which the screen calls. Code of your own
+can call it too. A refused edit throws `CurationRefused`, naming the field it's about. Given
+the acting admin as `actor`, it requires an admin and records the edit through
+`marque/trove`'s `StaffActionsInterface` (`taxonomy.term.added`, `renamed`, `deleted`;
+`taxonomy.facet_value.added`, `deleted`). The vocabulary is the tracker's, so every edit to
+it is recorded. With no store installed, nothing is kept.
+
 ### Reaching it
 
 Taxonomy registers the screen with `marque/trove`'s `AdminScreenRegistry`, so installing
@@ -296,7 +304,7 @@ write, rather than trusting whatever middleware the surrounding route happens to
 
 - PHP 8.3+
 - Laravel 13+
-- `marque/trove` 4.2+
+- `marque/trove` 5.0+
 
 Runs on SQLite, MySQL, MariaDB and PostgreSQL — the full suite is exercised against all
 four, not merely claimed.

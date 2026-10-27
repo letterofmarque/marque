@@ -5,14 +5,26 @@ All notable changes to `marque/taxonomy` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.2.0] — 2026-10-27
+## [2.0.0] — 2026-10-27
 
-> Works with trove 5.0 as well as 4.x.
+> Edits to a catalogue's vocabulary are recorded as staff actions, and live in a Curator service the admin screen calls.
 
-### Changed
+### Breaking
 
-- **`marque/trove` widened to `^4.2|^5.0`.** Nothing here depends on what trove 5 changed: an
-  owner passes every admin check, because `isAdmin()` now means admin or above.
+- **Requires `marque/trove` ^5.0**, for `StaffActionsInterface`. An owner passes every admin
+  check, because `isAdmin()` now means admin or above.
+
+### Added
+
+- **`Curator`**, the vocabulary edits that used to live inside `TaxonomyAdmin`: `addTerm`,
+  `renameTerm`, `deleteTerm`, `addFacetValue` and `deleteFacetValue`, with the same rules
+  (no level or vocabulary invented, nothing deleted that something depends on). A refusal
+  throws `CurationRefused` with the field it's about. The admin screen calls it and shows
+  the same messages as before.
+- **Every vocabulary edit made by an admin is recorded** through trove's
+  `StaffActionsInterface` (`taxonomy.term.added`, `renamed`, `deleted`;
+  `taxonomy.facet_value.added`, `deleted`), with what changed, inside the edit's
+  transaction. Given an actor below Admin, `Curator` refuses.
 
 ## [1.1.1] — 2026-10-25
 
