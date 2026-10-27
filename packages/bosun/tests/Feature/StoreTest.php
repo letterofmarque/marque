@@ -8,6 +8,7 @@ use Marque\Bosun\Models\StaffActionEntry;
 use Marque\Bosun\Store\DatabaseStaffActions;
 use Marque\Bosun\Tests\TestUser;
 use Marque\Trove\Contracts\StaffActionsInterface;
+use Marque\Trove\Enums\Role;
 use Marque\Trove\Support\StaffAction;
 use Marque\Usarrs\Services\UserAdminService;
 
@@ -101,4 +102,34 @@ describe('failing open', function () {
         expect($member->fresh()->status)->toBe('banned')
             ->and(StaffActionEntry::query()->count())->toBe(0);
     });
+
+    it('lets a usarrs role change commit when the database rejects its record, on every engine', function () {
+        Log::spy();
+
+        $owner = TestUser::factory()->owner()->create();
+
+        // Its morph class is longer than staff_actions.subject_type, so the
+        // database itself refuses the record's INSERT: PostgreSQL, MySQL and
+        // MariaDB by the column length, SQLite by a test trigger enforcing the
+        // same. Inside setRole's transaction, which is inside the test's: on
+        // PostgreSQL only bosun's savepoint keeps either of them usable.
+        $member = LongMorphUser::query()->create([
+            'name' => 'Long', 'email' => 'long@example.com', 'password' => 'x', 'role' => 'user',
+        ]);
+
+        app(UserAdminService::class)->setRole($member, Role::Moderator, actor: $owner, reason: 'Promoted');
+
+        expect($member->fresh()->role)->toBe(Role::Moderator)
+            ->and(StaffActionEntry::query()->count())->toBe(0);
+
+        Log::shouldHaveReceived('error')->withArgs(fn (string $message): bool => str_contains($message, 'could not be recorded'));
+    });
 });
+
+class LongMorphUser extends TestUser
+{
+    public function getMorphClass(): string
+    {
+        return str_repeat('x', 300);
+    }
+}
