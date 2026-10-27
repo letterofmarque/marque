@@ -10,6 +10,7 @@ use Livewire\Livewire;
 use Marque\Bosun\Console\PruneCommand;
 use Marque\Bosun\Http\Middleware\StampStaffPresence;
 use Marque\Bosun\Livewire\AuditLog;
+use Marque\Bosun\Livewire\Staff;
 use Marque\Bosun\Store\DatabaseStaffActions;
 use Marque\Trove\Contracts\StaffActionsInterface;
 use Marque\Trove\Enums\Role;
@@ -34,6 +35,7 @@ class BosunServiceProvider extends ServiceProvider
 
         $this->app->make(Router::class)->pushMiddlewareToGroup('web', StampStaffPresence::class);
 
+        Livewire::component('bosun-staff', Staff::class);
         Livewire::component('bosun-audit-log', AuditLog::class);
 
         $this->registerAdminScreens();
@@ -64,6 +66,17 @@ class BosunServiceProvider extends ServiceProvider
     protected function registerAdminScreens(): void
     {
         $registry = $this->app->make(AdminScreenRegistry::class);
+
+        $registry->register(new AdminScreen(
+            identifier: 'bosun-staff',
+            label: 'Staff',
+            component: 'bosun-staff',
+            path: 'admin/staff',
+            minimumRole: Role::Admin,
+            icon: 'user-group',
+            group: 'Staff',
+            position: 10,
+        ));
 
         $registry->register(new AdminScreen(
             identifier: 'bosun-audit-log',
