@@ -47,24 +47,24 @@
         </div>
     </div>
 
-    @if (auth()->user()->isAdmin() && auth()->id() !== $targetUser->getAuthIdentifier())
+    @if (Gate::allows('ban', $targetUser) || $roles !== [])
         <div class="flex flex-wrap gap-2">
-            @if (($targetUser->status ?? 'active') !== 'banned')
-                <x-deck::button variant="danger" wire:click="ban" wire:confirm="{{ __('Ban this user?') }}">
-                    {{ __('Ban User') }}
-                </x-deck::button>
-            @else
-                <x-deck::button variant="primary" wire:click="unban">
-                    {{ __('Unban User') }}
-                </x-deck::button>
-            @endif
-
-            @foreach ($roles as $role)
-                @if ($role->value !== ($targetUser->role->value ?? $targetUser->role))
-                    <x-deck::button variant="ghost" wire:click="setRole('{{ $role->value }}')" wire:confirm="{{ __('Set role to :role?', ['role' => $role->value]) }}">
-                        {{ __('Set :role', ['role' => ucfirst($role->value)]) }}
+            @can('ban', $targetUser)
+                @if (($targetUser->status ?? 'active') !== 'banned')
+                    <x-deck::button variant="danger" wire:click="ban" wire:confirm="{{ __('Ban this user?') }}">
+                        {{ __('Ban User') }}
+                    </x-deck::button>
+                @else
+                    <x-deck::button variant="primary" wire:click="unban">
+                        {{ __('Unban User') }}
                     </x-deck::button>
                 @endif
+            @endcan
+
+            @foreach ($roles as $role)
+                <x-deck::button variant="ghost" wire:click="setRole('{{ $role->value }}')" wire:confirm="{{ __('Set role to :role?', ['role' => $role->value]) }}">
+                    {{ __('Set :role', ['role' => ucfirst($role->value)]) }}
+                </x-deck::button>
             @endforeach
         </div>
     @endif

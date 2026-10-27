@@ -34,6 +34,7 @@ use Marque\Trove\Registry\DashboardPanelRegistry;
 use Marque\Trove\Registry\NavItem;
 use Marque\Trove\Registry\NavRegistry;
 use Marque\Usarrs\Auth\SocialiteOAuthProvider;
+use Marque\Usarrs\Console\OwnerCommand;
 use Marque\Usarrs\Contracts\InviteServiceInterface;
 use Marque\Usarrs\Contracts\OAuthProvider;
 use Marque\Usarrs\Enums\UserStatus;
@@ -203,6 +204,10 @@ class UsarrsServiceProvider extends ServiceProvider
         }
 
         if ($this->app->runningInConsole()) {
+            $this->commands([
+                OwnerCommand::class,
+            ]);
+
             $this->publishes([
                 __DIR__.'/../config/usarrs.php' => config_path('usarrs.php'),
             ], 'usarrs-config');
