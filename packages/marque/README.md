@@ -134,6 +134,7 @@ admin:                    # the owner account, sent a link to set its password
 
 stylesheet: true          # add the packages' template paths to resources/css/app.css
 user_model: true          # add HasRoles, UserInterface and MustVerifyEmail to app/Models/User.php
+                          # (and the tracker-stats trait, on a private tracker)
 home_page: dashboard      # dashboard, splash, torrents, profile-stats or leave
 ```
 
