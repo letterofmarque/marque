@@ -52,6 +52,7 @@ Newest first. Each links to the full write-up.
 
 | Release | Date | Summary | Who's affected |
 |---|---|---|---|
+| [11.0](releases/11.0.md) ([bloodhound steps](../packages/bloodhound/README.md#upgrading-from-9x-to-100)) | 2026-10-28 | An Owner role above Admin; every package records its staff actions; new `marque/bosun` keeps them, with the owner's Staff and Audit log screens; bans and role changes now save on a stock `User` model; the installer takes a preseed file | everyone: run `usarrs:owner` after upgrading; app code matching on roles or using `isAdmin()` as exactly-Admin; hand-written user models and interface implementations; scripted `bloodhound:standing` (needs `--by`) |
 | [10.1](releases/10.1.md) | 2026-10-22 | Hit-and-run: a downloaded torrent is owed 72 hours of seeding or 1:1 on it; pre-warning, then strike; three strikes pause new downloading. Off on upgrade, on for a new private tracker; members see what they owe | nobody on upgrade; anyone who turns it on (a published `min_seedtime` of 86400 enforces 24 hours) |
 | [10.0](releases/10.0.md) ([upgrade steps](../packages/bloodhound/README.md#upgrading-from-8x-to-90)) | 2026-10-22 | The ratio is enforced: members below `min_ratio` go on watch, then have new downloading paused until they recover (seeding never is); grace allowance, staff and per-member exemptions; members see their standing on the dashboard; a malformed announce key gets a reason by default | anyone running bloodhound, whose members go on watch after upgrading; guise/disguise must be 5.3 |
 | [9.1](releases/9.1.md) | 2026-10-21 | From one real 6.0 → 9.0 upgrade: an app's own `/dashboard` no longer breaks every page and is reported; a stale published bloodhound config is reported; login returns to the page it was going to; every member can get an announce key; a tracker with no scheduler says so; seed and leech time on the dashboard; `FakeTorrent` for consumer tests | apps with their own `/dashboard`; bloodhound configs published before 2.0; installs that imported members |
@@ -110,6 +111,8 @@ release each guide belongs to.
 | 20 | Release | [Marque 10.0](releases/10.0.md) | 10.0 | Ratio enforcement on by default: tell members, check the numbers, exempt, or `ratio_mode=off` |
 | 21 | Guide | [bloodhound 8.x → 9.0](../packages/bloodhound/README.md#upgrading-from-8x-to-90) | 10.0 | What changes for members, the malformed-key default, upgrading guise/disguise together |
 | 22 | Release | [Marque 10.1](releases/10.1.md) | 10.1 | Hit-and-run, off until you turn it on; check a published `min_seedtime` first |
+| 23 | Release | [Marque 11.0](releases/11.0.md) | 11.0 | trove 5 and its dependants together, then `usarrs:owner`; check role matches in app code; optional `marque/bosun` |
+| 24 | Guide | [bloodhound 9.x → 10.0](../packages/bloodhound/README.md#upgrading-from-9x-to-100) | 11.0 | trove ^5 alongside usarrs 9; `--by` on scripted exemptions |
 
 ## Currently at 2.x or earlier?
 
