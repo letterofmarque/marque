@@ -5,6 +5,18 @@ All notable changes to `marque/squidink` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
+## [1.1.4] — 2026-10-28
+
+> Ships its MIT licence, and the README and editor comments name deck rather than id.
+
+### Fixed
+
+- **The LICENSE file is included**, so the split repository and the Packagist download
+  carry the licence text (#10944).
+- **README:** colours accept strict hex as well as named values, and only validated colours
+  and sizes reach a `style` attribute.
+- **The editor views' comments** name `marque/deck`, which replaced `id`. No markup changed.
+
 ## [1.1.3] — 2026-10-05
 
 > Narrowing a schema no longer deletes code blocks or image alt text, runs blocks

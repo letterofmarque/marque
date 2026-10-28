@@ -5,7 +5,7 @@ All notable changes to `marque/skipper` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
-## [1.1.0] — 2026-10-27
+## [1.1.0] — 2026-10-28
 
 > Works with trove 5.0 as well as 4.x, and requires the trove 4.2 it was always built on.
 

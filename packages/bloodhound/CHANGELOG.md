@@ -7,7 +7,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [10.0.0] — 2026-10-27
+## [10.0.0] — 2026-10-28
 
 > Exemptions and seedbox decisions are recorded as staff actions, and bloodhound:standing requires --by, as 9.x warned.
 
