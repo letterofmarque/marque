@@ -1,0 +1,93 @@
+# The clean room: a fresh Laravel app with Marque installed from this working
+# tree, in Docker, so nothing depends on the host's PHP, Redis or mail.
+#
+#   tools/clean-room            build, install, check, tear down
+#   tools/clean-room --keep     leave it up: http://127.0.0.1:18000, mail at :18025
+#
+# A compose project of its own (marque-clean-room), separate from the engine
+# stack in ../../docker-compose.yml, so neither can disturb the other.
+#
+# ─── ports ───────────────────────────────────────────────────────────────
+#
+# Loopback only, in the 18xxx range, clear of the engine stack's 13xxx/15xxx:
+#
+#   18000  the app (php artisan serve), with --keep
+#   18025  Mailpit's web UI
+
+services:
+  app:
+    build: .
+    command: ["sleep", "infinity"]
+    working_dir: /site
+    volumes:
+      # The whole working tree, read-only: the clean room installs from it and
+      # must never write into it. The whole repo rather than packages/ alone
+      # because composer reads a path package's version from git, and without
+      # .git it guesses a branch the packages' branch-aliases don't name.
+      - ../..:/marque:ro
+      - ${CLEAN_ROOM_PRESEED:-./preseed.yml}:/preseed.yml:ro
+      - composer-cache:/cache/composer
+      - npm-cache:/cache/npm
+    environment:
+      CLEAN_ROOM_ENGINE: ${CLEAN_ROOM_ENGINE:-sqlite}
+    ports:
+      - "127.0.0.1:18000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      mail:
+        condition: service_started
+
+  redis:
+    # What a private tracker requires, and what bloodhound:check-redis and
+    # marque:install refuse to run without: it persists, and never evicts.
+    image: redis:7
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  mail:
+    # marque:install refuses a log or array mailer: the owner's set-your-password
+    # link has to really go somewhere. Mailpit catches it, and checks.php reads it.
+    image: axllent/mailpit:v1.27
+    ports:
+      - "127.0.0.1:18025:8025"
+
+  mysql:
+    profiles: ["mysql"]
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: marque
+      MYSQL_DATABASE: marque
+      MYSQL_USER: marque
+      MYSQL_PASSWORD: marque
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "--silent"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+
+  pgsql:
+    profiles: ["pgsql"]
+    image: postgres:17
+    environment:
+      POSTGRES_DB: marque
+      POSTGRES_USER: marque
+      POSTGRES_PASSWORD: marque
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marque -d marque"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  composer-cache:
+  npm-cache:

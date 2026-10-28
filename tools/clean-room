@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+#
+# The clean room: install Marque into a brand-new Laravel app, from this
+# working tree, the way an operator would, and check the result.
+#
+#   tools/clean-room                       SQLite, default preseed, then tear down
+#   tools/clean-room --engine mysql        or pgsql
+#   tools/clean-room --preseed my.yml      install with your own answers
+#   tools/clean-room --keep                leave it running afterwards:
+#                                            app   http://127.0.0.1:18000
+#                                            mail  http://127.0.0.1:18025
+#
+# Everything happens in Docker (docker/clean-room/): PHP 8.3, the floor every
+# package declares, a durable Redis, Mailpit, and the chosen database. Nothing
+# depends on, or touches, the host's PHP, Redis or mail. The working tree is
+# mounted read-only.
+#
+# What it catches that the package suites can't: a package that resolves in
+# the monorepo but not in a real app, an installer step that only fails
+# against real files, a screen that only breaks once every package is booted
+# together. It was built for Marque 11.0, the first release with a new
+# package and a role change across the suite (Job #306).
+#
+# Exit status: 0 when every check passes, 1 when one fails, 2 for bad usage.
+
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+ENGINE=sqlite
+KEEP=0
+PRESEED=docker/clean-room/preseed.yml
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --engine)  ENGINE="${2:-}"; shift 2 ;;
+        --keep)    KEEP=1; shift ;;
+        --preseed) PRESEED="${2:-}"; shift 2 ;;
+        -h|--help) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        *) echo "Unknown option: $1 (see --help)" >&2; exit 2 ;;
+    esac
+done
+
+case "$ENGINE" in
+    sqlite|mysql|pgsql) ;;
+    *) echo "--engine is sqlite, mysql or pgsql, not [$ENGINE]" >&2; exit 2 ;;
+esac
+
+[[ -f "$PRESEED" ]] || { echo "No preseed at $PRESEED" >&2; exit 2; }
+
+export CLEAN_ROOM_ENGINE="$ENGINE"
+export CLEAN_ROOM_PRESEED="$(realpath "$PRESEED")"
+
+compose=(docker compose -p marque-clean-room -f docker/clean-room/compose.yml)
+[[ "$ENGINE" != sqlite ]] && compose+=(--profile "$ENGINE")
+
+teardown() {
+    if [[ $KEEP -eq 1 ]]; then
+        printf '\nLeft running. Serve it with:\n  %s exec -d app php artisan serve --host=0.0.0.0 --port=8000\n' "${compose[*]}"
+        printf 'then http://127.0.0.1:18000 (mail at http://127.0.0.1:18025).\nTear down: %s down -v\n' "${compose[*]}"
+    else
+        "${compose[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
+    fi
+}
+trap teardown EXIT
+
+# A fresh room every time: whatever a previous --keep left is gone.
+"${compose[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
+
+printf '\033[1m==> Starting the clean room (%s)\033[0m\n' "$ENGINE"
+"${compose[@]}" up -d --build --wait
+
+if [[ "$ENGINE" != sqlite ]]; then
+    "${compose[@]}" up -d --wait "$ENGINE"
+fi
+
+"${compose[@]}" exec -T app bash /marque/docker/clean-room/run.sh

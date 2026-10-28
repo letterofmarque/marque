@@ -85,7 +85,10 @@ class UserAdminService
                 }
             }
 
-            $user->update(['role' => $role->value]);
+            // forceFill, not update(): Laravel's stock User lists its fillable
+            // attributes and role isn't one, so update() drops it without a
+            // word. The clean room caught a role change that did nothing.
+            $user->forceFill(['role' => $role->value])->save();
 
             // Inside the transaction, so an action rolled back is never
             // recorded as having happened.
@@ -99,7 +102,9 @@ class UserAdminService
     {
         DB::transaction(function () use ($user, $status, $action, $actor, $reason): void {
             $from = $user->status;
-            $user->update(['status' => $status->value]);
+            // forceFill for the same reason: status isn't fillable on a stock
+            // User either, so a ban through update() never banned anyone.
+            $user->forceFill(['status' => $status->value])->save();
 
             $this->record($actor, $action, $user, $reason, [
                 'status' => ['from' => $from instanceof UserStatus ? $from->value : $from, 'to' => $status->value],

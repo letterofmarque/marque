@@ -1,0 +1,16 @@
+# The clean room's default install: a private tracker with everything on, so
+# every package in the suite is installed and every installer step runs.
+tracker: private
+extras:
+  api: true
+  forums: true
+  taxonomy: true
+  admin_panel: true
+  staff_management: true
+site_name: "Clean Room"
+admin:
+  name: Olive Owner
+  email: owner@clean-room.test
+stylesheet: true
+user_model: true
+home_page: dashboard

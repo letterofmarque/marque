@@ -25,6 +25,16 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   implementation of the interface must accept them.
 - **Requires `marque/trove` ^5.0**, for `Role::Owner` and `StaffActionsInterface`.
 
+### Fixed
+
+- **Bans, unbans and role changes now save on a stock Laravel `User` model.** Laravel's
+  stock `User` lists its fillable attributes, and `role` and `status` aren't among them, so
+  `UserAdminService` writing them with `update()` silently did nothing: the admin screen
+  said the member was banned, and they weren't. Found by the new clean room (a real app
+  installed from scratch); the suite's own test user is unguarded and never saw it. They're
+  written with `forceFill()` now, and `usarrs:owner` reads the role back and fails if it
+  didn't save. Apps that call `Model::unguard()` were never affected.
+
 ### Added
 
 - **`UserPolicy::setRole($user, $target, Role $role)` and `unban`.** `ban`, `unban`,

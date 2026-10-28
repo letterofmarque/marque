@@ -42,6 +42,14 @@ class OwnerCommand extends Command
 
         $service->setRole($user, Role::Owner);
 
+        // Read back rather than trusted: a role that didn't stick, reported as
+        // set, is worse than an error.
+        if ($user->fresh()?->role !== Role::Owner) {
+            $this->error("{$email} could not be made an owner: the role didn't save.");
+
+            return self::FAILURE;
+        }
+
         $this->info("{$email} is now an owner. Owners grant and remove Admin from the user screen.");
 
         return self::SUCCESS;

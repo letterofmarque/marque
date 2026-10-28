@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+#
+# Tests for the clean room's wiring (tools/clean-room, docker/clean-room/),
+# without running an install. The install itself takes minutes and needs
+# Docker and the network; what can be wrong without either is checked here:
+#
+#   - the compose file is valid, and its ports are loopback-only and clear
+#     of the engine stack's, which a dev machine runs alongside it;
+#   - the app image is the PHP floor the packages declare;
+#   - Redis is the durable kind a private tracker requires, or marque:install
+#     refuses it and the clean room tests nothing;
+#   - the default preseed is a complete, valid preseed, so an unattended run
+#     can't stop on a question or a typo;
+#   - the scripts parse.
+#
+# Run: tools/test-clean-room
+
+set -uo pipefail
+
+cd "$(dirname "$0")/.."
+
+PASS=0
+FAIL=0
+
+pass() { printf '  \033[32m✓\033[0m %s\n' "$1"; PASS=$((PASS + 1)); }
+fail() {
+    printf '  \033[31m✗\033[0m %s\n' "$1"
+    [[ $# -gt 1 ]] && printf '      %s\n' "$2"
+    FAIL=$((FAIL + 1))
+}
+
+DIR=docker/clean-room
+COMPOSE=$DIR/compose.yml
+
+printf '\n\033[1mThe compose file\033[0m\n'
+
+if docker compose -p marque-clean-room -f "$COMPOSE" config -q 2>/dev/null; then
+    pass 'it is valid compose'
+else
+    fail 'docker compose rejects it' "$(docker compose -f "$COMPOSE" config -q 2>&1 | head -3)"
+fi
+
+ports=$(grep -oE '"[0-9.]+:[0-9]+:[0-9]+"' "$COMPOSE" | tr -d '"')
+
+if [[ -n "$ports" ]] && ! grep -vqE '^127\.0\.0\.1:' <<<"$ports"; then
+    pass 'every published port is loopback-only'
+else
+    fail 'a port is published beyond loopback' "$ports"
+fi
+
+engine_ports=$(grep -oE '"127\.0\.0\.1:[0-9]+' docker-compose.yml | cut -d: -f2)
+clash=""
+for p in $(cut -d: -f2 <<<"$ports"); do
+    grep -qx "$p" <<<"$engine_ports" && clash+="$p "
+done
+[[ -z "$clash" ]] && pass 'no port clashes with the engine stack' || fail 'ports clash with docker-compose.yml' "$clash"
+
+grep -qE '^\s+- \.\./\.\.:/marque:ro$' "$COMPOSE" \
+    && pass 'the working tree is mounted read-only' \
+    || fail 'the working tree is not mounted read-only at /marque'
+
+printf '\n\033[1mThe environment it installs into\033[0m\n'
+
+floor=$(python3 -c "import json;print(json.load(open('packages/trove/composer.json'))['require']['php'].lstrip('^'))")
+grep -qE "^FROM php:${floor}-" "$DIR/Dockerfile" \
+    && pass "the app image is PHP ${floor}, the declared floor" \
+    || fail "the app image is not PHP ${floor}" "$(grep '^FROM' "$DIR/Dockerfile")"
+
+# The whole service block, to the next service: comments sit above command.
+redis=$(awk '/^  redis:/{on=1;next} /^  [a-z]/{on=0} on' "$COMPOSE" | grep 'command:')
+if grep -q 'appendonly", "yes' <<<"$redis" && grep -q 'noeviction' <<<"$redis"; then
+    pass 'Redis persists and never evicts, as a private tracker requires'
+else
+    fail 'Redis is not durable: marque:install would refuse it' "$redis"
+fi
+
+printf '\n\033[1mThe default preseed\033[0m\n'
+
+if [[ -f packages/marque/vendor/autoload.php ]]; then
+    out=$(php -r '
+        require "packages/marque/vendor/autoload.php";
+        try {
+            $missing = Marque\Marque\Install\Preseed::fromFile($argv[1])->missing();
+            echo $missing === [] ? "ok" : "missing: ".implode(", ", $missing);
+        } catch (Throwable $e) { echo $e->getMessage(); }
+    ' "$DIR/preseed.yml")
+    [[ "$out" == ok ]] && pass 'it is valid and answers every question' || fail 'it would stop an unattended install' "$out"
+else
+    fail 'packages/marque has no vendor/ to check the preseed with' 'cd packages/marque && composer install'
+fi
+
+printf '\n\033[1mThe scripts\033[0m\n'
+
+bash -n tools/clean-room && pass 'tools/clean-room parses' || fail 'tools/clean-room has a syntax error'
+bash -n "$DIR/run.sh" && pass 'run.sh parses' || fail 'run.sh has a syntax error'
+php -l "$DIR/checks.php" >/dev/null 2>&1 && pass 'checks.php parses' || fail 'checks.php has a syntax error' "$(php -l "$DIR/checks.php" 2>&1 | head -2)"
+
+if [[ $FAIL -eq 0 ]]; then
+    printf '\n\033[32m%d passed.\033[0m\n' "$PASS"
+    exit 0
+fi
+
+printf '\n\033[31m%d passed, %d failed.\033[0m\n' "$PASS" "$FAIL"
+exit 1
