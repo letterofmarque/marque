@@ -93,6 +93,52 @@ say) after the initial setup. It reads what composer already has installed:
 The later steps (stylesheet, User model, home page, admin) skip work that's
 already done.
 
+## Answering the questions ahead of time (preseed)
+
+Like Debian's preseeding, a file can answer the installer's questions, so an install can
+be repeated exactly, run unattended in CI, or kept beside a deployment as the record of
+how it was set up:
+
+```bash
+php artisan marque:install --preseed=marque.yml
+php artisan marque:install --preseed=marque.yml --no-interaction
+```
+
+A question the file answers isn't asked, and the run says what it answered. One it leaves
+out is asked as normal. With `--no-interaction` there's nobody to ask, so the file must
+answer every question; one that doesn't is refused before anything is changed, naming
+what's missing.
+
+The installer refuses the whole file, before it changes anything, if it has a key it
+doesn't recognise or a value of the wrong kind. A misspelt key that was quietly ignored
+would become a default nobody chose. Every answer, with a comment for each:
+
+```yaml
+# marque.yml: how this tracker was installed.
+
+tracker: private          # private or public. On a re-run it must match what's installed
+
+extras:                   # true installs it, false leaves it out
+  api: false              # marque/cennad, the REST API
+  forums: true            # marque/parley, forums and torrent comments
+  taxonomy: false         # marque/taxonomy, the content-type engine
+  admin_panel: true       # marque/skipper, the admin panel
+  staff_management: true  # marque/bosun, the staff action log and Staff screens
+
+site_name: "Ten Yard"     # APP_NAME. Empty keeps the current name
+
+admin:                    # the owner account, sent a link to set its password
+  name: Ada
+  email: ada@example.com
+# admin: false            # or create no account
+
+stylesheet: true          # add the packages' template paths to resources/css/app.css
+user_model: true          # add HasRoles, UserInterface and MustVerifyEmail to app/Models/User.php
+home_page: dashboard      # dashboard, splash, torrents, profile-stats or leave
+```
+
+An extra that's already installed isn't asked about, whatever the file says.
+
 ## Licence
 
 MIT. See [LICENSE](LICENSE).

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Marque\Marque\Console;
 
+use Closure;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -21,8 +22,10 @@ use Marque\Marque\Install\HitAndRunDefault;
 use Marque\Marque\Install\HomePage;
 use Marque\Marque\Install\InstallAnswers;
 use Marque\Marque\Install\InstalledPackages;
+use Marque\Marque\Install\InvalidPreseed;
 use Marque\Marque\Install\MixedTrackerInstall;
 use Marque\Marque\Install\PackageSelection;
+use Marque\Marque\Install\Preseed;
 use Marque\Marque\Install\StylesheetWiring;
 use Marque\Marque\Install\UserModelPatch;
 use RuntimeException;
@@ -61,12 +64,25 @@ class InstallCommand extends Command
 
     private ?string $adminEmail = null;
 
-    protected $signature = 'marque:install';
+    protected $signature = 'marque:install
+        {--preseed= : A YAML file answering the questions ahead of time (see the README)}';
 
     protected $description = 'Install and wire up Marque — interviews you, then configures the app';
 
+    private Preseed $preseed;
+
     public function handle(EnvironmentCheck $check): int
     {
+        // The preseed is read and checked before anything else, so a file
+        // that can't be used is refused while nothing has been touched.
+        try {
+            $this->preseed = $this->loadPreseed();
+        } catch (InvalidPreseed $e) {
+            $this->components->error($e->getMessage());
+
+            return self::FAILURE;
+        }
+
         // Split deliberately. The database is required no matter what the
         // operator answers, and discovering it is unreachable AFTER a page of
         // questions wastes their time — so it is checked first. Redis is
@@ -100,7 +116,14 @@ class InstallCommand extends Command
         }
 
         $this->newLine();
-        $selection = $this->interview($existing);
+
+        try {
+            $selection = $this->interview($existing);
+        } catch (InvalidPreseed $e) {
+            $this->components->error($e->getMessage());
+
+            return self::FAILURE;
+        }
 
         $check->runConditional($report, $selection->needsRedis(), needsDurableRedis: $selection->isPrivate());
 
@@ -166,20 +189,32 @@ class InstallCommand extends Command
         // private, so pressing Enter on a public install used to add
         // bloodhound beside hound (#10803).
         if ($existing !== null) {
+            $kind = $existing->isPrivate() ? 'private' : 'public';
+
+            // A preseed asking for the other kind is refused, not ignored:
+            // whoever wrote it expects a tracker this install won't give them.
+            if ($this->preseed->answers('tracker') && $this->preseed->answer('tracker') !== $kind) {
+                throw new InvalidPreseed(sprintf(
+                    'The preseed says tracker: %s, but this is already a %s tracker, and one install is never both.',
+                    $this->preseed->answer('tracker'),
+                    $kind,
+                ));
+            }
+
             $this->components->info(sprintf(
                 'This is already a %s tracker — keeping it. Adding anything else stays on that tracker.',
-                $existing->isPrivate() ? 'private' : 'public',
+                $kind,
             ));
             $selection = $existing;
         } else {
-            $type = select(
+            $type = $this->answer('tracker', 'What kind of tracker is this?', fn () => select(
                 label: 'What kind of tracker is this?',
                 options: [
                     'private' => 'Private — accounts, invites, ratio tracking',
                     'public' => 'Public — open announce, no account needed',
                 ],
                 default: 'private',
-            );
+            ));
 
             $selection = $type === 'private'
                 ? PackageSelection::private()
@@ -188,17 +223,21 @@ class InstallCommand extends Command
 
         // Only what isn't installed yet is offered.
         $extras = [
-            'marque/cennad' => ['Add the REST API?', false, fn (PackageSelection $s) => $s->withApi()],
-            'marque/parley' => ['Add forums and torrent comments?', false, fn (PackageSelection $s) => $s->withForums()],
-            'marque/taxonomy' => ['Add the content taxonomy engine?', false, fn (PackageSelection $s) => $s->withTaxonomy()],
-            'marque/skipper' => ['Add the admin panel?', true, fn (PackageSelection $s) => $s->withAdminPanel()],
+            'api' => ['Add the REST API?', false, fn (PackageSelection $s) => $s->withApi()],
+            'forums' => ['Add forums and torrent comments?', false, fn (PackageSelection $s) => $s->withForums()],
+            'taxonomy' => ['Add the content taxonomy engine?', false, fn (PackageSelection $s) => $s->withTaxonomy()],
+            'admin_panel' => ['Add the admin panel?', true, fn (PackageSelection $s) => $s->withAdminPanel()],
             // On by default for a private tracker, where staff hand out bans and
             // exemptions; asked of a public one too, which can have accounts.
-            'marque/bosun' => ['Add staff management (who did what, Staff and Audit log screens)?', $selection->isPrivate(), fn (PackageSelection $s) => $s->withStaffManagement()],
+            'staff_management' => ['Add staff management (who did what, Staff and Audit log screens)?', $selection->isPrivate(), fn (PackageSelection $s) => $s->withStaffManagement()],
         ];
 
-        foreach ($extras as $package => [$label, $default, $add]) {
-            if (! $selection->includes($package) && confirm(label: $label, default: $default)) {
+        foreach ($extras as $name => [$label, $default, $add]) {
+            if ($selection->includes(Preseed::EXTRAS[$name])) {
+                continue;
+            }
+
+            if ($this->answer("extras.{$name}", $label, fn () => confirm(label: $label, default: $default))) {
                 $selection = $add($selection);
             }
         }
@@ -225,6 +264,22 @@ class InstallCommand extends Command
      */
     private function askAboutAdmin(): void
     {
+        // One preseed answer covers all three questions: false, or the name
+        // and address (Preseed has already validated them).
+        if ($this->preseed->answers('admin')) {
+            $admin = $this->preseed->answer('admin');
+            $this->components->twoColumnDetail('Create an admin account?', $admin === false ? 'no <fg=gray>(preseed)</>' : "{$admin['email']} <fg=gray>(preseed)</>");
+
+            if ($admin !== false) {
+                $this->adminName = $admin['name'];
+                $this->adminEmail = $admin['email'];
+            }
+
+            return;
+        }
+
+        $this->refuseUnattended('admin', 'Create an admin account?');
+
         if (! confirm(label: 'Create an admin account?', default: true)) {
             return;
         }
@@ -259,12 +314,12 @@ class InstallCommand extends Command
     {
         $current = (string) config('app.name');
 
-        $name = text(
+        $name = (string) $this->answer('site_name', 'What is this tracker called?', fn () => text(
             label: 'What is this tracker called?',
             placeholder: $current,
             default: $current === 'Laravel' ? '' : $current,
             hint: 'Shown in the page title and the app shell.',
-        );
+        ));
 
         if (trim($name) === '' || $name === $current) {
             return;
@@ -364,7 +419,7 @@ class InstallCommand extends Command
 
         $this->newLine();
 
-        if (! confirm(label: 'Add them?', default: true)) {
+        if (! $this->answer('stylesheet', 'Add them?', fn () => confirm(label: 'Add them?', default: true))) {
             $this->components->warn('Skipped. The app will render unstyled until those lines exist.');
 
             return;
@@ -432,7 +487,7 @@ class InstallCommand extends Command
         $this->line($patch->diff($selection->isPrivate()));
         $this->newLine();
 
-        if (! confirm(label: 'Apply this to app/Models/User.php?', default: true)) {
+        if (! $this->answer('user_model', 'Apply this to app/Models/User.php?', fn () => confirm(label: 'Apply this to app/Models/User.php?', default: true))) {
             $this->components->warn('Skipped. /torrents will fail until your User model '
                 .'uses HasRoles and implements UserInterface, and `verified` passes everyone '
                 .'until it implements MustVerifyEmail.');
@@ -480,11 +535,11 @@ class InstallCommand extends Command
 
         $this->components->info('Your app still opens on Laravel\'s welcome page');
 
-        $choice = select(
+        $choice = $this->answer('home_page', 'What should / show?', fn () => select(
             label: 'What should / show?',
             options: HomePage::options(),
             default: HomePage::defaultFor($selection),
-        );
+        ));
 
         if ($choice === HomePage::LEAVE_ALONE) {
             $this->components->warn('Left alone. / still shows whatever it showed before.');
@@ -548,6 +603,58 @@ class InstallCommand extends Command
             $message['fatal']
                 ? $this->components->error($message['text'])
                 : $this->components->warn($message['text']);
+        }
+    }
+
+    /**
+     * @throws InvalidPreseed
+     */
+    private function loadPreseed(): Preseed
+    {
+        $path = $this->option('preseed');
+
+        if ($path === null || $path === '') {
+            return Preseed::none();
+        }
+
+        $preseed = Preseed::fromFile($path);
+
+        // Unattended, every question needs an answer, and that's checked now
+        // rather than discovered part way through the install.
+        if (! $this->input->isInteractive() && ($missing = $preseed->missing()) !== []) {
+            throw new InvalidPreseed("Run with --no-interaction, the preseed must answer every question. It doesn't answer: ".implode(', ', $missing).'.');
+        }
+
+        return $preseed;
+    }
+
+    /**
+     * The preseed's answer if it has one, said aloud so the run still reads
+     * as a record of what was chosen; otherwise the question, asked.
+     */
+    private function answer(string $question, string $label, Closure $prompt): mixed
+    {
+        if ($this->preseed->answers($question)) {
+            $answer = $this->preseed->answer($question);
+            $shown = is_bool($answer) ? ($answer ? 'yes' : 'no') : ($answer === '' ? '(unchanged)' : (string) $answer);
+            $this->components->twoColumnDetail($label, "{$shown} <fg=gray>(preseed)</>");
+
+            return $answer;
+        }
+
+        $this->refuseUnattended($question, $label);
+
+        return $prompt();
+    }
+
+    /**
+     * A preseeded unattended run never falls back to a default. loadPreseed()
+     * already refuses an incomplete file, so this is the belt to its braces.
+     */
+    private function refuseUnattended(string $question, string $label): void
+    {
+        if ($this->preseed->loaded() && ! $this->input->isInteractive()) {
+            throw new InvalidPreseed("The preseed doesn't answer {$question} (\"{$label}\").");
         }
     }
 }

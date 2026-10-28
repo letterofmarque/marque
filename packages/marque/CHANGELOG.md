@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`--preseed=<file>`**: a YAML file answers the installer's questions ahead of time, as
+  Debian's preseeding does, for repeatable and unattended installs. Unanswered questions are
+  asked. With `--no-interaction` the file must answer every one, or the install is refused
+  up front, naming what's missing. Unknown keys and wrong values refuse the file before
+  anything changes.
 - **Offers staff management** (`marque/bosun`): the staff action log and the owner's
   Staff and Audit log screens. On by default for a private tracker, and asked of a public
   one too. Not asked again once installed.
