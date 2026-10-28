@@ -1084,6 +1084,20 @@ This is a Bloodhound feature and has no equivalent in [marque/hound](https://pac
 | `bloodhound:backfill-ledger` | — | Once, after upgrading from 7.x: credits pre-8.0 history its time and stopped bytes |
 | `bloodhound:record-pruned-history` | — | Once, if needed: accounts for rows a pre-8.0 prune deleted without carrying them |
 
+## Upgrading from 9.x to 10.0
+
+Two breaking changes, both small:
+
+- **It requires `marque/trove` ^5.0.** Upgrade it with the rest of Marque 11.0: trove 5,
+  usarrs 9, and the frontend releases that accept trove 5 (guise and disguise 5.4, cennad
+  4.5). Composer won't install bloodhound 10 beside trove 4.
+- **`bloodhound:standing exempt` and `unexempt` require `--by`,** the deciding admin's user
+  id, as 9.x warned. A script that exempts members without it now fails, so add
+  `--by=<admin id>`.
+
+Exemptions and seedbox decisions are now recorded as staff actions. Install `marque/bosun`
+to keep and read them; without it nothing changes.
+
 ## Upgrading to 9.2
 
 Nothing to do. The ratio grace allowance is now set in GB, as `enforcement.grace_gb`

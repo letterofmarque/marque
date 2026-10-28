@@ -175,7 +175,7 @@ composer require marque/bosun
 - Ratio and seedtime summed from an append-only ledger that can be reconciled, audited and rebuilt
 - Version-based client whitelist/blacklist
 - Anti-cheat (speed caps that forfeit, location limits and a cap on a member's clients per torrent, swarm consistency), with registered seedboxes on their own speed cap. How many torrents a member seeds is never limited
-- Ratio enforcement: a member below the minimum ratio goes on watch, then has new downloading paused until they recover (seeding never is), with a grace allowance and staff and per-member exemptions; and hit-and-run: a downloaded torrent is owed 72 hours of seeding or 1:1 on it, and three strikes pause new downloading. It's off until you turn it on, and runs beside the ratio rule, or alone under `ratio_mode` `seedtime`; or `ratio_mode` off
+- Ratio enforcement: a member below the minimum ratio goes on watch, then has new downloading paused until they recover (seeding never is), with a grace allowance and staff and per-member exemptions; and hit-and-run: a downloaded torrent is owed 72 hours of seeding or 1:1 on it, and three strikes pause new downloading. It's off by default in bloodhound and `marque:install` turns it on for a new private tracker; it runs beside the ratio rule, or alone under `ratio_mode` `seedtime`; or `ratio_mode` off
 - Support for compact and dictionary peer formats
 
 ### Guise (Web UI)
@@ -215,6 +215,9 @@ composer require marque/bosun
   `rename_level` preserves every existing classification through a rename
 - Classification data is never deleted by a definition edit — orphaned rows remain and are
   recoverable, enforced by foreign keys rather than by convention
+- Cascading upload form and an admin screen that populates declared levels but deliberately
+  cannot create or remove one
+- Ships no domain vocabulary at all; your app declares its own levels and facets in YAML
 
 ### Bosun (Staff)
 - A record of every staff action across the suite (bans, role changes, torrent edits,
@@ -223,9 +226,6 @@ composer require marque/bosun
 - The Staff screen: staff by role, actions over 7/30/90 days, last seen, and role changes
   with a required reason under the owner rules
 - The Audit log: every staff action, filterable by staff member, action, subject and date
-- Cascading upload form and an admin screen that populates declared levels but deliberately
-  cannot create or remove one
-- Ships no domain vocabulary at all; your app declares its own levels and facets in YAML
 
 ## Configuration
 
@@ -243,9 +243,9 @@ php artisan vendor:publish --tag=taxonomy-config
 ## Versioning
 
 Packages follow [Semantic Versioning](https://semver.org) and are versioned
-independently, so packages sit on different majors (usarrs on 8, threepio on 4) and that is normal.
+independently, so packages sit on different majors (usarrs on 9, threepio on 4) and that is normal.
 
-Most people want a caret on the current major (`^8.6` for usarrs today), which is what `composer require` gives you by default: new
+Most people want a caret on the current major (`^9.0` for usarrs today), which is what `composer require` gives you by default: new
 features and fixes automatically, never a breaking change. Minor releases are cut
 frequently, so you should not need to track `dev-main` to get a finished feature.
 
@@ -273,7 +273,9 @@ picks it up automatically. Two things to watch:
   more than three tags arrive in a single push — the tags land, nothing splits, and
   Packagist is never notified. It fails silently.
 - **Release in dependency order.** A package must be published before anything that
-  requires it: `threepio` → `trove` → `deck` → everything else.
+  requires it, as each `composer.json` says: `threepio` → `trove` → `deck`, then `squidink`
+  before `parley` and `usarrs` before `bosun` and the installer. The release tooling works
+  the order out from the `composer.json` files.
 
 If a split is missed, re-trigger it from an existing tag:
 

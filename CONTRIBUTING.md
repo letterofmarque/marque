@@ -113,6 +113,7 @@ packages/
 ├── squidink/     → letterofmarque/squidink
 ├── parley/       → letterofmarque/parley
 ├── taxonomy/     → letterofmarque/taxonomy
+├── bosun/        → letterofmarque/bosun
 └── marque/       → letterofmarque/installer
 ```
 

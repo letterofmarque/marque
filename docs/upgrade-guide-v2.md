@@ -1,8 +1,8 @@
 # Upgrading to Marque v2.0
 
 > **Note:** this predates [docs/upgrading.md](upgrading.md), the suite-wide
-> release index — there's no "Marque 2.0" entry there since that page starts
-> at 3.0. This guide is still current for the v1→v2 jump.
+> release index. Its Releases table starts at 3.0; this guide is the first row of
+> its ordered path. It is still current for the v1→v2 jump.
 
 > **Note (2026-08-20):** `marque/id`, introduced by this guide, was renamed to
 > `marque/ise` — same package, same content, new name (the old one collided

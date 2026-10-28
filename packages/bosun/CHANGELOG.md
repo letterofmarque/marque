@@ -14,7 +14,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md).
 - **Stores staff actions** recorded through trove's `StaffActionsInterface`: who, what, to
   which record, why and what changed. It fails open: a record that can't be stored never
   blocks the action, and is logged. Records are written in a savepoint inside the action's
-  transaction. Kept for good by default; `bosun:prune` with `BOSUN_RETENTION_DAYS` trims
+  transaction. Integer user ids only: a record with a string or UUID actor is refused and
+  logged, the same on every database. Kept for good by default; `bosun:prune` with `BOSUN_RETENTION_DAYS` trims
   them.
 - **Staff presence**: a `web` middleware notes when each staff member was last on, at
   most every five minutes. Members are never tracked.

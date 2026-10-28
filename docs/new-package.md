@@ -3,8 +3,8 @@
 *Read this before creating a package in `packages/`. Everything here has already
 cost someone a debugging session — most of it twice.*
 
-Five packages have been added since the v2.0 lineup refactor: `squidink` and `parley`
-(both 2026-08-20), then `taxonomy`, `skipper` and the `marque` installer. The first two hit
+Six packages have been added since the v2.0 lineup refactor: `squidink` and `parley`
+(both 2026-08-20), then `taxonomy`, `skipper`, the `marque` installer and `bosun`. The first two hit
 the same gotchas in the same order, and this doc exists so later ones don't have to.
 
 ## Before it can ship

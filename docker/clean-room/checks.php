@@ -104,6 +104,12 @@ $check('usarrs:owner makes another user an owner', function () use ($verified) {
 echo "\n\033[1mThe admin panel and bosun's screens\033[0m\n";
 
 $check('the panel lists the Staff and Audit log screens', fn () => $sees($get('/admin', $owner), 'Audit log'));
+$check('the panel draws each screen\'s icon, not a blank', function () use ($get, $owner) {
+    $html = (string) $get('/admin', $owner)->getContent();
+    $missing = array_filter(['user-group', 'clipboard-document-list', 'users', 'tag'], fn (string $icon): bool => ! str_contains($html, 'data-icon="'.$icon.'"'));
+
+    return $missing === [] ? true : 'no icon drawn for: '.implode(', ', $missing);
+});
 $check('the Staff screen renders for the owner, with the owner on it', fn () => $sees($get('/admin/staff', $owner), $owner->name));
 $check('the Audit log renders for the owner', fn () => $sees($get('/admin/audit-log', $owner), 'Audit log'));
 

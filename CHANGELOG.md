@@ -13,7 +13,7 @@ changelogs — edit those, not this.*
 - **[bloodhound 10.0.0](packages/bloodhound/CHANGELOG.md)** — Exemptions and seedbox decisions are recorded as staff actions, and bloodhound:standing requires --by, as 9.x warned.
 - **[bosun 1.0.0](packages/bosun/CHANGELOG.md)** — New: staff management. A record of every staff action, when each staff member was last on, and the owner's Staff and Audit log screens.
 - **[cennad 4.5.0](packages/cennad/CHANGELOG.md)** — Works with trove 5.0 as well as 4.x, and passes the editor to trove so a moderator's edit of someone else's torrent is recorded.
-- **[deck 2.2.0](packages/deck/CHANGELOG.md)** — Works with trove 5.0 as well as 4.x.
+- **[deck 2.2.0](packages/deck/CHANGELOG.md)** — Works with trove 5.0 as well as 4.x, and ships the icons packages register for admin screens and dashboard panels.
 - **[disguise 5.4.0](packages/disguise/CHANGELOG.md)** — Works with trove 5.0 as well as 4.x, and passes the editor to trove so a moderator's edit of someone else's torrent is recorded.
 - **[guise 5.4.0](packages/guise/CHANGELOG.md)** — Works with trove 5.0 as well as 4.x, and passes the editor to trove so a moderator's edit of someone else's torrent is recorded.
 - **[hound 5.1.0](packages/hound/CHANGELOG.md)** — Works with trove 5.0 as well as 4.x.

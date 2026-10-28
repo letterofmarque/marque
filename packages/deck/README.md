@@ -4,7 +4,7 @@ App layout shell and shared Blade UI components for the [Marque](https://github.
 
 `deck` provides the page shell (layout, navigation, footer) and a small set of Blade
 components used across the Marque frontend packages: `guise`, `disguise`, `usarrs`,
-`parley` and `skipper`. `squidink` and `taxonomy` deliberately use none of them, so
+`parley`, `skipper` and `bosun`. `squidink` and `taxonomy` deliberately use none of them, so
 they work in an app without deck. It is the surface everything else
 stands on, which is where the name comes from.
 
@@ -62,9 +62,12 @@ underlying element, and `class` merges with the component's own classes.
 
 ### Icons
 
-`<x-deck::icon>` ships the Heroicons used by the Marque views — `arrow-left`,
-`arrow-down-tray`, `magnifying-glass`, `pencil`, `plus` — inlined as SVG to avoid an
-icon-package dependency. Add more by extending `resources/views/components/icon.blade.php`.
+`<x-deck::icon>` ships the Heroicons used by the Marque views and the icons packages
+register for admin screens and dashboard panels — `arrow-left`,
+`arrow-down-tray`, `clipboard-document-list`, `magnifying-glass`, `pencil`, `plus`, `server`,
+`tag`, `user`, `user-group` and `users` — inlined as SVG to avoid an icon-package dependency.
+Any other name renders nothing. Add more by extending
+`resources/views/components/icon.blade.php`.
 
 ## Navigation
 

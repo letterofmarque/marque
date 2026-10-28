@@ -133,3 +133,18 @@ class LongMorphUser extends TestUser
         return str_repeat('x', 300);
     }
 }
+
+it('refuses a non-integer actor id the same way on every engine', function () {
+    Log::spy();
+
+    app(StaffActionsInterface::class)->record(new StaffAction(
+        actorId: '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d',
+        action: 'usarrs.user.banned',
+        subjectType: 'user',
+        subjectId: 2,
+    ));
+
+    expect(StaffActionEntry::query()->count())->toBe(0);
+
+    Log::shouldHaveReceived('error')->withArgs(fn (string $message): bool => str_contains($message, 'integer user ids only'));
+});

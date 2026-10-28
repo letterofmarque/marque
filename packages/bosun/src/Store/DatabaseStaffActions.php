@@ -25,6 +25,19 @@ final class DatabaseStaffActions implements StaffActionsInterface
 {
     public function record(StaffAction $action): void
     {
+        // Integer user ids only: the Staff screen counts and joins by them. A
+        // string or UUID id is refused here, the same on every engine, rather
+        // than left to the database (PostgreSQL and MySQL reject it, SQLite
+        // would store a row no staff filter can ever find).
+        if (! is_int($action->actorId) && ! ctype_digit($action->actorId)) {
+            Log::error('bosun: a staff action could not be recorded; bosun stores integer user ids only. The action itself went ahead.', [
+                'action' => $action->action,
+                'actor_id' => $action->actorId,
+            ]);
+
+            return;
+        }
+
         try {
             DB::connection((new StaffActionEntry)->getConnectionName())->transaction(function () use ($action): void {
                 StaffActionEntry::query()->create([

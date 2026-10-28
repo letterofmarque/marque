@@ -10,12 +10,18 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
 ## [2.2.0] — 2026-10-28
 
-> Works with trove 5.0 as well as 4.x.
+> Works with trove 5.0 as well as 4.x, and ships the icons packages register for admin screens and dashboard panels.
 
 ### Changed
 
 - **`marque/trove` widened to `^4.11|^5.0`.** Nothing here depends on what trove 5 changed: an
   owner passes every admin check, because `isAdmin()` now means admin or above.
+
+### Fixed
+
+- **`<x-deck::icon>` ships the icons packages register**: `users`, `server`, `tag`, `user`,
+  `user-group` and `clipboard-document-list`. Before, the admin panel's screen icons and the
+  dashboard's panel icons rendered blank, because an unknown name renders nothing.
 
 ## [2.1.0] — 2026-10-24
 

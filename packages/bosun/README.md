@@ -44,7 +44,7 @@ Whatever the packages record. As of Marque 11.0 that is:
 | Package | Actions |
 |---|---|
 | usarrs | `usarrs.user.banned`, `unbanned`, `role_changed`; `usarrs.invite.revoked` |
-| trove (through guise, disguise and cennad) | `trove.torrent.edited`, `deleted` |
+| trove | `trove.torrent.edited` (through guise, disguise and cennad), `trove.torrent.deleted` (through cennad's API) |
 | bloodhound | `bloodhound.exemption.granted`, `removed`; `bloodhound.seedbox.approved`, `revoked` |
 | parley | `parley.thread.pinned`, `unpinned`, `locked`, `unlocked`, `edited`, `deleted`; `parley.post.edited`, `deleted` |
 | taxonomy | `taxonomy.term.added`, `renamed`, `deleted`; `taxonomy.facet_value.added`, `deleted` |
@@ -68,8 +68,8 @@ error is logged (`bosun: a staff action could not be recorded`) and reported, an
 shows in the log. Records are written inside the staff action's own transaction, in a
 savepoint, so a failed write doesn't take the caller's transaction with it on PostgreSQL.
 
-bosun stores actor and user ids as integers. An app with string or UUID user ids will
-see each record fail, and log, as above.
+bosun supports integer user ids only. With string or UUID ids, each record is refused and
+logged as above, on every database, and the actions themselves go ahead.
 
 ## The Staff screen
 

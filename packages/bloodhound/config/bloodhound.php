@@ -140,7 +140,7 @@ return [
     //                 A value you set wins over grace_gb; the old 5 GiB default
     //                 is ignored. Use grace_gb.
     // 'exempt_role' - this role and above are never watched or restricted
-    //                 (trove roles: user, uploader, moderator, admin). An admin
+    //                 (trove roles: user, uploader, moderator, admin, owner). An admin
     //                 can also exempt one member: bloodhound:standing exempt.
     'enforcement' => [
         'watch_days' => env('BLOODHOUND_RATIO_WATCH_DAYS', 14),

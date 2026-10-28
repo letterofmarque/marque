@@ -78,7 +78,7 @@ covers only the screens skipper serves.
 
 ## Stability
 
-**The registration contract is public API from trove 4.x.** `Marque\Trove\Registry\`
+**The registration contract is public API from trove 4.2.** `Marque\Trove\Registry\`
 (`AdminScreen`, `AdminScreenRegistry`, and their public surface) follows semver on
 `marque/trove`. Build against it.
 
@@ -93,7 +93,8 @@ panel listing, and once when the request is authorised (on the routes skipper ge
 see above for a package's own route). Filtering a menu is not protecting
 a screen — without the second check, a moderator reaches an admin screen by typing its URL.
 
-Roles come from trove (`user` → `uploader` → `moderator` → `admin`), and a screen is visible
+Roles come from trove (`user` → `uploader` → `moderator` → `admin` → `owner`, the last
+from trove 5.0), and a screen is visible
 to any role at or above its floor.
 
 The panel itself (`/admin`) answers 403 to someone no registered screen admits, the same as
