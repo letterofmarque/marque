@@ -5,6 +5,15 @@ All notable changes to `marque/marque` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] — 2026-10-28
+
+> The README's preseed example and the installer's tests use a neutral site name.
+
+### Changed
+
+- **A neutral example site name** in the README's preseed example, a code comment and the
+  tests. No behaviour changed.
+
 ## [2.0.0] — 2026-10-28
 
 > The admin account the installer creates is the tracker's owner, so a fresh install can grant Admin, and the installer offers staff management (bosun).

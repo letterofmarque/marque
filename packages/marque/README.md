@@ -125,7 +125,7 @@ extras:                   # true installs it, false leaves it out
   admin_panel: true       # marque/skipper, the admin panel
   staff_management: true  # marque/bosun, the staff action log and Staff screens
 
-site_name: "Ten Yard"     # APP_NAME. Empty keeps the current name
+site_name: "Harbour Light"  # APP_NAME. Empty keeps the current name
 
 admin:                    # the owner account, sent a link to set its password
   name: Ada

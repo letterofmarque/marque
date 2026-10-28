@@ -88,10 +88,10 @@ final class EnvWriterTest extends TestCase
     {
         $this->write("APP_NAME=Laravel\n");
 
-        (new EnvWriter($this->path))->set('APP_NAME', 'Ten Yard Tracker');
+        (new EnvWriter($this->path))->set('APP_NAME', 'Harbour Light Tracker');
 
         // Unquoted, everything after the first space is discarded by dotenv.
-        $this->assertStringContainsString('APP_NAME="Ten Yard Tracker"', $this->read());
+        $this->assertStringContainsString('APP_NAME="Harbour Light Tracker"', $this->read());
     }
 
     public function test_it_does_not_quote_a_simple_value(): void

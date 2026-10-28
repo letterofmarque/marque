@@ -63,7 +63,7 @@ final class EnvWriter
     }
 
     /**
-     * Unquoted, dotenv stops at the first space — "Ten Yard Tracker" would
+     * Unquoted, dotenv stops at the first space — "Harbour Light Tracker" would
      * silently become "Ten". Quote when the value is not a bare word, and
      * escape what would otherwise close the string early.
      */

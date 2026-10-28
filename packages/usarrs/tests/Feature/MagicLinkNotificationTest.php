@@ -18,10 +18,10 @@ function magicMail(): string
 }
 
 it('names the site from deck.app_name', function () {
-    config()->set('deck.app_name', 'Ten Yard');
+    config()->set('deck.app_name', 'Harbour Light');
     config()->set('app.name', 'Laravel');
 
-    expect(magicMail())->toContain('Login to Ten Yard');
+    expect(magicMail())->toContain('Login to Harbour Light');
 });
 
 it('falls back to app.name when deck sets none', function () {

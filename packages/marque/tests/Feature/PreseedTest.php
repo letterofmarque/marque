@@ -22,7 +22,7 @@ final class PreseedTest extends TestCase
         return [
             'tracker' => 'private',
             'extras' => ['api' => false, 'forums' => true, 'taxonomy' => false, 'admin_panel' => true, 'staff_management' => true],
-            'site_name' => 'Ten Yard',
+            'site_name' => 'Harbour Light',
             'admin' => ['name' => 'Ada', 'email' => 'ada@example.com'],
             'stylesheet' => true,
             'user_model' => true,
@@ -105,7 +105,7 @@ final class PreseedTest extends TestCase
     public function test_it_reads_yaml_with_comments(): void
     {
         $path = tempnam(sys_get_temp_dir(), 'preseed');
-        file_put_contents($path, "# Ten Yard's production install\ntracker: private  # members only\nextras:\n  staff_management: true\n");
+        file_put_contents($path, "# Harbour Light's production install\ntracker: private  # members only\nextras:\n  staff_management: true\n");
 
         $preseed = Preseed::fromFile($path);
         unlink($path);
