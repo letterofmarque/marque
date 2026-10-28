@@ -192,6 +192,9 @@ class InstallCommand extends Command
             'marque/parley' => ['Add forums and torrent comments?', false, fn (PackageSelection $s) => $s->withForums()],
             'marque/taxonomy' => ['Add the content taxonomy engine?', false, fn (PackageSelection $s) => $s->withTaxonomy()],
             'marque/skipper' => ['Add the admin panel?', true, fn (PackageSelection $s) => $s->withAdminPanel()],
+            // On by default for a private tracker, where staff hand out bans and
+            // exemptions; asked of a public one too, which can have accounts.
+            'marque/bosun' => ['Add staff management (who did what, Staff and Audit log screens)?', $selection->isPrivate(), fn (PackageSelection $s) => $s->withStaffManagement()],
         ];
 
         foreach ($extras as $package => [$label, $default, $add]) {

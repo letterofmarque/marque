@@ -24,7 +24,7 @@ final class PackageSelection
 
     private const PUBLIC_TRACKER = ['marque/hound', 'marque/disguise'];
 
-    private const EXTRAS = ['marque/cennad', 'marque/parley', 'marque/taxonomy', 'marque/skipper'];
+    private const EXTRAS = ['marque/cennad', 'marque/parley', 'marque/taxonomy', 'marque/skipper', 'marque/bosun'];
 
     /** @var list<string> */
     private array $extras = [];
@@ -156,6 +156,15 @@ final class PackageSelection
     public function withAdminPanel(): self
     {
         return $this->with('marque/skipper');
+    }
+
+    /**
+     * bosun: the staff action log, staff presence, and the owner's Staff and
+     * Audit log screens. It shows its screens through the admin panel.
+     */
+    public function withStaffManagement(): self
+    {
+        return $this->with('marque/bosun');
     }
 
     /**

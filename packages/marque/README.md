@@ -39,6 +39,12 @@ Everything else is a choice, and `marque:install` makes it with you:
 | Forums and comments | `marque/parley` + `marque/squidink` |
 | Content taxonomy | `marque/taxonomy` |
 | Admin panel | `marque/skipper` |
+| Staff management (on by default for a private tracker) | `marque/bosun` |
+
+If you let it create an admin account, that account is the tracker's **owner**: an admin
+who can also grant and remove Admin, which nobody else can. It's sent a link to set its
+password. On an install that already has admins but no owner, the installer says so; make
+one with `php artisan usarrs:owner <email>`.
 
 **A new private tracker starts with hit-and-run on.** bloodhound ships its hit-and-run
 rule off, so upgrading an existing tracker changes nothing for its members. A tracker built

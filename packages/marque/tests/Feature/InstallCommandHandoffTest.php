@@ -72,6 +72,7 @@ final class InstallCommandHandoffTest extends TestCase
             ->expectsConfirmation('Add forums and torrent comments?', 'no')
             ->expectsConfirmation('Add the content taxonomy engine?', 'no')
             ->expectsConfirmation('Add the admin panel?', 'yes')
+            ->expectsConfirmation('Add staff management (who did what, Staff and Audit log screens)?', 'yes')
             ->expectsQuestion('What is this tracker called?', '')
             ->expectsConfirmation('Create an admin account?', 'yes')
             ->expectsQuestion('What is the admin called?', 'Ada')
@@ -93,6 +94,7 @@ final class InstallCommandHandoffTest extends TestCase
         $this->assertTrue($answers->selection->isPrivate());
         $this->assertContains('marque/cennad', $answers->selection->packages());
         $this->assertContains('marque/skipper', $answers->selection->packages());
+        $this->assertContains('marque/bosun', $answers->selection->packages());
         $this->assertNotContains('marque/parley', $answers->selection->packages());
         $this->assertSame('Ada', $answers->adminName);
         $this->assertSame('ada@example.com', $answers->adminEmail);
@@ -137,6 +139,7 @@ final class InstallCommandHandoffTest extends TestCase
             ->expectsConfirmation('Add forums and torrent comments?', 'no')
             ->expectsConfirmation('Add the content taxonomy engine?', 'no')
             ->expectsConfirmation('Add the admin panel?', 'no')
+            ->expectsConfirmation('Add staff management (who did what, Staff and Audit log screens)?', 'no')
             ->expectsQuestion('What is this tracker called?', '')
             ->expectsConfirmation('Create an admin account?', 'no')
             ->expectsOutputToContain('Nothing new to install')

@@ -20,7 +20,7 @@ changelogs — edit those, not this.*
 - **[disguise 5.4.0](packages/disguise/CHANGELOG.md)** — Works with trove 5.0 as well as 4.x, and passes the editor to trove so a moderator's edit of someone else's torrent is recorded.
 - **[guise 5.4.0](packages/guise/CHANGELOG.md)** — Works with trove 5.0 as well as 4.x, and passes the editor to trove so a moderator's edit of someone else's torrent is recorded.
 - **[hound 5.1.0](packages/hound/CHANGELOG.md)** — Works with trove 5.0 as well as 4.x.
-- **[marque 2.0.0](packages/marque/CHANGELOG.md)** — The admin account the installer creates is the tracker's owner, so a fresh install can grant Admin.
+- **[marque 2.0.0](packages/marque/CHANGELOG.md)** — The admin account the installer creates is the tracker's owner, so a fresh install can grant Admin, and the installer offers staff management (bosun).
 - **[parley 4.0.0](packages/parley/CHANGELOG.md)** — Moderation is recorded as staff actions: pinning and locking, and deleting or editing someone else's thread or post.
 - **[skipper 1.1.0](packages/skipper/CHANGELOG.md)** — Works with trove 5.0 as well as 4.x, and requires the trove 4.2 it was always built on.
 - **[taxonomy 2.0.0](packages/taxonomy/CHANGELOG.md)** — Edits to a catalogue's vocabulary are recorded as staff actions, and live in a Curator service the admin screen calls.

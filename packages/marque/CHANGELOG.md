@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.0.0] — 2026-10-27
 
-> The admin account the installer creates is the tracker's owner, so a fresh install can grant Admin.
+> The admin account the installer creates is the tracker's owner, so a fresh install can grant Admin, and the installer offers staff management (bosun).
 
 ### Changed
 
@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An existing admin is any role at Admin or above, so a rerun that finds the owner leaves
   it alone instead of seeding a second account. An install that has admins but no owner is
   told to run `php artisan usarrs:owner <email>`.
+
+### Added
+
+- **Offers staff management** (`marque/bosun`): the staff action log and the owner's
+  Staff and Audit log screens. On by default for a private tracker, and asked of a public
+  one too. Not asked again once installed.
 
 ### Breaking
 

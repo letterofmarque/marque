@@ -42,6 +42,7 @@ final class InstallCommandRerunTest extends TestCase
             ->expectsConfirmation('Add forums and torrent comments?', 'no')
             ->expectsConfirmation('Add the content taxonomy engine?', 'no')
             ->expectsConfirmation('Add the admin panel?', 'no')
+            ->expectsConfirmation('Add staff management (who did what, Staff and Audit log screens)?', 'no')
             ->expectsQuestion('What is this tracker called?', '')
             ->expectsConfirmation('Create an admin account?', 'no')
             ->assertFailed(); // stopped by the dead Redis, after the interview
@@ -49,7 +50,7 @@ final class InstallCommandRerunTest extends TestCase
 
     public function test_it_does_not_ask_about_extras_already_installed(): void
     {
-        $this->installed(['marque/hound', 'marque/disguise', 'marque/cennad', 'marque/skipper']);
+        $this->installed(['marque/hound', 'marque/disguise', 'marque/cennad', 'marque/skipper', 'marque/bosun']);
 
         $this->artisan('marque:install')
             ->expectsConfirmation('Add forums and torrent comments?', 'no')

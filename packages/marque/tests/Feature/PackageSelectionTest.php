@@ -68,19 +68,21 @@ final class PackageSelectionTest extends TestCase
             ->withForums()
             ->withTaxonomy()
             ->withAdminPanel()
+            ->withStaffManagement()
             ->packages();
 
         $this->assertContains('marque/cennad', $packages);
         $this->assertContains('marque/parley', $packages);
         $this->assertContains('marque/taxonomy', $packages);
         $this->assertContains('marque/skipper', $packages);
+        $this->assertContains('marque/bosun', $packages);
     }
 
     public function test_optional_extras_are_absent_unless_asked_for(): void
     {
         $packages = PackageSelection::private()->packages();
 
-        foreach (['marque/cennad', 'marque/parley', 'marque/taxonomy', 'marque/skipper'] as $extra) {
+        foreach (['marque/cennad', 'marque/parley', 'marque/taxonomy', 'marque/skipper', 'marque/bosun'] as $extra) {
             $this->assertNotContains($extra, $packages);
         }
     }
