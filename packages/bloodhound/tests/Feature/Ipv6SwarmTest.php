@@ -168,7 +168,7 @@ describe('ipv4= and ipv6=', function () {
     });
 });
 
-describe('a dual-stack peer is one location', function () {
+describe('locations: where a peer last connected from', function () {
     test('a second leeching client at a dual-stack client\'s IPv6 /64 is at the same place', function () {
         announced6($this, '-qB4210-aaaaaaaaaaaa', '203.0.113.7', 0, ['left' => 500]);
         announced6($this, '-qB4210-aaaaaaaaaaaa', '2001:db8:1:2::10', 120, ['left' => 500, 'event' => '']);
@@ -196,16 +196,18 @@ describe('a dual-stack peer is one location', function () {
         expect($leecher['peers'])->toBe(compact4('198.51.100.9'));
     });
 
-    // Two clients in one house: one has flipped to IPv6 since. Their single
-    // addresses used to read as two locations, refusing the household.
-    test('a household whose clients last announced over different families is one place', function () {
-        announced6($this, '-qB4210-aaaaaaaaaaaa', '203.0.113.7', 0, ['left' => 500]);
-        announced6($this, '-qB4210-aaaaaaaaaaaa', '2001:db8:1:2::10', 120, ['left' => 500, 'event' => '']);
+    // Found by the 10.1 third read-through. One peer ID announces from home
+    // over IPv4, then from a friend's over IPv6; if its two families vouched
+    // for each other, ordinary clients at both places would pass. A peer is
+    // located where it last connected from, and nothing else.
+    test('one peer ID announcing from two places over different families doesn\'t make them one place', function () {
+        announced6($this, '-qB4210-xxxxxxxxxxxx', '203.0.113.7', 0, ['left' => 500]);
+        announced6($this, '-qB4210-xxxxxxxxxxxx', '2001:db8:9::1', 60, ['left' => 500, 'event' => '']);
 
-        expect(announced6($this, '-qB4210-bbbbbbbbbbbb', '203.0.113.7', 130, ['left' => 500]))->not->toHaveKey('failure reason');
+        expect(announced6($this, '-qB4210-yyyyyyyyyyyy', '203.0.113.7', 120, ['left' => 500]))->toHaveKey('failure reason');
     });
 
-    test('a dual-stack client elsewhere counts once against the limit', function () {
+    test('a dual-stack client elsewhere counts once against the limit, whatever it announces', function () {
         config(['bloodhound.anti_cheat.max_seeding_locations_per_torrent' => 2]);
 
         announced6($this, '-qB4210-aaaaaaaaaaaa', '203.0.113.7', 0, ['ipv6' => '2001:db8:1:2::10']);

@@ -10,7 +10,6 @@ use Marque\Bloodhound\Contracts\SeedboxRegistry;
 use Marque\Bloodhound\Events\CheatDetected;
 use Marque\Bloodhound\Support\Location;
 use Marque\Threepio\Services\PeerService;
-use Marque\Threepio\Support\PeerAddresses;
 use Marque\Threepio\Support\PeerLookup;
 
 /**
@@ -177,14 +176,6 @@ final class AntiCheatService
      * leeching are limited separately: the leeching limit is what stops one
      * account being shared to download.
      *
-     * A peer is located by the addresses it has been seen connecting from,
-     * an IPv4 and an IPv6 one when it is dual-stack (#11112). Peers sharing a
-     * location are at one place, so a dual-stack client is one place. An
-     * address a client only announced (ipv4= / ipv6=) never locates it: a
-     * client can announce any address, including the account owner's. A peer
-     * has moved when the address it connected from is none of the locations
-     * it was seen at.
-     *
      * @param  array<string, array<string, mixed>>  $livePeers
      */
     public function checkLocationLimits(int $userId, string $peerId, string $ip, int $left, ?string $event, PeerLookup $lookup, array $livePeers): array
@@ -193,18 +184,11 @@ final class AntiCheatService
             return ['passed' => true, 'reason' => null];
         }
 
+        $location = Location::of($ip);
         $seeding = $left === 0;
         $record = $lookup->isLive() ? $lookup->baseline : null;
-        $now = $lookup->readAt;
-        $expiry = $lookup->peerExpiry;
 
-        $here = Location::of(PeerAddresses::normalise($ip));
-        $seenAt = $record !== null ? Location::ofAddresses(PeerAddresses::connected($record, $now, $expiry)) : [];
-
-        $moved = $record !== null && ! in_array($here, $seenAt, true);
-
-        // Where it was is still where it is, unless it moved.
-        $mine = $moved ? [$here] : array_values(array_unique([$here, ...$seenAt]));
+        $moved = $record !== null && Location::of((string) $record['ip']) !== $location;
         $startedLeeching = $record !== null && (int) $record['left'] === 0 && ! $seeding;
 
         if ($record !== null && ! $moved && ! $startedLeeching) {
@@ -222,23 +206,23 @@ final class AntiCheatService
                 continue;
             }
 
-            $peerLocations = Location::ofAddresses(PeerAddresses::connected($peer, $now, $expiry));
+            $peerLocation = Location::of((string) $peer['ip']);
 
             // Another client of the member, in the same state, already here.
-            if (array_intersect($peerLocations, $mine) !== []) {
+            if ($peerLocation === $location) {
                 $locations = null;
 
                 break;
             }
 
-            $locations[] = $peerLocations;
+            $locations[$peerLocation] = true;
         }
 
         if ($locations !== null) {
             $kind = $seeding ? 'seeding' : 'leeching';
             $max = (int) config("bloodhound.anti_cheat.max_{$kind}_locations_per_torrent", $seeding ? 3 : 1);
 
-            if (Location::places($locations) >= $max) {
+            if (count($locations) >= $max) {
                 return [
                     'passed' => false,
                     // A client restarted somewhere else under a new peer ID

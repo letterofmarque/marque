@@ -227,7 +227,8 @@ Set these in `config/threepio.php`, not here:
 ## IPv6
 
 IPv6 peers are handed out in `peers6` (BEP 7) beside the IPv4 ones in `peers`, and a
-dual-stack client, which announces over each family in turn, is handed out in both.
+dual-stack client, which announces over each family in turn, is handed out in both in
+compact responses.
 
 | Key | Default | Description |
 |-----|---------|-------------|

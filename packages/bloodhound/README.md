@@ -267,7 +267,7 @@ member and torrent to record it against, or the tracker itself is refusing.
 
 IPv6 peers are handed out in `peers6` (BEP 7) beside the IPv4 ones in `peers`. A
 dual-stack client, which announces over IPv4 and IPv6 in turn under one peer ID, keeps an
-address in each family and is handed out in both (see
+address in each family and is handed out in both in compact responses (see
 [threepio](../threepio/README.md#one-address-per-family)).
 
 A client can also say what address it has in the other family, with `ipv4=` and
@@ -275,7 +275,7 @@ A client can also say what address it has in the other family, with `ipv4=` and
 to the same rule as the address the announce came from: the right family, and public in
 production. Anything else is ignored, not refused. An announced address only fills the
 family the announce didn't arrive over. An `ipv4=` sent over IPv4 never replaces the
-address the client connected from, and an announced address never counts as a location
+address the client connected from, and an announced address is never used for location
 (see [Location limits](#anti-cheat)). They're trusted because the announcer is a member,
 and every ledger row, refusals included, records the announced addresses it accepted
 (`announced_ipv4`, `announced_ipv6`). Turn it off and a peer is handed out only where it announced from.
@@ -447,14 +447,11 @@ and recovery still finds them. The user agent is stored scrubbed to valid UTF-8.
 
 **Location limits.** A location is an IP address; for IPv6 it is the /64, because a
 connection is usually handed a whole /64 and clients pick addresses from it freely. A
-dual-stack peer has two, its IPv4 address and its IPv6 /64, and peers that share either
-are at one place, so one machine on both families is never counted twice. Two clients in
-one house count once while either has been seen at the house on the family the other
-uses. A client's first-ever IPv6 announce, while the member's other client there is known
-only by its IPv4 address, is a new location, and the leeching limit refuses it; its IPv4
-announces still go through. Only addresses a peer connected from in the last
-`peer_expiry` locate it. One it only announced (`ipv4=`, `ipv6=`) never does, because a
-client can announce any address, including the account owner's.
+peer is located where its last announce came from. An address it announced (`ipv4=`,
+`ipv6=`) never locates it, because a client can announce any address, including the
+account owner's. Neither does the other family's address it keeps for handing out: one
+peer ID can announce from two places, so a peer's two families are never taken as one
+machine. A dual-stack client is still one location, wherever it last announced from.
 Seeding and leeching are limited separately:
 `max_seeding_locations_per_torrent` (3) and `max_leeching_locations_per_torrent` (1). The
 leeching limit is what stops one account being shared to download. Only a **new**
@@ -462,12 +459,9 @@ location is counted against a limit:
 
 - a peer already in the swarm, announcing from where it was, is never refused by a
   count, so a leecher that finishes becomes a seeder without being refused;
-- a peer is counted again (not against itself) when it moves, that is, when the address
-  it connects from is none of the locations it was seen at. A dual-stack client that
-  restarts on an IPv4-only network elsewhere has moved, and its old IPv6 address stops
-  counting as one of its places, so the house it left is free for another client;
-- a peer is also counted again when it turns from seeding to leeching, so starting as a
-  seeder and then reporting bytes left does not get round the leeching limit;
+- a peer is counted again (not against itself) when it moves to another location, or
+  turns from seeding to leeching, so starting as a seeder and then reporting bytes left
+  does not get round the leeching limit;
 - a client at a location the member already uses on that torrent, in the same state, is
   not a new location;
 - a new peer is classed as seeding or leeching by the `left` it reports, and counted

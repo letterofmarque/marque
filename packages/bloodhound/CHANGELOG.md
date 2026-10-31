@@ -9,19 +9,13 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [10.1.0] — 2026-11-01
 
-> IPv6 peers reach the swarm: peers6, ipv4= and ipv6= honoured and recorded on the ledger, and a dual-stack client counted as one location.
+> IPv6 peers reach the swarm: peers6, a dual-stack client handed out in both families, and ipv4= and ipv6= honoured and recorded on the ledger.
 
 ### Fixed
 
 - **IPv6 peers were invisible to the swarm** (#11112), through threepio. They're handed out
-  in `peers6` now, and a dual-stack client is handed out in both families. Requires
-  `marque/threepio` ^4.2.
-- **A dual-stack household could be refused as two locations.** Two clients in one house,
-  one of which last announced over IPv6, read as two places, and the leeching limit
-  refused the second. A peer's locations are now the IPv4 address and IPv6 /64 it was
-  seen connecting from, and peers that share either are at one place. A peer has moved
-  when the address it connects from is none of those. An announced address never counts
-  as a location: a client can announce any address, including the account owner's.
+  in `peers6` now, and a dual-stack client is handed out in both families in compact
+  responses. Requires `marque/threepio` ^4.2.
 - **An IPv4 client on a dual-stack listener (`::ffff:a.b.c.d`)** is recorded as its IPv4
   address.
 
@@ -29,8 +23,9 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 - **`ipv4=` and `ipv6=` (BEP 7) are honoured**, so a dual-stack peer is reachable in both
   families after one announce. An announced address only fills the family the announce
-  didn't arrive over. Each must be the right family, and public in production.
-  Anything else is ignored, not refused. `trust_announced_addresses`
+  didn't arrive over, and never counts toward the location limits, which still locate a
+  peer where its last announce came from. Each must be the right family, and public in
+  production. Anything else is ignored, not refused. `trust_announced_addresses`
   (`BLOODHOUND_TRUST_ANNOUNCED_ADDRESSES`, default `true`) turns this off.
 - **`announce_log.announced_ipv4` and `announced_ipv6`**, which record the announced
   addresses the tracker accepted. Both nullable; run `php artisan migrate`.
