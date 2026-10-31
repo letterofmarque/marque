@@ -7,7 +7,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [Unreleased]
+## [10.1.0] — 2026-11-01
 
 > IPv6 peers reach the swarm: peers6, ipv4= and ipv6= honoured and recorded on the ledger, and a dual-stack client counted as one location.
 
