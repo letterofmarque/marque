@@ -18,20 +18,22 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   `marque/threepio` ^4.2.
 - **A dual-stack household could be refused as two locations.** Two clients in one house,
   one of which last announced over IPv6, read as two places, and the leeching limit
-  refused the second. A peer's locations are now its IPv4 address and its IPv6 /64, and
-  peers that share either are at one place. Moving means sharing none of the locations
-  the peer had.
+  refused the second. A peer's locations are now the IPv4 address and IPv6 /64 it was
+  seen connecting from, and peers that share either are at one place. A peer has moved
+  when the address it connects from is none of those. An announced address never counts
+  as a location: a client can announce any address, including the account owner's.
 - **An IPv4 client on a dual-stack listener (`::ffff:a.b.c.d`)** is recorded as its IPv4
   address.
 
 ### Added
 
 - **`ipv4=` and `ipv6=` (BEP 7) are honoured**, so a dual-stack peer is reachable in both
-  families after one announce. Each must be the right family, and public in production.
+  families after one announce. An announced address only fills the family the announce
+  didn't arrive over. Each must be the right family, and public in production.
   Anything else is ignored, not refused. `trust_announced_addresses`
   (`BLOODHOUND_TRUST_ANNOUNCED_ADDRESSES`, default `true`) turns this off.
-- **`announce_log.announced_ipv4` and `announced_ipv6`**, which record what the client
-  claimed when it was trusted. Both nullable; run `php artisan migrate`.
+- **`announce_log.announced_ipv4` and `announced_ipv6`**, which record the announced
+  addresses the tracker accepted. Both nullable; run `php artisan migrate`.
 
 ## [10.0.0] — 2026-10-28
 

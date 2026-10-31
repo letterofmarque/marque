@@ -164,8 +164,6 @@ final class AnnounceService
             event: $eventEnum?->value,
             lookup: $lookup,
             livePeers: $livePeers,
-            ipv4: $announce->ipv4,
-            ipv6: $announce->ipv6,
         );
 
         if (! $antiCheatCheck['passed']) {

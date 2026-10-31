@@ -231,7 +231,7 @@ dual-stack client, which announces over each family in turn, is handed out in bo
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `trust_announced_addresses` | `false` | Hand out the `ipv4=` / `ipv6=` addresses a client announces besides the one it connected from |
+| `trust_announced_addresses` | `false` | Hand out the `ipv4=` / `ipv6=` address a client announces for the family it didn't connect over |
 
 ```env
 HOUND_TRUST_ANNOUNCED_ADDRESSES=false
@@ -241,7 +241,8 @@ HOUND_TRUST_ANNOUNCED_ADDRESSES=false
 honouring these would let anyone put any public address into a swarm's peer lists and
 aim its traffic there. With it off, a peer is handed out where it announced from, which
 for libtorrent-based clients is both families anyway. Turned on, each address must be the
-right family, and public in production; anything else is ignored.
+right family, and public in production; anything else is ignored. An announced address
+only fills the other family: it never replaces the address the client connected from.
 
 An IPv6-only peer can only reach IPv6-capable peers, and an IPv4-only one only IPv4 peers.
 Nothing a tracker does changes that.

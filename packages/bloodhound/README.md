@@ -270,12 +270,15 @@ dual-stack client, which announces over IPv4 and IPv6 in turn under one peer ID,
 address in each family and is handed out in both (see
 [threepio](../threepio/README.md#one-address-per-family)).
 
-A client can also say what other address it has, with `ipv4=` and `ipv6=`. bloodhound
-hands those out too (`trust_announced_addresses`, on by default), held to the same rule as
-the address the announce came from: the right family, and public in production. Anything
-else is ignored, not refused. They're trusted because the announcer is a member, and the
-ledger row records what they claimed (`announced_ipv4`, `announced_ipv6`). Turn it off
-and a peer is handed out only where it announced from.
+A client can also say what address it has in the other family, with `ipv4=` and
+`ipv6=`. bloodhound hands that out too (`trust_announced_addresses`, on by default), held
+to the same rule as the address the announce came from: the right family, and public in
+production. Anything else is ignored, not refused. An announced address only fills the
+family the announce didn't arrive over. An `ipv4=` sent over IPv4 never replaces the
+address the client connected from, and an announced address never counts as a location
+(see [Location limits](#anti-cheat)). They're trusted because the announcer is a member,
+and the ledger row records the addresses it accepted (`announced_ipv4`,
+`announced_ipv6`). Turn it off and a peer is handed out only where it announced from.
 
 An IPv6-only peer can only reach IPv6-capable peers. Behind Cloudflare, which publishes
 AAAA records for proxied hosts, expect many members to announce over IPv6.
@@ -415,7 +418,7 @@ a count.
 |---|---|---|
 | Port | Every announce | Refused: a port in `threepio.blacklisted_ports`, or outside 1–65535 |
 | Minimum gap | Regular announces (no `event`) from a peer in the swarm, at the address it last announced from | Refused when sooner than `min_announce_gap` after its last accepted announce |
-| Location limits | A peer not in the swarm, other than `stopped` | Refused at a new location past the seeding or leeching limit |
+| Location limits | A new peer, or one that moved or turned from seeding to leeching; never `stopped` | Refused at a new location past the seeding or leeching limit |
 | Clients per torrent | A peer not in the swarm, other than `stopped` | Refused when the member already has `max_clients_per_torrent` live clients on the torrent |
 | Speed | Every announce with a baseline | The direction over the cap is forfeited; the announce is accepted |
 | Data anomaly | Every announce | More `left` than the torrent's size: reported, never refused |
@@ -446,7 +449,10 @@ and recovery still finds them. The user agent is stored scrubbed to valid UTF-8.
 connection is usually handed a whole /64 and clients pick addresses from it freely. A
 dual-stack peer has two, its IPv4 address and its IPv6 /64, and peers that share either
 are at one place: one machine on both families is never counted twice, and two clients in
-one house still count once after one of them has switched to announcing over IPv6.
+one house still count once after one of them has switched to announcing over IPv6. Only
+addresses a peer was seen connecting from locate it. One it only announced (`ipv4=`,
+`ipv6=`) never does, because a client can announce any address, including the account
+owner's.
 Seeding and leeching are limited separately:
 `max_seeding_locations_per_torrent` (3) and `max_leeching_locations_per_torrent` (1). The
 leeching limit is what stops one account being shared to download. Only a **new**
@@ -454,8 +460,10 @@ location is counted against a limit:
 
 - a peer already in the swarm, announcing from where it was, is never refused by a
   count, so a leecher that finishes becomes a seeder without being refused;
-- a peer is counted again (not against itself) when it moves to another location (none
-  of the addresses it had), or
+- a peer is counted again (not against itself) when it moves: when the address it
+  connects from is none of the locations it was seen at. A dual-stack client that
+  restarts on an IPv4-only network elsewhere has moved, even though its old IPv6 address
+  hasn't expired yet. Or
   turns from seeding to leeching, so starting as a seeder and then reporting bytes left
   does not get round the leeching limit;
 - a client at a location the member already uses on that torrent, in the same state, is

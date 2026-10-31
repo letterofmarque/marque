@@ -45,9 +45,6 @@ final class AntiCheatService
      * `forfeit_upload` / `forfeit_download` mark a direction whose bytes are
      * not credited; `reason` says why, for the ledger row.
      *
-     * $ipv4 and $ipv6 are the addresses the client announced and the tracker
-     * accepted (BEP 7), null when it sent none or they aren't trusted.
-     *
      * @param  array<string, array<string, mixed>>  $livePeers  the torrent's live peers, as PeerService::livePeers() returns them
      * @return array{passed: bool, reason: ?string, forfeit_upload: bool, forfeit_download: bool}
      */
@@ -64,8 +61,6 @@ final class AntiCheatService
         ?string $event,
         PeerLookup $lookup,
         array $livePeers,
-        ?string $ipv4 = null,
-        ?string $ipv6 = null,
     ): array {
         $pass = ['passed' => true, 'reason' => null, 'forfeit_upload' => false, 'forfeit_download' => false];
 
@@ -83,7 +78,7 @@ final class AntiCheatService
             return $gapCheck + $pass;
         }
 
-        $limitCheck = $this->checkLocationLimits($userId, $peerId, $ip, $left, $event, $lookup, $livePeers, $ipv4, $ipv6);
+        $limitCheck = $this->checkLocationLimits($userId, $peerId, $ip, $left, $event, $lookup, $livePeers);
         if (! $limitCheck['passed']) {
             return $limitCheck + $pass;
         }
@@ -182,15 +177,17 @@ final class AntiCheatService
      * leeching are limited separately: the leeching limit is what stops one
      * account being shared to download.
      *
-     * A peer is located by every address it has, an IPv4 and an IPv6 one when
-     * it is dual-stack (#11112): its addresses after this announce, for the
-     * announcing peer. Peers sharing a location are at one place, so a
-     * dual-stack client is one place, and moving means sharing none of the
-     * locations it had.
+     * A peer is located by the addresses it has been seen connecting from,
+     * an IPv4 and an IPv6 one when it is dual-stack (#11112). Peers sharing a
+     * location are at one place, so a dual-stack client is one place. An
+     * address a client only announced (ipv4= / ipv6=) never locates it: a
+     * client can announce any address, including the account owner's. A peer
+     * has moved when the address it connected from is none of the locations
+     * it was seen at.
      *
      * @param  array<string, array<string, mixed>>  $livePeers
      */
-    public function checkLocationLimits(int $userId, string $peerId, string $ip, int $left, ?string $event, PeerLookup $lookup, array $livePeers, ?string $ipv4 = null, ?string $ipv6 = null): array
+    public function checkLocationLimits(int $userId, string $peerId, string $ip, int $left, ?string $event, PeerLookup $lookup, array $livePeers): array
     {
         if ($event === 'stopped') {
             return ['passed' => true, 'reason' => null];
@@ -201,9 +198,13 @@ final class AntiCheatService
         $now = $lookup->readAt;
         $expiry = $lookup->peerExpiry;
 
-        $mine = Location::ofAddresses(PeerAddresses::merge($record, $ip, $ipv4, $ipv6, $now, $expiry));
+        $here = Location::of(PeerAddresses::normalise($ip));
+        $seenAt = $record !== null ? Location::ofAddresses(PeerAddresses::connected($record, $now, $expiry)) : [];
 
-        $moved = $record !== null && array_intersect(Location::ofAddresses(PeerAddresses::of($record, $now, $expiry)), $mine) === [];
+        $moved = $record !== null && ! in_array($here, $seenAt, true);
+
+        // Where it was is still where it is, unless it moved.
+        $mine = $moved ? [$here] : array_values(array_unique([$here, ...$seenAt]));
         $startedLeeching = $record !== null && (int) $record['left'] === 0 && ! $seeding;
 
         if ($record !== null && ! $moved && ! $startedLeeching) {
@@ -221,7 +222,7 @@ final class AntiCheatService
                 continue;
             }
 
-            $peerLocations = Location::ofAddresses(PeerAddresses::of($peer, $now, $expiry));
+            $peerLocations = Location::ofAddresses(PeerAddresses::connected($peer, $now, $expiry));
 
             // Another client of the member, in the same state, already here.
             if (array_intersect($peerLocations, $mine) !== []) {

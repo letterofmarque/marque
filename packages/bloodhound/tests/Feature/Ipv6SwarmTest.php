@@ -164,16 +164,30 @@ describe('ipv4= and ipv6=', function () {
 
 describe('a dual-stack peer is one location', function () {
     test('a second leeching client at a dual-stack client\'s IPv6 /64 is at the same place', function () {
-        announced6($this, '-qB4210-aaaaaaaaaaaa', '203.0.113.7', 0, ['left' => 500, 'ipv6' => '2001:db8:1:2::10']);
+        announced6($this, '-qB4210-aaaaaaaaaaaa', '203.0.113.7', 0, ['left' => 500]);
+        announced6($this, '-qB4210-aaaaaaaaaaaa', '2001:db8:1:2::10', 120, ['left' => 500, 'event' => '']);
 
-        expect(announced6($this, '-qB4210-bbbbbbbbbbbb', '2001:db8:1:2::99', 5, ['left' => 500]))->not->toHaveKey('failure reason');
+        expect(announced6($this, '-qB4210-bbbbbbbbbbbb', '2001:db8:1:2::99', 130, ['left' => 500]))->not->toHaveKey('failure reason');
     });
 
-    test('a new client is located by the IPv4 address it announces, not only the IPv6 one it connects from', function () {
+    // Found by the 10.1 docs read-through. A client can announce any address,
+    // so one that claims the account owner's is not at the owner's house: it
+    // is located where it connected from, and a second leeching location is
+    // refused as it always was.
+    test('an announced address never puts a client at the place of the member\'s other client', function () {
         announced6($this, '-qB4210-aaaaaaaaaaaa', '203.0.113.7', 0, ['left' => 500]);
 
-        expect(announced6($this, '-qB4210-bbbbbbbbbbbb', '2001:db8:1:2::10', 5, ['left' => 500, 'ipv4' => '203.0.113.7']))
-            ->not->toHaveKey('failure reason');
+        expect(announced6($this, '-qB4210-bbbbbbbbbbbb', '198.51.100.9', 5, ['left' => 500, 'ipv4' => '203.0.113.7']))
+            ->toHaveKey('failure reason')
+            ->and(announced6($this, '-qB4210-cccccccccccc', '2001:db8:9::1', 10, ['left' => 500, 'ipv4' => '203.0.113.7']))
+            ->toHaveKey('failure reason');
+    });
+
+    test('an ipv4= over an IPv4 connection doesn\'t replace the address it connected from', function () {
+        announced6($this, '-qB4210-aaaaaaaaaaaa', '198.51.100.9', 0, ['ipv4' => '203.0.113.7']);
+        $leecher = announced6($this, '-qB4210-bbbbbbbbbbbb', '192.0.2.44', 5, ['left' => 500], $this->other);
+
+        expect($leecher['peers'])->toBe(compact4('198.51.100.9'));
     });
 
     // Two clients in one house: one has flipped to IPv6 since. Their single
@@ -192,6 +206,18 @@ describe('a dual-stack peer is one location', function () {
 
         expect(announced6($this, '-qB4210-bbbbbbbbbbbb', '198.51.100.9', 5))->not->toHaveKey('failure reason')
             ->and(announced6($this, '-qB4210-cccccccccccc', '192.0.2.44', 10))->toHaveKey('failure reason');
+    });
+
+    // Found by the 10.1 docs read-through: the family the peer no longer has
+    // was carried forward for peer_expiry, so the move went uncounted.
+    test('a dual-stack client restarting on an IPv4-only network elsewhere has moved', function () {
+        announced6($this, '-qB4210-aaaaaaaaaaaa', '203.0.113.7', 0, ['left' => 500]);
+        announced6($this, '-qB4210-aaaaaaaaaaaa', '2001:db8:1:2::10', 120, ['left' => 500, 'event' => '']);
+        announced6($this, '-qB4210-bbbbbbbbbbbb', '2001:db8:1:2::99', 130, ['left' => 500]);
+
+        // The first client moves to another network, IPv4 only. The member's
+        // second client is still leeching at home, so this is a second place.
+        expect(announced6($this, '-qB4210-aaaaaaaaaaaa', '192.0.2.44', 240, ['left' => 500, 'event' => '']))->toHaveKey('failure reason');
     });
 
     test('a client that moves to a new place on both families has moved', function () {
