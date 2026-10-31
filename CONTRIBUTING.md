@@ -254,7 +254,7 @@ tools/clean-room --keep                # leave it up: app on :18000, mail on :18
 It all runs in Docker (`docker/clean-room/`): PHP 8.3, the lowest version the packages
 support, plus a durable Redis, Mailpit and the database. It needs nothing on your machine
 but Docker, and it mounts your working tree read-only. The install is unattended:
-`marque:install --preseed --no-interaction`, answered by `docker/clean-room/preseed.yml`.
+`marque:install --preseed=/preseed.yml --no-interaction`, answered by `docker/clean-room/preseed.yml`.
 The checks then send requests through the installed app as real users (the owner, a
 moderator, a member) and exit non-zero if any fail. `tools/test-clean-room` checks the
 wiring without running an install.
