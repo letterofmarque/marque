@@ -10,8 +10,8 @@ changelogs — edit those, not this.*
 
 ## 2026-11-01
 
-- **[bloodhound 10.1.0](packages/bloodhound/CHANGELOG.md)** — IPv6 peers reach the swarm: peers6, a dual-stack client handed out in both families, and ipv4= and ipv6= honoured and recorded on the ledger.
-- **[hound 5.2.0](packages/hound/CHANGELOG.md)** — IPv6 peers are handed out in peers6 and dual-stack clients in both families; ipv4= and ipv6= only if the operator trusts them.
+- **[bloodhound 10.1.0](packages/bloodhound/CHANGELOG.md)** — IPv6 peers reach the swarm: peers6, a dual-stack client handed out in both families in compact responses, and ipv4= and ipv6= honoured and recorded on the ledger.
+- **[hound 5.2.0](packages/hound/CHANGELOG.md)** — IPv6 peers are handed out in peers6 and dual-stack clients in both families in compact responses; ipv4= and ipv6= only if the operator trusts them.
 - **[threepio 4.2.0](packages/threepio/CHANGELOG.md)** — IPv6 peers are handed out, in `peers6` (BEP 7), and a dual-stack peer keeps an address in each family, so compact responses carry it in both.
 
 ## 2026-10-29

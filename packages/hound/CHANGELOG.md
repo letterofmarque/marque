@@ -9,14 +9,15 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [5.2.0] — 2026-11-01
 
-> IPv6 peers are handed out in peers6 and dual-stack clients in both families; ipv4= and ipv6= only if the operator trusts them.
+> IPv6 peers are handed out in peers6 and dual-stack clients in both families in compact responses; ipv4= and ipv6= only if the operator trusts them.
 
 ### Fixed
 
 - **IPv6 peers were never handed out** (#11112), through threepio. They're handed out in
-  `peers6` now, and a client announcing over each family in turn is handed out in both.
-  An IPv4 client on a dual-stack listener (`::ffff:a.b.c.d`) is recorded as its IPv4
-  address. Requires `marque/threepio` ^4.2.
+  `peers6` now, and a client announcing over each family in turn is handed out in both in
+  compact responses. An IPv4 client on a dual-stack listener (`::ffff:a.b.c.d`) was refused in production as
+  "Invalid IP" (PHP counts the mapped range as reserved); it's accepted now and recorded as
+  its IPv4 address. Requires `marque/threepio` ^4.2.
 
 ### Added
 

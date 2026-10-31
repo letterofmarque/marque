@@ -277,8 +277,9 @@ production. Anything else is ignored, not refused. An announced address only fil
 family the announce didn't arrive over. An `ipv4=` sent over IPv4 never replaces the
 address the client connected from, and an announced address is never used for location
 (see [Location limits](#anti-cheat)). They're trusted because the announcer is a member,
-and every ledger row, refusals included, records the announced addresses it accepted
-(`announced_ipv4`, `announced_ipv6`). Turn it off and a peer is handed out only where it announced from.
+and every ledger row, refusals included, records the announced addresses that passed
+vetting (`announced_ipv4`, `announced_ipv6`). Turn it off and a peer is handed out only
+where it announced from (addresses already claimed age out within `peer_expiry`).
 
 An IPv6-only peer can only reach IPv6-capable peers. Behind Cloudflare, which publishes
 AAAA records for proxied hosts, expect many members to announce over IPv6.
