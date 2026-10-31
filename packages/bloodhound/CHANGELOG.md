@@ -7,6 +7,32 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+> IPv6 peers reach the swarm: peers6, ipv4= and ipv6= honoured and recorded on the ledger, and a dual-stack client counted as one location.
+
+### Fixed
+
+- **IPv6 peers were invisible to the swarm** (#11112), through threepio. They're handed out
+  in `peers6` now, and a dual-stack client is handed out in both families. Requires
+  `marque/threepio` ^4.2.
+- **A dual-stack household could be refused as two locations.** Two clients in one house,
+  one of which last announced over IPv6, read as two places, and the leeching limit
+  refused the second. A peer's locations are now its IPv4 address and its IPv6 /64, and
+  peers that share either are at one place. Moving means sharing none of the locations
+  the peer had.
+- **An IPv4 client on a dual-stack listener (`::ffff:a.b.c.d`)** is recorded as its IPv4
+  address.
+
+### Added
+
+- **`ipv4=` and `ipv6=` (BEP 7) are honoured**, so a dual-stack peer is reachable in both
+  families after one announce. Each must be the right family, and public in production.
+  Anything else is ignored, not refused. `trust_announced_addresses`
+  (`BLOODHOUND_TRUST_ANNOUNCED_ADDRESSES`, default `true`) turns this off.
+- **`announce_log.announced_ipv4` and `announced_ipv6`**, which record what the client
+  claimed when it was trusted. Both nullable; run `php artisan migrate`.
+
 ## [10.0.0] — 2026-10-28
 
 > Exemptions and seedbox decisions are recorded as staff actions, and bloodhound:standing requires --by, as 9.x warned.

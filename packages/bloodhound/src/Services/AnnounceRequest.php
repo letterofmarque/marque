@@ -25,5 +25,7 @@ final readonly class AnnounceRequest
         public int $left,
         public string $userAgent,
         public string $eventLabel,
+        public ?string $ipv4 = null,
+        public ?string $ipv6 = null,
     ) {}
 }

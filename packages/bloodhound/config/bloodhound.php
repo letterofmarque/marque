@@ -308,6 +308,16 @@ return [
     // is never kept.
     'baseline_retention' => env('BLOODHOUND_BASELINE_RETENTION', 7 * 86_400),
 
+    // Hand out the addresses a client announces besides the one it connected
+    // from (BEP 7's ipv4= and ipv6=), so a dual-stack peer reaches peers on
+    // both families after one announce. Each must be the right family, and
+    // public in production; anything else is ignored. On by default because
+    // the announcer is a member, and what they claimed is recorded on the
+    // ledger row (announced_ipv4 / announced_ipv6). Off, a peer is handed out
+    // only where it announced from: libtorrent announces over each family in
+    // turn, so most dual-stack clients still reach both.
+    'trust_announced_addresses' => env('BLOODHOUND_TRUST_ANNOUNCED_ADDRESSES', true),
+
     /*
     |--------------------------------------------------------------------------
     | Anti-Cheat

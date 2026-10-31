@@ -38,6 +38,9 @@ final class AnnounceService
      * recorded, and only then written to the swarm. A failed insert therefore
      * leaves the baseline where it was, and the client's retry is credited in
      * full.
+     *
+     * $ip is the address the announce came from; $ipv4 and $ipv6 are what
+     * the client said it has (BEP 7), already vetted, null when absent.
      */
     public function handle(
         UserInterface $user,
@@ -53,6 +56,8 @@ final class AnnounceService
         string $userAgent,
         bool $compact,
         int $numWant,
+        ?string $ipv4 = null,
+        ?string $ipv6 = null,
     ): Response {
         // The baseline every credit is measured against lives in Redis. A
         // Redis that can forget it is refused in production, before anything
@@ -65,7 +70,7 @@ final class AnnounceService
         // missing scheduler can't report itself (#11070).
         $this->freshness->reportFromAnnounce();
 
-        $announce = new AnnounceRequest($user, $torrent, $peerId, $ip, $port, $uploaded, $downloaded, $left, $userAgent, $this->eventLabel($event));
+        $announce = new AnnounceRequest($user, $torrent, $peerId, $ip, $port, $uploaded, $downloaded, $left, $userAgent, $this->eventLabel($event), $ipv4, $ipv6);
 
         // A refused client is still an announce from a known member on a known
         // torrent, so it is recorded like any other refusal.
@@ -159,6 +164,8 @@ final class AnnounceService
             event: $eventEnum?->value,
             lookup: $lookup,
             livePeers: $livePeers,
+            ipv4: $announce->ipv4,
+            ipv6: $announce->ipv6,
         );
 
         if (! $antiCheatCheck['passed']) {
@@ -265,6 +272,8 @@ final class AnnounceService
             userAgent: $announce->userAgent,
             isSeeder: $isSeeder,
             lookup: $credit->lookup,
+            ipv4: $announce->ipv4,
+            ipv6: $announce->ipv6,
         );
 
         $maxPeers = min($numWant, (int) config('threepio.max_peers_per_announce', 50));
@@ -410,6 +419,9 @@ final class AnnounceService
             'peer_id' => PeerIdColumn::encode($announce->peerId),
             'event' => $announce->eventLabel,
             'ip' => $announce->ip,
+            // What the client said it has besides (BEP 7), when trusted.
+            'announced_ipv4' => $announce->ipv4,
+            'announced_ipv6' => $announce->ipv6,
             'port' => $announce->port,
             // The client's own text: scrubbed, since the column holds UTF-8.
             'user_agent' => mb_scrub($announce->userAgent, 'UTF-8'),

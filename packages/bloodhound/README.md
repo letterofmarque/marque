@@ -263,6 +263,23 @@ and Redis is not touched. A refusal at step 1 (a bad announce key, an unknown to
 missing or invalid parameters, an out-of-range port) or step 2 writes no row: there is no
 member and torrent to record it against, or the tracker itself is refusing.
 
+### IPv6 and dual-stack peers
+
+IPv6 peers are handed out in `peers6` (BEP 7) beside the IPv4 ones in `peers`. A
+dual-stack client, which announces over IPv4 and IPv6 in turn under one peer ID, keeps an
+address in each family and is handed out in both (see
+[threepio](../threepio/README.md#one-address-per-family)).
+
+A client can also say what other address it has, with `ipv4=` and `ipv6=`. bloodhound
+hands those out too (`trust_announced_addresses`, on by default), held to the same rule as
+the address the announce came from: the right family, and public in production. Anything
+else is ignored, not refused. They're trusted because the announcer is a member, and the
+ledger row records what they claimed (`announced_ipv4`, `announced_ipv6`). Turn it off
+and a peer is handed out only where it announced from.
+
+An IPv6-only peer can only reach IPv6-capable peers. Behind Cloudflare, which publishes
+AAAA records for proxied hosts, expect many members to announce over IPv6.
+
 ### Peer Storage
 
 Peers live in Redis, under threepio's key prefix (`threepio.redis.prefix`, `marque:` by
@@ -426,7 +443,10 @@ stored in the ledger as `x:` and its hex, the same way every time, so its rows s
 and recovery still finds them. The user agent is stored scrubbed to valid UTF-8.
 
 **Location limits.** A location is an IP address; for IPv6 it is the /64, because a
-connection is usually handed a whole /64 and clients pick addresses from it freely.
+connection is usually handed a whole /64 and clients pick addresses from it freely. A
+dual-stack peer has two, its IPv4 address and its IPv6 /64, and peers that share either
+are at one place: one machine on both families is never counted twice, and two clients in
+one house still count once after one of them has switched to announcing over IPv6.
 Seeding and leeching are limited separately:
 `max_seeding_locations_per_torrent` (3) and `max_leeching_locations_per_torrent` (1). The
 leeching limit is what stops one account being shared to download. Only a **new**
@@ -434,7 +454,8 @@ location is counted against a limit:
 
 - a peer already in the swarm, announcing from where it was, is never refused by a
   count, so a leecher that finishes becomes a seeder without being refused;
-- a peer is counted again (not against itself) when it moves to another location, or
+- a peer is counted again (not against itself) when it moves to another location (none
+  of the addresses it had), or
   turns from seeding to leeching, so starting as a seeder and then reporting bytes left
   does not get round the leeching limit;
 - a client at a location the member already uses on that torrent, in the same state, is
@@ -719,6 +740,7 @@ Covered in full under [Announce URL shape](#announce-url-shape) above.
 |-----|---------|-------------|
 | `redis.durability` | `required` | `attested` when your provider makes Redis durable without AOF (`BLOODHOUND_REDIS_DURABILITY`); the eviction policy is still checked |
 | `baseline_retention` | `604800` | Seconds an expired peer's record is kept as its baseline (7 days) |
+| `trust_announced_addresses` | `true` | Hand out the `ipv4=` / `ipv6=` addresses a client announces (`BLOODHOUND_TRUST_ANNOUNCED_ADDRESSES`); see [IPv6 and dual-stack peers](#ipv6-and-dual-stack-peers) |
 
 See [Redis](#redis) and [Retained baselines](#retained-baselines).
 
@@ -880,6 +902,7 @@ credit with nothing left to re-derive it from.
 | `user_id`, `torrent_id`, `peer_id` | Who, on what, from which client session |
 | `event` | `started`, `regular`, `completed`, `stopped`; `ended` for a session the member ended; or `opening_balance` for a migration's carried total |
 | `ip`, `port`, `user_agent` | Where from |
+| `announced_ipv4`, `announced_ipv6` | Addresses the client announced besides (`ipv4=`, `ipv6=`), when trusted and valid; else null |
 | `uploaded`, `downloaded`, `left` | The cumulative counters the client reported |
 | `upload_delta`, `download_delta` | Bytes this row credits |
 | `seed_seconds`, `leech_seconds` | Seconds this row credits (at most `peer_expiry`, and only one of the two) |
@@ -1083,6 +1106,17 @@ This is a Bloodhound feature and has no equivalent in [marque/hound](https://pac
 | `bloodhound:seedbox` | — | `list` (`--status=`), `approve` or `revoke` a seedbox (`--by=`) |
 | `bloodhound:backfill-ledger` | — | Once, after upgrading from 7.x: credits pre-8.0 history its time and stopped bytes |
 | `bloodhound:record-pruned-history` | — | Once, if needed: accounts for rows a pre-8.0 prune deleted without carrying them |
+
+## Upgrading to 10.1
+
+Run `php artisan migrate`: it adds two nullable columns to `announce_log`
+(`announced_ipv4`, `announced_ipv6`), with no default, which is an instant change on
+MySQL 8, MariaDB and PostgreSQL. It requires `marque/threepio` ^4.2.
+
+IPv6 peers are handed out from the first announce after the upgrade; nothing in Redis
+needs clearing. `ipv4=` and `ipv6=` are honoured by default. Set
+`BLOODHOUND_TRUST_ANNOUNCED_ADDRESSES=false` to hand a peer out only where it announced
+from. See [IPv6 and dual-stack peers](#ipv6-and-dual-stack-peers).
 
 ## Upgrading from 9.x to 10.0
 

@@ -77,6 +77,8 @@ class AnnounceLog extends Model
         'peer_id',
         'event',
         'ip',
+        'announced_ipv4',
+        'announced_ipv6',
         'port',
         'user_agent',
         'uploaded',

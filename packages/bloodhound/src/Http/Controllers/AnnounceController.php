@@ -11,6 +11,7 @@ use Illuminate\Routing\Controller;
 use Marque\Bloodhound\Models\AnnounceKey;
 use Marque\Bloodhound\Services\AnnounceService;
 use Marque\Bloodhound\Support\AnnounceRouting;
+use Marque\Threepio\Support\PeerAddresses;
 use Marque\Threepio\Support\RawQuery;
 use Marque\Threepio\Support\TrackerResponse;
 use Marque\Trove\Contracts\UserInterface;
@@ -101,6 +102,8 @@ class AnnounceController extends Controller
         // Get user agent
         $userAgent = $request->userAgent() ?? '';
 
+        [$ipv4, $ipv6] = $this->announcedAddresses($request);
+
         return $this->announceService->handle(
             user: $user,
             torrent: $torrent,
@@ -115,7 +118,36 @@ class AnnounceController extends Controller
             userAgent: $userAgent,
             compact: $compact,
             numWant: $numWant,
+            ipv4: $ipv4,
+            ipv6: $ipv6,
         );
+    }
+
+    /**
+     * The addresses the client says it has besides the one it connected from
+     * (BEP 7's `ipv4=` and `ipv6=`), so a dual-stack peer is handed out in
+     * both families after one announce.
+     *
+     * Trusted by default (`bloodhound.trust_announced_addresses`): the
+     * announcer is a member, and what they claimed goes in the ledger with
+     * the announce. Each is held to the rule the connecting address is: the
+     * right family, and public in production. Anything else is ignored, not
+     * refused.
+     *
+     * @return array{0: ?string, 1: ?string}
+     */
+    private function announcedAddresses(Request $request): array
+    {
+        if (! config('bloodhound.trust_announced_addresses', true)) {
+            return [null, null];
+        }
+
+        $publicOnly = app()->environment('production');
+
+        return [
+            PeerAddresses::announced($request->query('ipv4'), 4, $publicOnly),
+            PeerAddresses::announced($request->query('ipv6'), 6, $publicOnly),
+        ];
     }
 
     /**
@@ -224,6 +256,10 @@ class AnnounceController extends Controller
         if ($ip === null || ! filter_var($ip, FILTER_VALIDATE_IP)) {
             return null;
         }
+
+        // A dual-stack listener reports an IPv4 client as ::ffff:a.b.c.d; it
+        // is an IPv4 peer, and goes in `peers`, not `peers6`.
+        $ip = PeerAddresses::normalise($ip);
 
         // Don't allow private/reserved IPs (unless in development)
         if (app()->environment('production')) {
