@@ -64,7 +64,7 @@ class AnnounceController extends Controller
             return TrackerResponse::error('Invalid IP');
         }
 
-        [$ipv4, $ipv6] = $this->announcedAddresses($request);
+        [$ipv4, $ipv6] = $this->announcedAddresses($request, $ip);
 
         return $this->announceService->handle(
             torrent: $torrent,
@@ -94,17 +94,20 @@ class AnnounceController extends Controller
      *
      * @return array{0: ?string, 1: ?string}
      */
-    private function announcedAddresses(Request $request): array
+    private function announcedAddresses(Request $request, string $ip): array
     {
         if (! config('hound.trust_announced_addresses', false)) {
             return [null, null];
         }
 
         $publicOnly = app()->environment('production');
+        $connected = PeerAddresses::family($ip);
 
+        // Only the family the announce didn't come over: the address it came
+        // from is what the tracker saw, and a claim for that family is unused.
         return [
-            PeerAddresses::announced($request->query('ipv4'), 4, $publicOnly),
-            PeerAddresses::announced($request->query('ipv6'), 6, $publicOnly),
+            $connected === 4 ? null : PeerAddresses::announced($request->query('ipv4'), 4, $publicOnly),
+            $connected === 6 ? null : PeerAddresses::announced($request->query('ipv6'), 6, $publicOnly),
         ];
     }
 

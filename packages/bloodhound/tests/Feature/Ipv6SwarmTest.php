@@ -125,6 +125,12 @@ describe('ipv4= and ipv6=', function () {
         expect($leecher['peers6'])->toBe(compact4('2001:db8::1'));
     });
 
+    test('a claim for the family the client connected over is neither used nor recorded', function () {
+        announced6($this, '-qB4210-aaaaaaaaaaaa', '198.51.100.9', 0, ['ipv4' => '203.0.113.7']);
+
+        expect(AnnounceLog::query()->where('user_id', $this->user->id)->first()->announced_ipv4)->toBeNull();
+    });
+
     test('an address of the wrong family, or not an address, is ignored', function () {
         announced6($this, '-qB4210-aaaaaaaaaaaa', '2001:db8::1', 0, ['ipv4' => '2001:db8::2', 'ipv6' => 'nonsense']);
         $leecher = announced6($this, '-qB4210-bbbbbbbbbbbb', '198.51.100.9', 5, ['left' => 500], $this->other);
@@ -218,6 +224,26 @@ describe('a dual-stack peer is one location', function () {
         // The first client moves to another network, IPv4 only. The member's
         // second client is still leeching at home, so this is a second place.
         expect(announced6($this, '-qB4210-aaaaaaaaaaaa', '192.0.2.44', 240, ['left' => 500, 'event' => '']))->toHaveKey('failure reason');
+    });
+
+    // Found by the 10.1 second read-through. A laptop leaves the dual-stack
+    // home for an IPv4-only network elsewhere; the owner then leeches at home
+    // over IPv6. The laptop's home IPv6 used to count as where it still was,
+    // for an hour, or for as long as it kept claiming it with ipv6=.
+    test('a client that left home doesn\'t keep home as one of its places, claimed or not', function () {
+        foreach ([[], ['ipv6' => '2001:db8:1:2::10']] as $i => $claim) {
+            Redis::connection(config('threepio.redis.connection', 'default'))->flushdb();
+            $base = $i * 10_000;
+            $laptop = sprintf('-qB4210-laptop%06d', $i);
+
+            announced6($this, $laptop, '203.0.113.7', $base, ['left' => 500]);
+            announced6($this, $laptop, '2001:db8:1:2::10', $base + 120, ['left' => 500, 'event' => '']);
+            announced6($this, $laptop, '198.51.100.9', $base + 240, ['left' => 500, 'event' => ''] + $claim);
+            announced6($this, $laptop, '198.51.100.9', $base + 2_000, ['left' => 500, 'event' => ''] + $claim);
+
+            expect(announced6($this, sprintf('-qB4210-home%08d', $i), '2001:db8:1:2::99', $base + 2_010, ['left' => 500]))
+                ->toHaveKey('failure reason');
+        }
     });
 
     test('a client that moves to a new place on both families has moved', function () {
