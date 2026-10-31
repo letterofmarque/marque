@@ -224,6 +224,28 @@ Set these in `config/threepio.php`, not here:
 | `redis.connection` | `default` | Laravel Redis connection name |
 | `redis.prefix` | `marque:` | Key namespace |
 
+## IPv6
+
+IPv6 peers are handed out in `peers6` (BEP 7) beside the IPv4 ones in `peers`, and a
+dual-stack client, which announces over each family in turn, is handed out in both.
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `trust_announced_addresses` | `false` | Hand out the `ipv4=` / `ipv6=` addresses a client announces besides the one it connected from |
+
+```env
+HOUND_TRUST_ANNOUNCED_ADDRESSES=false
+```
+
+**Off by default, deliberately.** Nobody answers for an announce on a public tracker, so
+honouring these would let anyone put any public address into a swarm's peer lists and
+aim its traffic there. With it off, a peer is handed out where it announced from, which
+for libtorrent-based clients is both families anyway. Turned on, each address must be the
+right family, and public in production; anything else is ignored.
+
+An IPv6-only peer can only reach IPv6-capable peers, and an IPv4-only one only IPv4 peers.
+Nothing a tracker does changes that.
+
 ## Behind a proxy
 
 Hound rejects private and reserved IP ranges **in production only** — under any other

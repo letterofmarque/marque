@@ -7,6 +7,24 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+> IPv6 peers are handed out in peers6 and dual-stack clients in both families; ipv4= and ipv6= only if the operator trusts them.
+
+### Fixed
+
+- **IPv6 peers were never handed out** (#11112), through threepio. They're handed out in
+  `peers6` now, and a client announcing over each family in turn is handed out in both.
+  An IPv4 client on a dual-stack listener (`::ffff:a.b.c.d`) is recorded as its IPv4
+  address. Requires `marque/threepio` ^4.2.
+
+### Added
+
+- **`trust_announced_addresses`** (`HOUND_TRUST_ANNOUNCED_ADDRESSES`, default `false`)
+  honours BEP 7's `ipv4=` and `ipv6=`. It's off by default: nobody answers for an announce
+  on a public tracker, so honouring them lets anyone put an address into a swarm and aim
+  its traffic there.
+
 ## [5.1.0] — 2026-10-28
 
 > Works with trove 5.0 as well as 4.x.

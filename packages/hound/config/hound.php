@@ -78,6 +78,13 @@ return [
         'max_peers_per_torrent' => env('HOUND_MAX_PEERS_PER_TORRENT', 10),
     ],
 
+    // Hand out the addresses a client announces besides the one it connected
+    // from (BEP 7's ipv4= and ipv6=). Off by default: nobody answers for an
+    // announce on a public tracker, so anyone could put any public address
+    // into a swarm and aim its traffic there. Dual-stack clients still reach
+    // both families without it, since they announce over each in turn.
+    'trust_announced_addresses' => env('HOUND_TRUST_ANNOUNCED_ADDRESSES', false),
+
     /*
     |--------------------------------------------------------------------------
     | Logging

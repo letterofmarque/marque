@@ -35,6 +35,8 @@ final class AnnounceService
         ?string $event,
         bool $compact,
         int $numWant,
+        ?string $ipv4 = null,
+        ?string $ipv6 = null,
     ): Response {
         // Check port blacklist
         $blacklisted = config('threepio.blacklisted_ports', []);
@@ -64,8 +66,8 @@ final class AnnounceService
 
         return match ($eventEnum) {
             AnnounceEvent::Stopped => $this->handleStopped($torrent, $peerId),
-            AnnounceEvent::Completed => $this->handleCompleted($torrent, $peerId, $ip, $port, $uploaded, $downloaded, $left, $isSeeder, $compact, $numWant),
-            default => $this->handleRegular($torrent, $peerId, $ip, $port, $uploaded, $downloaded, $left, $isSeeder, $compact, $numWant),
+            AnnounceEvent::Completed => $this->handleCompleted($torrent, $peerId, $ip, $port, $uploaded, $downloaded, $left, $isSeeder, $compact, $numWant, $ipv4, $ipv6),
+            default => $this->handleRegular($torrent, $peerId, $ip, $port, $uploaded, $downloaded, $left, $isSeeder, $compact, $numWant, $ipv4, $ipv6),
         };
     }
 
@@ -108,6 +110,8 @@ final class AnnounceService
         bool $isSeeder,
         bool $compact,
         int $numWant,
+        ?string $ipv4 = null,
+        ?string $ipv6 = null,
     ): Response {
         // Deliberately a blind increment, unlike bloodhound.
         //
@@ -120,7 +124,7 @@ final class AnnounceService
         // accountable user can do. See Spec #99.
         $torrent->increment('times_completed');
 
-        return $this->handleRegular($torrent, $peerId, $ip, $port, $uploaded, $downloaded, $left, $isSeeder, $compact, $numWant);
+        return $this->handleRegular($torrent, $peerId, $ip, $port, $uploaded, $downloaded, $left, $isSeeder, $compact, $numWant, $ipv4, $ipv6);
     }
 
     /**
@@ -137,6 +141,8 @@ final class AnnounceService
         bool $isSeeder,
         bool $compact,
         int $numWant,
+        ?string $ipv4 = null,
+        ?string $ipv6 = null,
     ): Response {
         // A public tracker has no users. null, not 0: threepio treats 0 as a
         // real user id, and every anonymous peer ever seen piled into one
@@ -152,6 +158,8 @@ final class AnnounceService
             left: $left,
             userAgent: '',
             isSeeder: $isSeeder,
+            ipv4: $ipv4,
+            ipv6: $ipv6,
         );
 
         // Get peers for response
