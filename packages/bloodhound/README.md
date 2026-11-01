@@ -284,6 +284,19 @@ where it announced from (addresses already claimed age out within `peer_expiry`)
 An IPv6-only peer can only reach IPv6-capable peers. Behind Cloudflare, which publishes
 AAAA records for proxied hosts, expect many members to announce over IPv6.
 
+**Accepting one family only.** `address_families` (`BLOODHOUND_ADDRESS_FAMILIES`) is
+`ipv4,ipv6` by default; set it to `ipv4` or `ipv6` to take announces over that family
+only. That's the simplest answer to dual-stack ambiguity in the location limits (see
+[Location limits](#anti-cheat)), at the cost of the other family's
+members. An announce over the family that's off gets an ordinary response: no peers, the
+torrent's stored counts, and a `warning message` ("This tracker accepts IPv4 announces
+only"). It isn't a failure, so a dual-stack client shows no error and carries on over the
+family that's on, and a client that only has the other family is told why it finds
+nobody. Nothing is recorded for it, in the ledger or the swarm. Its counters are
+cumulative, so the next announce over the family that's on credits everything. An
+announced address in a family that's off is ignored too. Anything unrecognised in the
+setting means both.
+
 ### Peer Storage
 
 Peers live in Redis, under threepio's key prefix (`threepio.redis.prefix`, `marque:` by
@@ -745,6 +758,7 @@ Covered in full under [Announce URL shape](#announce-url-shape) above.
 |-----|---------|-------------|
 | `redis.durability` | `required` | `attested` when your provider makes Redis durable without AOF (`BLOODHOUND_REDIS_DURABILITY`); the eviction policy is still checked |
 | `baseline_retention` | `604800` | Seconds an expired peer's record is kept as its baseline (7 days) |
+| `address_families` | `ipv4,ipv6` | Families announces are accepted over: `ipv4`, `ipv6`, or both (`BLOODHOUND_ADDRESS_FAMILIES`); see [IPv6 and dual-stack peers](#ipv6-and-dual-stack-peers) |
 | `trust_announced_addresses` | `true` | Hand out the `ipv4=` / `ipv6=` addresses a client announces (`BLOODHOUND_TRUST_ANNOUNCED_ADDRESSES`); see [IPv6 and dual-stack peers](#ipv6-and-dual-stack-peers) |
 
 See [Redis](#redis) and [Retained baselines](#retained-baselines).

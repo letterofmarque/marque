@@ -7,6 +7,18 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+> A tracker can take announces over IPv4 only, or IPv6 only (address_families); the other family is told so in a warning, not a failure.
+
+### Added
+
+- **`address_families`** (`BLOODHOUND_ADDRESS_FAMILIES`, default `ipv4,ipv6`). Set it to
+  `ipv4` or `ipv6` to take announces over that family only. An announce over the other
+  family gets an ordinary response with no peers and a `warning message`, so a dual-stack
+  client shows no error and carries on over the family that's on. Nothing is recorded for
+  it, and an announced address in that family is ignored. Requires `marque/threepio` ^4.3.
+
 ## [10.1.0] — 2026-11-01
 
 > IPv6 peers reach the swarm: peers6, a dual-stack client handed out in both families in compact responses, and ipv4= and ipv6= honoured and recorded on the ledger.

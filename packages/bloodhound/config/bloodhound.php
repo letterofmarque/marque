@@ -318,6 +318,13 @@ return [
     // turn, so most dual-stack clients still reach both.
     'trust_announced_addresses' => env('BLOODHOUND_TRUST_ANNOUNCED_ADDRESSES', true),
 
+    // The address families announces are accepted over: 'ipv4,ipv6' (both),
+    // 'ipv4' or 'ipv6'. An announce over a family that is off gets a normal
+    // response with no peers and a warning message saying which family the
+    // tracker takes, and is recorded nowhere. A dual-stack client carries on
+    // over the other one. Anything unrecognised means both.
+    'address_families' => env('BLOODHOUND_ADDRESS_FAMILIES', 'ipv4,ipv6'),
+
     /*
     |--------------------------------------------------------------------------
     | Anti-Cheat

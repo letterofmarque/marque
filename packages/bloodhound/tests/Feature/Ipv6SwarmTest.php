@@ -256,3 +256,56 @@ describe('locations: where a peer last connected from', function () {
         expect(announced6($this, '-qB4210-cccccccccccc', '2001:db8:9::1', 10, ['left' => 500]))->toHaveKey('failure reason');
     });
 });
+
+describe('address_families', function () {
+    test('an IPv4-only tracker answers an IPv6 announce with a warning, and records nothing', function () {
+        config(['bloodhound.address_families' => 'ipv4']);
+
+        $declined = announced6($this, '-qB4210-aaaaaaaaaaaa', '2001:db8::1', 0);
+
+        expect($declined)->not->toHaveKey('failure reason')
+            ->and($declined['warning message'])->toBe('This tracker accepts IPv4 announces only')
+            ->and($declined['peers'])->toBe('')
+            ->and(AnnounceLog::query()->count())->toBe(0);
+
+        $leecher = announced6($this, '-qB4210-bbbbbbbbbbbb', '198.51.100.9', 5, ['left' => 500], $this->other);
+
+        expect($leecher['peers'])->toBe('')
+            ->and($leecher)->not->toHaveKey('peers6')
+            ->and($leecher)->not->toHaveKey('warning message');
+    });
+
+    test('a dual-stack client carries on over the family that is on', function () {
+        config(['bloodhound.address_families' => 'ipv4']);
+
+        announced6($this, '-qB4210-aaaaaaaaaaaa', '2001:db8::1', 0);
+        announced6($this, '-qB4210-aaaaaaaaaaaa', '203.0.113.7', 5);
+        $leecher = announced6($this, '-qB4210-bbbbbbbbbbbb', '198.51.100.9', 10, ['left' => 500], $this->other);
+
+        expect($leecher['peers'])->toBe(compact4('203.0.113.7'))
+            ->and($leecher)->not->toHaveKey('peers6');
+    });
+
+    test('an ipv6= claim is not handed out when IPv6 is off', function () {
+        config(['bloodhound.address_families' => 'ipv4']);
+
+        announced6($this, '-qB4210-aaaaaaaaaaaa', '203.0.113.7', 0, ['ipv6' => '2001:db8::1']);
+        $leecher = announced6($this, '-qB4210-bbbbbbbbbbbb', '198.51.100.9', 5, ['left' => 500], $this->other);
+
+        expect($leecher)->not->toHaveKey('peers6')
+            ->and(AnnounceLog::query()->where('user_id', $this->user->id)->first()->announced_ipv6)->toBeNull();
+    });
+
+    test('an IPv6-only tracker turns IPv4 away the same way', function () {
+        config(['bloodhound.address_families' => 'ipv6']);
+
+        expect(announced6($this, '-qB4210-aaaaaaaaaaaa', '203.0.113.7', 0)['warning message'])->toBe('This tracker accepts IPv6 announces only')
+            ->and(announced6($this, '-qB4210-bbbbbbbbbbbb', '2001:db8::1', 5))->not->toHaveKey('warning message');
+    });
+
+    test('a value it doesn\'t recognise means both, so a typo shuts nobody out', function () {
+        config(['bloodhound.address_families' => 'ip4']);
+
+        expect(announced6($this, '-qB4210-aaaaaaaaaaaa', '2001:db8::1', 0))->not->toHaveKey('warning message');
+    });
+});
