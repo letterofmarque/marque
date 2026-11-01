@@ -80,7 +80,9 @@ a web browser rather than a BitTorrent client.
 ### Announce flow
 
 1. Required parameters validated (`info_hash`, `peer_id`, `port`, `uploaded`, `downloaded`, `left`)
-2. Torrent looked up by info_hash — an unregistered hash is refused
+2. Torrent looked up by info_hash — an unregistered hash is refused. An announce over an
+   address family that's off (`address_families`) is answered here with a warning, and
+   nothing after this step runs for it
 3. Port checked against threepio's blacklist
 4. IP peer count checked against the limit
 5. Peer upserted in Redis with no user (`userId: null`), or removed on a `stopped` announce
@@ -244,8 +246,8 @@ HOUND_ADDRESS_FAMILIES=ipv4,ipv6
 announce over the other family gets an ordinary response with no peers and a
 `warning message` saying which family the tracker takes. It isn't a failure, so a
 dual-stack client carries on over the family that's on without showing an error. Nothing
-is recorded for it, and an announced address in that family is ignored. Anything
-unrecognised in the setting means both.
+is recorded for it, and an announced address in that family is ignored. A setting with no
+recognisable family means both.
 
 **Off by default, deliberately.** Nobody answers for an announce on a public tracker, so
 honouring these would let anyone put any public address into a swarm's peer lists and

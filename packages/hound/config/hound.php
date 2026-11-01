@@ -88,7 +88,8 @@ return [
     // The address families announces are accepted over: 'ipv4,ipv6' (both),
     // 'ipv4' or 'ipv6'. An announce over a family that is off gets a normal
     // response with no peers and a warning message saying which family the
-    // tracker takes, and is recorded nowhere. Anything unrecognised means both.
+    // tracker takes, and is recorded nowhere. A setting with no recognisable
+    // family means both.
     'address_families' => env('HOUND_ADDRESS_FAMILIES', 'ipv4,ipv6'),
 
     /*

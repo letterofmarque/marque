@@ -242,7 +242,9 @@ key formats are disjoint first.
 ### Announce Flow
 
 1. Announce key validated, user looked up (a disabled account is refused); torrent
-   identified by info_hash; parameters and IP validated.
+   identified by info_hash; parameters and IP validated. An announce over an address
+   family that's off (`address_families`) is answered here with a warning, and nothing
+   after this step runs for it.
 2. The tracker's Redis checked for durability (cached; see [Redis](#redis)). In
    production a failing check refuses the announce here.
 3. Client validated against the whitelist or blacklist.
@@ -290,12 +292,13 @@ only. That's the simplest answer to dual-stack ambiguity in the location limits 
 [Location limits](#anti-cheat)), at the cost of the other family's
 members. An announce over the family that's off gets an ordinary response: no peers, the
 torrent's stored counts, and a `warning message` ("This tracker accepts IPv4 announces
-only"). It isn't a failure, so a dual-stack client shows no error and carries on over the
+only", or IPv6). It isn't a failure, so a dual-stack client shows no error and carries on over the
 family that's on, and a client that only has the other family is told why it finds
 nobody. Nothing is recorded for it, in the ledger or the swarm. Its counters are
-cumulative, so the next announce over the family that's on credits everything. An
-announced address in a family that's off is ignored too. Anything unrecognised in the
-setting means both.
+cumulative, so the next announce over the family that's on credits every byte. An event
+(`completed`, `stopped`) sent only over the family that's off is lost; clients send
+events to every endpoint, so in practice it arrives over the other. An announced address
+in a family that's off is ignored too. A setting with no recognisable family means both.
 
 ### Peer Storage
 

@@ -322,7 +322,8 @@ return [
     // 'ipv4' or 'ipv6'. An announce over a family that is off gets a normal
     // response with no peers and a warning message saying which family the
     // tracker takes, and is recorded nowhere. A dual-stack client carries on
-    // over the other one. Anything unrecognised means both.
+    // over the other one. A setting with no recognisable
+    // family means both.
     'address_families' => env('BLOODHOUND_ADDRESS_FAMILIES', 'ipv4,ipv6'),
 
     /*

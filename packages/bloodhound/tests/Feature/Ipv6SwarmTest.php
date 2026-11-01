@@ -303,6 +303,12 @@ describe('address_families', function () {
             ->and(announced6($this, '-qB4210-bbbbbbbbbbbb', '2001:db8::1', 5))->not->toHaveKey('warning message');
     });
 
+    test('a client that asked for the dictionary form gets it, declined or not', function () {
+        config(['bloodhound.address_families' => 'ipv4']);
+
+        expect(announced6($this, '-qB4210-aaaaaaaaaaaa', '2001:db8::1', 0, ['compact' => 0])['peers'])->toBe([]);
+    });
+
     test('a value it doesn\'t recognise means both, so a typo shuts nobody out', function () {
         config(['bloodhound.address_families' => 'ip4']);
 

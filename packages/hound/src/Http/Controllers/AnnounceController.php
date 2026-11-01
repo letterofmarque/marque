@@ -64,7 +64,7 @@ class AnnounceController extends Controller
             return TrackerResponse::error('Invalid IP');
         }
 
-        $declined = $this->declinedFamily($ip, $torrent);
+        $declined = $this->declinedFamily($ip, $torrent, $compact);
         if ($declined !== null) {
             return $declined;
         }
@@ -88,30 +88,21 @@ class AnnounceController extends Controller
     }
 
     /**
-     * The addresses the client says it has besides the one it connected from
-     * (BEP 7's `ipv4=` and `ipv6=`).
-     *
-     * Ignored unless `hound.trust_announced_addresses` is on. Nobody answers
-     * for an announce here, so honouring them lets anyone put any public
-     * address into a swarm's peer lists and aim its traffic at it (the old
-     * `ip=` reflection). Dual-stack clients still reach both families: they
-     * announce over each in turn, and the peer keeps an address in each.
-     *
-     * @return array{0: ?string, 1: ?string}
-     */
-    /**
      * An announce over an address family the operator has turned off
      * (`hound.address_families`), answered rather than refused.
      *
      * A dual-stack client announces over both families, and a failure would
      * show it a red error for the one that is off. It gets an ordinary
-     * response instead, with no peers, the torrent's stored counts and a BEP 3
-     * `warning message` saying which family the tracker takes, so a client
+     * response instead, with no peers, the torrent's stored counts and a
+     * `warning message` (not BEP 3's, but the long-standing tracker key
+     * clients show) saying which family the tracker takes, so a client
      * that has only the other family is told why it finds nobody. Nothing is
      * recorded, in the ledger or the swarm: the announce over the family that
-     * is on carries the client's counters, cumulative as always.
+     * is on carries the client's counters, cumulative as always. An event
+     * sent only over the family that is off is lost; clients send events to
+     * every endpoint.
      */
-    private function declinedFamily(string $ip, Torrent $torrent): ?Response
+    private function declinedFamily(string $ip, Torrent $torrent, bool $compact): ?Response
     {
         $families = PeerAddresses::families(config('hound.address_families', 'ipv4,ipv6'));
 
@@ -125,10 +116,23 @@ class AnnounceController extends Controller
             incomplete: (int) $torrent->leechers,
             interval: (int) config('threepio.announce_interval', 1800),
             minInterval: (int) config('threepio.min_announce_interval', 300),
+            compact: $compact,
             warning: 'This tracker accepts IPv'.$families[0].' announces only',
         );
     }
 
+    /**
+     * The addresses the client says it has besides the one it connected from
+     * (BEP 7's `ipv4=` and `ipv6=`).
+     *
+     * Ignored unless `hound.trust_announced_addresses` is on. Nobody answers
+     * for an announce here, so honouring them lets anyone put any public
+     * address into a swarm's peer lists and aim its traffic at it (the old
+     * `ip=` reflection). Dual-stack clients still reach both families: they
+     * announce over each in turn, and the peer keeps an address in each.
+     *
+     * @return array{0: ?string, 1: ?string}
+     */
     private function announcedAddresses(Request $request, string $ip): array
     {
         if (! config('hound.trust_announced_addresses', false)) {
