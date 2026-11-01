@@ -72,3 +72,17 @@ it('honours ipv4= when the operator trusts announced addresses', function () {
 
     expect($leecher['peers'])->toBe(inet_pton('192.0.2.1').pack('n', 51413));
 });
+
+it('answers an IPv6 announce with a warning on an IPv4-only tracker, and records nothing', function () {
+    config(['hound.address_families' => 'ipv4']);
+
+    $declined = houndAnnounced6($this, '-qB4210-aaaaaaaaaaaa', '2001:db8::1');
+
+    expect($declined)->not->toHaveKey('failure reason')
+        ->and($declined['warning message'])->toBe('This tracker accepts IPv4 announces only');
+
+    $leecher = houndAnnounced6($this, '-qB4210-bbbbbbbbbbbb', '198.51.100.9', ['left' => 500]);
+
+    expect($leecher['peers'])->toBe('')
+        ->and($leecher)->not->toHaveKey('peers6');
+});

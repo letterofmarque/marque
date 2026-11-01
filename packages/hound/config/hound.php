@@ -85,6 +85,12 @@ return [
     // both families without it, since they announce over each in turn.
     'trust_announced_addresses' => env('HOUND_TRUST_ANNOUNCED_ADDRESSES', false),
 
+    // The address families announces are accepted over: 'ipv4,ipv6' (both),
+    // 'ipv4' or 'ipv6'. An announce over a family that is off gets a normal
+    // response with no peers and a warning message saying which family the
+    // tracker takes, and is recorded nowhere. Anything unrecognised means both.
+    'address_families' => env('HOUND_ADDRESS_FAMILIES', 'ipv4,ipv6'),
+
     /*
     |--------------------------------------------------------------------------
     | Logging

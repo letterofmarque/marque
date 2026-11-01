@@ -232,11 +232,20 @@ compact responses.
 
 | Key | Default | Description |
 |-----|---------|-------------|
+| `address_families` | `ipv4,ipv6` | Families announces are accepted over: `ipv4`, `ipv6`, or both |
 | `trust_announced_addresses` | `false` | Hand out the `ipv4=` / `ipv6=` address a client announces for the family it didn't connect over |
 
 ```env
 HOUND_TRUST_ANNOUNCED_ADDRESSES=false
+HOUND_ADDRESS_FAMILIES=ipv4,ipv6
 ```
+
+**Accepting one family only.** With `address_families` set to `ipv4` (or `ipv6`), an
+announce over the other family gets an ordinary response with no peers and a
+`warning message` saying which family the tracker takes. It isn't a failure, so a
+dual-stack client carries on over the family that's on without showing an error. Nothing
+is recorded for it, and an announced address in that family is ignored. Anything
+unrecognised in the setting means both.
 
 **Off by default, deliberately.** Nobody answers for an announce on a public tracker, so
 honouring these would let anyone put any public address into a swarm's peer lists and
