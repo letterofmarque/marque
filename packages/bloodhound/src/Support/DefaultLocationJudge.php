@@ -87,7 +87,7 @@ final class DefaultLocationJudge implements LocationJudge
     {
         $before = (string) $record['ip'];
         $family = PeerAddresses::family($question->ip);
-        $window = (int) config('bloodhound.anti_cheat.ambiguous_window', 300);
+        $window = (int) config('bloodhound.anti_cheat.ambiguous_window', 3600);
 
         // A dual-stack machine comes back to a family on its own address. If
         // the peer was last seen on another network in this family, it has

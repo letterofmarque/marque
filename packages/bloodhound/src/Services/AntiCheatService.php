@@ -219,7 +219,7 @@ final class AntiCheatService
             }
 
             if ($policy !== 'allow') {
-                $flag = self::AMBIGUOUS_LOCATION.': moved across address families from a place the member already uses; refused under ambiguous_locations=refuse ('.$verdict->reason.')';
+                $flag = self::AMBIGUOUS_LOCATION.': moved across address families from a place the member already uses';
             }
         } elseif (! $verdict->passed()) {
             return ['passed' => false, 'reason' => $verdict->reason];

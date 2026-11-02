@@ -15,6 +15,7 @@ use Marque\Bloodhound\Console\Commands\AggregateLedger;
 use Marque\Bloodhound\Console\Commands\AuditLedger;
 use Marque\Bloodhound\Console\Commands\BackfillLedger;
 use Marque\Bloodhound\Console\Commands\CheckRedis;
+use Marque\Bloodhound\Console\Commands\DetectLocationSharing;
 use Marque\Bloodhound\Console\Commands\EnforceHitAndRun;
 use Marque\Bloodhound\Console\Commands\EnforceRatio;
 use Marque\Bloodhound\Console\Commands\IssueAnnounceKeys;
@@ -365,6 +366,7 @@ class BloodhoundServiceProvider extends ServiceProvider
             AuditLedger::class,
             BackfillLedger::class,
             CheckRedis::class,
+            DetectLocationSharing::class,
             EnforceHitAndRun::class,
             EnforceRatio::class,
             IssueAnnounceKeys::class,
@@ -395,6 +397,10 @@ class BloodhoundServiceProvider extends ServiceProvider
         // permanent-and-invisible into something an operator is told about,
         // so it runs unconditionally rather than being something to enable.
         Schedule::command('bloodhound:reconcile-ledger')->daily();
+
+        // Daily, over the last day: account-sharing patterns only the ledger
+        // shows (#11133). Reports and fires events; changes nothing.
+        Schedule::command('bloodhound:detect-location-sharing')->daily();
 
         // Hourly, and before enforce-ratio: its strikes feed the restricted
         // standing that enforce-ratio decides, and commands due in the same

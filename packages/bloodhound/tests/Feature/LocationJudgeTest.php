@@ -9,6 +9,7 @@ declare(strict_types=1);
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Redis;
 use Marque\Bloodhound\Contracts\LocationJudge;
+use Marque\Bloodhound\Models\AnnounceLog;
 use Marque\Bloodhound\Services\AntiCheatService;
 use Marque\Bloodhound\Support\DefaultLocationJudge;
 use Marque\Bloodhound\Support\LocationQuestion;
@@ -95,4 +96,18 @@ it('still holds a passed peer to the client limit, which is not a location quest
     judged($this, '-qB4210-aaaaaaaaaaaa', '203.0.113.7', 0);
 
     expect(judged($this, '-qB4210-bbbbbbbbbbbb', '203.0.113.7', 5)['failure reason'])->toContain('Client limit reached');
+});
+
+it('fits a long reason into the ledger column rather than failing the announce', function () {
+    app()->forgetInstance(AntiCheatService::class);
+    app()->instance(LocationJudge::class, new class implements LocationJudge
+    {
+        public function judge(LocationQuestion $question): LocationVerdict
+        {
+            return LocationVerdict::refuse(str_repeat('far too long ', 40));
+        }
+    });
+
+    expect(judged($this, '-qB4210-aaaaaaaaaaaa', '203.0.113.7', 0))->toHaveKey('failure reason')
+        ->and(mb_strlen(AnnounceLog::query()->value('anti_cheat_reason')))->toBe(255);
 });

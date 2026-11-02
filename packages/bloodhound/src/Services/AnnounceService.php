@@ -432,7 +432,26 @@ final class AnnounceService
             'uploaded' => $announce->uploaded,
             'downloaded' => $announce->downloaded,
             'left' => $announce->left,
-        ] + $outcome)->save();
+        ] + $this->fitReason($outcome))->save();
+    }
+
+    /**
+     * The reason column holds 255 characters, and a reason can be longer: a
+     * bound LocationJudge writes its own, and a flag can sit beside a
+     * forfeit in both directions. Cut to fit rather than fail the announce,
+     * which on every engine but SQLite is an error. A flag comes first, so
+     * the prefix the detector reads survives.
+     *
+     * @param  array<string, mixed>  $outcome
+     * @return array<string, mixed>
+     */
+    private function fitReason(array $outcome): array
+    {
+        if (is_string($outcome['anti_cheat_reason'] ?? null)) {
+            $outcome['anti_cheat_reason'] = mb_substr($outcome['anti_cheat_reason'], 0, 255);
+        }
+
+        return $outcome;
     }
 
     /**

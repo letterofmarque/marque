@@ -406,7 +406,12 @@ return [
         //   'allow'  accept it silently
         // Anything else means 'flag'.
         'ambiguous_locations' => env('BLOODHOUND_AMBIGUOUS_LOCATIONS', 'flag'),
-        'ambiguous_window' => env('BLOODHOUND_AMBIGUOUS_WINDOW', 300),
+        // Seconds since the peer's last announce, over the other family, for
+        // a refusal to count as ambiguous. At least an announce interval: a
+        // dual-stack client's first family each cycle comes an interval
+        // after its last announce, over the second. Defaults to an hour,
+        // threepio's default peer_expiry.
+        'ambiguous_window' => env('BLOODHOUND_AMBIGUOUS_WINDOW', 3600),
 
         // A member's live clients (peer IDs) on one torrent, counted only for
         // a new one. Many peer IDs on one torrent pollute its swarm; one

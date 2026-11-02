@@ -112,13 +112,13 @@ describe('flag (the default)', function () {
     });
 
     test('a switch across families outside the window is a plain new location, refused', function () {
+        config(['bloodhound.anti_cheat.ambiguous_window' => 300]);
+
         expect(household($this, gap: 400))->toHaveKey('failure reason');
     });
 
-    test('the window is the operator\'s', function () {
-        config(['bloodhound.anti_cheat.ambiguous_window' => 600]);
-
-        expect(household($this, gap: 400))->not->toHaveKey('failure reason');
+    test('the window spans an announce interval by default, so a dual-stack client\'s first family each cycle is not refused', function () {
+        expect(household($this, gap: 1_790))->not->toHaveKey('failure reason');
     });
 });
 
