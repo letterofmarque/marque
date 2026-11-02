@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Redis;
 use Marque\Bloodhound\Contracts\LocationJudge;
 use Marque\Bloodhound\Models\AnnounceLog;
 use Marque\Bloodhound\Services\AntiCheatService;
+use Marque\Bloodhound\Services\LocationSharingDetector;
 use Marque\Bloodhound\Support\DefaultLocationJudge;
 use Marque\Bloodhound\Support\LocationQuestion;
 use Marque\Bloodhound\Support\LocationVerdict;
@@ -110,4 +111,36 @@ it('fits a long reason into the ledger column rather than failing the announce',
 
     expect(judged($this, '-qB4210-aaaaaaaaaaaa', '203.0.113.7', 0))->toHaveKey('failure reason')
         ->and(mb_strlen(AnnounceLog::query()->value('anti_cheat_reason')))->toBe(255);
+});
+
+it('never takes a refused announce for a link, whatever its reason says', function () {
+    config(['bloodhound.anti_cheat.ambiguous_locations' => 'refuse']);
+    app()->forgetInstance(AntiCheatService::class);
+    app()->instance(LocationJudge::class, new class implements LocationJudge
+    {
+        // New peers pass; a peer that moves is "ambiguous", so refused.
+        public function judge(LocationQuestion $question): LocationVerdict
+        {
+            $record = $question->record();
+
+            return $record === null || $record['ip'] === $question->ip
+                ? LocationVerdict::pass()
+                : LocationVerdict::ambiguous(AntiCheatService::AMBIGUOUS_LOCATION.': by ASN');
+        }
+    });
+
+    judged($this, '-qB4210-aaaaaaaaaaaa', '203.0.113.7', 0);
+    judged($this, '-qB4210-cccccccccccc', '203.0.113.7', 2);
+    judged($this, '-qB4210-bbbbbbbbbbbb', '2001:db8:9::1', 5);
+    expect(judged($this, '-qB4210-aaaaaaaaaaaa', '2001:db8:9::1', 10, ['event' => ''])['failure reason'])->toStartWith('Ambiguous location');
+
+    // In the window: the member's other clients at both places.
+    judged($this, '-qB4210-cccccccccccc', '203.0.113.7', 3_000, ['event' => '']);
+    judged($this, '-qB4210-bbbbbbbbbbbb', '2001:db8:9::1', 3_005, ['event' => '']);
+    $this->travelTo($this->t->copy()->addSeconds(3_100));
+
+    $detector = app(LocationSharingDetector::class);
+
+    expect($detector->detect($this->t->copy()->addSeconds(2_000), $this->t->copy()->subDay()))->toBe([])
+        ->and($detector->detect($this->t->copy()->subDay()))->toBe([]);
 });

@@ -79,7 +79,9 @@ function keepLeeching($test, int $from, int $hours): void
     }
 }
 
-test('a dual-stack household switching families every interval is not reported', function () {
+// Nobody else of the member's is at the IPv6 end, so the link is never one
+// to report, switching or not; the next test is the one switching clears.
+test('a dual-stack client and an IPv4-only one in one house are not reported', function () {
     detected($this, '-qB4210-laptop000000', '203.0.113.7', 0, ['event' => 'started']);
     detected($this, '-qB4210-desktop00000', '203.0.113.7', 10, ['event' => 'started']);
 
@@ -126,6 +128,58 @@ test('a link that isn\'t sustained, without other peers at both ends, is not rep
     }
 
     expect(findings($this, 6_000))->toBe([]);
+});
+
+// Found by the 11.0 final review: a link checked on a later day had its
+// earlier switching thrown away, so a household was reported for a week once
+// its dual-stack client restarted under a new peer ID.
+test('a household whose dual-stack client restarted under a new peer ID is not reported the next day', function () {
+    detected($this, '-qB4210-laptop000000', '203.0.113.7', 0, ['event' => 'started']);
+    detected($this, '-qB4210-desktop00000', '203.0.113.7', 10, ['event' => 'started']);
+
+    foreach (range(0, 9) as $i) {
+        $at = 15 + $i * 1_800;
+        detected($this, '-qB4210-desktop00000', '2001:db8:1:2::10', $at);
+        detected($this, '-qB4210-laptop000000', '203.0.113.7', $at + 900);
+        detected($this, '-qB4210-desktop00000', '203.0.113.7', $at + 1_795);
+    }
+
+    // The next day: the desktop's client restarted, so a new peer ID.
+    $day = 86_400;
+    detected($this, '-qB4210-desktop22222', '203.0.113.7', $day, ['event' => 'started']);
+    detected($this, '-qB4210-laptop000000', '203.0.113.7', $day + 5, ['event' => 'started']);
+
+    foreach (range(0, 9) as $i) {
+        $at = $day + 15 + $i * 1_800;
+        detected($this, '-qB4210-desktop22222', '2001:db8:1:2::10', $at);
+        detected($this, '-qB4210-laptop000000', '203.0.113.7', $at + 900);
+        detected($this, '-qB4210-desktop22222', '203.0.113.7', $at + 1_795);
+    }
+
+    expect(findings($this, $day + 20_000))->toBe([]);
+});
+
+test('a household of two dual-stack clients is not reported the day after one stops', function () {
+    detected($this, '-qB4210-laptop000000', '203.0.113.7', 0, ['event' => 'started']);
+    detected($this, '-qB4210-desktop00000', '203.0.113.7', 10, ['event' => 'started']);
+
+    foreach (range(0, 5) as $i) {
+        $at = 15 + $i * 1_800;
+        detected($this, '-qB4210-desktop00000', '2001:db8:1:2::10', $at);
+        detected($this, '-qB4210-laptop000000', '2001:db8:1:2::20', $at + 5);
+        detected($this, '-qB4210-laptop000000', '203.0.113.7', $at + 900);
+        detected($this, '-qB4210-desktop00000', '203.0.113.7', $at + 1_795);
+    }
+
+    detected($this, '-qB4210-desktop00000', '203.0.113.7', 11_000, ['event' => 'stopped']);
+
+    foreach (range(0, 47) as $i) {
+        $at = 11_100 + $i * 1_800;
+        detected($this, '-qB4210-laptop000000', '2001:db8:1:2::20', $at);
+        detected($this, '-qB4210-laptop000000', '203.0.113.7', $at + 900);
+    }
+
+    expect(findings($this, 86_400 + 12_000))->toBe([]);
 });
 
 // The residual hole under flag: a helper peer at home moves to a friend's

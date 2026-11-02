@@ -24,7 +24,9 @@ use Marque\Threepio\Support\PeerAddresses;
  *   announced from two places to set the link up does not.
  *
  * Only accepted announces are read: a refused one never put the peer
- * anywhere. One pass in id order, with a little state per session.
+ * anywhere. One pass in id order, with a little state per session, so its
+ * memory grows with the sessions in the window; a link from before the
+ * window costs two reads on the (torrent_id, peer_id, id) index.
  */
 final class LocationSharingDetector
 {
@@ -160,20 +162,72 @@ final class LocationSharingDetector
         AnnounceLog::query()
             ->select(['id', 'user_id', 'torrent_id', 'peer_id', 'ip', 'anti_cheat_flagged', 'anti_cheat_reason', 'prior_up'])
             ->where('anti_cheat_flagged', true)
+            ->whereNotNull('prior_up')
             ->where('id', '>=', $from)
             ->where('id', '<', $before)
             ->where('anti_cheat_reason', 'like', AntiCheatService::AMBIGUOUS_LOCATION.'%')
-            ->orderBy('id')
-            ->each(function (AnnounceLog $row) use (&$links) {
+            ->lazyById(1_000)
+            ->each(function (AnnounceLog $row) use (&$links, $before) {
+                $key = "{$row->user_id}:{$row->torrent_id}:{$row->peer_id}";
+
+                // The first link per peer is the one checked.
+                if (isset($links[$key])) {
+                    return;
+                }
+
                 $place = Location::of(PeerAddresses::normalise((string) $row->ip));
                 $previous = $this->placeBefore($row);
 
-                if ($previous !== null && $previous !== $place) {
-                    $links["{$row->user_id}:{$row->torrent_id}:{$row->peer_id}"] ??= ['from' => $previous, 'to' => $place, 'switches' => 0, 'user' => (int) $row->user_id, 'torrent' => (int) $row->torrent_id, 'peer' => (string) $row->peer_id];
+                if ($previous === null || $previous === $place) {
+                    return;
                 }
+
+                $links[$key] = [
+                    'from' => $previous,
+                    'to' => $place,
+                    'switches' => $this->switchesBefore($row, $before, [$previous, $place]),
+                    'user' => (int) $row->user_id,
+                    'torrent' => (int) $row->torrent_id,
+                    'peer' => (string) $row->peer_id,
+                ];
             });
 
         return $links;
+    }
+
+    /**
+     * Switches between a link's two places by its peer, from the link up to
+     * the window. A dual-stack client that switched all week and then
+     * restarted under a new peer ID (libtorrent makes one each session) has
+     * a sustained link, not one to report.
+     *
+     * @param  list<string>  $places
+     */
+    private function switchesBefore(AnnounceLog $link, int $before, array $places): int
+    {
+        $switches = 0;
+        $previous = Location::of(PeerAddresses::normalise((string) $link->ip));
+
+        AnnounceLog::query()
+            ->select(['id', 'ip'])
+            ->where('torrent_id', $link->torrent_id)
+            ->where('peer_id', $link->peer_id)
+            ->where('user_id', $link->user_id)
+            ->where('id', '>', $link->id)
+            ->where('id', '<', $before)
+            ->where(fn ($query) => $query->where('anti_cheat_flagged', false)->orWhereNotNull('prior_up'))
+            ->lazyById(1_000)
+            ->each(function (AnnounceLog $row) use (&$switches, &$previous, $places) {
+                $place = Location::of(PeerAddresses::normalise((string) $row->ip));
+
+                if ($place !== $previous && in_array($place, $places, true) && in_array($previous, $places, true)) {
+                    $switches++;
+                }
+
+                $previous = $place;
+            });
+
+        return $switches;
     }
 
     /**

@@ -507,7 +507,7 @@ hold:
 
 | Setting | A dual-stack household | One account used at two places |
 |---|---|---|
-| `flag` (default) | Not refused for switching families. The announce is credited and its ledger row flagged ("Ambiguous location") | Can get in, but only by way of a flagged row and a `CheatDetected` (`location_ambiguous`) event. The detector reports some setups; see below for which |
+| `flag` (default) | Not refused for switching families. The announce is credited and its ledger row flagged ("Ambiguous location") | What `refuse` would stop gets in only by way of a flagged row and a `CheatDetected` (`location_ambiguous`) event. Some sharing gets in under every setting; see below for that, and for what the detector reports |
 | `refuse` | The dual-stack client's announces over its second family are refused, so it shows a tracker error for that endpoint (10.x behaviour) | Refused |
 | `allow` | Not refused, nothing flagged | Can get in silently |
 
@@ -519,7 +519,8 @@ means `flag`.
 One household case is still refused under every setting. A *new* client whose very first
 announce arrives over the family the member's other client isn't on has no record to link
 it to anything. Its announce over the other family goes through at the same moment, and
-its next announce over the first is ambiguous, so it clears on its own. Treating that
+its next announce over the first is ambiguous, so under `flag` and `allow` it clears on
+its own. Treating that
 first one as ambiguous too would let a new client claim a place an attacker's peer ID had
 merely passed through.
 
@@ -529,9 +530,9 @@ who want to know should listen for `location_ambiguous`.
 `bloodhound:detect-location-sharing` runs daily and reads the ledger for two patterns:
 
 - **An unsustained link.** An ambiguous row in the last week linked two places, the peer
-  that linked them hasn't kept switching between them (a real dual-stack client switches
-  every announce interval), and in the last day the member has had other clients at
-  both. This is a client at home moving to a friend's to set up the link, then clients at
+  that linked them has switched between them fewer than three times since (a real
+  dual-stack client switches every announce interval, and keeps that credit after it
+  stops or restarts), and in the last day the member has had other clients at both. This is a client at home moving to a friend's to set up the link, then clients at
   each. It's reported every day the member keeps both places, for a week after the setup
   (`--link-days`).
 - **A peer that keeps going back to a network it left, within one family.** That's one
@@ -553,15 +554,17 @@ What it can't see, because nothing on a tracker can tell these from a real house
   there. It looks like a dual-stack client whose IPv4 went away. Its setup row is still
   flagged.
 
-It can also report a real household: one whose second dual-stack client stopped
-switching within three announces (a small torrent finishing, say), with other clients at
-both places.
+It can also report a real household: one whose dual-stack client switched fewer than
+three times after linking the places before it stopped or restarted, while the member
+has other clients at both.
 
 An address a client announces (`ipv4=`, `ipv6=`) never counts toward any of this. If
 none of that suits, take announces over one family only (`address_families`). Or judge
 locations yourself: bind your own `Marque\Bloodhound\Contracts\LocationJudge` in a
 service provider. It's asked a `LocationQuestion` (the member, the peer, its record, the
-torrent's live peers) on every announce but `stopped`, and answers
+torrent's live peers) on every announce that reaches the location check (not `stopped`,
+not one anti-cheat has already refused, and never with `anti_cheat.enabled` off), and
+answers
 `LocationVerdict::pass()`, `refuse($reason)` or `ambiguous($reason)`. The policy above
 applies to its ambiguous verdicts too. Better evidence than timing, such as matching IPv4
 and IPv6 networks by ASN from GeoIP data you hold, belongs there.

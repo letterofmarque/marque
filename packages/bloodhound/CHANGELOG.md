@@ -33,13 +33,9 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   never refuses or changes a credit. The README says which sharing it can't see.
 - **`Contracts\LocationJudge`**: bind your own to decide where a peer is (by ASN, say).
   It's asked a `LocationQuestion` and answers a `LocationVerdict` (pass, refuse,
-  ambiguous). `DefaultLocationJudge` is 10.x's rule plus the ambiguous case.
-
-### Fixed
-
-- **A reason longer than the ledger column** (255 characters) is cut to fit instead of
-  failing the announce on MySQL, MariaDB and PostgreSQL. A bound LocationJudge could
-  write one.
+  ambiguous). `DefaultLocationJudge` is 10.x's rule plus the ambiguous case. A ledger
+  row's reason is cut to the column's 255 characters, so a judge's long reason can't fail
+  the announce.
 
 ## [10.2.0] — 2026-11-02
 
