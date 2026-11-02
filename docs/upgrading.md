@@ -52,6 +52,7 @@ Newest first. Each links to the full write-up.
 
 | Release | Date | Summary | Who's affected |
 |---|---|---|---|
+| [12.0](releases/12.0.md) ([bloodhound steps](../packages/bloodhound/README.md#upgrading-from-10x-to-110)) | 2026-11-02 | IPv6 peers reach the swarm (`peers6`, dual-stack clients in both families, `ipv4=`/`ipv6=`); a tracker can take one address family only; dual-stack households aren't refused for switching families (ambiguous locations, flagged by default), with a daily account-sharing detector and a bindable `LocationJudge` | anyone running bloodhound (ambiguous locations are accepted and flagged; set `refuse` for 10.x's behaviour; `migrate` from before 10.1); hound users get IPv6 peers with nothing to do |
 | [11.0](releases/11.0.md) ([bloodhound steps](../packages/bloodhound/README.md#upgrading-from-9x-to-100)) | 2026-10-28 | An Owner role above Admin; every package records its staff actions; new `marque/bosun` keeps them, with the owner's Staff and Audit log screens; bans and role changes now save on a stock `User` model; the installer takes a preseed file | everyone: run `usarrs:owner` after upgrading; app code matching on roles or using `isAdmin()` as exactly-Admin; hand-written user models and interface implementations; scripted `bloodhound:standing` (needs `--by`) |
 | [10.1](releases/10.1.md) | 2026-10-22 | Hit-and-run: a downloaded torrent is owed 72 hours of seeding or 1:1 on it; pre-warning, then strike; three strikes pause new downloading. Off on upgrade, on for a new private tracker; members see what they owe | nobody on upgrade; anyone who turns it on (a published `min_seedtime` of 86400 enforces 24 hours) |
 | [10.0](releases/10.0.md) ([upgrade steps](../packages/bloodhound/README.md#upgrading-from-8x-to-90)) | 2026-10-22 | The ratio is enforced: members below `min_ratio` go on watch, then have new downloading paused until they recover (seeding never is); grace allowance, staff and per-member exemptions; members see their standing on the dashboard; a malformed announce key gets a reason by default | anyone running bloodhound, whose members go on watch after upgrading; guise/disguise must be 5.3 |
@@ -113,6 +114,8 @@ release each guide belongs to.
 | 22 | Release | [Marque 10.1](releases/10.1.md) | 10.1 | Hit-and-run, off until you turn it on; check a published `min_seedtime` first |
 | 23 | Release | [Marque 11.0](releases/11.0.md) | 11.0 | trove 5 and its dependants together, then `usarrs:owner`; check role matches in app code; optional `marque/bosun` |
 | 24 | Guide | [bloodhound 9.x → 10.0](../packages/bloodhound/README.md#upgrading-from-9x-to-100) | 11.0 | trove ^5 alongside usarrs 9; `--by` on scripted exemptions |
+| 25 | Release | [Marque 12.0](releases/12.0.md) | 12.0 | IPv6 peers, one-family trackers, and ambiguous locations: decide `ambiguous_locations` |
+| 26 | Guide | [bloodhound 10.x → 11.0](../packages/bloodhound/README.md#upgrading-from-10x-to-110) | 12.0 | `migrate` from before 10.1; `refuse` to keep 10.x's refusals; listen for the new `CheatDetected` types |
 
 ## Currently at 2.x or earlier?
 
