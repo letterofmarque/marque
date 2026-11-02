@@ -39,9 +39,13 @@ final class LocationSharingDetector
     public const SUSTAINED = 3;
 
     /**
+     * Read the ledger from $since. Links come from ambiguous rows since
+     * $linksSince (earlier, so a link set up days ago is still checked
+     * against what the member does now), defaulting to $since.
+     *
      * @return list<array{kind: string, user_id: int, torrent_id: int, peer_id: string, places: list<string>, count: int}>
      */
-    public function detect(Carbon $since): array
+    public function detect(Carbon $since, ?Carbon $linksSince = null): array
     {
         $from = $this->firstIdSince($since);
 
@@ -53,8 +57,8 @@ final class LocationSharingDetector
         $sessions = [];
         /** @var array<string, array<string, array<string, true>>> $members  "user:torrent" => place => peer IDs */
         $members = [];
-        /** @var array<string, array{from: string, to: string, switches: int}> $links */
-        $links = [];
+        /** @var array<string, array{from: string, to: string, switches: int, user: int, torrent: int, peer: string}> $links */
+        $links = $this->earlierLinks($linksSince, $from);
 
         AnnounceLog::query()
             ->select(['id', 'user_id', 'torrent_id', 'peer_id', 'event', 'ip', 'anti_cheat_flagged', 'anti_cheat_reason', 'prior_up'])
@@ -90,10 +94,14 @@ final class LocationSharingDetector
                         $links[$key]['switches']++;
                     }
 
-                    if ($previous !== null && $previous !== $place
-                        && $row->anti_cheat_flagged
-                        && str_starts_with((string) $row->anti_cheat_reason, AntiCheatService::AMBIGUOUS_LOCATION)) {
-                        $links[$key] ??= ['from' => $previous, 'to' => $place, 'switches' => 0];
+                    if ($this->ambiguous($row)) {
+                        // The row before it may be before the window, when
+                        // the link was set up across the run's boundary.
+                        $before = $previous ?? $this->placeBefore($row);
+
+                        if ($before !== null && $before !== $place) {
+                            $links[$key] ??= ['from' => $before, 'to' => $place, 'switches' => 0, 'user' => (int) $row->user_id, 'torrent' => (int) $row->torrent_id, 'peer' => (string) $row->peer_id];
+                        }
                     }
 
                     $session['last'][$family] = $place;
@@ -108,27 +116,91 @@ final class LocationSharingDetector
 
         $findings = [];
 
-        foreach ($sessions as $key => $session) {
+        foreach ($sessions as $session) {
             if ($session['returns'] >= self::ALTERNATIONS) {
                 $findings[] = $this->finding('alternating_peer', $session, array_keys($session['places']), $session['returns']);
             }
+        }
 
-            $link = $links[$key] ?? null;
-
-            if ($link === null || $link['switches'] >= self::SUSTAINED) {
+        // Every link, including one whose peer has gone quiet since setting
+        // it up: what matters is what the member does now.
+        foreach ($links as $link) {
+            if ($link['switches'] >= self::SUSTAINED) {
                 continue;
             }
 
             // Other peers of the member at both of the link's places.
-            $places = $members["{$session['user']}:{$session['torrent']}"] ?? [];
-            $others = fn (string $place) => array_diff_key($places[$place] ?? [], [$session['peer'] => true]) !== [];
+            $places = $members["{$link['user']}:{$link['torrent']}"] ?? [];
+            $others = fn (string $place) => array_diff_key($places[$place] ?? [], [$link['peer'] => true]) !== [];
 
             if ($others($link['from']) && $others($link['to'])) {
-                $findings[] = $this->finding('unsustained_link', $session, [$link['from'], $link['to']], $link['switches']);
+                $findings[] = $this->finding('unsustained_link', $link, [$link['from'], $link['to']], $link['switches']);
             }
         }
 
         return $findings;
+    }
+
+    /**
+     * Links set up between $since and the window: an ambiguous row, and the
+     * place its peer announced from just before.
+     *
+     * @return array<string, array{from: string, to: string, switches: int, user: int, torrent: int, peer: string}>
+     */
+    private function earlierLinks(?Carbon $since, int $before): array
+    {
+        $from = $since === null ? null : $this->firstIdSince($since);
+
+        if ($from === null || $from >= $before) {
+            return [];
+        }
+
+        $links = [];
+
+        AnnounceLog::query()
+            ->select(['id', 'user_id', 'torrent_id', 'peer_id', 'ip', 'anti_cheat_flagged', 'anti_cheat_reason', 'prior_up'])
+            ->where('anti_cheat_flagged', true)
+            ->where('id', '>=', $from)
+            ->where('id', '<', $before)
+            ->where('anti_cheat_reason', 'like', AntiCheatService::AMBIGUOUS_LOCATION.'%')
+            ->orderBy('id')
+            ->each(function (AnnounceLog $row) use (&$links) {
+                $place = Location::of(PeerAddresses::normalise((string) $row->ip));
+                $previous = $this->placeBefore($row);
+
+                if ($previous !== null && $previous !== $place) {
+                    $links["{$row->user_id}:{$row->torrent_id}:{$row->peer_id}"] ??= ['from' => $previous, 'to' => $place, 'switches' => 0, 'user' => (int) $row->user_id, 'torrent' => (int) $row->torrent_id, 'peer' => (string) $row->peer_id];
+                }
+            });
+
+        return $links;
+    }
+
+    /**
+     * Was this row accepted as an ambiguous location under `flag`?
+     */
+    private function ambiguous(AnnounceLog $row): bool
+    {
+        return $row->anti_cheat_flagged
+            && $row->prior_up !== null
+            && str_starts_with((string) $row->anti_cheat_reason, AntiCheatService::AMBIGUOUS_LOCATION);
+    }
+
+    /**
+     * Where the row's peer announced from last before it, accepted.
+     */
+    private function placeBefore(AnnounceLog $row): ?string
+    {
+        $before = AnnounceLog::query()
+            ->where('torrent_id', $row->torrent_id)
+            ->where('peer_id', $row->peer_id)
+            ->where('id', '<', $row->id)
+            ->where('user_id', $row->user_id)
+            ->where(fn ($query) => $query->where('anti_cheat_flagged', false)->orWhereNotNull('prior_up'))
+            ->orderByDesc('id')
+            ->value('ip');
+
+        return $before === null ? null : Location::of(PeerAddresses::normalise((string) $before));
     }
 
     /**

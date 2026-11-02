@@ -49,11 +49,34 @@ function detected($test, string $peer, string $ip, int $seconds, array $params =
         ->getContent());
 }
 
-function findings($test, int $at): array
+function findings($test, int $at, int $linkDays = 7): array
 {
     $test->travelTo($test->t->copy()->addSeconds($at));
 
-    return app(LocationSharingDetector::class)->detect(Carbon::now()->subDay());
+    return app(LocationSharingDetector::class)->detect(Carbon::now()->subDay(), Carbon::now()->subDays($linkDays));
+}
+
+/**
+ * The residual hole under flag, set up at $at: a helper at home moves to a
+ * friend's over the other family, and a client there joins it.
+ */
+function linkedSetup($test, int $at): void
+{
+    detected($test, '-qB4210-xxxxxxxxxxxx', '203.0.113.7', $at, ['event' => 'started']);
+    detected($test, '-qB4210-yyyyyyyyyyyy', '203.0.113.7', $at + 10, ['event' => 'started']);
+    detected($test, '-qB4210-xxxxxxxxxxxx', '2001:db8:9::1', $at + 20);
+    detected($test, '-qB4210-zzzzzzzzzzzz', '2001:db8:9::2', $at + 30, ['event' => 'started']);
+}
+
+/**
+ * Y at home and Z at the friend's keep announcing, from $from for $hours.
+ */
+function keepLeeching($test, int $from, int $hours): void
+{
+    foreach (range(0, $hours * 2 - 1) as $i) {
+        detected($test, '-qB4210-yyyyyyyyyyyy', '203.0.113.7', $from + $i * 1_800);
+        detected($test, '-qB4210-zzzzzzzzzzzz', '2001:db8:9::2', $from + $i * 1_800 + 5);
+    }
 }
 
 test('a dual-stack household switching families every interval is not reported', function () {
@@ -123,6 +146,38 @@ test('a link set up once and never sustained, with other peers at both ends, is 
 
     expect($found)->toHaveCount(1)
         ->and($found[0])->toMatchArray(['kind' => 'unsustained_link', 'user_id' => $this->user->id, 'torrent_id' => $this->torrent->id, 'peer_id' => '-qB4210-xxxxxxxxxxxx'])
+        ->and($found[0]['places'])->toBe(['203.0.113.7', '20010db800090000::/64']);
+});
+
+// Found by the 11.0 review: only the setup day was ever read, so a setup
+// that survived one day was never reported again.
+test('a link set up days ago is still reported while the member keeps both places', function () {
+    linkedSetup($this, 0);
+    keepLeeching($this, 1_800, 74);
+
+    $found = findings($this, 75 * 3_600);
+
+    expect($found)->toHaveCount(1)
+        ->and($found[0]['kind'])->toBe('unsustained_link')
+        ->and(findings($this, 75 * 3_600, linkDays: 1))->toBe([]);
+});
+
+test('a link set up across the window\'s edge is still a link', function () {
+    detected($this, '-qB4210-xxxxxxxxxxxx', '203.0.113.7', 0, ['event' => 'started']);
+    detected($this, '-qB4210-yyyyyyyyyyyy', '203.0.113.7', 10, ['event' => 'started']);
+    detected($this, '-qB4210-xxxxxxxxxxxx', '203.0.113.7', 1_800);
+    detected($this, '-qB4210-yyyyyyyyyyyy', '203.0.113.7', 1_810);
+
+    // The window opens at 3,600: X's last home announce is before it, the
+    // move after.
+    detected($this, '-qB4210-xxxxxxxxxxxx', '2001:db8:9::1', 3_620);
+    detected($this, '-qB4210-zzzzzzzzzzzz', '2001:db8:9::2', 3_630, ['event' => 'started']);
+    keepLeeching($this, 3_640, 2);
+
+    $this->travelTo($this->t->copy()->addSeconds(11_000));
+    $found = app(LocationSharingDetector::class)->detect($this->t->copy()->addSeconds(3_600), $this->t->copy()->addSeconds(3_600));
+
+    expect($found)->toHaveCount(1)
         ->and($found[0]['places'])->toBe(['203.0.113.7', '20010db800090000::/64']);
 });
 

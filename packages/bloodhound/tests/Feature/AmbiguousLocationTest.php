@@ -122,6 +122,16 @@ describe('flag (the default)', function () {
     });
 });
 
+// Documented, not fixed: making it ambiguous would let a new client match the
+// other-family address an attacker's peer ID left behind (Sequence B).
+test('a new client whose first announce comes over the other family is refused once, then ambiguous', function () {
+    ambiguous($this, '-qB4210-laptop000000', '203.0.113.7', 0);
+
+    expect(ambiguous($this, '-qB4210-desktop00000', '2001:db8:1:2::10', 10))->toHaveKey('failure reason')
+        ->and(ambiguous($this, '-qB4210-desktop00000', '203.0.113.7', 11))->not->toHaveKey('failure reason')
+        ->and(ambiguous($this, '-qB4210-desktop00000', '2001:db8:1:2::10', 70, ['event' => '']))->not->toHaveKey('failure reason');
+});
+
 describe('refuse', function () {
     test('the household\'s IPv6 announces are refused, as in 10.2, and no event fires', function () {
         config(['bloodhound.anti_cheat.ambiguous_locations' => 'refuse']);

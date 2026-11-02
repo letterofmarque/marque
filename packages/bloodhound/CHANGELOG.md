@@ -9,7 +9,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [11.0.0] — 2026-11-02
 
-> Dual-stack households aren't refused as two locations: an ambiguous location is flagged by default, a daily detector reports account sharing, and locations can be judged by your own LocationJudge.
+> Dual-stack clients aren't refused for switching families: an ambiguous location is flagged by default, a daily detector reports two account-sharing patterns, and locations can be judged by your own LocationJudge.
 
 ### Breaking
 
@@ -26,11 +26,11 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   (`location_ambiguous`), once a day per peer per torrent. `refuse` refuses it, and
   `allow` accepts it silently. **`anti_cheat.ambiguous_window`** (3600) is how recent the
   peer's other-family announce must be.
-- **`bloodhound:detect-location-sharing`**, scheduled daily over the last day. It reports a
-  peer ID going back to a network it left within one family, and an ambiguous link that
-  wasn't sustained while the member had other clients at both ends. Findings are logged
-  and fired as `CheatDetected` (`location_sharing_suspected`). It never refuses or changes
-  a credit.
+- **`bloodhound:detect-location-sharing`**, scheduled daily. It reports a peer ID going
+  back to a network it left within one family, and an ambiguous link from the last week
+  that wasn't sustained while, in the last day, the member had other clients at both ends.
+  Findings are logged and fired as `CheatDetected` (`location_sharing_suspected`). It
+  never refuses or changes a credit. The README says which sharing it can't see.
 - **`Contracts\LocationJudge`**: bind your own to decide where a peer is (by ASN, say).
   It's asked a `LocationQuestion` and answers a `LocationVerdict` (pass, refuse,
   ambiguous). `DefaultLocationJudge` is 10.x's rule plus the ambiguous case.

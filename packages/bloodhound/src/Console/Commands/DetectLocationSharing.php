@@ -13,21 +13,26 @@ use Marque\Bloodhound\Services\LocationSharingDetector;
 /**
  * Report the account-sharing patterns the ledger shows (#11133).
  *
- * Scheduled daily over the last day. Each finding fires CheatDetected
+ * Scheduled daily over the last day, checking links set up over the last
+ * week, so a setup is reported every day for a week, not only on the day it
+ * happened. Each finding fires CheatDetected
  * (`location_sharing_suspected`) and is logged; nothing is refused and no
  * credit changes. A finding is evidence for staff, not a verdict: a VPN
  * switched on and off looks like an alternating peer.
  */
 class DetectLocationSharing extends Command
 {
-    protected $signature = 'bloodhound:detect-location-sharing {--hours=24 : How far back to read the ledger}';
+    protected $signature = 'bloodhound:detect-location-sharing
+        {--hours=24 : How far back to read what members did}
+        {--link-days=7 : How far back an ambiguous location still counts as a link to check}';
 
     protected $description = 'Report peers that look like one account used from more than one place';
 
     public function handle(LocationSharingDetector $detector): int
     {
         $hours = max(1, (int) $this->option('hours'));
-        $findings = $detector->detect(Carbon::now()->subHours($hours));
+        $linkDays = max(1, (int) $this->option('link-days'));
+        $findings = $detector->detect(Carbon::now()->subHours($hours), Carbon::now()->subDays($linkDays));
 
         if ($findings === []) {
             $this->info("No location sharing suspected in the last {$hours} hour(s).");

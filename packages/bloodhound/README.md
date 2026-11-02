@@ -497,43 +497,74 @@ hold:
 - that last announce was within `ambiguous_window` seconds (an hour by default; it has to
   span an announce interval, because a client's first family each cycle comes an
   interval after its last announce, over the second);
-- the place it came from is one where the member already has another client;
+- the place it came from is one where the member has another live client in the same
+  state (leeching, or seeding);
 - it hasn't been seen on another network in the family it now announces over. A
   dual-stack machine comes back to a family on its own address, so a new network there is
   a move.
 
 `ambiguous_locations` says what happens to one:
 
-| Setting | The household | One account used at two places |
+| Setting | A dual-stack household | One account used at two places |
 |---|---|---|
-| `flag` (default) | Never refused. The announce is credited, its ledger row flagged ("Ambiguous location") | Gets in, but leaves a flagged row, fires `CheatDetected` (`location_ambiguous`), and the detector reports the pattern |
-| `refuse` | The dual-stack client's IPv6 announces are refused, so the client shows a tracker error for that endpoint (10.x behaviour) | Refused |
-| `allow` | Never refused, nothing flagged | Gets in silently |
+| `flag` (default) | Not refused for switching families. The announce is credited and its ledger row flagged ("Ambiguous location") | Can get in, but only by way of a flagged row and a `CheatDetected` (`location_ambiguous`) event. The detector reports some setups; see below for which |
+| `refuse` | The dual-stack client's announces over its second family are refused, so it shows a tracker error for that endpoint (10.x behaviour) | Refused |
+| `allow` | Not refused, nothing flagged | Can get in silently |
 
 Under `flag`, every ambiguous row is flagged but `CheatDetected` fires at most once a day
-per peer per torrent: a household is ambiguous on every IPv6 announce, and an event each
-time would bury everything else. Anything other than the three values means `flag`.
+per peer per torrent: a household is ambiguous on every announce over its second family,
+and an event each time would bury everything else. Anything other than the three values
+means `flag`.
 
-What `flag` lets through, and how it's caught. A member's client X at home moves to a
-friend's over the other family. That's ambiguous, accepted and flagged. A second client
-at the friend's then joins X's location without a flag. The flagged row is the only trace
-at announce time, so `bloodhound:detect-location-sharing` (daily, over the last day)
-reads the ledger for it. It reports a link that wasn't sustained, meaning the peer that
-linked the two places stopped switching between them while the member had other clients
-at both. A real dual-stack client keeps switching every announce interval. It also
-reports a peer ID that keeps going back to a network it left within one family, which is
-how one peer ID shared between two places looks. A VPN switched on and off looks like
-that too. So findings are evidence for staff, logged and fired as `CheatDetected`
-(`location_sharing_suspected`), and the command never refuses or changes a credit.
+One household case is still refused under every setting. A *new* client whose very first
+announce arrives over the family the member's other client isn't on has no record to link
+it to anything. Its announce over the other family goes through at the same moment, and
+its next announce over the first is ambiguous, so it clears on its own. Treating that
+first one as ambiguous too would let a new client claim a place an attacker's peer ID had
+merely passed through.
+
+**What `flag` lets through, and what the detector can see.** Under `flag`, a refusal that
+might be a household is accepted, and the flagged row and its event are the trace. Staff
+who want to know should listen for `location_ambiguous`.
+`bloodhound:detect-location-sharing` runs daily and reads the ledger for two patterns:
+
+- **An unsustained link.** An ambiguous row in the last week linked two places, the peer
+  that linked them hasn't kept switching between them (a real dual-stack client switches
+  every announce interval), and in the last day the member has had other clients at
+  both. This is a client at home moving to a friend's to set up the link, then clients at
+  each. It's reported every day the member keeps both places, for a week after the setup
+  (`--link-days`).
+- **A peer that keeps going back to a network it left, within one family.** That's one
+  peer ID shared between two places on IPv4 (or two IPv6 /64s). It also looks like a VPN
+  switched on and off, a phone moving between Wi-Fi and mobile data, a dual-WAN router,
+  or a carrier whose CGNAT doesn't keep one IPv4 address per customer.
+
+Findings are logged and fired as `CheatDetected` (`location_sharing_suspected`). They're
+evidence for staff, not verdicts, and the command never refuses or changes a credit.
+
+What it can't see, because nothing on a tracker can tell these from a real household:
+
+- **One peer ID shared across families**, with one place on IPv4 and the other on IPv6,
+  and no second client. It looks exactly like one dual-stack client. 10.x accepted it too,
+  and no ambiguous row is ever written.
+- **A linking peer that keeps switching between the two places**, driven by a script. It
+  looks like a household of two dual-stack clients.
+- **A linking peer that settles at the far place**, with no other client of the member
+  there. It looks like a dual-stack client whose IPv4 went away. Its setup row is still
+  flagged.
+
+It can also report a real household: one whose second dual-stack client stopped
+switching within three announces (a small torrent finishing, say), with other clients at
+both places.
 
 An address a client announces (`ipv4=`, `ipv6=`) never counts toward any of this. If
-neither policy suits, take announces over one family only (`address_families`). Or judge
+none of that suits, take announces over one family only (`address_families`). Or judge
 locations yourself: bind your own `Marque\Bloodhound\Contracts\LocationJudge` in a
 service provider. It's asked a `LocationQuestion` (the member, the peer, its record, the
-torrent's live peers) and answers `LocationVerdict::pass()`, `refuse($reason)` or
-`ambiguous($reason)`, and the policy above applies to its ambiguous verdicts too. Better
-evidence than timing, such as matching IPv4 and IPv6 networks by ASN from GeoIP data you
-hold, belongs there.
+torrent's live peers) on every announce but `stopped`, and answers
+`LocationVerdict::pass()`, `refuse($reason)` or `ambiguous($reason)`. The policy above
+applies to its ambiguous verdicts too. Better evidence than timing, such as matching IPv4
+and IPv6 networks by ASN from GeoIP data you hold, belongs there.
 
 **Clients per torrent.** A member may run `max_clients_per_torrent` (5) live peer IDs on
 one torrent; only a new one past that is refused. Many peer IDs on one torrent pollute its
@@ -560,7 +591,8 @@ their bytes.
 `location_ambiguous`, and add an entry to the Redis `suspicious` list. The detector fires
 `location_sharing_suspected`. Refusals (port, gap, location, clients per torrent, and
 client validation) fire nothing: each is a flagged ledger row with its reason, which
-`AnnounceLogServiceInterface::flagged()` returns along with forfeits.
+`AnnounceLogServiceInterface::flagged()` returns along with forfeits and ambiguous
+locations.
 
 `anti_cheat.enabled = false` turns off every check above: nothing is refused, forfeited
 or reported. Client validation has its own switch.
@@ -1168,7 +1200,7 @@ This is a Bloodhound feature and has no equivalent in [marque/hound](https://pac
 |---|---|---|
 | `bloodhound:aggregate-ledger` | Every minute | Folds new ledger rows into the totals (up to the horizon), and checks Redis durability |
 | `bloodhound:reconcile-ledger` | Daily | Reports totals that disagree with the ledger |
-| `bloodhound:detect-location-sharing` | Daily | Reports patterns of one account used from more than one place; `--hours=` (24) |
+| `bloodhound:detect-location-sharing` | Daily | Reports two patterns of one account used from more than one place; `--hours=` (24), `--link-days=` (7) |
 | `bloodhound:prune-announce-log` | Daily | Deletes rows past `retention_days`, carrying what they credited |
 | `bloodhound:sync-swarm-counts` | Hourly | Sweeps expired peers, keeping their baselines; settles swarm counts |
 | `bloodhound:enforce-hit-and-run` | Hourly | Applies hit-and-run: pre-warns, strikes, clears strikes once seeded |
@@ -1185,16 +1217,18 @@ This is a Bloodhound feature and has no equivalent in [marque/hound](https://pac
 ## Upgrading from 10.x to 11.0
 
 One change in default behaviour, which is why it's a major: an ambiguous location is
-accepted and flagged (`ambiguous_locations=flag`) instead of refused. A member whose
-dual-stack client was refused on its IPv6 announces is no longer refused. To keep 10.x's
-behaviour exactly, set `BLOODHOUND_AMBIGUOUS_LOCATIONS=refuse`.
+accepted and flagged (`ambiguous_locations=flag`) instead of refused. A dual-stack client
+is no longer refused for switching families. A new client starting over the other family
+is still refused once (see [Ambiguous locations](#anti-cheat)). To keep 10.x's refusals,
+set `BLOODHOUND_AMBIGUOUS_LOCATIONS=refuse`; the detector still runs and reports either
+way.
 
 Nothing else is needed: no migration, and nothing in Redis to clear.
 `bloodhound:detect-location-sharing` is scheduled daily with the rest. Its findings
 arrive as `CheatDetected` events with type `location_sharing_suspected`, and as warnings
-in the log. Listen for them if you want staff told. If you'd set
-`BLOODHOUND_MAX_LEECHING_LOCATIONS=2` to work around dual-stack refusals, you can put it
-back to 1.
+in the log. Listen for them, and for `location_ambiguous`, if you want staff told. If
+you'd set `BLOODHOUND_MAX_LEECHING_LOCATIONS=2` to work around dual-stack refusals, you can
+put it back to 1.
 
 ## Upgrading to 10.1
 
