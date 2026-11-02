@@ -533,8 +533,9 @@ Some household cases are still refused under every setting:
 - **A dual-stack desktop that has so far announced only over IPv6** has no IPv4 address to
   pair, so an IPv4-only laptop starting then is a new location. It clears at the desktop's
   first IPv4 announce, which libtorrent sends within seconds. A desktop client that only
-  ever announces over IPv6, and doesn't claim an IPv4 address with `ipv4=`, never pairs,
-  and the laptop stays refused.
+  ever announces over IPv6, and doesn't claim an IPv4 address with `ipv4=`, never pairs:
+  the laptop stays refused until the desktop announces over IPv4 or claims an IPv4
+  address.
 - **A desktop whose two families were last seen more than `dual_stack_gap` apart**, such
   as one endpoint failing and backing off. The laptop clears once both announce close
   together again.
@@ -546,6 +547,14 @@ Some household cases are still refused under every setting:
   its next IPv6 announce is then ambiguous. libtorrent's endpoint order varies, so this can
   happen on any start. The same goes for a dual-stack client turning from seeding to
   leeching with an IPv6 announce beside an IPv4-only one.
+
+And one rule that isn't about dual-stack at all: **a household whose address changes has
+moved**, as far as a tracker can tell. That covers a new public IPv4 address, or the ISP
+renumbering its IPv6 prefix. Each client is refused at the new address while the member
+has another client still recorded at the old one, until the old records age out
+(`threepio.peer_expiry`, an hour by default) or the member ends those sessions from their
+profile. Every version has worked this way. The rule that stops a client counting a
+place it has left is the same one that stops this.
 
 **What `flag` lets through, and what the detector can see.** Under `flag`, a refusal that
 might be a household is accepted, and the flagged row and its event are the trace. Staff

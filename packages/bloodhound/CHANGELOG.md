@@ -20,7 +20,9 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   under `refuse`.
 - **The README lists two household cases refused once:** a dual-stack client starting,
   or turning to leeching, over IPv6 beside an IPv4-only one. Each clears at its IPv4
-  announce seconds later.
+  announce seconds later. It also says plainly that a household whose IPv4 address or
+  IPv6 prefix changes has moved, as far as a tracker can tell, and is refused at the new
+  address until the old records age out, as in every version.
 
 ## [11.1.0] — 2026-11-02
 
