@@ -7,6 +7,21 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+> A client turning from seeding to leeching beside a dual-stack one isn't refused for an hour; the README lists the household cases still refused once.
+
+### Fixed
+
+- **An IPv4-only client turning from seeding to leeching beside a dual-stack one was
+  refused until its record expired**, about an hour (found by Job #319's check). It hadn't
+  moved, so 11.1's paired-address grounds, which only covered new clients, didn't apply.
+  They now cover a client turning to leeching where it is: flagged under `flag`, refused
+  under `refuse`.
+- **The README lists two household cases refused once:** a dual-stack client starting,
+  or turning to leeching, over IPv6 beside an IPv4-only one. Each clears at its IPv4
+  announce seconds later.
+
 ## [11.1.0] — 2026-11-02
 
 > An IPv4-only client beside a dual-stack one is no longer locked out: under flag it's an ambiguous location, flagged, instead of refused on every try.

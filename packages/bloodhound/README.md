@@ -503,8 +503,9 @@ hold:
   dual-stack machine comes back to a family on its own address, so a new network there is
   a move.
 
-A *new* client's refusal is ambiguous when it lands on another of the member's clients'
-address in that client's other family, and that client was seen on both families within
+A *new* client's refusal, or one turning from seeding to leeching where it is, is
+ambiguous when it lands on another of the member's clients' address in that client's
+other family, and that client was seen on both families within
 `dual_stack_gap` seconds (120). That's an IPv4-only laptop starting beside a dual-stack
 desktop. The desktop's IPv6 announce follows its IPv4 one each cycle, so its place is
 almost always its IPv6 /64, and before 11.1 the laptop was refused on every try. The
@@ -543,7 +544,8 @@ Some household cases are still refused under every setting:
   first announce is refused: nothing pairs the IPv4-only client with an IPv6 address. It
   clears at its IPv4 announce, seconds later, which lands on the other client's place;
   its next IPv6 announce is then ambiguous. libtorrent's endpoint order varies, so this can
-  happen on any start.
+  happen on any start. The same goes for a dual-stack client turning from seeding to
+  leeching with an IPv6 announce beside an IPv4-only one.
 
 **What `flag` lets through, and what the detector can see.** Under `flag`, a refusal that
 might be a household is accepted, and the flagged row and its event are the trace. Staff

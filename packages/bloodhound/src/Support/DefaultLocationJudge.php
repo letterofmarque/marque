@@ -25,9 +25,10 @@ use Marque\Threepio\Support\PeerAddresses;
  * families, within `anti_cheat.ambiguous_window` seconds of its last
  * announce, the place it announced from then is one the member already
  * uses, and it hasn't been seen on another network in the family it now
- * announces over. A new client's refusal is ambiguous when it lands on
- * another client's address in that client's other family, and that client
- * was seen on both within `anti_cheat.dual_stack_gap` seconds. That is a dual-stack client announcing over IPv4 and IPv6 in turn at
+ * announces over. A new client's refusal, or one turning from seeding to
+ * leeching where it is, is ambiguous when it lands on another client's
+ * address in that client's other family, and that client was seen on both
+ * within `anti_cheat.dual_stack_gap` seconds. That is a dual-stack client announcing over IPv4 and IPv6 in turn at
  * a house where the member's other client is. It is also exactly what one
  * peer ID announcing from two places looks like, which is why it is only
  * ambiguous: the policy decides, and the ledger detector watches what
@@ -81,10 +82,13 @@ final class DefaultLocationJudge implements LocationJudge
         // A new client at another client's paired address: an IPv4-only
         // laptop starting while the dual-stack desktop's last announce was
         // over IPv6, which it is almost always, its IPv4 one coming seconds
-        // before. Refused, it never got a record and stayed locked out.
-        $ambiguous = $record === null
-            ? isset($pairedAt[$location])
-            : $moved && $this->acrossFamilies($question, $record, $places);
+        // before. Refused, it never got a record and stayed locked out. The
+        // same for one turning from seeding to leeching where it is (a
+        // partial seed taking more files): refused until its record expired.
+        $ambiguous = match (true) {
+            $record === null, ! $moved => isset($pairedAt[$location]),
+            default => $this->acrossFamilies($question, $record, $places),
+        };
 
         return $ambiguous ? LocationVerdict::ambiguous($refusal) : LocationVerdict::refuse($refusal);
     }

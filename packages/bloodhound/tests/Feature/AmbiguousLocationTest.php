@@ -233,6 +233,29 @@ test('a dual-stack client starting over IPv6 beside an IPv4-only one is refused 
         ->and(ambiguous($this, '-qB4210-desktop00000', '2001:db8:1:2::10', 1_901, ['event' => '']))->not->toHaveKey('failure reason');
 });
 
+// Found by Job #319's 11.1 check: a client turning from seeding to leeching
+// where it is hadn't moved, so the paired-address grounds didn't apply, and
+// it was refused until its record expired.
+test('an IPv4-only client turning from seeding to leeching beside a dual-stack one is not refused', function () {
+    ambiguous($this, '-qB4210-laptop000000', '203.0.113.7', 0, ['left' => 0]);
+    ambiguous($this, '-qB4210-desktop00000', '203.0.113.7', 10);
+    ambiguous($this, '-qB4210-desktop00000', '2001:db8:1:2::10', 15, ['event' => '']);
+
+    expect(ambiguous($this, '-qB4210-laptop000000', '203.0.113.7', 600, ['event' => '', 'left' => 500]))->not->toHaveKey('failure reason')
+        ->and(lastRowOf('-qB4210-laptop000000')->anti_cheat_reason)->toStartWith(AntiCheatService::AMBIGUOUS_LOCATION)
+        ->and(lastRowOf('-qB4210-laptop000000')->prior_up)->not->toBeNull();
+});
+
+test('a dual-stack client turning to leeching over IPv6 beside an IPv4-only one is refused once, then clears', function () {
+    ambiguous($this, '-qB4210-laptop000000', '203.0.113.7', 0);
+    ambiguous($this, '-qB4210-desktop00000', '203.0.113.7', 10, ['left' => 0]);
+    ambiguous($this, '-qB4210-desktop00000', '2001:db8:1:2::10', 15, ['event' => '', 'left' => 0]);
+
+    expect(ambiguous($this, '-qB4210-desktop00000', '2001:db8:1:2::10', 600, ['event' => '', 'left' => 500]))->toHaveKey('failure reason')
+        ->and(ambiguous($this, '-qB4210-desktop00000', '203.0.113.7', 605, ['event' => '', 'left' => 500]))->not->toHaveKey('failure reason')
+        ->and(ambiguous($this, '-qB4210-desktop00000', '2001:db8:1:2::10', 2_400, ['event' => '', 'left' => 500]))->not->toHaveKey('failure reason');
+});
+
 test('the laptop beside a dual-stack client is refused under refuse, as in 10.x', function () {
     config(['bloodhound.anti_cheat.ambiguous_locations' => 'refuse']);
 
