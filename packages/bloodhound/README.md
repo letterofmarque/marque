@@ -503,6 +503,12 @@ hold:
   dual-stack machine comes back to a family on its own address, so a new network there is
   a move.
 
+A *new* client's refusal is ambiguous when it lands on another of the member's clients'
+address in that client's other family, and that client was seen on both families within
+`dual_stack_gap` seconds (120). That's an IPv4-only laptop starting beside a dual-stack
+desktop. The desktop's IPv6 announce follows its IPv4 one each cycle, so its place is
+almost always its IPv6 /64, and before 11.0.1 the laptop was refused on every try.
+
 `ambiguous_locations` says what happens to one:
 
 | Setting | A dual-stack household | One account used at two places |
@@ -516,16 +522,10 @@ per peer per torrent: a household is ambiguous on every announce over its second
 and an event each time would bury everything else. Anything other than the three values
 means `flag`.
 
-One household case is still refused under every setting. A *new* client whose first
-announce arrives over a family the member's other client isn't on has no record to link
-it to anything. For example, an IPv4-only laptop starting while the dual-stack desktop
-has so far announced only over IPv6. It's refused until the two share a family: either
-its own announce over the other family (a dual-stack client sends one at the same moment,
-and its next announce over the first is then ambiguous), or the other client's next
-announce over this one, which libtorrent sends within seconds. Under `flag` and `allow`
-it clears on its own that way. Treating that
-first one as ambiguous too would let a new client claim a place an attacker's peer ID had
-merely passed through.
+One household case is still refused under every setting. A dual-stack desktop that has
+so far announced only over IPv6 has no IPv4 address to pair, so an IPv4-only laptop
+starting then is a new location. It clears at the desktop's first IPv4 announce, which
+libtorrent sends within seconds.
 
 **What `flag` lets through, and what the detector can see.** Under `flag`, a refusal that
 might be a household is accepted, and the flagged row and its event are the trace. Staff
@@ -556,6 +556,11 @@ What it can't see, because nothing on a tracker can tell these from a real house
 - **A linking peer that settles at the far place**, with no other client of the member
   there. It looks like a dual-stack client whose IPv4 went away. Its setup row is still
   flagged.
+- **A new client at a paired address.** One peer ID announces from two places within
+  `dual_stack_gap` seconds, or a client claims the other address with `ipv4=`/`ipv6=`,
+  and then a new client joins at that address. It looks like a laptop beside a
+  dual-stack desktop. The new client's first row is flagged, and nothing links it to a
+  second place afterwards. (Under `refuse` it's refused.)
 
 It can also report a real household: one whose dual-stack client switched fewer than
 three times after linking the places before it stopped or restarted, while the member
@@ -917,6 +922,7 @@ per second.
 | `anti_cheat.max_leeching_locations_per_torrent` | `1` | Locations a member may leech one torrent from |
 | `anti_cheat.ambiguous_locations` | `flag` | `flag`, `refuse` or `allow` an [ambiguous location](#anti-cheat) (`BLOODHOUND_AMBIGUOUS_LOCATIONS`) |
 | `anti_cheat.ambiguous_window` | `3600` | Seconds since the peer's last announce, over the other family, for a refusal to be ambiguous (`BLOODHOUND_AMBIGUOUS_WINDOW`) |
+| `anti_cheat.dual_stack_gap` | `120` | Seconds between a client's IPv4 and IPv6 announces for a new client at its other address to be ambiguous (`BLOODHOUND_DUAL_STACK_GAP`) |
 | `anti_cheat.max_clients_per_torrent` | `5` | A member's live clients (peer IDs) on one torrent; only a new one is refused |
 | `anti_cheat.block_datacenter_ips` | `false` | Not built yet; setting it does nothing <!-- check-docs: ignore — never built, needs a design decision first (#10813) --> |
 

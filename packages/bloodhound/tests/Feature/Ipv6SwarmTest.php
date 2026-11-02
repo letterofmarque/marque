@@ -200,11 +200,18 @@ describe('locations: where a peer last connected from', function () {
     // over IPv4, then from a friend's over IPv6; if its two families vouched
     // for each other, ordinary clients at both places would pass. A peer is
     // located where it last connected from, and nothing else.
+    // Within dual_stack_gap it looks like a dual-stack client (11.0.1): under
+    // refuse it's refused, under flag the new client gets in only flagged.
     test('one peer ID announcing from two places over different families doesn\'t make them one place', function () {
+        config(['bloodhound.anti_cheat.ambiguous_locations' => 'refuse']);
         announced6($this, '-qB4210-xxxxxxxxxxxx', '203.0.113.7', 0, ['left' => 500]);
         announced6($this, '-qB4210-xxxxxxxxxxxx', '2001:db8:9::1', 60, ['left' => 500, 'event' => '']);
 
         expect(announced6($this, '-qB4210-yyyyyyyyyyyy', '203.0.113.7', 120, ['left' => 500]))->toHaveKey('failure reason');
+
+        config(['bloodhound.anti_cheat.ambiguous_locations' => 'flag']);
+        expect(announced6($this, '-qB4210-yyyyyyyyyyyy', '203.0.113.7', 180, ['left' => 500]))->not->toHaveKey('failure reason')
+            ->and(AnnounceLog::query()->where('peer_id', '-qB4210-yyyyyyyyyyyy')->orderByDesc('id')->value('anti_cheat_reason'))->toStartWith('Ambiguous location');
     });
 
     test('a dual-stack client elsewhere counts once against the limit, whatever it announces', function () {
@@ -243,8 +250,17 @@ describe('locations: where a peer last connected from', function () {
             announced6($this, $laptop, '198.51.100.9', $base + 240, ['left' => 500, 'event' => ''] + $claim);
             announced6($this, $laptop, '198.51.100.9', $base + 2_000, ['left' => 500, 'event' => ''] + $claim);
 
-            expect(announced6($this, sprintf('-qB4210-home%08d', $i), '2001:db8:1:2::99', $base + 2_010, ['left' => 500]))
-                ->toHaveKey('failure reason');
+            $home = announced6($this, sprintf('-qB4210-home%08d', $i), '2001:db8:1:2::99', $base + 2_010, ['left' => 500]);
+
+            // Unclaimed, home isn't one of its places. Still claiming it, the
+            // laptop looks dual-stack (11.0.1): the home client gets in only
+            // flagged, never silently.
+            if ($claim === []) {
+                expect($home)->toHaveKey('failure reason');
+            } else {
+                expect($home)->not->toHaveKey('failure reason')
+                    ->and(AnnounceLog::query()->where('peer_id', sprintf('-qB4210-home%08d', $i))->orderByDesc('id')->value('anti_cheat_reason'))->toStartWith('Ambiguous location');
+            }
         }
     });
 

@@ -413,6 +413,12 @@ return [
         // threepio's default peer_expiry.
         'ambiguous_window' => env('BLOODHOUND_AMBIGUOUS_WINDOW', 3600),
 
+        // Seconds between a client's IPv4 and IPv6 announces for it to count
+        // as dual-stack, so that a new client at its other address (an
+        // IPv4-only laptop beside a dual-stack desktop) is ambiguous rather
+        // than a new location.
+        'dual_stack_gap' => env('BLOODHOUND_DUAL_STACK_GAP', 120),
+
         // A member's live clients (peer IDs) on one torrent, counted only for
         // a new one. Many peer IDs on one torrent pollute its swarm; one
         // client per torrent across thousands of torrents is a seedbox doing

@@ -25,7 +25,9 @@ use Marque\Threepio\Support\PeerAddresses;
  * families, within `anti_cheat.ambiguous_window` seconds of its last
  * announce, the place it announced from then is one the member already
  * uses, and it hasn't been seen on another network in the family it now
- * announces over. That is a dual-stack client announcing over IPv4 and IPv6 in turn at
+ * announces over. A new client's refusal is ambiguous when it lands on
+ * another client's address in that client's other family, and that client
+ * was seen on both within `anti_cheat.dual_stack_gap` seconds. That is a dual-stack client announcing over IPv4 and IPv6 in turn at
  * a house where the member's other client is. It is also exactly what one
  * peer ID announcing from two places looks like, which is why it is only
  * ambiguous: the policy decides, and the ledger detector watches what
@@ -46,6 +48,7 @@ final class DefaultLocationJudge implements LocationJudge
         }
 
         $places = [];
+        $pairedAt = [];
 
         foreach ($question->others() as $peer) {
             $place = Location::of((string) $peer['ip']);
@@ -56,6 +59,10 @@ final class DefaultLocationJudge implements LocationJudge
             }
 
             $places[$place] = true;
+
+            if (($other = $this->pairedAddress($question, $peer)) !== null) {
+                $pairedAt[Location::of($other)] = true;
+            }
         }
 
         $max = $question->limit();
@@ -71,9 +78,42 @@ final class DefaultLocationJudge implements LocationJudge
         // than wait for it to expire.
         $refusal = "Location limit reached ({$max} {$kind} locations per torrent); if a client restarted somewhere else, end the other session from your profile";
 
-        return $moved && $this->acrossFamilies($question, $record, $places)
-            ? LocationVerdict::ambiguous($refusal)
-            : LocationVerdict::refuse($refusal);
+        // A new client at another client's paired address: an IPv4-only
+        // laptop starting while the dual-stack desktop's last announce was
+        // over IPv6, which it is almost always, its IPv4 one coming seconds
+        // before. Refused, it never got a record and stayed locked out.
+        $ambiguous = $record === null
+            ? isset($pairedAt[$location])
+            : $moved && $this->acrossFamilies($question, $record, $places);
+
+        return $ambiguous ? LocationVerdict::ambiguous($refusal) : LocationVerdict::refuse($refusal);
+    }
+
+    /**
+     * A client's address in the family it didn't last announce over, when
+     * it was seen on both families within `anti_cheat.dual_stack_gap`
+     * seconds: what a dual-stack client announcing over both endpoints looks
+     * like. Grounds for calling a refusal ambiguous, never proof of a place:
+     * two announces from two places seconds apart, or an announced address,
+     * look the same.
+     *
+     * @param  array<string, mixed>  $peer
+     */
+    private function pairedAddress(LocationQuestion $question, array $peer): ?string
+    {
+        $family = PeerAddresses::family((string) $peer['ip']);
+        $other = $family === 4 ? 6 : 4;
+        $readAt = $question->lookup->readAt;
+        $expiry = $question->lookup->peerExpiry;
+        $address = PeerAddresses::of($peer, $readAt, $expiry)["ipv{$other}"];
+
+        if ($family === null || $address === null) {
+            return null;
+        }
+
+        $gap = abs((int) ($peer["ipv{$other}_at"] ?? 0) - (int) ($peer["ipv{$family}_at"] ?? $peer['last_action'] ?? 0));
+
+        return $gap <= (int) config('bloodhound.anti_cheat.dual_stack_gap', 120) ? $address : null;
     }
 
     /**
