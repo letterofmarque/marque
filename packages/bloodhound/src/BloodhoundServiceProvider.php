@@ -26,6 +26,7 @@ use Marque\Bloodhound\Console\Commands\ReconcileLedger;
 use Marque\Bloodhound\Console\Commands\RecordPrunedHistory;
 use Marque\Bloodhound\Console\Commands\SyncSwarmCounts;
 use Marque\Bloodhound\Contracts\AnnounceLogServiceInterface;
+use Marque\Bloodhound\Contracts\LocationJudge;
 use Marque\Bloodhound\Contracts\SeedboxRegistry;
 use Marque\Bloodhound\Events\TorrentCompleted;
 use Marque\Bloodhound\Exceptions\RemovedConfiguration;
@@ -44,6 +45,7 @@ use Marque\Bloodhound\Services\SeedingObligations;
 use Marque\Bloodhound\Services\TorrentFilePolicy;
 use Marque\Bloodhound\Services\TrackerSessions;
 use Marque\Bloodhound\Services\TrackerStatsService;
+use Marque\Bloodhound\Support\DefaultLocationJudge;
 use Marque\Bloodhound\Support\PeerIdColumn;
 use Marque\Threepio\Services\PeerService;
 use Marque\Trove\Contracts\DownloadGateInterface;
@@ -96,6 +98,10 @@ class BloodhoundServiceProvider extends ServiceProvider
         $this->app->singleton(Seedboxes::class);
         $this->app->singleton(SeedboxesInterface::class, fn ($app) => $app->make(Seedboxes::class));
         $this->app->singleton(SeedboxRegistry::class, fn ($app) => $app->make(Seedboxes::class));
+
+        // Where a peer is, for the location limits. Bind your own in an app
+        // service provider to judge by better evidence (ASN, say).
+        $this->app->singleton(LocationJudge::class, DefaultLocationJudge::class);
 
         // A member's live sessions, and ending one (Job #193, D8), for a
         // frontend to show: the leeching limit is only fair with it.

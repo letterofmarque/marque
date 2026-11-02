@@ -6,9 +6,10 @@ namespace Marque\Bloodhound\Services;
 
 use Illuminate\Redis\Connections\Connection;
 use Illuminate\Support\Facades\Redis;
+use Marque\Bloodhound\Contracts\LocationJudge;
 use Marque\Bloodhound\Contracts\SeedboxRegistry;
 use Marque\Bloodhound\Events\CheatDetected;
-use Marque\Bloodhound\Support\Location;
+use Marque\Bloodhound\Support\LocationQuestion;
 use Marque\Threepio\Services\PeerService;
 use Marque\Threepio\Support\PeerLookup;
 
@@ -36,6 +37,7 @@ final class AntiCheatService
     public function __construct(
         private readonly PeerService $peerService,
         private readonly SeedboxRegistry $seedboxes,
+        private readonly LocationJudge $locations,
     ) {}
 
     /**
@@ -165,16 +167,9 @@ final class AntiCheatService
      * Refuse a new location past the member's limit on this torrent, or a
      * new client past their limit on it.
      *
-     * A peer already in the swarm, announcing from where it was in the state
-     * it was in, is never refused by a count: the count used to include the
-     * announcing peer, so a member at the limit was refused on every announce
-     * from every client (F6). It is counted again, without itself, when it
-     * moves: to another location, or from seeding to leeching (starting as a
-     * seeder and then reporting bytes left was a way round the leeching
-     * limit). A location is an IP (an IPv6 /64), so a second client at a
-     * location the member already uses is not a new one. Seeding and
-     * leeching are limited separately: the leeching limit is what stops one
-     * account being shared to download.
+     * Where a peer is, and whether that keeps the member within their limit,
+     * is the LocationJudge's question (DefaultLocationJudge unless the app
+     * binds its own). The client count is asked here.
      *
      * @param  array<string, array<string, mixed>>  $livePeers
      */
@@ -184,54 +179,13 @@ final class AntiCheatService
             return ['passed' => true, 'reason' => null];
         }
 
-        $location = Location::of($ip);
-        $seeding = $left === 0;
+        $verdict = $this->locations->judge(new LocationQuestion($userId, $peerId, $ip, $left, $lookup, $livePeers));
+
+        if (! $verdict->passed()) {
+            return ['passed' => false, 'reason' => $verdict->reason];
+        }
+
         $record = $lookup->isLive() ? $lookup->baseline : null;
-
-        $moved = $record !== null && Location::of((string) $record['ip']) !== $location;
-        $startedLeeching = $record !== null && (int) $record['left'] === 0 && ! $seeding;
-
-        if ($record !== null && ! $moved && ! $startedLeeching) {
-            return ['passed' => true, 'reason' => null];
-        }
-
-        $locations = [];
-
-        foreach ($livePeers as $otherPeerId => $peer) {
-            if ((string) $otherPeerId === $peerId || ($peer['user_id'] ?? null) !== $userId) {
-                continue;
-            }
-
-            if ((((int) $peer['left']) === 0) !== $seeding) {
-                continue;
-            }
-
-            $peerLocation = Location::of((string) $peer['ip']);
-
-            // Another client of the member, in the same state, already here.
-            if ($peerLocation === $location) {
-                $locations = null;
-
-                break;
-            }
-
-            $locations[$peerLocation] = true;
-        }
-
-        if ($locations !== null) {
-            $kind = $seeding ? 'seeding' : 'leeching';
-            $max = (int) config("bloodhound.anti_cheat.max_{$kind}_locations_per_torrent", $seeding ? 3 : 1);
-
-            if (count($locations) >= $max) {
-                return [
-                    'passed' => false,
-                    // A client restarted somewhere else under a new peer ID
-                    // is the usual way to arrive here, and the member can
-                    // clear the old session rather than wait for it to expire.
-                    'reason' => "Location limit reached ({$max} {$kind} locations per torrent); if a client restarted somewhere else, end the other session from your profile",
-                ];
-            }
-        }
 
         // A new peer: at most max_clients_per_torrent of the member's live
         // peer IDs on this torrent. Many peer IDs on one torrent pollute its
