@@ -132,6 +132,16 @@ test('a new client whose first announce comes over the other family is refused o
         ->and(ambiguous($this, '-qB4210-desktop00000', '2001:db8:1:2::10', 70, ['event' => '']))->not->toHaveKey('failure reason');
 });
 
+test('an IPv4-only client starting while the dual-stack one has only used IPv6 is refused until that one announces over IPv4', function () {
+    ambiguous($this, '-qB4210-desktop00000', '2001:db8:1:2::10', 0);
+
+    expect(ambiguous($this, '-qB4210-laptop000000', '203.0.113.7', 5))->toHaveKey('failure reason');
+
+    ambiguous($this, '-qB4210-desktop00000', '203.0.113.7', 10, ['event' => '']);
+
+    expect(ambiguous($this, '-qB4210-laptop000000', '203.0.113.7', 15))->not->toHaveKey('failure reason');
+});
+
 describe('refuse', function () {
     test('the household\'s IPv6 announces are refused, as in 10.2, and no event fires', function () {
         config(['bloodhound.anti_cheat.ambiguous_locations' => 'refuse']);

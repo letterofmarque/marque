@@ -516,11 +516,14 @@ per peer per torrent: a household is ambiguous on every announce over its second
 and an event each time would bury everything else. Anything other than the three values
 means `flag`.
 
-One household case is still refused under every setting. A *new* client whose very first
-announce arrives over the family the member's other client isn't on has no record to link
-it to anything. Its announce over the other family goes through at the same moment, and
-its next announce over the first is ambiguous, so under `flag` and `allow` it clears on
-its own. Treating that
+One household case is still refused under every setting. A *new* client whose first
+announce arrives over a family the member's other client isn't on has no record to link
+it to anything. For example, an IPv4-only laptop starting while the dual-stack desktop
+has so far announced only over IPv6. It's refused until the two share a family: either
+its own announce over the other family (a dual-stack client sends one at the same moment,
+and its next announce over the first is then ambiguous), or the other client's next
+announce over this one, which libtorrent sends within seconds. Under `flag` and `allow`
+it clears on its own that way. Treating that
 first one as ambiguous too would let a new client claim a place an attacker's peer ID had
 merely passed through.
 
