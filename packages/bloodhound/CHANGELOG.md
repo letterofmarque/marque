@@ -7,7 +7,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [Unreleased]
+## [11.1.1] — 2026-11-02
 
 > A client turning from seeding to leeching beside a dual-stack one isn't refused for an hour; the README lists the household cases still refused once.
 
