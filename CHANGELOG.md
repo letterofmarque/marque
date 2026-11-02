@@ -12,6 +12,7 @@ changelogs — edit those, not this.*
 
 - **[bloodhound 10.2.0](packages/bloodhound/CHANGELOG.md)** — A tracker can take announces over IPv4 only, or IPv6 only (address_families); the other family is told so in a warning, not a failure.
 - **[bloodhound 11.0.0](packages/bloodhound/CHANGELOG.md)** — Dual-stack clients aren't refused for switching families: an ambiguous location is flagged by default, a daily detector reports two account-sharing patterns, and locations can be judged by your own LocationJudge.
+- **[bloodhound 11.1.0](packages/bloodhound/CHANGELOG.md)** — An IPv4-only client beside a dual-stack one is no longer locked out: under flag it's an ambiguous location, flagged, instead of refused on every try.
 - **[hound 5.3.0](packages/hound/CHANGELOG.md)** — A tracker can take announces over IPv4 only, or IPv6 only (address_families); the other family is told so in a warning, not a failure.
 - **[threepio 4.3.0](packages/threepio/CHANGELOG.md)** — A tracker can tell a client something without failing its announce (`warning message`), and read which address families it accepts from config.
 

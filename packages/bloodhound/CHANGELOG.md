@@ -7,7 +7,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [Unreleased]
+## [11.1.0] — 2026-11-02
 
 > An IPv4-only client beside a dual-stack one is no longer locked out: under flag it's an ambiguous location, flagged, instead of refused on every try.
 
