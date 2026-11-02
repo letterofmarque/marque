@@ -105,7 +105,7 @@ class LedgerBackfill
         while (true) {
             $rows = AnnounceLog::query()
                 ->toBase()
-                ->select(['id', 'user_id', 'torrent_id', 'peer_id', 'event', 'left', 'uploaded', 'downloaded', 'upload_delta', 'download_delta', 'prior_up', 'anti_cheat_flagged', 'created_at'])
+                ->select(['id', 'user_id', 'torrent_id', 'peer_id', 'event', 'left', 'uploaded', 'downloaded', 'upload_delta', 'download_delta', 'prior_up', 'anti_cheat_flagged', 'anti_cheat_reason', 'created_at'])
                 ->where('id', '<=', $boundary)
                 ->when($at !== null, fn ($query) => $query->where(fn ($q) => $q
                     ->where('torrent_id', '>', $at[0])
@@ -128,7 +128,7 @@ class LedgerBackfill
 
                 // A refusal credited nothing and diffed against nothing; an
                 // opening balance is not an announce.
-                if ($row->event === AnnounceLog::EVENT_OPENING_BALANCE || ((bool) $row->anti_cheat_flagged && $row->prior_up === null)) {
+                if ($row->event === AnnounceLog::EVENT_OPENING_BALANCE || AnnounceLog::refused($row->anti_cheat_flagged, $row->prior_up, $row->anti_cheat_reason)) {
                     continue;
                 }
 

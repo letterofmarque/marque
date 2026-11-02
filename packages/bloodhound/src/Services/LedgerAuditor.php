@@ -316,7 +316,7 @@ class LedgerAuditor
 
         AnnounceLog::query()
             ->where('event', '!=', AnnounceLog::EVENT_OPENING_BALANCE)
-            ->where(fn ($query) => $query->where('anti_cheat_flagged', false)->orWhereNotNull('prior_up'))
+            ->accepted()
             ->orderBy('torrent_id')
             ->orderBy('peer_id')
             ->orderBy('id')

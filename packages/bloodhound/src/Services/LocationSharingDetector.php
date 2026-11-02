@@ -68,8 +68,8 @@ final class LocationSharingDetector
             ->whereNotIn('event', [AnnounceLog::EVENT_OPENING_BALANCE, AnnounceLog::EVENT_ENDED])
             ->chunkById(5_000, function ($rows) use (&$sessions, &$members, &$links) {
                 foreach ($rows as $row) {
-                    // A refusal: flagged, and no baseline. It placed nobody.
-                    if ($row->anti_cheat_flagged && $row->prior_up === null) {
+                    // A refusal placed nobody.
+                    if ($row->wasRefused()) {
                         continue;
                     }
 
@@ -162,7 +162,7 @@ final class LocationSharingDetector
         AnnounceLog::query()
             ->select(['id', 'user_id', 'torrent_id', 'peer_id', 'ip', 'anti_cheat_flagged', 'anti_cheat_reason', 'prior_up'])
             ->where('anti_cheat_flagged', true)
-            ->whereNotNull('prior_up')
+            ->accepted()
             ->where('id', '>=', $from)
             ->where('id', '<', $before)
             ->where('anti_cheat_reason', 'like', AntiCheatService::AMBIGUOUS_LOCATION.'%')
@@ -215,7 +215,7 @@ final class LocationSharingDetector
             ->where('user_id', $link->user_id)
             ->where('id', '>', $link->id)
             ->where('id', '<', $before)
-            ->where(fn ($query) => $query->where('anti_cheat_flagged', false)->orWhereNotNull('prior_up'))
+            ->accepted()
             ->lazyById(1_000)
             ->each(function (AnnounceLog $row) use (&$switches, &$previous, $places) {
                 $place = Location::of(PeerAddresses::normalise((string) $row->ip));
@@ -236,7 +236,7 @@ final class LocationSharingDetector
     private function ambiguous(AnnounceLog $row): bool
     {
         return $row->anti_cheat_flagged
-            && $row->prior_up !== null
+            && ! $row->wasRefused()
             && str_starts_with((string) $row->anti_cheat_reason, AntiCheatService::AMBIGUOUS_LOCATION);
     }
 
@@ -250,7 +250,7 @@ final class LocationSharingDetector
             ->where('peer_id', $row->peer_id)
             ->where('id', '<', $row->id)
             ->where('user_id', $row->user_id)
-            ->where(fn ($query) => $query->where('anti_cheat_flagged', false)->orWhereNotNull('prior_up'))
+            ->accepted()
             ->orderByDesc('id')
             ->value('ip');
 

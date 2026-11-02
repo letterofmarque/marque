@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Marque\Bloodhound\Models;
 
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Marque\Bloodhound\Services\AntiCheatService;
 use Marque\Trove\Models\Torrent;
 
 /**
@@ -66,6 +68,42 @@ class AnnounceLog extends Model
      * Events after which a session is over: the next row starts a new one.
      */
     public const SESSION_ENDS = ['stopped', self::EVENT_ENDED];
+
+    /**
+     * Was this a refusal: an announce that credited nothing and placed the
+     * peer nowhere?
+     *
+     * A refusal is flagged and has no baseline. So is one accepted announce:
+     * a new client let in as an ambiguous location (11.1), which has no
+     * baseline because it is new. Its reason starts with
+     * AntiCheatService::AMBIGUOUS_LOCATION, which a refusal's never does
+     * (AnnounceService rewrites one that would). Ask this, or the accepted()
+     * scope, rather than testing the flag and the baseline by hand.
+     */
+    public static function refused(mixed $flagged, mixed $priorUp, mixed $reason): bool
+    {
+        return (bool) $flagged
+            && $priorUp === null
+            && ! str_starts_with((string) $reason, AntiCheatService::AMBIGUOUS_LOCATION);
+    }
+
+    public function wasRefused(): bool
+    {
+        return self::refused($this->anti_cheat_flagged, $this->prior_up, $this->anti_cheat_reason);
+    }
+
+    /**
+     * Rows that weren't refusals (see refused()).
+     *
+     * @param  Builder<self>  $query
+     */
+    public function scopeAccepted(Builder $query): void
+    {
+        $query->where(fn (Builder $q) => $q
+            ->where('anti_cheat_flagged', false)
+            ->orWhereNotNull('prior_up')
+            ->orWhere('anti_cheat_reason', 'like', AntiCheatService::AMBIGUOUS_LOCATION.'%'));
+    }
 
     protected $table = 'announce_log';
 

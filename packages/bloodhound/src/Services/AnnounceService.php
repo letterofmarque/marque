@@ -339,6 +339,13 @@ final class AnnounceService
      */
     private function writeRefusal(AnnounceRequest $announce, string $reason): void
     {
+        // Never the accepted-ambiguous marker: readers tell a refusal from an
+        // accepted new client by it (AnnounceLog::refused()), and a bound
+        // LocationJudge writes its own reasons.
+        if (str_starts_with($reason, AntiCheatService::AMBIGUOUS_LOCATION)) {
+            $reason = 'Refused: '.$reason;
+        }
+
         $this->writeRow($announce, [
             'upload_delta' => 0,
             'download_delta' => 0,
@@ -371,10 +378,10 @@ final class AnnounceService
         $seeding = ($credit['prior_left'] ?? $announce->left) === 0;
         $forfeited = $check['forfeit_upload'] || $check['forfeit_download'];
 
-        // A flag on an announce credited in full (an ambiguous location). Its
-        // row always has a baseline (prior_up): an ambiguous verdict needs a
-        // live record, so readers that take "flagged with no baseline" for a
-        // refusal still read it as credited.
+        // A flag on an announce credited in full (an ambiguous location). A
+        // new client's has no baseline, like a refusal's; its reason, which
+        // starts with AntiCheatService::AMBIGUOUS_LOCATION, is what tells
+        // them apart (AnnounceLog::refused()).
         $reasons = array_filter([$check['flag'] ?? null, $forfeited ? $check['reason'] : null]);
 
         $this->writeRow($announce, [

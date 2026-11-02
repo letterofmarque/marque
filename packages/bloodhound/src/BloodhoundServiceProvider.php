@@ -160,7 +160,7 @@ class BloodhoundServiceProvider extends ServiceProvider
             ->where('peer_id', PeerIdColumn::encode($peerId))
             ->where('user_id', $userId)
             ->where('event', '!=', AnnounceLog::EVENT_OPENING_BALANCE)
-            ->where(fn ($query) => $query->where('anti_cheat_flagged', false)->orWhereNotNull('prior_up'))
+            ->accepted()
             // No further back than a retained baseline lasts: a peer away
             // longer than that starts a new session, recovery or not.
             ->where('created_at', '>=', now()->subSeconds((int) config('bloodhound.baseline_retention', 7 * 86_400)))

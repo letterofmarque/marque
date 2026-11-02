@@ -416,7 +416,8 @@ return [
         // Seconds between a client's IPv4 and IPv6 announces for it to count
         // as dual-stack, so that a new client at its other address (an
         // IPv4-only laptop beside a dual-stack desktop) is ambiguous rather
-        // than a new location.
+        // than a new location. An announced (ipv4=/ipv6=) address always
+        // counts. 0 turns it off.
         'dual_stack_gap' => env('BLOODHOUND_DUAL_STACK_GAP', 120),
 
         // A member's live clients (peer IDs) on one torrent, counted only for

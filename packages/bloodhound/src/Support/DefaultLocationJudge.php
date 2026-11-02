@@ -107,13 +107,18 @@ final class DefaultLocationJudge implements LocationJudge
         $expiry = $question->lookup->peerExpiry;
         $address = PeerAddresses::of($peer, $readAt, $expiry)["ipv{$other}"];
 
-        if ($family === null || $address === null) {
+        $limit = (int) config('bloodhound.anti_cheat.dual_stack_gap', 120);
+
+        // 0 turns pairing off. An announced address is stamped with the
+        // moment of its announce, so its gap is always 0, and "<= 0" would
+        // leave exactly that route open.
+        if ($family === null || $address === null || $limit <= 0) {
             return null;
         }
 
-        $gap = abs((int) ($peer["ipv{$other}_at"] ?? 0) - (int) ($peer["ipv{$family}_at"] ?? $peer['last_action'] ?? 0));
+        $gap = abs((int) ($peer["ipv{$other}_at"] ?? $peer['last_action'] ?? 0) - (int) ($peer["ipv{$family}_at"] ?? $peer['last_action'] ?? 0));
 
-        return $gap <= (int) config('bloodhound.anti_cheat.dual_stack_gap', 120) ? $address : null;
+        return $gap <= $limit ? $address : null;
     }
 
     /**
