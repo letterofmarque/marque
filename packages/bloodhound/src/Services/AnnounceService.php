@@ -371,6 +371,12 @@ final class AnnounceService
         $seeding = ($credit['prior_left'] ?? $announce->left) === 0;
         $forfeited = $check['forfeit_upload'] || $check['forfeit_download'];
 
+        // A flag on an announce credited in full (an ambiguous location). Its
+        // row always has a baseline (prior_up): an ambiguous verdict needs a
+        // live record, so readers that take "flagged with no baseline" for a
+        // refusal still read it as credited.
+        $reasons = array_filter([$check['flag'] ?? null, $forfeited ? $check['reason'] : null]);
+
         $this->writeRow($announce, [
             'upload_delta' => $check['forfeit_upload'] ? 0 : $credit['upload_delta'],
             'download_delta' => $check['forfeit_download'] ? 0 : $credit['download_delta'],
@@ -379,8 +385,8 @@ final class AnnounceService
             'prior_up' => $credit['prior_up'],
             'prior_down' => $credit['prior_down'],
             'prior_at' => $credit['prior_at'] !== null ? $this->at($credit['prior_at']) : null,
-            'anti_cheat_flagged' => $forfeited,
-            'anti_cheat_reason' => $forfeited ? $check['reason'] : null,
+            'anti_cheat_flagged' => $reasons !== [],
+            'anti_cheat_reason' => $reasons !== [] ? implode('; ', $reasons) : null,
             'created_at' => $this->at($credit['measured_at']),
         ]);
     }

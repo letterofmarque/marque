@@ -10,6 +10,7 @@ use Marque\Bloodhound\Contracts\LocationJudge;
 use Marque\Bloodhound\Contracts\SeedboxRegistry;
 use Marque\Bloodhound\Events\CheatDetected;
 use Marque\Bloodhound\Support\LocationQuestion;
+use Marque\Bloodhound\Support\LocationVerdict;
 use Marque\Threepio\Services\PeerService;
 use Marque\Threepio\Support\PeerLookup;
 
@@ -34,6 +35,12 @@ use Marque\Threepio\Support\PeerLookup;
  */
 final class AntiCheatService
 {
+    /**
+     * How an ambiguous location's ledger row reason begins, under `flag`.
+     * The detector finds them by it.
+     */
+    public const AMBIGUOUS_LOCATION = 'Ambiguous location';
+
     public function __construct(
         private readonly PeerService $peerService,
         private readonly SeedboxRegistry $seedboxes,
@@ -44,10 +51,12 @@ final class AntiCheatService
      * Run all anti-cheat checks on an announce request.
      *
      * `forfeit_upload` / `forfeit_download` mark a direction whose bytes are
-     * not credited; `reason` says why, for the ledger row.
+     * not credited; `reason` says why, for the ledger row. `flag` is a reason
+     * to flag the row of an announce that passed and is credited in full (an
+     * ambiguous location under `flag`).
      *
      * @param  array<string, array<string, mixed>>  $livePeers  the torrent's live peers, as PeerService::livePeers() returns them
-     * @return array{passed: bool, reason: ?string, forfeit_upload: bool, forfeit_download: bool}
+     * @return array{passed: bool, reason: ?string, forfeit_upload: bool, forfeit_download: bool, flag: ?string}
      */
     public function check(
         int $torrentId,
@@ -63,7 +72,7 @@ final class AntiCheatService
         PeerLookup $lookup,
         array $livePeers,
     ): array {
-        $pass = ['passed' => true, 'reason' => null, 'forfeit_upload' => false, 'forfeit_download' => false];
+        $pass = ['passed' => true, 'reason' => null, 'forfeit_upload' => false, 'forfeit_download' => false, 'flag' => null];
 
         if (! config('bloodhound.anti_cheat.enabled', true)) {
             return $pass;
@@ -82,6 +91,20 @@ final class AntiCheatService
         $limitCheck = $this->checkLocationLimits($userId, $peerId, $ip, $left, $event, $lookup, $livePeers);
         if (! $limitCheck['passed']) {
             return $limitCheck + $pass;
+        }
+
+        if (($limitCheck['flag'] ?? null) !== null) {
+            $pass['flag'] = $limitCheck['flag'];
+
+            // Every such row is flagged, for the detector. The event fires
+            // once a day per peer: a dual-stack household is ambiguous on
+            // every announce over its second family, and an event each time
+            // would bury everything else staff are shown.
+            $once = $this->prefix().'ambiguous:'.$torrentId.':'.bin2hex($peerId);
+
+            if ($this->redis()->set($once, 1, 'EX', 86_400, 'NX')) {
+                $this->dispatchCheatEvent('location_ambiguous', $userId, $torrentId, $limitCheck['flag']);
+            }
         }
 
         // More left than the torrent holds is impossible, but trove's size
@@ -171,7 +194,12 @@ final class AntiCheatService
      * is the LocationJudge's question (DefaultLocationJudge unless the app
      * binds its own). The client count is asked here.
      *
+     * An ambiguous verdict goes to `anti_cheat.ambiguous_locations`: `refuse`
+     * refuses it, `allow` passes it, and `flag` (the default, and what any
+     * other value means) passes it with a `flag` reason for the ledger row.
+     *
      * @param  array<string, array<string, mixed>>  $livePeers
+     * @return array{passed: bool, reason: ?string, flag?: ?string}
      */
     public function checkLocationLimits(int $userId, string $peerId, string $ip, int $left, ?string $event, PeerLookup $lookup, array $livePeers): array
     {
@@ -181,7 +209,19 @@ final class AntiCheatService
 
         $verdict = $this->locations->judge(new LocationQuestion($userId, $peerId, $ip, $left, $lookup, $livePeers));
 
-        if (! $verdict->passed()) {
+        $flag = null;
+
+        if ($verdict->kind === LocationVerdict::AMBIGUOUS) {
+            $policy = (string) config('bloodhound.anti_cheat.ambiguous_locations', 'flag');
+
+            if ($policy === 'refuse') {
+                return ['passed' => false, 'reason' => $verdict->reason];
+            }
+
+            if ($policy !== 'allow') {
+                $flag = self::AMBIGUOUS_LOCATION.': moved across address families from a place the member already uses; refused under ambiguous_locations=refuse ('.$verdict->reason.')';
+            }
+        } elseif (! $verdict->passed()) {
             return ['passed' => false, 'reason' => $verdict->reason];
         }
 
@@ -210,7 +250,7 @@ final class AntiCheatService
             }
         }
 
-        return ['passed' => true, 'reason' => null];
+        return ['passed' => true, 'reason' => null, 'flag' => $flag];
     }
 
     /**
