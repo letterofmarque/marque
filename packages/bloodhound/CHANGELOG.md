@@ -20,16 +20,18 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   on its own; it didn't. A new client is now ambiguous when it lands on another client's
   other-family address and that client was seen on both families within
   `anti_cheat.dual_stack_gap` seconds (120). Under `flag` that's accepted and flagged
-  with its own reason; under `refuse` it's refused as before. Its row has no baseline,
-  because the client is new, and the ledger's readers (Redis-loss recovery, the audit,
+  with its own reason; under `refuse` it's refused as before. Its row usually has no
+  baseline, the client being new, and the ledger's readers (Redis-loss recovery, the audit,
   the detector) still count it as accepted: `AnnounceLog::refused()` and the `accepted()`
   scope are the one definition of a refusal now. A refusal's reason never starts
-  "Ambiguous location"; a bound judge's that would is recorded as "Refused: …".
+  "Ambiguous location", in any case; a bound judge's that would is recorded as
+  "Refused: …". (A refusal row a bound judge wrote under 11.0.0 with exactly that
+  prefix isn't rewritten, and reads as accepted.)
 
 ### Added
 
-- **`anti_cheat.dual_stack_gap`** (`BLOODHOUND_DUAL_STACK_GAP`, 120). An announced address
-  always counts; 0 turns pairing off.
+- **`anti_cheat.dual_stack_gap`** (`BLOODHOUND_DUAL_STACK_GAP`, 120). An address announced
+  on the client's latest announce always counts; 0 turns pairing off.
 - **`AnnounceLog::refused()`, `wasRefused()` and the `accepted()` scope**: whether a
   ledger row was a refusal.
 

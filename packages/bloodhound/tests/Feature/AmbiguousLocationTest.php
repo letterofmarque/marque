@@ -182,6 +182,37 @@ test('a refusal never carries the accepted-ambiguous marker in the ledger, whate
         ->and($row->wasRefused())->toBeTrue();
 });
 
+// Found by the 11.1 review: LIKE ignores case on most engines, so a refusal
+// reason in another case read as accepted, and recovery took its counters as
+// a baseline.
+test('a refusal reason in any case is rewritten, so recovery never takes it for a baseline', function () {
+    // Bound before the first request: the route keeps its controller.
+    app()->instance(LocationJudge::class, new class implements LocationJudge
+    {
+        public function judge(LocationQuestion $question): LocationVerdict
+        {
+            return $question->ip === '198.51.100.20'
+                ? LocationVerdict::refuse('AMBIGUOUS LOCATION: by ASN')
+                : LocationVerdict::pass();
+        }
+    });
+
+    ambiguous($this, '-qB4210-aaaaaaaaaaaa', '203.0.113.7', 0, ['downloaded' => 1_000]);
+    ambiguous($this, '-qB4210-aaaaaaaaaaaa', '198.51.100.20', 1_800, ['event' => '', 'downloaded' => 50_000]);
+
+    $refused = lastRowOf('-qB4210-aaaaaaaaaaaa');
+
+    expect($refused->anti_cheat_reason)->toBe('Refused: AMBIGUOUS LOCATION: by ASN')
+        ->and($refused->wasRefused())->toBeTrue()
+        ->and(AnnounceLog::query()->accepted()->whereKey($refused->id)->exists())->toBeFalse();
+
+    Redis::connection(config('threepio.redis.connection', 'default'))->flushdb();
+
+    ambiguous($this, '-qB4210-aaaaaaaaaaaa', '203.0.113.7', 2_400, ['event' => '', 'downloaded' => 60_000]);
+
+    expect(lastRowOf('-qB4210-aaaaaaaaaaaa')->download_delta)->toBe(59_000);
+});
+
 test('dual_stack_gap 0 turns pairing off, claims included', function () {
     config(['bloodhound.anti_cheat.dual_stack_gap' => 0]);
 

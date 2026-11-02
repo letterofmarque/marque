@@ -342,7 +342,8 @@ final class AnnounceService
         // Never the accepted-ambiguous marker: readers tell a refusal from an
         // accepted new client by it (AnnounceLog::refused()), and a bound
         // LocationJudge writes its own reasons.
-        if (str_starts_with($reason, AntiCheatService::AMBIGUOUS_LOCATION)) {
+        // In any case: SQL's LIKE ignores it on SQLite, MySQL and MariaDB.
+        if (stripos($reason, AntiCheatService::AMBIGUOUS_LOCATION) === 0) {
             $reason = 'Refused: '.$reason;
         }
 

@@ -76,15 +76,16 @@ class AnnounceLog extends Model
      * A refusal is flagged and has no baseline. So is one accepted announce:
      * a new client let in as an ambiguous location (11.1), which has no
      * baseline because it is new. Its reason starts with
-     * AntiCheatService::AMBIGUOUS_LOCATION, which a refusal's never does
-     * (AnnounceService rewrites one that would). Ask this, or the accepted()
-     * scope, rather than testing the flag and the baseline by hand.
+     * AntiCheatService::AMBIGUOUS_LOCATION, which a refusal's never does, in
+     * any case (AnnounceService rewrites one that would; LIKE ignores case on
+     * most engines). Ask this, or the accepted() scope, rather than testing
+     * the flag and the baseline by hand.
      */
     public static function refused(mixed $flagged, mixed $priorUp, mixed $reason): bool
     {
         return (bool) $flagged
             && $priorUp === null
-            && ! str_starts_with((string) $reason, AntiCheatService::AMBIGUOUS_LOCATION);
+            && stripos((string) $reason, AntiCheatService::AMBIGUOUS_LOCATION) !== 0;
     }
 
     public function wasRefused(): bool

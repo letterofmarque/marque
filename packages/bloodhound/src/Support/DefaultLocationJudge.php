@@ -109,9 +109,9 @@ final class DefaultLocationJudge implements LocationJudge
 
         $limit = (int) config('bloodhound.anti_cheat.dual_stack_gap', 120);
 
-        // 0 turns pairing off. An announced address is stamped with the
-        // moment of its announce, so its gap is always 0, and "<= 0" would
-        // leave exactly that route open.
+        // 0 turns pairing off. An address announced on the client's latest
+        // announce is stamped with that moment, so its gap is 0, and "<= 0"
+        // would leave exactly that route open.
         if ($family === null || $address === null || $limit <= 0) {
             return null;
         }
