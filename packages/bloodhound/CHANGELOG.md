@@ -7,7 +7,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [Unreleased]
+## [11.0.0] — 2026-11-02
 
 > Dual-stack households aren't refused as two locations: an ambiguous location is flagged by default, a daily detector reports account sharing, and locations can be judged by your own LocationJudge.
 

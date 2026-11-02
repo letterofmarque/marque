@@ -11,6 +11,7 @@ changelogs — edit those, not this.*
 ## 2026-11-02
 
 - **[bloodhound 10.2.0](packages/bloodhound/CHANGELOG.md)** — A tracker can take announces over IPv4 only, or IPv6 only (address_families); the other family is told so in a warning, not a failure.
+- **[bloodhound 11.0.0](packages/bloodhound/CHANGELOG.md)** — Dual-stack households aren't refused as two locations: an ambiguous location is flagged by default, a daily detector reports account sharing, and locations can be judged by your own LocationJudge.
 - **[hound 5.3.0](packages/hound/CHANGELOG.md)** — A tracker can take announces over IPv4 only, or IPv6 only (address_families); the other family is told so in a warning, not a failure.
 - **[threepio 4.3.0](packages/threepio/CHANGELOG.md)** — A tracker can tell a client something without failing its announce (`warning message`), and read which address families it accepts from config.
 
