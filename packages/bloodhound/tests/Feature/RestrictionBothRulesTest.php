@@ -34,10 +34,13 @@ beforeEach(function () {
     Event::fake([MemberRestricted::class, StandingRestored::class]);
 
     // The rule starts counting the first time it runs, and only strikes since
-    // then count. Started a day back, as on a tracker already running it: a
+    // then count. Started well back, as on a tracker already running it: a
     // strike planted at now() before the first run otherwise fell a second
     // short when the clock ticked over in between (nightly, MySQL, 2026-10-22).
-    $this->travelTo(now()->subDay());
+    // A fixed date, before every date the tests below travel to: "a day ago"
+    // overtook their 2026-11-01 on 2026-11-02, and their strikes fell before
+    // the rule had started.
+    $this->travelTo('2026-10-01 00:00:00');
     app(HitAndRunEnforcer::class)->since();
     $this->travelBack();
 
