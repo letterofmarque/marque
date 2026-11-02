@@ -224,6 +224,15 @@ test('dual_stack_gap 0 turns pairing off, claims included', function () {
         ->and(ambiguous($this, '-qB4210-friend222222', '2001:db8:9::2', 610))->toHaveKey('failure reason');
 });
 
+// Listed in the README; found missing from it by Job #319's 11.1 check.
+test('a dual-stack client starting over IPv6 beside an IPv4-only one is refused once, then clears', function () {
+    ambiguous($this, '-qB4210-laptop000000', '203.0.113.7', 0);
+
+    expect(ambiguous($this, '-qB4210-desktop00000', '2001:db8:1:2::10', 100))->toHaveKey('failure reason')
+        ->and(ambiguous($this, '-qB4210-desktop00000', '203.0.113.7', 101))->not->toHaveKey('failure reason')
+        ->and(ambiguous($this, '-qB4210-desktop00000', '2001:db8:1:2::10', 1_901, ['event' => '']))->not->toHaveKey('failure reason');
+});
+
 test('the laptop beside a dual-stack client is refused under refuse, as in 10.x', function () {
     config(['bloodhound.anti_cheat.ambiguous_locations' => 'refuse']);
 

@@ -539,6 +539,11 @@ Some household cases are still refused under every setting:
   together again.
 - **A dual-stack laptop starting over IPv6** in the few seconds between the desktop's IPv4
   and IPv6 announces. It clears on its next try.
+- **A dual-stack client starting (or restarting) over IPv6 beside an IPv4-only one.** Its
+  first announce is refused: nothing pairs the IPv4-only client with an IPv6 address. It
+  clears at its IPv4 announce, seconds later, which lands on the other client's place;
+  its next IPv6 announce is then ambiguous. libtorrent's endpoint order varies, so this can
+  happen on any start.
 
 **What `flag` lets through, and what the detector can see.** Under `flag`, a refusal that
 might be a household is accepted, and the flagged row and its event are the trace. Staff
