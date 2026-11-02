@@ -7,6 +7,40 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+> Dual-stack households aren't refused as two locations: an ambiguous location is flagged by default, a daily detector reports account sharing, and locations can be judged by your own LocationJudge.
+
+### Breaking
+
+- **An ambiguous location is accepted and flagged instead of refused**
+  (`anti_cheat.ambiguous_locations`, default `flag`). It's a refusal where the peer only
+  moved across address families from a place the member already uses (#11133). That is a
+  dual-stack client announcing over IPv4 and IPv6 in turn at a house where the member has
+  another client. Set `BLOODHOUND_AMBIGUOUS_LOCATIONS=refuse` to keep 10.x's behaviour.
+
+### Added
+
+- **`anti_cheat.ambiguous_locations`**: `flag` (default) accepts and credits the announce,
+  flags its ledger row ("Ambiguous location") and fires `CheatDetected`
+  (`location_ambiguous`), once a day per peer per torrent. `refuse` refuses it, and
+  `allow` accepts it silently. **`anti_cheat.ambiguous_window`** (3600) is how recent the
+  peer's other-family announce must be.
+- **`bloodhound:detect-location-sharing`**, scheduled daily over the last day. It reports a
+  peer ID going back to a network it left within one family, and an ambiguous link that
+  wasn't sustained while the member had other clients at both ends. Findings are logged
+  and fired as `CheatDetected` (`location_sharing_suspected`). It never refuses or changes
+  a credit.
+- **`Contracts\LocationJudge`**: bind your own to decide where a peer is (by ASN, say).
+  It's asked a `LocationQuestion` and answers a `LocationVerdict` (pass, refuse,
+  ambiguous). `DefaultLocationJudge` is 10.x's rule plus the ambiguous case.
+
+### Fixed
+
+- **A reason longer than the ledger column** (255 characters) is cut to fit instead of
+  failing the announce on MySQL, MariaDB and PostgreSQL. A bound LocationJudge could
+  write one.
+
 ## [10.2.0] — 2026-11-02
 
 > A tracker can take announces over IPv4 only, or IPv6 only (address_families); the other family is told so in a warning, not a failure.

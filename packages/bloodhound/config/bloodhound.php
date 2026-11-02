@@ -401,7 +401,7 @@ return [
         //   'flag'   accept and credit it, flag the ledger row and fire
         //            CheatDetected (location_ambiguous); bloodhound:detect-
         //            location-sharing reports the account sharing pattern
-        //   'refuse' refuse it, as before 10.3 (dual-stack households see a
+        //   'refuse' refuse it, as 10.x did (dual-stack households see a
         //            tracker error on one family)
         //   'allow'  accept it silently
         // Anything else means 'flag'.
