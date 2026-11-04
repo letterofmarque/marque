@@ -173,7 +173,7 @@ test('an enforcement block published before 9.2 gets grace_gb, from BLOODHOUND_R
     config(['bloodhound.enforcement' => ['watch_days' => 7, 'grace_bytes' => 5 * 1024 ** 3, 'exempt_role' => 'admin']]);
 
     try {
-        (fn () => $this->fillEnforcementDefaults())->call(new BloodhoundServiceProvider(app()));
+        (fn () => $this->fillPublishedBlocks())->call(new BloodhoundServiceProvider(app()));
     } finally {
         putenv('BLOODHOUND_RATIO_GRACE_GB');
     }
@@ -181,6 +181,33 @@ test('an enforcement block published before 9.2 gets grace_gb, from BLOODHOUND_R
     expect((int) config('bloodhound.enforcement.grace_gb'))->toBe(20)
         ->and(config('bloodhound.enforcement.watch_days'))->toBe(7)
         ->and(config('bloodhound.enforcement.exempt_role'))->toBe('admin');
+});
+
+// Found by the Marque 12.0 read-through: anti_cheat gained keys in 11.0, and
+// every installer-built tracker has a published config, so
+// BLOODHOUND_AMBIGUOUS_LOCATIONS=refuse did nothing there.
+test('an anti_cheat block published before 11.0 gets the ambiguous keys, from their env vars', function () {
+    putenv('BLOODHOUND_AMBIGUOUS_LOCATIONS=refuse');
+    config(['bloodhound.anti_cheat' => ['enabled' => true, 'max_leeching_locations_per_torrent' => 2]]);
+
+    try {
+        (fn () => $this->fillPublishedBlocks())->call(new BloodhoundServiceProvider(app()));
+    } finally {
+        putenv('BLOODHOUND_AMBIGUOUS_LOCATIONS');
+    }
+
+    expect(config('bloodhound.anti_cheat.ambiguous_locations'))->toBe('refuse')
+        ->and((int) config('bloodhound.anti_cheat.ambiguous_window'))->toBe(3600)
+        ->and((int) config('bloodhound.anti_cheat.dual_stack_gap'))->toBe(120)
+        ->and(config('bloodhound.anti_cheat.max_leeching_locations_per_torrent'))->toBe(2);
+});
+
+test('a list an operator edits is not filled back in', function () {
+    config(['bloodhound.whitelist' => ['qBittorrent' => ['prefix' => '-qB', 'min_version' => '4.0.0', 'blocked_versions' => []]]]);
+
+    (fn () => $this->fillPublishedBlocks())->call(new BloodhoundServiceProvider(app()));
+
+    expect(array_keys(config('bloodhound.whitelist')))->toBe(['qBittorrent']);
 });
 
 test('the shipped config carries grace_gb 5 and no grace_bytes', function () {

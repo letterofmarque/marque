@@ -62,7 +62,7 @@ class BloodhoundServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/bloodhound.php', 'bloodhound');
-        $this->fillEnforcementDefaults();
+        $this->fillPublishedBlocks();
 
         // Register services as singletons
         $this->app->singleton(ClientValidationService::class);
@@ -295,27 +295,36 @@ class BloodhoundServiceProvider extends ServiceProvider
     }
 
     /**
-     * Give a published `enforcement` block the keys it lacks, from the shipped
-     * config, env vars included.
+     * Give a published block the keys it lacks, from the shipped config, env
+     * vars included.
      *
-     * The merge is top-level only, so a config published on 9.0 or 9.1 has an
-     * `enforcement` block without grace_gb, and BLOODHOUND_RATIO_GRACE_GB would
-     * do nothing until the operator edited the file. That would leave the one
-     * setting 9.2 added for operators out of reach of most of them. A key the
-     * file does set always wins. Skipped when the config is cached, as
-     * mergeConfigFrom is: the cache already holds the filled block.
+     * The merge is top-level only, so a config published on an earlier
+     * release has the block without the keys added since, and their env vars
+     * do nothing until the operator edits the file: BLOODHOUND_RATIO_GRACE_GB
+     * (9.2, `enforcement`), BLOODHOUND_AMBIGUOUS_LOCATIONS and its neighbours
+     * (11.0, `anti_cheat`). Every tracker marque:install built has a
+     * published config. A key the file does set always wins. Only these
+     * blocks: a list an operator edits (the client whitelist, say) must not
+     * get back what they removed. Skipped when the config is cached, as
+     * mergeConfigFrom is: the cache already holds the filled blocks.
      */
-    private function fillEnforcementDefaults(): void
+    private function fillPublishedBlocks(): void
     {
         if ($this->app->configurationIsCached()) {
             return;
         }
 
         $shipped = require __DIR__.'/../config/bloodhound.php';
-        $published = config('bloodhound.enforcement');
 
-        if (is_array($published)) {
-            config(['bloodhound.enforcement' => $published + $shipped['enforcement']]);
+        // By name, each: the blocks whose keys grow between releases.
+        $published = ['enforcement' => config('bloodhound.enforcement'), 'anti_cheat' => config('bloodhound.anti_cheat')];
+
+        if (is_array($published['enforcement'])) {
+            config(['bloodhound.enforcement' => $published['enforcement'] + $shipped['enforcement']]);
+        }
+
+        if (is_array($published['anti_cheat'])) {
+            config(['bloodhound.anti_cheat' => $published['anti_cheat'] + $shipped['anti_cheat']]);
         }
     }
 

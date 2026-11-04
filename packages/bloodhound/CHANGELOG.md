@@ -7,6 +7,21 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+> BLOODHOUND_AMBIGUOUS_LOCATIONS works on a tracker with a published config: the anti_cheat keys 11.0 added are filled from the shipped config.
+
+### Fixed
+
+- **`BLOODHOUND_AMBIGUOUS_LOCATIONS`, `BLOODHOUND_AMBIGUOUS_WINDOW` and
+  `BLOODHOUND_DUAL_STACK_GAP` did nothing with a published config** (found by the Marque
+  12.0 read-through). Laravel merges a package config top-level only, so a
+  `config/bloodhound.php` published before 11.0 has an `anti_cheat` block without them,
+  and the code fell back to the defaults. Every tracker `marque:install` built has a
+  published config, so `refuse` couldn't be chosen there. The `anti_cheat` block is now
+  filled from the shipped config, env vars included, as `enforcement` has been since 9.2.
+  A key the file sets still wins, and edited lists (the client whitelist) are left alone.
+
 ## [11.1.1] — 2026-11-02
 
 > A client turning from seeding to leeching beside a dual-stack one isn't refused for an hour; the README lists the household cases still refused once.

@@ -1262,16 +1262,24 @@ One change in default behaviour, which is why it's a major: an ambiguous locatio
 accepted and flagged (`ambiguous_locations=flag`) instead of refused. A dual-stack client
 is no longer refused for switching families. From 11.1, a new client at another client's
 paired address is ambiguous too; see [Ambiguous locations](#anti-cheat) for the cases
-still refused. To keep 10.x's refusals,
-set `BLOODHOUND_AMBIGUOUS_LOCATIONS=refuse`; the detector still runs and reports either
-way.
+still refused. To keep 10.x's refusals, set `BLOODHOUND_AMBIGUOUS_LOCATIONS=refuse`; the
+detector still runs and reports either way. With a published `config/bloodhound.php`
+(every tracker `marque:install` built has one), that works from 11.1.2, which fills the
+`anti_cheat` keys 11.0 added from the shipped config; on 11.0 to 11.1.1, add them to the
+file's `anti_cheat` block yourself.
 
-Nothing else is needed: no migration, and nothing in Redis to clear.
+App code that reads `announce_log` and takes "flagged, with no baseline" for a refusal
+should ask `AnnounceLog::refused()` or use the `accepted()` scope instead: from 11.1 an
+admitted new client's row is flagged and usually has no baseline.
+
+Nothing else is needed beyond [10.1's migration](#upgrading-to-101) if you're coming from
+10.0, and nothing in Redis to clear.
 `bloodhound:detect-location-sharing` is scheduled daily with the rest. Its findings
 arrive as `CheatDetected` events with type `location_sharing_suspected`, and as warnings
 in the log. Listen for them, and for `location_ambiguous`, if you want staff told. If
 you'd set `BLOODHOUND_MAX_LEECHING_LOCATIONS=2` to work around dual-stack refusals, you can
-put it back to 1.
+put it back to 1, knowing the few household cases still refused once (listed under
+[Ambiguous locations](#anti-cheat)).
 
 ## Upgrading to 10.1
 
