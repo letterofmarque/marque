@@ -7,7 +7,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [Unreleased]
+## [11.1.2] — 2026-11-04
 
 > BLOODHOUND_AMBIGUOUS_LOCATIONS works on a tracker with a published config: the anti_cheat keys 11.0 added are filled from the shipped config.
 
