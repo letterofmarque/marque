@@ -6,6 +6,7 @@ namespace Marque\Deck\View\Components;
 
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Route;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Marque\Trove\Registry\NavRegistry;
 
@@ -25,6 +26,15 @@ use Marque\Trove\Registry\NavRegistry;
  */
 class Navigation extends Component
 {
+    /**
+     * Both properties are #[Locked] (#11135). Livewire lets an update request
+     * set any public property that isn't, and these come from config and the
+     * registry, never from the client. Scanners were setting items.0 to an int,
+     * and the view 500'd indexing it; a client could also rewrite its own
+     * labels and links. Locked, Livewire refuses the update before the view
+     * runs: a 419 in production, not a 500.
+     */
+    #[Locked]
     public string $appName;
 
     /**
@@ -37,6 +47,7 @@ class Navigation extends Component
      *
      * @var list<array{identifier: string, label: string, route: string, icon: string|null}>
      */
+    #[Locked]
     public array $items = [];
 
     public function mount(): void

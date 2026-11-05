@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use Marque\Deck\View\Components\Navigation;
 use Marque\Trove\Registry\NavItem;
@@ -40,4 +41,22 @@ describe('navigation rendering', function () {
             ->assertDontSee('Gone Link')
             ->assertSee('Probe Link');
     });
+});
+
+// #11135: scanners posted Livewire updates setting items.0 to an int, and the
+// blade indexing $item['route'] 500'd (402 errors on one production log). The
+// menu comes from the registry, never from the client: Livewire must refuse
+// the update before the view runs.
+describe('navigation state from the client', function () {
+    it('refuses an update to its items', function (string $path, mixed $value) {
+        Livewire::test(Navigation::class)->set($path, $value);
+    })->with([
+        'replace the list' => ['items', 5],
+        'replace an entry' => ['items.0', 5],
+        'rewrite a label' => ['items.0.label', 'Pwned'],
+    ])->throws(CannotUpdateLockedPropertyException::class);
+
+    it('refuses an update to the app name', function () {
+        Livewire::test(Navigation::class)->set('appName', 'Pwned');
+    })->throws(CannotUpdateLockedPropertyException::class);
 });

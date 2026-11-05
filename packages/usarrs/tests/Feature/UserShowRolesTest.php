@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use Marque\Trove\Enums\Role;
 use Marque\Usarrs\Livewire\Admin\UserShow;
@@ -92,3 +93,14 @@ describe('called directly', function () {
         expect($member->fresh()->role)->toBe(Role::Admin);
     });
 });
+
+// #11135's sweep: the user this screen acts on is the route's to say.
+it('refuses a client update to the user it acts on', function () {
+    $admin = TestUser::factory()->admin()->create();
+    $member = TestUser::factory()->create();
+    $other = TestUser::factory()->create();
+
+    Livewire::actingAs($admin)
+        ->test(UserShow::class, ['user' => $member->id])
+        ->set('userId', $other->id);
+})->throws(CannotUpdateLockedPropertyException::class);

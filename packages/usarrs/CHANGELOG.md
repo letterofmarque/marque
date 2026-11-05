@@ -7,6 +7,17 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+> The admin user screen's subject comes from its URL only.
+
+### Fixed
+
+- **`Admin\UserShow`'s `$userId` is `#[Locked]`** (#11135's sweep). A crafted Livewire
+  update could swap the user the screen acts on. Every action already re-checks the policy
+  against the actor, so this gained nothing an admin couldn't do at that user's URL, but the
+  screen's subject is the route's to say.
+
 ## [9.0.0] — 2026-10-28
 
 > Staff are managed from above: only an owner manages admins and grants Admin or Owner, nobody acts on themselves, the last owner can't be demoted, and usarrs:owner sets the first.

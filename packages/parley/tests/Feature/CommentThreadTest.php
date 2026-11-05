@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use Marque\Parley\Exceptions\ThreadLockedException;
 use Marque\Parley\Exceptions\TooManyPostsException;
@@ -318,4 +319,59 @@ describe('CommentThread', function () {
             ->call('submit'))
             ->not->toThrow(TooManyPostsException::class);
     });
+});
+
+// #11135's sweep: a CommentThread acts on its own thread and nothing else. The
+// thread it posts into and the post being replied to or edited were plain public
+// properties, so a crafted Livewire update could point submit() at any thread
+// in the database; and startReply() took any post id, so a reply landed in that
+// post's thread, wherever it was.
+describe('CommentThread state from the client', function () {
+    it('refuses an update to the state that says which thread and post it acts on', function (string $property) {
+        $thread = Thread::factory()->create();
+
+        Livewire::actingAs(TestUser::factory()->create())
+            ->test(CommentThread::class, ['thread' => $thread])
+            ->set($property, 999);
+    })->with(['threadId', 'replyingTo', 'editingPost'])
+        ->throws(CannotUpdateLockedPropertyException::class);
+
+    it('refuses to reply to a post in another thread, and posts nothing there', function () {
+        $user = TestUser::factory()->create();
+        $here = Thread::factory()->create();
+        $elsewhere = Thread::factory()->create();
+        $foreign = Post::factory()->inThread($elsewhere)->create();
+
+        Livewire::actingAs($user)
+            ->test(CommentThread::class, ['thread' => $here])
+            ->call('startReply', $foreign->id)
+            ->assertNotFound();
+
+        expect($elsewhere->posts()->count())->toBe(1)
+            ->and($here->posts()->count())->toBe(0);
+    });
+
+    it('refuses to reply before its thread exists, when no post can be in it', function () {
+        $user = TestUser::factory()->create();
+        $subject = TestSubject::create(['name' => 'nobody has commented']);
+        $foreign = Post::factory()->inThread(Thread::factory()->create())->create();
+
+        Livewire::actingAs($user)
+            ->test(CommentThread::class, ['subject' => $subject])
+            ->call('startReply', $foreign->id)
+            ->assertNotFound();
+    });
+
+    it('refuses to edit or delete a post in another thread, even one the user wrote', function (string $method) {
+        $user = TestUser::factory()->create();
+        $here = Thread::factory()->create();
+        $theirs = Post::factory()->inThread(Thread::factory()->create())->create(['user_id' => $user->id]);
+
+        Livewire::actingAs($user)
+            ->test(CommentThread::class, ['thread' => $here])
+            ->call($method, $theirs->id)
+            ->assertNotFound();
+
+        expect(Post::query()->find($theirs->id))->not->toBeNull();
+    })->with(['startEdit', 'delete']);
 });

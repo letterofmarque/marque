@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use Marque\Bosun\Livewire\Staff;
 use Marque\Bosun\Models\StaffActionEntry;
@@ -131,3 +132,10 @@ describe('changing a role', function () {
 it('refuses a moderator', function () {
     Livewire::actingAs($this->moderator)->test(Staff::class)->assertForbidden();
 });
+
+// #11135's sweep: whose role is changing is set by startChange(), not the client.
+it('refuses a client update to the member being changed', function () {
+    Livewire::actingAs($this->owner)
+        ->test(Staff::class)
+        ->set('changing', $this->member->id);
+})->throws(CannotUpdateLockedPropertyException::class);

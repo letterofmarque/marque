@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Marque\SquidInk\Livewire;
 
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Marque\SquidInk\Editor\Toolbar;
 use Marque\SquidInk\SquidInk;
@@ -22,18 +23,30 @@ use Marque\SquidInk\SquidInk;
  */
 class Editor extends Component
 {
+    /*
+     * Only $value is the author's to change. The rest is set by the page at
+     * mount, or by togglePreview(), so it's #[Locked] (#11135's sweep).
+     * Unlocked, a crafted update naming a parser that doesn't exist would make
+     * the preview throw, a 500 from input.
+     */
+    #[Locked]
     public string $name = 'body';
 
     public string $value = '';
 
+    #[Locked]
     public ?string $parser = null;
 
+    #[Locked]
     public int $rows = 12;
 
+    #[Locked]
     public ?string $label = null;
 
+    #[Locked]
     public ?string $placeholder = null;
 
+    #[Locked]
     public bool $showPreview = false;
 
     public function mount(

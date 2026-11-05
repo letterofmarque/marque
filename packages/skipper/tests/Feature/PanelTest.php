@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
+use Livewire\Livewire;
 use Marque\Skipper\Livewire\Panel;
 use Marque\Skipper\Tests\TestUser;
 use Marque\Trove\Enums\Role;
@@ -142,4 +144,20 @@ describe('the admin panel', function () {
             ->assertSee('have no route to reach them')
             ->assertDontSee('No admin screens are registered yet');
     });
+});
+
+// #11135's sweep: the tiles come from the registry, never from the client.
+describe('the panel state from the client', function () {
+    it('refuses an update to it', function (string $property, mixed $value) {
+        // An empty registry still renders the panel; the lock refuses the
+        // update before anything reads it.
+        Livewire::actingAs(TestUser::factory()->create(['role' => Role::Admin->value]))
+            ->test(Panel::class)
+            ->set($property, $value);
+    })->with([
+        'title' => ['title', 'Pwned'],
+        'groups' => ['groups', 5],
+        'a tile' => ['groups.General.0.url', 'https://example.com'],
+        'unroutable' => ['unroutable', true],
+    ])->throws(CannotUpdateLockedPropertyException::class);
 });

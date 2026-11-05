@@ -5,6 +5,17 @@ All notable changes to `marque/skipper` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
+## [Unreleased]
+
+> A crafted Livewire request can no longer rewrite the admin panel's tiles.
+
+### Fixed
+
+- **`Panel`'s `$title`, `$groups` and `$unroutable` are `#[Locked]`** (#11135's sweep).
+  They come from config and the screen registry, but as unlocked public properties a crafted
+  Livewire update could rewrite this viewer's tiles (labels, links), or make the view 500 on
+  a malformed group. This is the same shape as deck's `Navigation`.
+
 ## [1.1.0] — 2026-10-28
 
 > Works with trove 5.0 as well as 4.x, and requires the trove 4.2 it was always built on.

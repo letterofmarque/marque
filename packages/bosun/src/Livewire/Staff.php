@@ -8,6 +8,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Marque\Bosun\Models\StaffPresence;
 use Marque\Bosun\Services\AuditLog;
@@ -27,6 +28,12 @@ use Marque\Usarrs\Services\UserAdminService;
  */
 class Staff extends Component
 {
+    /**
+     * The member whose role is being changed. Set by startChange(), never by
+     * the client, so it's #[Locked] (#11135's sweep). applyChange() checks the
+     * policy either way.
+     */
+    #[Locked]
     public ?int $changing = null;
 
     public string $role = '';

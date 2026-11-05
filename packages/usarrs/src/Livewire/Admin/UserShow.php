@@ -7,6 +7,7 @@ namespace Marque\Usarrs\Livewire\Admin;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Gate;
+use Livewire\Attributes\Locked;
 use Marque\Trove\Contracts\UserInterface;
 use Marque\Trove\Enums\Role;
 use Marque\Usarrs\Enums\UserStatus;
@@ -17,6 +18,12 @@ class UserShow extends Component
 {
     use AuthorizesRequests;
 
+    /**
+     * The user this page is about, from its route. #[Locked] (#11135's sweep):
+     * the actions re-check the policy, so swapping it gains nothing, but the
+     * page's subject is the URL's to say, not the client's.
+     */
+    #[Locked]
     public int $userId;
 
     public function mount(int $user): void

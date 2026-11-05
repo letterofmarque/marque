@@ -123,7 +123,7 @@ describe('posts', function () {
     it('records through the comment thread screen', function () {
         Livewire::actingAs($this->moderator)
             ->test(CommentThread::class, ['thread' => $this->thread])
-            ->set('editingPost', $this->post->id)
+            ->call('startEdit', $this->post->id)
             ->set('editingBody', 'Cleaned up')
             ->call('saveEdit')
             ->call('delete', $this->post->id);

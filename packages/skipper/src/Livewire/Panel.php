@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Marque\Skipper\Livewire;
 
 use Illuminate\Contracts\View\View;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Marque\Skipper\Support\OwnRoutes;
 use Marque\Trove\Enums\Role;
@@ -24,6 +25,13 @@ use Marque\Trove\Registry\AdminScreenRegistry;
  */
 class Panel extends Component
 {
+    /**
+     * Every property here is #[Locked] (#11135's sweep): they come from config
+     * and the registry, never from the client. Unlocked, a crafted Livewire
+     * update could rewrite this viewer's tiles (labels, links) or make the view
+     * 500 on a malformed group.
+     */
+    #[Locked]
     public string $title = '';
 
     /**
@@ -36,12 +44,14 @@ class Panel extends Component
      *
      * @var array<string, list<array{identifier: string, label: string, route: string, icon: string|null}>>
      */
+    #[Locked]
     public array $groups = [];
 
     /**
      * Whether screens open to this viewer exist but none has a route, so the
      * empty state can say so rather than claim nothing is registered.
      */
+    #[Locked]
     public bool $unroutable = false;
 
     public function mount(): void

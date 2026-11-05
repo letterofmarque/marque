@@ -5,6 +5,17 @@ All notable changes to `marque/squidink` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
+## [Unreleased]
+
+> The Livewire editor's settings can't be changed from the client; a bogus parser name no longer makes the preview 500.
+
+### Fixed
+
+- **The Livewire `Editor`'s settings are `#[Locked]`** (#11135's sweep): `$name`,
+  `$parser`, `$rows`, `$label`, `$placeholder` and `$showPreview`. Only `$value` is the
+  author's to change. Before, a crafted Livewire update naming a parser that doesn't exist
+  made the preview throw, a 500 from input.
+
 ## [1.1.4] — 2026-10-28
 
 > Ships its MIT licence, and the README and editor comments name deck rather than id.

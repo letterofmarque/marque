@@ -5,6 +5,16 @@ All notable changes to `marque/bosun` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
+## [Unreleased]
+
+> The staff screen's member-being-changed can't be set from the client.
+
+### Fixed
+
+- **`Staff`'s `$changing` is `#[Locked]`** (#11135's sweep). It is set by `startChange()`.
+  `applyChange()` already re-checked the policy, so a crafted update gained nothing, but the
+  client has no business setting it.
+
 ## [1.0.0] — 2026-10-28
 
 > New: staff management. A record of every staff action, when each staff member was last on, and the owner's Staff and Audit log screens.

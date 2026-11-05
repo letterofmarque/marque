@@ -8,6 +8,18 @@ those versions describe the package under its former names.*
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
+## [Unreleased]
+
+> A crafted Livewire request can no longer make the navigation 500, or rewrite its links.
+
+### Fixed
+
+- **`Navigation`'s `$items` and `$appName` are `#[Locked]`** (#11135). Livewire lets an
+  update request set any public property that isn't locked. Scanners were setting `items.0`
+  to an int, and the view 500'd indexing it: 402 errors in one production log since
+  September, burying real ones. A client could also rewrite its own nav labels and links for
+  that render. Livewire now refuses the update before the view runs: a 419 in production.
+
 ## [2.2.0] — 2026-10-28
 
 > Works with trove 5.0 as well as 4.x, and ships the icons packages register for admin screens and dashboard panels.

@@ -48,12 +48,23 @@ class CommentThread extends Component
     #[Locked]
     public ?Model $subject = null;
 
+    /**
+     * Which thread this component acts on, and which of its posts is being
+     * replied to or edited. All #[Locked]: they're set here, never by the
+     * client. Unlocked, a crafted Livewire update could point submit() at any
+     * thread in the database (#11135's sweep). Each post id is also checked
+     * against this thread where it arrives (postInThisThread()), because an
+     * action's argument is client input too.
+     */
+    #[Locked]
     public ?int $threadId = null;
 
     public string $body = '';
 
+    #[Locked]
     public ?int $replyingTo = null;
 
+    #[Locked]
     public ?int $editingPost = null;
 
     public string $editingBody = '';
@@ -95,7 +106,7 @@ class CommentThread extends Component
                 // thread — so this goes through PostService::reply() rather
                 // than resolveThread(). Simpler, and correct for both mount
                 // shapes without needing to know which one this is.
-                $parent = Post::query()->findOrFail($this->replyingTo);
+                $parent = $this->postInThisThread($this->replyingTo);
                 $post = $this->postService()->reply($parent, $user, $data['body']);
                 $this->threadId = $post->thread_id;
             } else {
@@ -119,7 +130,7 @@ class CommentThread extends Component
 
     public function startReply(int $postId): void
     {
-        $this->replyingTo = $postId;
+        $this->replyingTo = $this->postInThisThread($postId)->getKey();
         $this->editingPost = null;
     }
 
@@ -130,7 +141,7 @@ class CommentThread extends Component
 
     public function startEdit(int $postId): void
     {
-        $post = Post::query()->findOrFail($postId);
+        $post = $this->postInThisThread($postId);
 
         $this->authorize('update', $post);
 
@@ -146,7 +157,7 @@ class CommentThread extends Component
 
     public function saveEdit(): void
     {
-        $post = Post::query()->findOrFail($this->editingPost);
+        $post = $this->postInThisThread($this->editingPost);
 
         $this->authorize('update', $post);
 
@@ -159,7 +170,7 @@ class CommentThread extends Component
 
     public function delete(int $postId): void
     {
-        $post = Post::query()->findOrFail($postId);
+        $post = $this->postInThisThread($postId);
 
         $this->authorize('delete', $post);
 
@@ -235,6 +246,21 @@ class CommentThread extends Component
         $this->threadId = $thread->getKey();
 
         return $thread;
+    }
+
+    /**
+     * A post of this component's thread, or a 404. Before the thread exists
+     * nothing is in it, so every id is refused.
+     */
+    private function postInThisThread(?int $postId): Post
+    {
+        $post = $this->threadId === null || $postId === null
+            ? null
+            : Post::query()->where('thread_id', $this->threadId)->find($postId);
+
+        abort_if($post === null, 404);
+
+        return $post;
     }
 
     private function existingThread(): ?Thread

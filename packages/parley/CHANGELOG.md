@@ -5,6 +5,20 @@ All notable changes to `marque/parley` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
+## [Unreleased]
+
+> A comment thread acts on its own thread only: a crafted request can't post a comment or reply into another one.
+
+### Security
+
+- **`CommentThread` could be pointed at any thread** (found by #11135's sweep). Its
+  `$threadId`, `$replyingTo` and `$editingPost` were plain public properties, so a crafted
+  Livewire update could set `threadId` and post a comment into any thread in the database.
+  `startReply()` also took any post id, so a reply landed in that post's thread, wherever it
+  was. All three are `#[Locked]` now, and every post id the component is handed (reply,
+  edit, delete) must belong to its own thread, or it answers 404. Edits and deletes already
+  checked the policy, so they gained nothing: they're scoped for consistency.
+
 ## [4.0.0] — 2026-10-28
 
 > Moderation is recorded as staff actions: pinning and locking, and deleting or editing someone else's thread or post.
