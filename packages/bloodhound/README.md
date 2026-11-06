@@ -1202,8 +1202,9 @@ or `--all` for everyone reconcile reports.
 php artisan bloodhound:accept-totals --user=42 --by=1 --reason="Imported from the old tracker"
 ```
 
-It refuses when a member's own totals are below what their torrents add up to by more than
-torrent 0 holds. Those totals contradict each other, so a rebuild is the fix.
+It refuses a member whose own totals are below what the ledger explains for their torrents,
+by more than torrent 0 holds. Those totals contradict each other, so a rebuild is the fix.
+Under `--all` such a member is listed and skipped, and everyone else is accepted.
 
 **`bloodhound:adjust-totals`: give or take an amount.** The adjustment and the totals
 move together, the way the aggregator moves them. Amounts are whole bytes or seconds,
@@ -1213,8 +1214,10 @@ signed; `--torrent=` defaults to 0, the member as a whole.
 php artisan bloodhound:adjust-totals 42 --torrent=17 --uploaded=8000000000 --by=1 --reason="Speed forfeit was a false positive"
 ```
 
-Nothing goes below zero. Take credit back from the torrent it's on: torrent 0 holds only
-what's on the member as a whole.
+Nothing goes below zero, on either side: not the stored totals, and not what the ledger
+explains for the torrent, which is what a rebuild would write. Take credit back from the
+torrent it's on: torrent 0 holds only what's on the member as a whole. If a stored total
+is more than the ledger explains, accept it first, then debit it.
 
 **Adjustments are never edited or deleted.** A wrong one is answered by another, signed
 the other way, so the record of what was decided and by whom survives the correction.

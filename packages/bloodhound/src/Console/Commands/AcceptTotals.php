@@ -6,6 +6,7 @@ namespace Marque\Bloodhound\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 use Marque\Bloodhound\Console\Commands\Concerns\RecordsLedgerAdjustments;
 use Marque\Bloodhound\Services\LedgerAdjuster;
 use Marque\Bloodhound\Services\LedgerAuditor;
@@ -59,14 +60,43 @@ class AcceptTotals extends Command
         $users = $this->option('all') ? $this->drifting($auditor) : [(int) $this->option('user')];
 
         $gaps = [];
+        $refused = [];
 
         foreach ($users as $userId) {
-            foreach ($adjuster->gaps($userId) as $gap) {
+            try {
+                $preview = $adjuster->preview($userId);
+            } catch (InvalidArgumentException $e) {
+                $this->error($e->getMessage());
+
+                return self::FAILURE;
+            }
+
+            if ($preview['refusal'] !== null) {
+                $refused[$userId] = $preview['refusal'];
+            }
+
+            foreach ($preview['gaps'] as $gap) {
                 $gaps[] = $gap;
             }
         }
 
+        // A member accept would refuse is shown and skipped, never written
+        // halfway through a run (found by the Job #213 check).
+        foreach ($refused as $userId => $why) {
+            $this->warn("Skipping member {$userId}: {$why}");
+        }
+
+        if (! $this->option('all') && $refused !== []) {
+            return self::FAILURE;
+        }
+
         if ($gaps === []) {
+            if ($refused !== []) {
+                $this->line('Nothing else to accept.');
+
+                return self::FAILURE;
+            }
+
             $this->info('The ledger already explains these totals: nothing to accept.');
 
             return self::SUCCESS;
@@ -91,17 +121,29 @@ class AcceptTotals extends Command
         }
 
         $written = 0;
+        $accepted = 0;
 
         foreach ($members as $userId) {
-            $rows = $adjuster->accept($userId, $by, $reason);
+            // Measured again under the lock: a fold or a rebuild between the
+            // preview and here can change the answer for one member, and that
+            // member alone is skipped.
+            try {
+                $rows = $adjuster->accept($userId, $by, $reason);
+            } catch (InvalidArgumentException $e) {
+                $this->warn("Skipping member {$userId}: {$e->getMessage()}");
+
+                continue;
+            }
+
             $written += count($rows);
+            $accepted += $rows === [] ? 0 : 1;
 
             if ($rows !== []) {
                 Log::warning("bloodhound ledger adjustment — user {$userId}: stored totals accepted as correct (".count($rows)." row(s)) by user {$by}: {$reason}");
             }
         }
 
-        $this->info("Recorded {$written} adjustment(s) for ".count($members).' member(s).');
+        $this->info("Recorded {$written} adjustment(s) for {$accepted} member(s).");
 
         return self::SUCCESS;
     }

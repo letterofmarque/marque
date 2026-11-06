@@ -165,6 +165,33 @@ describe('accept', function () {
         expect(LedgerAdjustment::query()->count())->toBe(0);
     });
 
+    // The ledger explains a pair that has no torrent_user row, and the
+    // member's lower stored total is said to be right. The message names what
+    // the ledger explains, which holds here too.
+    it('names what the ledger explains when a pair has no row', function () {
+        folded($this->member, $this->torrent, 3_000);
+        app(LedgerAggregator::class)->run();
+        TorrentUser::query()->delete();
+        DB::table($this->member->getTable())->where('id', $this->member->id)->update(['uploaded' => 0]);
+
+        expect(fn () => app(LedgerAdjuster::class)->accept($this->member->id, by: $this->admin->id, reason: 'r'))
+            ->toThrow(InvalidArgumentException::class, 'below what the ledger explains for their torrents');
+    });
+
+    it('previews a refusal instead of gaps', function () {
+        storeTotals($this->member, $this->torrent, ['uploaded' => 5_000]);
+        DB::table($this->member->getTable())->where('id', $this->member->id)->update(['uploaded' => 1_000]);
+
+        $preview = app(LedgerAdjuster::class)->preview($this->member->id);
+
+        expect($preview['refusal'])->toContain('rebuild-totals')
+            ->and($preview['gaps'])->toBe([]);
+    });
+
+    it('refuses to preview a member who is nobody', function () {
+        app(LedgerAdjuster::class)->preview(999_999);
+    })->throws(InvalidArgumentException::class, 'member');
+
     // The same contradiction with no torrent-0 row: recording it would leave
     // torrent 0's credit negative, which a rebuild writes as a negative row.
     it('refuses when torrent 0 would be left negative with no row of its own', function () {
@@ -282,6 +309,29 @@ describe('adjust', function () {
 
         expect(LedgerAdjustment::query()->count())->toBe(0)
             ->and(memberTotals($this->member)['uploaded'])->toBe(500);
+    });
+
+    // The ledger side matters as well as the stored side: a rebuild writes
+    // what the ledger explains for the pair, so a debit beyond it would be
+    // rebuilt as a negative total, into an unsigned column (found by the
+    // Job #213 check).
+    it('refuses a debit beyond what the ledger explains for the pair, even when the stored total covers it', function () {
+        storeTotals($this->member, $this->torrent, ['uploaded' => 100]);
+
+        expect(fn () => app(LedgerAdjuster::class)->adjust($this->member->id, $this->torrent->id, ['uploaded' => -60], by: $this->admin->id, reason: 'r'))
+            ->toThrow(InvalidArgumentException::class, 'accept-totals');
+
+        expect(LedgerAdjustment::query()->count())->toBe(0);
+    });
+
+    it('allows the same debit once the stored total is accepted', function () {
+        storeTotals($this->member, $this->torrent, ['uploaded' => 100]);
+        app(LedgerAdjuster::class)->accept($this->member->id, by: $this->admin->id, reason: 'Import');
+
+        app(LedgerAdjuster::class)->adjust($this->member->id, $this->torrent->id, ['uploaded' => -60], by: $this->admin->id, reason: 'r');
+        app(LedgerRebuilder::class)->rebuild();
+
+        expect(memberTotals($this->member)['uploaded'])->toBe(40);
     });
 
     it('refuses an adjustment that moves nothing', function () {

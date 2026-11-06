@@ -77,6 +77,43 @@ describe('bloodhound:accept-totals', function () {
             ->and(app(LedgerAuditor::class)->reconcile()->hasDrift())->toBeFalse();
     });
 
+    // Found by the Job #213 check: one refused member stopped --all midway,
+    // after the members before it were written. A refused member is shown in
+    // the preview and skipped; everyone else is accepted.
+    it('skips and reports a member it would refuse, under --all, and accepts the rest', function () {
+        $contradicted = TestUser::create(['name' => 'Odd', 'email' => 'cmd-odd@example.com', 'password' => 'p']);
+        $later = TestUser::create(['name' => 'Later', 'email' => 'cmd-later@example.com', 'password' => 'p']);
+        importedTotals($this->member, $this->torrent, 5_000);
+        importedTotals($contradicted, $this->torrent, 5_000);
+        DB::table($contradicted->getTable())->where('id', $contradicted->id)->update(['uploaded' => 1_000]);
+        importedTotals($later, $this->torrent, 3_000);
+
+        $this->artisan('bloodhound:accept-totals', ['--all' => true, '--by' => $this->admin->id, '--reason' => 'Import', '--force' => true])
+            ->expectsOutputToContain("member {$contradicted->id}")
+            ->expectsOutputToContain('Recorded 2 adjustment(s) for 2 member(s)')
+            ->assertSuccessful();
+
+        expect(LedgerAdjustment::query()->where('user_id', $contradicted->id)->count())->toBe(0)
+            ->and(LedgerAdjustment::query()->where('user_id', $later->id)->count())->toBe(1);
+    });
+
+    it('refuses one member it would refuse, and writes nothing', function () {
+        importedTotals($this->member, $this->torrent, 5_000);
+        DB::table($this->member->getTable())->where('id', $this->member->id)->update(['uploaded' => 1_000]);
+
+        $this->artisan('bloodhound:accept-totals', ['--user' => $this->member->id, '--by' => $this->admin->id, '--reason' => 'Import', '--force' => true])
+            ->expectsOutputToContain('rebuild-totals')
+            ->assertFailed();
+
+        expect(LedgerAdjustment::query()->count())->toBe(0);
+    });
+
+    it('refuses a member who is nobody', function () {
+        $this->artisan('bloodhound:accept-totals', ['--user' => 999_999, '--by' => $this->admin->id, '--reason' => 'Import'])
+            ->expectsOutputToContain('No member has id [999999]')
+            ->assertFailed();
+    });
+
     it('says so when there is nothing to accept', function () {
         $this->artisan('bloodhound:accept-totals', ['--user' => $this->member->id, '--by' => $this->admin->id, '--reason' => 'Imported'])
             ->expectsOutputToContain('nothing to accept')
@@ -122,14 +159,15 @@ describe('bloodhound:adjust-totals', function () {
         expect((int) DB::table($this->member->getTable())->where('id', $this->member->id)->value('uploaded'))->toBe(13_000);
     });
 
-    it('takes a negative amount', function () {
+    it('takes a negative amount, from a total the ledger explains', function () {
         importedTotals($this->member, $this->torrent, 5_000);
+        $this->artisan('bloodhound:accept-totals', ['--user' => $this->member->id, '--by' => $this->admin->id, '--reason' => 'Imported', '--force' => true]);
 
         $this->artisan('bloodhound:adjust-totals', [
             'user' => $this->member->id, '--torrent' => $this->torrent->id, '--uploaded' => '-1000', '--by' => $this->admin->id, '--reason' => 'Double-counted', '--force' => true,
         ])->assertSuccessful();
 
-        expect(LedgerAdjustment::query()->sole()->only(['torrent_id', 'uploaded']))->toBe(['torrent_id' => $this->torrent->id, 'uploaded' => -1_000]);
+        expect(LedgerAdjustment::query()->latest('id')->first()->only(['torrent_id', 'uploaded']))->toBe(['torrent_id' => $this->torrent->id, 'uploaded' => -1_000]);
     });
 
     it('adjusts the member as a whole by default', function () {

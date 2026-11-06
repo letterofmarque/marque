@@ -27,7 +27,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   commands show what they will write and ask first (`--force` for scripts), log a warning,
   and record a staff action (`bloodhound.ledger.accepted` / `.adjusted`). Adjustments are
   append-only: a wrong one is answered by another, signed the other way. Nothing goes below
-  zero. Reconcile, rebuild and the upgrade-time gap finders read adjustments with the rest
+  zero, neither a stored total nor what the ledger explains (which a rebuild would write).
+  Under `--all`, a member whose totals contradict each other is listed and skipped. Reconcile, rebuild and the upgrade-time gap finders read adjustments with the rest
   of the ledger (one definition, `LedgerExtras`), so reconcile is clean afterwards, a
   rebuild keeps the result, and nothing is carried twice. Run `migrate`.
 - **A 4.1.0 install that ran the queued announce log can settle its pre-ledger totals**

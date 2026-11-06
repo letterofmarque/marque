@@ -43,14 +43,17 @@ class LedgerAdjuster
     ) {}
 
     /**
-     * What accept() would write for this member, without writing it: the
-     * signed gap per torrent, and the member-level remainder on torrent 0.
+     * What accept() would do for this member, without doing it: the signed gap
+     * per torrent and the member-level remainder on torrent 0, or why it would
+     * refuse (and then no gaps).
      *
-     * @return list<array{user_id: int, torrent_id: int, uploaded: int, downloaded: int, seedtime: int, leechtime: int}>
+     * @return array{gaps: list<array{user_id: int, torrent_id: int, uploaded: int, downloaded: int, seedtime: int, leechtime: int}>, refusal: string|null}
      */
-    public function gaps(int $userId): array
+    public function preview(int $userId): array
     {
-        return $this->measure($userId)['gaps'];
+        $measured = $this->measure($userId);
+
+        return ['gaps' => $measured['refusal'] === null ? $measured['gaps'] : [], 'refusal' => $measured['refusal']];
     }
 
     /**
@@ -70,15 +73,8 @@ class LedgerAdjuster
                 return [];
             }
 
-            // A rebuild's job, not an operator's: the member's own totals are
-            // below what their torrents add up to, by more than torrent 0
-            // holds, so the projections contradict each other. Recording it
-            // would leave torrent 0's credit negative, which a rebuild writes
-            // as a negative torrent_user row, into an unsigned column.
-            foreach (self::TOTALS as $column) {
-                if ($measured['torrentZero'][$column] < 0) {
-                    throw new InvalidArgumentException("This member's {$column} is below what their torrents add up to: the totals contradict each other. Run bloodhound:rebuild-totals --user={$userId} instead.");
-                }
+            if ($measured['refusal'] !== null) {
+                throw new InvalidArgumentException($measured['refusal']);
             }
 
             $written = [];
@@ -142,6 +138,7 @@ class LedgerAdjuster
 
         return $this->locked(function () use ($userId, $torrentId, $amounts, $by, $reason): LedgerAdjustment {
             $member = $this->memberTotals($userId);
+            $explained = $this->explainedPerTorrent($userId)[$torrentId] ?? [];
             $pair = (array) (DB::table('torrent_user')->where('user_id', $userId)->where('torrent_id', $torrentId)->first(self::TOTALS) ?? []);
 
             foreach (self::TOTALS as $column) {
@@ -156,6 +153,15 @@ class LedgerAdjuster
                     throw new InvalidArgumentException($torrentId === 0
                         ? "That would take {$column} below zero on torrent 0, the member as a whole: debit the torrent the credit is on instead (--torrent=<id>)."
                         : "That would take {$column} below zero on torrent {$torrentId}.");
+                }
+
+                // And on the ledger's side (found by the Job #213 check): a
+                // rebuild writes what the ledger explains for the pair, so a
+                // debit beyond it would be rebuilt as a negative total. Where
+                // the stored total is more than the ledger explains, that
+                // gap is accepted first, and then it can be debited.
+                if (($explained[$column] ?? 0) + $amounts[$column] < 0) {
+                    throw new InvalidArgumentException("That would take what the ledger explains for {$column} on torrent {$torrentId} below zero, and a rebuild would write it as a negative total. If the stored total is right, record it with bloodhound:accept-totals --user={$userId} first.");
                 }
             }
 
@@ -182,38 +188,16 @@ class LedgerAdjuster
     }
 
     /**
-     * The member's gaps against what the ledger explains: folded rows (up to
-     * the watermark, as reconcile counts them; a backlog is not drift) plus
-     * carry and adjustments.
+     * The member's gaps against what the ledger explains, and whether accept()
+     * would refuse.
      *
-     * @return array{gaps: list<array{user_id: int, torrent_id: int, uploaded: int, downloaded: int, seedtime: int, leechtime: int}>, remainder: array<string, int>|null, zeroRow: int|null, explained: array<string, int>, torrentZero: array<string, int>}
+     * @return array{gaps: list<array{user_id: int, torrent_id: int, uploaded: int, downloaded: int, seedtime: int, leechtime: int}>, remainder: array<string, int>|null, zeroRow: int|null, explained: array<string, int>, refusal: string|null}
      */
     private function measure(int $userId): array
     {
         $zero = array_fill_keys(self::TOTALS, 0);
-
-        /** @var array<int, array<string, int>> $expected per torrent */
-        $expected = [];
-
-        $sums = AnnounceLog::query()
-            ->where('id', '<=', LedgerCursor::positionFor(LedgerAggregator::STREAM))
-            ->where('user_id', $userId)
-            ->groupBy('torrent_id')
-            ->selectRaw('torrent_id, SUM(upload_delta) as uploaded, SUM(download_delta) as downloaded, SUM(seed_seconds) as seedtime, SUM(leech_seconds) as leechtime')
-            ->toBase()
-            ->get();
-
-        foreach ($sums as $row) {
-            foreach (self::TOTALS as $column) {
-                $expected[(int) $row->torrent_id][$column] = ($expected[(int) $row->torrent_id][$column] ?? 0) + (int) $row->{$column};
-            }
-        }
-
-        foreach ($this->extras->perPair($userId) as $extra) {
-            foreach (self::TOTALS as $column) {
-                $expected[$extra['torrent_id']][$column] = ($expected[$extra['torrent_id']][$column] ?? 0) + $extra[$column];
-            }
-        }
+        $member = $this->memberTotals($userId);
+        $expected = $this->explainedPerTorrent($userId);
 
         $explained = $zero;
 
@@ -244,7 +228,6 @@ class LedgerAdjuster
 
         // What the member's own totals hold beyond every pair's: torrent 0,
         // the precedent the opening balances set.
-        $member = $this->memberTotals($userId);
         $remainder = [];
 
         foreach (self::TOTALS as $column) {
@@ -259,12 +242,20 @@ class LedgerAdjuster
             }
         }
 
-        // What torrent 0 would hold afterwards: what a rebuild would write to
-        // its torrent_user row.
-        $torrentZero = $zero;
+        // A rebuild's job, not an operator's: the member's own totals are
+        // below what the ledger explains for their torrents, by more than
+        // torrent 0 holds, so the projections contradict each other.
+        // Recording it would leave torrent 0's credit negative, which a
+        // rebuild writes as a negative torrent_user row, into an unsigned
+        // column.
+        $refusal = null;
 
         foreach (self::TOTALS as $column) {
-            $torrentZero[$column] = ($expected[0][$column] ?? 0) + ($gaps[0][$column] ?? 0);
+            if (($expected[0][$column] ?? 0) + ($gaps[0][$column] ?? 0) < 0) {
+                $refusal = "This member's {$column} is below what the ledger explains for their torrents: the totals contradict each other. Run bloodhound:rebuild-totals --user={$userId} instead.";
+
+                break;
+            }
         }
 
         $written = [];
@@ -277,7 +268,41 @@ class LedgerAdjuster
             $written[] = ['user_id' => $userId, 'torrent_id' => $torrent] + $amounts + $zero;
         }
 
-        return ['gaps' => $written, 'remainder' => $remainder, 'zeroRow' => $zeroRow, 'explained' => $explained, 'torrentZero' => $torrentZero];
+        return ['gaps' => $written, 'remainder' => $remainder, 'zeroRow' => $zeroRow, 'explained' => $explained, 'refusal' => $refusal];
+    }
+
+    /**
+     * What the ledger explains for each of the member's torrents: folded rows
+     * (up to the watermark, as reconcile counts them; a backlog is not drift)
+     * plus carry and adjustments. This is what a rebuild would write.
+     *
+     * @return array<int, array<string, int>>
+     */
+    private function explainedPerTorrent(int $userId): array
+    {
+        $expected = [];
+
+        $sums = AnnounceLog::query()
+            ->where('id', '<=', LedgerCursor::positionFor(LedgerAggregator::STREAM))
+            ->where('user_id', $userId)
+            ->groupBy('torrent_id')
+            ->selectRaw('torrent_id, SUM(upload_delta) as uploaded, SUM(download_delta) as downloaded, SUM(seed_seconds) as seedtime, SUM(leech_seconds) as leechtime')
+            ->toBase()
+            ->get();
+
+        foreach ($sums as $row) {
+            foreach (self::TOTALS as $column) {
+                $expected[(int) $row->torrent_id][$column] = ($expected[(int) $row->torrent_id][$column] ?? 0) + (int) $row->{$column};
+            }
+        }
+
+        foreach ($this->extras->perPair($userId) as $extra) {
+            foreach (self::TOTALS as $column) {
+                $expected[$extra['torrent_id']][$column] = ($expected[$extra['torrent_id']][$column] ?? 0) + $extra[$column];
+            }
+        }
+
+        return $expected;
     }
 
     /**
@@ -287,6 +312,10 @@ class LedgerAdjuster
     {
         $userModel = config('trove.user_model', 'App\\Models\\User');
         $row = DB::table((new $userModel)->getTable())->where('id', $userId)->first(self::TOTALS);
+
+        if ($row === null) {
+            throw new InvalidArgumentException("No member has id [{$userId}].");
+        }
 
         return array_map('intval', (array) $row);
     }
