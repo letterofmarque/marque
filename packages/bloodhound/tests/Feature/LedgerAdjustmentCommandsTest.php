@@ -97,6 +97,19 @@ describe('bloodhound:accept-totals', function () {
             ->and(LedgerAdjustment::query()->where('user_id', $later->id)->count())->toBe(1);
     });
 
+    // torrent_user has no foreign key on user_id, so a deleted member's rows
+    // can outlive them, and reconcile reports their drift. Under --all that
+    // id is skipped like any refused member (found by the Job #213 check).
+    it('skips a drifting row whose member no longer exists, under --all', function () {
+        importedTotals($this->member, $this->torrent, 5_000);
+        TorrentUser::query()->create(['user_id' => 4242, 'torrent_id' => $this->torrent->id, 'uploaded' => 900]);
+
+        $this->artisan('bloodhound:accept-totals', ['--all' => true, '--by' => $this->admin->id, '--reason' => 'Import', '--force' => true])
+            ->expectsOutputToContain('Skipping member 4242')
+            ->expectsOutputToContain('Recorded 1 adjustment(s) for 1 member(s)')
+            ->assertSuccessful();
+    });
+
     it('refuses one member it would refuse, and writes nothing', function () {
         importedTotals($this->member, $this->torrent, 5_000);
         DB::table($this->member->getTable())->where('id', $this->member->id)->update(['uploaded' => 1_000]);

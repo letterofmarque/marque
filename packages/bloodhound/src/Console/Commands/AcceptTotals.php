@@ -66,9 +66,18 @@ class AcceptTotals extends Command
             try {
                 $preview = $adjuster->preview($userId);
             } catch (InvalidArgumentException $e) {
-                $this->error($e->getMessage());
+                // One named member who is nobody is the operator's mistake.
+                // Under --all it is a deleted member's leftover torrent_user
+                // rows (no foreign key holds them), skipped like any refusal.
+                if (! $this->option('all')) {
+                    $this->error($e->getMessage());
 
-                return self::FAILURE;
+                    return self::FAILURE;
+                }
+
+                $refused[$userId] = $e->getMessage();
+
+                continue;
             }
 
             if ($preview['refusal'] !== null) {
