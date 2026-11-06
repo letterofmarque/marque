@@ -56,13 +56,16 @@ describe('the ledger_adjustments table', function () {
 
     // A correction nobody can account for is the silent change this exists to
     // prevent, so the database refuses one as well as the service.
+    //
+    // In a savepoint: PostgreSQL aborts the whole transaction a test runs in
+    // after any error, which would fail the test's own teardown.
     it('refuses a row without a reason or an author', function (string $column) {
-        LedgerAdjustment::query()->insert([
+        (new LedgerAdjustment)->getConnection()->transaction(fn () => LedgerAdjustment::query()->insert([
             'user_id' => 7, 'torrent_id' => 3, 'uploaded' => 1,
             'downloaded' => 0, 'seedtime' => 0, 'leechtime' => 0,
             'reason' => 'r', 'made_by' => 1, 'created_at' => now(),
             $column => null,
-        ]);
+        ]));
     })->with(['reason', 'made_by'])->throws(Illuminate\Database\QueryException::class);
 });
 
