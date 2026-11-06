@@ -1069,12 +1069,13 @@ The table is append-only. Rows are never modified after they're written, so ther
 `updated_at`. Credit that is not a row of its own (what pruning removed, and what the
 upgrade carried over) lives in `ledger_carry`: one row per member and torrent, with
 `uploaded`, `downloaded`, `seedtime` and `leechtime`, on the same connection as
-`announce_log`. **The ledger is its rows plus its carry**, and everything below reads it
-that way.
+`announce_log`. Corrections an operator made on the record live in `ledger_adjustments`
+beside it (see [Correcting the numbers](#correcting-the-numbers)). **The ledger is its
+rows, its carry and its adjustments**, and everything below reads it that way.
 
 ### Isolating it on a separate database
 
-`announce_log.connection` takes any connection name from `config/database.php`. Point it at a second database - same engine or not - and all reads and writes for `announce_log` and `ledger_carry` go there, with no other change. Migrations follow it too.
+`announce_log.connection` takes any connection name from `config/database.php`. Point it at a second database - same engine or not - and all reads and writes for `announce_log` and `ledger_carry` go there, with no other change. `ledger_adjustments` follows it as well. Migrations follow it too.
 
 This is the mechanism for keeping a high-write-volume table off your main database. Note that `user_id` and `torrent_id` carry no foreign key constraints precisely so this works: a real FK would require those tables to live on the same connection, which is the thing you're trying to avoid.
 
@@ -1115,10 +1116,14 @@ it was a user disputing a ban.
 
 `bloodhound:reconcile-ledger` (scheduled daily) compares every member's and every
 member-and-torrent's bytes, seedtime and leechtime against the ledger: the sum of the rows
-the aggregator has folded, plus carry. **It reports; it does not repair.** You should learn
+the aggregator has folded, plus carry and adjustments. **It reports; it does not repair.** You should learn
 a number went wrong before anything changes it back. Rows not yet folded are reported as a
 backlog rather than as drift — an alert that cries wolf is an alert nobody reads. Drift is
 logged as a warning and the command exits 1.
+
+Reconcile can't tell which side is wrong. If the ledger is right, rebuild. If the stored
+totals are right and the ledger never saw where they came from, accept them (see
+[Correcting the numbers](#correcting-the-numbers)).
 
 #### Audit
 
@@ -1154,8 +1159,8 @@ checked as a chain. The upgrade records where they end.
 
 #### Rebuild
 
-`bloodhound:rebuild-totals` recomputes user and per-torrent totals from the ledger and its
-carry, for everyone or `--user=`: bytes, seedtime and leechtime. It takes the aggregator's
+`bloodhound:rebuild-totals` recomputes user and per-torrent totals from the ledger, its
+carry and its adjustments, for everyone or `--user=`: bytes, seedtime and leechtime. It takes the aggregator's
 cursor lock first, so a fold can't commit between its reset and its write; a fold that was
 waiting carries on from the same position afterwards. On MySQL a fold waiting through a
 long rebuild may hit `innodb_lock_wait_timeout` and fail; the next run retries. A rebuild
@@ -1167,9 +1172,53 @@ so hit-and-run doesn't take old activity for new. Its creation time is the pair'
 ledger row, and when the member was last seen is its newest. A pair with carried (pruned)
 history can't be dated exactly: its creation time is bounded by the oldest row left in the
 ledger, and placed before hit-and-run began, so the rule never judges carried activity.
+An adjusted pair is dated the same way.
 
 On a development machine, rebuilding from 200,000 rows took 29 to 95 seconds depending on
 the engine.
+
+### Correcting the numbers
+
+Some totals are real and no ledger row explains them: figures imported from an earlier
+tracker, history from before the ledger, a speed forfeit you decide was wrong. Reconcile
+reports the first two as drift every day, and the rebuild it recommends would erase them.
+The third never reached the totals at all.
+
+Two commands correct a member's totals **on the record**. Each writes a row to
+`ledger_adjustments` with the amounts (signed), the torrent (0 for the member as a whole),
+who decided (`--by`, a user id, required) and why (`--reason`, required). Each shows what
+it will write and asks first (`--force` for a script), logs a warning, and records a staff
+action (`bloodhound.ledger.accepted` or `bloodhound.ledger.adjusted`) that bosun's Audit
+log shows. Reconcile and rebuild read adjustments with the rest of the ledger, so
+reconcile is clean afterwards and a rebuild keeps the result.
+
+**`bloodhound:accept-totals`: the stored totals are right.** It records the gap between
+what's stored and what the ledger explains: per torrent from `torrent_user`, and what the
+member holds beyond their torrents on torrent 0. Either way round: a stored total below
+its ledger is accepted too. The totals themselves don't change. `--user=` for one member,
+or `--all` for everyone reconcile reports.
+
+```bash
+php artisan bloodhound:accept-totals --user=42 --by=1 --reason="Imported from the old tracker"
+```
+
+It refuses when a member's own totals are below what their torrents add up to by more than
+torrent 0 holds. Those totals contradict each other, so a rebuild is the fix.
+
+**`bloodhound:adjust-totals`: give or take an amount.** The adjustment and the totals
+move together, the way the aggregator moves them. Amounts are whole bytes or seconds,
+signed; `--torrent=` defaults to 0, the member as a whole.
+
+```bash
+php artisan bloodhound:adjust-totals 42 --torrent=17 --uploaded=8000000000 --by=1 --reason="Speed forfeit was a false positive"
+```
+
+Nothing goes below zero. Take credit back from the torrent it's on: torrent 0 holds only
+what's on the member as a whole.
+
+**Adjustments are never edited or deleted.** A wrong one is answered by another, signed
+the other way, so the record of what was decided and by whom survives the correction.
+`bloodhound:ledger-adjustments` lists them, newest first (`--user=`, `--limit=`).
 
 ### Retention, pruning and carry
 
@@ -1198,8 +1247,9 @@ and reconcile and rebuild stay exact: a prune followed by a rebuild reproduces t
 pre-prune totals, which was measured on all four engines with 200,000 rows. That prune took
 34 to 69 seconds, depending on the engine.
 
-Carry is signed, so that a future correction can be recorded as an adjustment. Neither a
-prune nor the upgrade ever writes a negative.
+Carry is signed, but neither a prune nor the upgrade ever writes a negative. An operator's
+correction is an adjustment, kept apart from carry (see
+[Correcting the numbers](#correcting-the-numbers)), and never pruned.
 
 ### Querying the log
 
@@ -1251,10 +1301,19 @@ This is a Bloodhound feature and has no equivalent in [marque/hound](https://pac
 | `bloodhound:check-redis` | — | Checks AOF and the eviction policy; `--recover` opens a recovery window |
 | `bloodhound:issue-keys` | — | Issues a key to every verified user without one, after an import; `--dry-run` |
 | `bloodhound:audit-ledger` | — | Checks every row's arithmetic and every peer's chain |
-| `bloodhound:rebuild-totals` | — | Recomputes totals from the ledger and carry; `--user=` for one member |
+| `bloodhound:rebuild-totals` | — | Recomputes totals from the ledger, carry and adjustments; `--user=` for one member |
+| `bloodhound:accept-totals` | — | Records stored totals the ledger can't explain as correct (`--user=` or `--all`, `--reason=`, `--by=`) |
+| `bloodhound:adjust-totals` | — | Gives or takes an amount from a member's totals (`--torrent=`, `--uploaded=` etc., `--reason=`, `--by=`) |
+| `bloodhound:ledger-adjustments` | — | Lists the adjustments operators have made, with who and why |
 | `bloodhound:seedbox` | — | `list` (`--status=`), `approve` or `revoke` a seedbox (`--by=`) |
 | `bloodhound:backfill-ledger` | — | Once, after upgrading from 7.x: credits pre-8.0 history its time and stopped bytes |
 | `bloodhound:record-pruned-history` | — | Once, if needed: accounts for rows a pre-8.0 prune deleted without carrying them |
+
+## Upgrading to 11.2
+
+Run `php artisan migrate`: it creates `ledger_adjustments`, on `announce_log`'s connection.
+Nothing else changes until you use the new commands (see
+[Correcting the numbers](#correcting-the-numbers)).
 
 ## Upgrading from 10.x to 11.0
 
@@ -1475,6 +1534,15 @@ That row asserts the old total was correct **as of migration**. It is not eviden
 it ever was — the per-announce history was never kept, which is exactly why the ledger now
 exists. Per-torrent history likewise starts empty. Hit-and-run counts only torrents first
 active after it's switched on anyway.
+
+**If you ran 4.1.0 with its queued announce log turned on**, the migration found rows
+already there and wrote no opening balance. Your pre-ledger totals have no row behind them,
+so reconcile reports them as drift, and a rebuild would reset them to what the ledger
+holds. Accept them once, before any rebuild:
+
+```bash
+php artisan bloodhound:accept-totals --all --by=<your user id> --reason="Pre-ledger totals (4.1.0 queued log)"
+```
 
 ## Events
 

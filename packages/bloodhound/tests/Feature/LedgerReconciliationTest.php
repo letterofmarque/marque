@@ -138,6 +138,20 @@ describe('reconciliation', function () {
         $this->artisan('bloodhound:reconcile-ledger')->assertFailed();
     });
 
+    // Reconcile can't tell which side is wrong; the operator can. So it names
+    // both fixes: rebuild when the ledger is right, accept when the stored
+    // totals are (Job #213).
+    test('the command names both ways to settle drift', function () {
+        auditRow($this->user->id, $this->torrent->id, 0, 1_000);
+        app(LedgerAggregator::class)->run();
+        $this->user->forceFill(['uploaded' => 999])->save();
+
+        $this->artisan('bloodhound:reconcile-ledger')
+            ->expectsOutputToContain('bloodhound:rebuild-totals')
+            ->expectsOutputToContain('bloodhound:accept-totals')
+            ->assertFailed();
+    });
+
     test('the command exits zero when everything agrees', function () {
         auditRow($this->user->id, $this->torrent->id, 0, 1_000);
         app(LedgerAggregator::class)->run();

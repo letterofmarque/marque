@@ -462,7 +462,9 @@ return [
     | regular-interval, completed, and stopped request, accepted or refused,
     | with the cumulative totals the client reported, the bytes and seconds
     | credited, and the baseline they were measured against. Each row carries
-    | its own credit, and every total is a sum of rows plus ledger_carry.
+    | its own credit, and every total is a sum of rows plus ledger_carry plus
+    | ledger_adjustments (operators' corrections, made with
+    | bloodhound:accept-totals and bloodhound:adjust-totals).
     |
     | This table is the source of truth for ratio and seedtime. User and
     | per-torrent totals are projections summed from it, and a wrong number

@@ -7,6 +7,38 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+> Operators can correct a member's totals on the record: accept stored totals the ledger can't explain, or give and take an amount, with who and why.
+
+### Added
+
+- **`ledger_adjustments`, and three commands to use it** (Job #213). Some totals are real
+  and no ledger row explains them: figures imported from an earlier tracker, history from
+  before the ledger, a speed forfeit an operator decides was wrong. Reconcile reported the
+  first two as drift every day, and the rebuild it recommended erased them; the third
+  never reached the totals. Now:
+  - `bloodhound:accept-totals --user=|--all` records the stored totals as correct, per
+    torrent and on torrent 0 (the member as a whole), without changing them.
+  - `bloodhound:adjust-totals` gives or takes a stated amount, moving the totals with it.
+  - `bloodhound:ledger-adjustments` lists them.
+
+  Each adjustment keeps who decided (`--by`) and why (`--reason`), both required. The
+  commands show what they will write and ask first (`--force` for scripts), log a warning,
+  and record a staff action (`bloodhound.ledger.accepted` / `.adjusted`). Adjustments are
+  append-only: a wrong one is answered by another, signed the other way. Nothing goes below
+  zero. Reconcile, rebuild and the upgrade-time gap finders read adjustments with the rest
+  of the ledger (one definition, `LedgerExtras`), so reconcile is clean afterwards, a
+  rebuild keeps the result, and nothing is carried twice. Run `migrate`.
+- **A 4.1.0 install that ran the queued announce log can settle its pre-ledger totals**
+  (#11051). That install got no opening balance, so reconcile reported its old totals as
+  drift and a rebuild reset them. `bloodhound:accept-totals --all` records them as correct.
+
+### Changed
+
+- **`bloodhound:reconcile-ledger` names both fixes when it finds drift**: rebuild-totals
+  when the ledger is right, accept-totals when the stored totals are.
+
 ## [11.1.2] — 2026-11-04
 
 > BLOODHOUND_AMBIGUOUS_LOCATIONS works on a tracker with a published config: the anti_cheat keys 11.0 added are filled from the shipped config.

@@ -14,7 +14,8 @@ use Marque\Bloodhound\Services\LedgerAuditor;
  * Scheduled, and loud when it finds something. A silent drift in a ratio is
  * the failure this whole Spec exists to prevent, so this reports rather than
  * repairs — an operator should know a number went wrong before anything
- * quietly changes it back. `bloodhound:rebuild-totals` is the fix.
+ * quietly changes it back. `bloodhound:rebuild-totals` is the fix when the
+ * ledger is right; `bloodhound:accept-totals` when the stored totals are.
  *
  * See Spec #99.
  */
@@ -52,8 +53,11 @@ class ReconcileLedger extends Command
             Log::warning("bloodhound ledger drift — {$line}");
         }
 
+        // Which side is wrong is the operator's call, not this command's.
         $this->newLine();
-        $this->line('Run bloodhound:rebuild-totals to recompute from the ledger.');
+        $this->line('If the ledger is right: bloodhound:rebuild-totals recomputes the totals from it.');
+        $this->line('If the stored totals are right (an import, history the ledger never saw):');
+        $this->line('  bloodhound:accept-totals records them as correct, with --reason and --by.');
 
         return self::FAILURE;
     }
