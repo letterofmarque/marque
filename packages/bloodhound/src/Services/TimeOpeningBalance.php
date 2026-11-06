@@ -92,7 +92,8 @@ class TimeOpeningBalance
 
     /**
      * Time the ledger accounts for per (user, torrent): rows up to the
-     * watermark plus carry, as reconcile counts it.
+     * watermark plus carry and adjustments (LedgerExtras), as reconcile
+     * counts it.
      *
      * @return array<string, array{seedtime: int, leechtime: int}>
      */
@@ -110,10 +111,9 @@ class TimeOpeningBalance
             $expected[$row->user_id.':'.$row->torrent_id] = ['seedtime' => (int) $row->seed, 'leechtime' => (int) $row->leech];
         }
 
-        foreach (LedgerCarry::query()->get() as $carry) {
-            $key = $carry->user_id.':'.$carry->torrent_id;
-            $expected[$key]['seedtime'] = ($expected[$key]['seedtime'] ?? 0) + $carry->seedtime;
-            $expected[$key]['leechtime'] = ($expected[$key]['leechtime'] ?? 0) + $carry->leechtime;
+        foreach (app(LedgerExtras::class)->perPair() as $key => $extra) {
+            $expected[$key]['seedtime'] = ($expected[$key]['seedtime'] ?? 0) + $extra['seedtime'];
+            $expected[$key]['leechtime'] = ($expected[$key]['leechtime'] ?? 0) + $extra['leechtime'];
         }
 
         return $expected;

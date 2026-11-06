@@ -8,7 +8,6 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Marque\Bloodhound\Models\AnnounceLog;
-use Marque\Bloodhound\Models\LedgerCarry;
 use Marque\Bloodhound\Models\LedgerCursor;
 
 /**
@@ -20,7 +19,7 @@ use Marque\Bloodhound\Models\LedgerCursor;
  *
  * Everything the site reads about a user's transfer is summed from ledger
  * rows (bytes and seconds, each row carrying its own credit) plus what
- * pruning carried forward, so a corrupted projection is not a loss, it is a
+ * pruning carried forward and what operators adjusted (LedgerExtras), so a corrupted projection is not a loss, it is a
  * stale cache. This throws the cache away and adds it up again.
  *
  * See Spec #99.
@@ -134,12 +133,11 @@ class LedgerRebuilder
             ]);
         }
 
-        // Credit whose rows were pruned (#11021). Without it a rebuild after
-        // a prune would replay only what survived, and cut the ratio of
-        // everyone whose history had aged out.
-        $carried = LedgerCarry::query()
-            ->when($userId !== null, fn ($q) => $q->where('user_id', $userId))
-            ->get();
+        // Credit whose rows were pruned (#11021), and operators' adjustments
+        // (Job #213). Without them a rebuild after a prune would replay only
+        // what survived, and cut the ratio of everyone whose history had aged
+        // out; and it would erase every correction an operator made.
+        $extras = app(LedgerExtras::class)->perPair($userId);
 
         // A prune deletes every folded row older than its cutoff, so carried
         // history predates the folded rows left (an unfolded row it withheld
@@ -155,25 +153,26 @@ class LedgerRebuilder
         // a real obligation on a re-created row is missed; one is never made up.
         $ruleBegan = self::timestamp(DB::table('ledger_cursors')->where('stream', HitAndRunEnforcer::STREAM)->value('created_at'));
 
-        foreach ($carried as $carry) {
+        foreach ($extras as $extra) {
             // created_at: the earlier of that bound and when it was first
-            // carried. last_seen takes when it was last carried, only when
+            // carried or adjusted. last_seen takes when it last was, only when
             // nothing in the ledger is newer, which errs towards less time
-            // away, never more.
-            $carriedAt = $carry->created_at?->getTimestamp();
+            // away, never more. An adjustment is dated the same way as carry:
+            // like carry, it can stand for activity from long before it.
+            $carriedAt = $extra['first'];
             $began = $oldestLeft !== null && $carriedAt !== null ? min($oldestLeft, $carriedAt) : ($oldestLeft ?? $carriedAt);
 
             if ($ruleBegan !== null && $began !== null) {
                 $began = min($began, $ruleBegan - 1);
             }
 
-            $stamp($carry->user_id, $carry->torrent_id, $began, null);
-            $stamps[$carry->user_id.':'.$carry->torrent_id]['last'] ??= $carry->updated_at?->getTimestamp();
-            $add($carry->user_id, $carry->torrent_id, [
-                'uploaded' => $carry->uploaded,
-                'downloaded' => $carry->downloaded,
-                'seedtime' => $carry->seedtime,
-                'leechtime' => $carry->leechtime,
+            $stamp($extra['user_id'], $extra['torrent_id'], $began, null);
+            $stamps[$extra['user_id'].':'.$extra['torrent_id']]['last'] ??= $extra['last'];
+            $add($extra['user_id'], $extra['torrent_id'], [
+                'uploaded' => $extra['uploaded'],
+                'downloaded' => $extra['downloaded'],
+                'seedtime' => $extra['seedtime'],
+                'leechtime' => $extra['leechtime'],
             ]);
         }
 

@@ -6,7 +6,6 @@ namespace Marque\Bloodhound\Services;
 
 use Illuminate\Support\Facades\DB;
 use Marque\Bloodhound\Models\AnnounceLog;
-use Marque\Bloodhound\Models\LedgerCarry;
 use Marque\Bloodhound\Models\LedgerCursor;
 
 /**
@@ -75,7 +74,8 @@ class LedgerAuditor
     /**
      * What every (user, torrent) total should be: the sum of the ledger's
      * rows up to the watermark (each row carries its own bytes and seconds),
-     * plus whatever pruning carried forward (#11021).
+     * plus what pruning carried forward (#11021) and what operators adjusted
+     * (Job #213): LedgerExtras.
      *
      * @return array<string, array{user_id: int, torrent_id: int, uploaded: int, downloaded: int, seedtime: int, leechtime: int}>
      */
@@ -107,12 +107,12 @@ class LedgerAuditor
             ]);
         }
 
-        foreach (LedgerCarry::query()->get() as $carry) {
-            $add($carry->user_id, $carry->torrent_id, [
-                'uploaded' => $carry->uploaded,
-                'downloaded' => $carry->downloaded,
-                'seedtime' => $carry->seedtime,
-                'leechtime' => $carry->leechtime,
+        foreach (app(LedgerExtras::class)->perPair() as $extra) {
+            $add($extra['user_id'], $extra['torrent_id'], [
+                'uploaded' => $extra['uploaded'],
+                'downloaded' => $extra['downloaded'],
+                'seedtime' => $extra['seedtime'],
+                'leechtime' => $extra['leechtime'],
             ]);
         }
 

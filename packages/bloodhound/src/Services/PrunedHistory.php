@@ -52,6 +52,11 @@ class PrunedHistory
             ->get()
             ->keyBy(fn ($row) => $row->user_id.':'.$row->torrent_id);
 
+        // What the ledger explains beyond its rows: carry AND adjustments
+        // (LedgerExtras). The gap is measured against both; only carry is
+        // written, since this is the tracker's bookkeeping, not an operator's.
+        $explained = app(LedgerExtras::class)->perPair();
+
         $carried = LedgerCarry::query()
             ->get()
             ->keyBy(fn (LedgerCarry $carry) => $carry->user_id.':'.$carry->torrent_id);
@@ -61,18 +66,20 @@ class PrunedHistory
 
         $connection = DB::connection((new AnnounceLog)->getConnectionName());
 
-        $connection->transaction(function () use ($ledger, $carried, &$recorded, &$users) {
+        $connection->transaction(function () use ($ledger, $explained, $carried, &$recorded, &$users) {
             DB::table('torrent_user')
                 ->select(['id', 'user_id', 'torrent_id', 'uploaded', 'downloaded'])
                 ->orderBy('id')
-                ->chunkById(1000, function ($rows) use ($ledger, $carried, &$recorded, &$users) {
+                ->chunkById(1000, function ($rows) use ($ledger, $explained, $carried, &$recorded, &$users) {
                     foreach ($rows as $row) {
                         $key = $row->user_id.':'.$row->torrent_id;
                         $sums = $ledger->get($key);
                         $carry = $carried->get($key);
 
-                        $up = (int) $row->uploaded - (int) ($sums->up ?? 0) - ($carry->uploaded ?? 0);
-                        $down = (int) $row->downloaded - (int) ($sums->down ?? 0) - ($carry->downloaded ?? 0);
+                        $extra = $explained[$key] ?? null;
+
+                        $up = (int) $row->uploaded - (int) ($sums->up ?? 0) - ($extra['uploaded'] ?? 0);
+                        $down = (int) $row->downloaded - (int) ($sums->down ?? 0) - ($extra['downloaded'] ?? 0);
 
                         // Each column on its own: a gap above the ledger is
                         // recorded, one below it is not.
