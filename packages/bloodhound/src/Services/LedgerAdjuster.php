@@ -71,15 +71,13 @@ class LedgerAdjuster
             }
 
             // A rebuild's job, not an operator's: the member's own totals are
-            // below what their torrents add up to, by more than that row
-            // holds, so the projections contradict each other.
-            if ($measured['remainder'] !== null && $measured['zeroRow'] !== null) {
-                $zeroRow = DB::table('torrent_user')->where('id', $measured['zeroRow'])->first(self::TOTALS);
-
-                foreach (self::TOTALS as $column) {
-                    if ((int) $zeroRow->{$column} + $measured['remainder'][$column] < 0) {
-                        throw new InvalidArgumentException("This member's {$column} is below what their torrents add up to: the totals contradict each other. Run bloodhound:rebuild-totals --user={$userId} instead.");
-                    }
+            // below what their torrents add up to, by more than torrent 0
+            // holds, so the projections contradict each other. Recording it
+            // would leave torrent 0's credit negative, which a rebuild writes
+            // as a negative torrent_user row, into an unsigned column.
+            foreach (self::TOTALS as $column) {
+                if ($measured['torrentZero'][$column] < 0) {
+                    throw new InvalidArgumentException("This member's {$column} is below what their torrents add up to: the totals contradict each other. Run bloodhound:rebuild-totals --user={$userId} instead.");
                 }
             }
 
@@ -147,8 +145,17 @@ class LedgerAdjuster
             $pair = (array) (DB::table('torrent_user')->where('user_id', $userId)->where('torrent_id', $torrentId)->first(self::TOTALS) ?? []);
 
             foreach (self::TOTALS as $column) {
-                if ($member[$column] + $amounts[$column] < 0 || (int) ($pair[$column] ?? 0) + $amounts[$column] < 0) {
-                    throw new InvalidArgumentException("That would take {$column} below zero.");
+                if ($member[$column] + $amounts[$column] < 0) {
+                    throw new InvalidArgumentException("That would take the member's {$column} below zero.");
+                }
+
+                // Credit held on a torrent is taken from that torrent. Torrent
+                // 0 holds only what's on the member as a whole, and a rebuild
+                // would write it negative into an unsigned column.
+                if ((int) ($pair[$column] ?? 0) + $amounts[$column] < 0) {
+                    throw new InvalidArgumentException($torrentId === 0
+                        ? "That would take {$column} below zero on torrent 0, the member as a whole: debit the torrent the credit is on instead (--torrent=<id>)."
+                        : "That would take {$column} below zero on torrent {$torrentId}.");
                 }
             }
 
@@ -179,7 +186,7 @@ class LedgerAdjuster
      * the watermark, as reconcile counts them; a backlog is not drift) plus
      * carry and adjustments.
      *
-     * @return array{gaps: list<array{user_id: int, torrent_id: int, uploaded: int, downloaded: int, seedtime: int, leechtime: int}>, remainder: array<string, int>|null, zeroRow: int|null, explained: array<string, int>}
+     * @return array{gaps: list<array{user_id: int, torrent_id: int, uploaded: int, downloaded: int, seedtime: int, leechtime: int}>, remainder: array<string, int>|null, zeroRow: int|null, explained: array<string, int>, torrentZero: array<string, int>}
      */
     private function measure(int $userId): array
     {
@@ -252,6 +259,14 @@ class LedgerAdjuster
             }
         }
 
+        // What torrent 0 would hold afterwards: what a rebuild would write to
+        // its torrent_user row.
+        $torrentZero = $zero;
+
+        foreach (self::TOTALS as $column) {
+            $torrentZero[$column] = ($expected[0][$column] ?? 0) + ($gaps[0][$column] ?? 0);
+        }
+
         $written = [];
 
         foreach ($gaps as $torrent => $amounts) {
@@ -262,7 +277,7 @@ class LedgerAdjuster
             $written[] = ['user_id' => $userId, 'torrent_id' => $torrent] + $amounts + $zero;
         }
 
-        return ['gaps' => $written, 'remainder' => $remainder, 'zeroRow' => $zeroRow, 'explained' => $explained];
+        return ['gaps' => $written, 'remainder' => $remainder, 'zeroRow' => $zeroRow, 'explained' => $explained, 'torrentZero' => $torrentZero];
     }
 
     /**

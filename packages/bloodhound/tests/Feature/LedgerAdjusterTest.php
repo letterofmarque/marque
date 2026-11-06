@@ -165,6 +165,18 @@ describe('accept', function () {
         expect(LedgerAdjustment::query()->count())->toBe(0);
     });
 
+    // The same contradiction with no torrent-0 row: recording it would leave
+    // torrent 0's credit negative, which a rebuild writes as a negative row.
+    it('refuses when torrent 0 would be left negative with no row of its own', function () {
+        storeTotals($this->member, $this->torrent, ['uploaded' => 5_000]);
+        DB::table($this->member->getTable())->where('id', $this->member->id)->update(['uploaded' => 1_000]);
+
+        expect(fn () => app(LedgerAdjuster::class)->accept($this->member->id, by: $this->admin->id, reason: 'Import'))
+            ->toThrow(InvalidArgumentException::class, 'rebuild');
+
+        expect(LedgerAdjustment::query()->count())->toBe(0);
+    });
+
     // A backlog is not drift: rows the aggregator hasn't folded are in
     // neither the totals nor what reconcile expects, so accepting doesn't
     // count them, and folding them afterwards leaves reconcile clean.

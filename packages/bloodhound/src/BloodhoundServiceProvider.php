@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\ServiceProvider;
+use Marque\Bloodhound\Console\Commands\AcceptTotals;
+use Marque\Bloodhound\Console\Commands\AdjustTotals;
 use Marque\Bloodhound\Console\Commands\AggregateLedger;
 use Marque\Bloodhound\Console\Commands\AuditLedger;
 use Marque\Bloodhound\Console\Commands\BackfillLedger;
@@ -19,6 +21,7 @@ use Marque\Bloodhound\Console\Commands\DetectLocationSharing;
 use Marque\Bloodhound\Console\Commands\EnforceHitAndRun;
 use Marque\Bloodhound\Console\Commands\EnforceRatio;
 use Marque\Bloodhound\Console\Commands\IssueAnnounceKeys;
+use Marque\Bloodhound\Console\Commands\ListLedgerAdjustments;
 use Marque\Bloodhound\Console\Commands\ManageSeedboxes;
 use Marque\Bloodhound\Console\Commands\ManageStanding;
 use Marque\Bloodhound\Console\Commands\PruneAnnounceLog;
@@ -371,6 +374,8 @@ class BloodhoundServiceProvider extends ServiceProvider
         }
 
         $this->commands([
+            AcceptTotals::class,
+            AdjustTotals::class,
             AggregateLedger::class,
             AuditLedger::class,
             BackfillLedger::class,
@@ -379,6 +384,7 @@ class BloodhoundServiceProvider extends ServiceProvider
             EnforceHitAndRun::class,
             EnforceRatio::class,
             IssueAnnounceKeys::class,
+            ListLedgerAdjustments::class,
             ManageSeedboxes::class,
             ManageStanding::class,
             PruneAnnounceLog::class,
