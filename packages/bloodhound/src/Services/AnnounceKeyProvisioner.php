@@ -46,11 +46,19 @@ class AnnounceKeyProvisioner
      * The member a key belongs to, provisioning them with $create when Marque
      * doesn't know the key yet.
      *
+     * Anything that commits on its own belongs in $created, not $create: a
+     * ledger adjustment carrying the member's old figures (the ledger may have
+     * its own database) would otherwise outlive a member a lost race rolled
+     * back. $created runs once the member and key are committed, and only in
+     * the request that created them. One that throws leaves the member in
+     * place without that work, loudly.
+     *
      * @param  Closure(): ?UserInterface  $create  asks the old system; creates
      *                                             and returns the member, or
      *                                             returns null for "not ours"
+     * @param  (Closure(UserInterface): void)|null  $created  after the member is committed
      */
-    public function provision(string $key, Closure $create): ?UserInterface
+    public function provision(string $key, Closure $create, ?Closure $created = null): ?UserInterface
     {
         $known = $this->userForKey($key);
 
@@ -59,7 +67,7 @@ class AnnounceKeyProvisioner
         }
 
         try {
-            return DB::transaction(function () use ($key, $create): ?UserInterface {
+            $user = DB::transaction(function () use ($key, $create): ?UserInterface {
                 $user = $create();
 
                 if ($user === null) {
@@ -80,5 +88,11 @@ class AnnounceKeyProvisioner
             // an account that isn't this key's), and stays an error.
             return $this->userForKey($key) ?? throw $e;
         }
+
+        if ($user !== null && $created !== null) {
+            $created($user);
+        }
+
+        return $user;
     }
 }

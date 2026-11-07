@@ -47,13 +47,17 @@ class LegacyAccountsTransform implements AnnounceTransform
             }
 
             static::$created++;
-            $user = TestUser::create(['name' => $old['email'], 'email' => $old['email'], 'password' => 'p']);
 
-            if (static::$carriedBy !== null && $old['uploaded'] > 0) {
-                app(LedgerAdjuster::class)->adjust((int) $user->id, 0, ['uploaded' => $old['uploaded']], by: static::$carriedBy, reason: 'Carried over from the old tracker');
+            return TestUser::create(['name' => $old['email'], 'email' => $old['email'], 'password' => 'p']);
+        }, function (UserInterface $user) use ($key): void {
+            // After the member is committed, and only by the request that
+            // created them: the adjustment commits on its own when the ledger
+            // has its own database.
+            $uploaded = static::$legacy[$key]['uploaded'] ?? 0;
+
+            if (static::$carriedBy !== null && $uploaded > 0) {
+                app(LedgerAdjuster::class)->adjust((int) $user->getAuthIdentifier(), 0, ['uploaded' => $uploaded], by: static::$carriedBy, reason: 'Carried over from the old tracker');
             }
-
-            return $user;
         });
     }
 }

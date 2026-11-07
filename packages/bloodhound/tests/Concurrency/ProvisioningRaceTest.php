@@ -69,3 +69,20 @@ it('returns the winner when its member collides on the member\'s own unique colu
     expect($user?->getAuthIdentifier())->toBe($winnerId)
         ->and(TestUser::query()->where('email', 'same@example.com')->count())->toBe(1);
 });
+
+// The losing request created no one, so it runs no after-creation work:
+// otherwise a ledger adjustment on its own database would outlive the member
+// it was made for (found by the Job #109 check).
+it('runs no after-creation work in the request that lost', function () {
+    $ran = false;
+
+    app(AnnounceKeyProvisioner::class)->provision(RACED, function () {
+        winnerCommits('winner@example.com');
+
+        return TestUser::create(['name' => 'Loser', 'email' => 'loser@example.com', 'password' => 'p']);
+    }, function () use (&$ran) {
+        $ran = true;
+    });
+
+    expect($ran)->toBeFalse();
+});

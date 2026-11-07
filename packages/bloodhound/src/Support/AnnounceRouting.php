@@ -85,6 +85,26 @@ final class AnnounceRouting
             }
         }
 
+        // A path-key endpoint answers everything under its paths: its key
+        // route, and the catch-all fallback for a malformed key. So a path
+        // nested under one of them is shadowed too, whichever was registered
+        // first (found by the Job #109 check). A query-key endpoint answers
+        // only its exact paths, so nesting under it is fine.
+        foreach ($claimed as $outer => [$outerName, $outerRole]) {
+            if ($endpoints[$outerName]->keyIsInQuery()) {
+                continue;
+            }
+
+            foreach ($claimed as $inner => [$innerName, $innerRole]) {
+                if (str_starts_with($inner, $outer.'/')) {
+                    throw new InvalidArgumentException(sprintf(
+                        'Announce endpoints collide: the %s endpoint\'s %s path "%s" is under the %s endpoint\'s %s path "%s", which takes a key as its next segment, so it would answer instead. Give each its own path.',
+                        $innerName, $innerRole, $inner, $outerName, $outerRole, $outer,
+                    ));
+                }
+            }
+        }
+
         return $endpoints;
     }
 

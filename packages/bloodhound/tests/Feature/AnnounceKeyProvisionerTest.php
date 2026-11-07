@@ -5,6 +5,7 @@ declare(strict_types=1);
 // Job #109 step 5: AnnounceKeyProvisioner, the race-safe half of lazy
 // migration. The concurrent case is in tests/Concurrency.
 
+use Illuminate\Support\Facades\DB;
 use Marque\Bloodhound\Models\AnnounceKey;
 use Marque\Bloodhound\Services\AnnounceKeyProvisioner;
 use Marque\Bloodhound\Tests\TestUser;
@@ -50,4 +51,40 @@ it('rolls back the member it created when the creator throws after creating them
     }))->toThrow(RuntimeException::class);
 
     expect(TestUser::query()->where('email', 'half@example.com')->exists())->toBeFalse();
+});
+
+// Found by the Job #109 check: work that commits on its own (a ledger
+// adjustment, when the ledger has its own database) can't go in the creator,
+// whose transaction a lost race rolls back. $created runs after the member is
+// committed, and only in the request that created them.
+describe('after the member is created', function () {
+    it('runs once, after commit, with the new member', function () {
+        $seen = [];
+
+        $user = app(AnnounceKeyProvisioner::class)->provision(
+            'feedfacefeedfacefeedfacefeedface',
+            fn () => TestUser::create(['name' => 'N', 'email' => 'after@example.com', 'password' => 'p']),
+            function ($created) use (&$seen) {
+                $seen[] = [$created->getAuthIdentifier(), DB::transactionLevel(), AnnounceKey::query()->where('key', 'feedfacefeedfacefeedfacefeedface')->exists()];
+            },
+        );
+
+        // Inside the test's own wrapping transaction (level 1), not the
+        // provisioning one (which would be 2), with the key already written.
+        expect($seen)->toBe([[$user->getAuthIdentifier(), 1, true]]);
+    });
+
+    it('does not run for a key Marque already knows, or when no one is created', function () {
+        makeTrackerUser('feedfacefeedfacefeedfacefeedface', 'known@example.com');
+        $runs = 0;
+
+        app(AnnounceKeyProvisioner::class)->provision('feedfacefeedfacefeedfacefeedface', fn () => null, function () use (&$runs) {
+            $runs++;
+        });
+        app(AnnounceKeyProvisioner::class)->provision('deadbeefdeadbeefdeadbeefdeadbeef', fn () => null, function () use (&$runs) {
+            $runs++;
+        });
+
+        expect($runs)->toBe(0);
+    });
 });

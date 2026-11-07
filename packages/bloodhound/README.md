@@ -264,8 +264,10 @@ Coming from TBDev or Gazelle, that serves `announce.php?passkey=<key>` beside
 - **A key in the path** gets the same bencoded "Invalid announce key" fallback on every
   endpoint, per its own `malformed_key`.
 - **No two endpoints may share a path**, including one's announce path as another's
-  scrape path. Laravel would let the first route win without a word, so bloodhound
-  refuses to boot instead, naming both.
+  scrape path, and no path may sit under the path of an endpoint that takes its key in
+  the path (`announce/legacy.php` under `/announce/{key}`): that endpoint would answer
+  it. Laravel would let one route win without a word, so bloodhound refuses to boot
+  instead, naming both.
 
 #### Reshaping old requests: transforms
 
@@ -368,15 +370,24 @@ The contract:
   key".
 
 **Bring their old ratio with them.** Provisioned at zero, a member can be restricted by
-your ratio rules for being new. Carry their old figures over in the creator, on the
-record (see [Correcting the numbers](#correcting-the-numbers)):
+your ratio rules for being new. Carry their old figures over on the record (see
+[Correcting the numbers](#correcting-the-numbers)), in `provision()`'s third argument,
+which runs once the member is committed and only in the request that created them:
 
 ```php
-$user = User::create([/* ... */]);
+return $this->provisioner->provision($key, $create, function (UserInterface $user) use ($key) {
+    $old = DB::connection('old_tracker')->table('users')->where('passkey', $key)->first();
 
-app(LedgerAdjuster::class)->adjust($user->id, 0, ['uploaded' => $old->uploaded, 'downloaded' => $old->downloaded],
-    by: $operatorId, reason: 'Carried over from the old tracker');
+    app(LedgerAdjuster::class)->adjust($user->getAuthIdentifier(), 0,
+        ['uploaded' => $old->uploaded, 'downloaded' => $old->downloaded],
+        by: $operatorId, reason: 'Carried over from the old tracker');
+});
 ```
+
+Not in the creator: the ledger can live on its own database, where an adjustment commits
+straight away, and a request that loses the race rolls its member back, which would leave
+the adjustment behind. If the adjustment fails, the member stays, without their old
+figures, and the error says so; `bloodhound:adjust-totals` can add them afterwards.
 
 **Prove the key formats are disjoint first.** bloodhound mints its own keys, 32 random
 letters and digits. If an old key could equal a key bloodhound minted for someone else,

@@ -21,8 +21,9 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   source, parameter, pattern, `malformed_key`) and is routed as
   `tracker.announce.<name>` / `tracker.scrape.<name>`. Each endpoint vets keys against its
   own pattern, and a path-key endpoint gets its own bencoded "Invalid announce key"
-  fallback. Two endpoints sharing a path refuse to boot, naming both, rather than one
-  silently shadowing the other.
+  fallback. Two endpoints sharing a path, or one under the path of an endpoint that takes
+  its key in the path, refuse to boot, naming both, rather than one silently shadowing
+  the other.
 - **An endpoint can name an `AnnounceTransform`** (Job #109): a class, resolved from the
   container, that reshapes a legacy request (a renamed parameter, a key in another case)
   into one the native tracker accepts, before announce or scrape handle it. Only a class
@@ -39,9 +40,11 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   for an unknown key `$create` asks the old tracker (the gate) and creates the member, or
   returns null and nothing is created. The member keeps their old key, so their old
   .torrent files and the native URL both work. Concurrent first announces with one key
-  produce exactly one member: the losing request rolls back and returns the winner's. A
-  transform can carry the member's old upload over with `LedgerAdjuster::adjust()`, on the
-  record, so a ratio-enforcing tracker doesn't restrict members its migration just created.
+  produce exactly one member: the losing request rolls back and returns the winner's.
+  `provision()`'s third argument runs once the member is committed, only in the request
+  that created them, which is where a transform carries the member's old figures over with
+  `LedgerAdjuster::adjust()`, on the record, so a ratio-enforcing tracker doesn't restrict
+  members its migration just created.
 
 ## [11.2.0] — 2026-11-07
 

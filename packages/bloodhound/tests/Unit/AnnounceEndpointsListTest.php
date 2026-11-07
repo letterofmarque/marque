@@ -59,6 +59,31 @@ describe('collisions', function () {
         'one endpoint\'s announce and scrape on one path' => [['self' => ['announce_path' => 'same', 'scrape_path' => 'same']], '"same"'],
     ]);
 
+    // Found by the Job #109 check: a path under a path-key endpoint's path is
+    // answered by that endpoint's catch-all fallback (or its key route), so
+    // the nested endpoint would never be reached.
+    it('refuses a path nested under a path-key endpoint\'s path, either way round', function (array $endpoints, string $path) {
+        config(['bloodhound.endpoints' => $endpoints]);
+
+        expect(fn () => AnnounceRouting::endpoints())->toThrow(InvalidArgumentException::class, $path);
+    })->with([
+        'under the primary\'s announce path' => [['legacy' => ['announce_path' => 'announce/legacy.php', 'scrape_path' => 'scrape.php', 'key_source' => 'query']], '"announce/legacy.php"'],
+        'under the primary\'s scrape path' => [['legacy' => ['announce_path' => 'announce.php', 'scrape_path' => 'scrape/legacy.php', 'key_source' => 'query']], '"scrape/legacy.php"'],
+        'a path-key endpoint\'s path above another\'s' => [['wide' => ['announce_path' => 'tracker', 'scrape_path' => 'tracker-scrape'], 'deep' => ['announce_path' => 'tracker/announce.php', 'scrape_path' => 'tracker/scrape.php', 'key_source' => 'query']], '"tracker/announce.php"'],
+    ]);
+
+    it('allows a path under a query-key endpoint\'s path, which answers only its exact path', function () {
+        config(['bloodhound.routes.key_source' => 'query', 'bloodhound.endpoints' => ['nested' => ['announce_path' => 'announce/nested', 'scrape_path' => 'scrape/nested']]]);
+
+        expect(array_keys(AnnounceRouting::endpoints()))->toBe([AnnounceRouting::PRIMARY, 'nested']);
+    });
+
+    it('does not take a shared prefix for nesting', function () {
+        config(['bloodhound.endpoints' => ['other' => ['announce_path' => 'announcement', 'scrape_path' => 'scraper']]]);
+
+        expect(array_keys(AnnounceRouting::endpoints()))->toBe([AnnounceRouting::PRIMARY, 'other']);
+    });
+
     it('names both endpoints in the message', function () {
         config(['bloodhound.endpoints' => ['clash' => ['announce_path' => 'announce', 'scrape_path' => 'other']]]);
 
