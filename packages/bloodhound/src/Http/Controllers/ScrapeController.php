@@ -31,9 +31,10 @@ class ScrapeController extends Controller
      */
     public function __invoke(Request $request, ?string $announceKey = null): Response
     {
-        $announceKey = AnnounceRouting::keyFromRequest($request, $announceKey);
+        $endpoint = AnnounceRouting::forRequest($request);
+        $announceKey = $endpoint->keyFromRequest($request, $announceKey);
 
-        if ($announceKey !== null && ! AnnounceRouting::matches($announceKey)) {
+        if ($announceKey !== null && ! $endpoint->matches($announceKey)) {
             return TrackerResponse::error('Invalid announce key');
         }
 

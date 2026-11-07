@@ -7,6 +7,23 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+> A tracker can serve several announce URLs at once: its native one beside the legacy URL old .torrent files still announce to.
+
+### Added
+
+- **`bloodhound.endpoints`: more announce URLs, served together** (Job #109). A migrating
+  tracker doesn't cut over: .torrent files issued years ago announce to the old URL, new
+  ones to the native one, both at once. `bloodhound.routes` stays the primary endpoint,
+  unchanged, with the route names `tracker.announce` / `tracker.scrape` and the URL new
+  downloads carry. Each entry in `bloodhound.endpoints` takes the same keys (paths, key
+  source, parameter, pattern, `malformed_key`) and is routed as
+  `tracker.announce.<name>` / `tracker.scrape.<name>`. Each endpoint vets keys against its
+  own pattern, and a path-key endpoint gets its own bencoded "Invalid announce key"
+  fallback. Two endpoints sharing a path refuse to boot, naming both, rather than one
+  silently shadowing the other.
+
 ## [11.2.0] — 2026-11-07
 
 > Operators can correct a member's totals on the record: accept stored totals the ledger can't explain, or give and take an amount, with who and why.

@@ -36,12 +36,15 @@ class AnnounceController extends Controller
      */
     public function __invoke(Request $request, ?string $announceKey = null): Response
     {
-        $announceKey = AnnounceRouting::keyFromRequest($request, $announceKey);
+        // The endpoint the request came in on (Job #109): its own key source
+        // and pattern, never another endpoint's.
+        $endpoint = AnnounceRouting::forRequest($request);
+        $announceKey = $endpoint->keyFromRequest($request, $announceKey);
 
         // Absent entirely (query mode, parameter missing) or malformed. Both are
         // a bencoded failure with HTTP 200, the shape every other tracker error
         // uses — clients surface the reason rather than reporting a dead tracker.
-        if ($announceKey === null || ! AnnounceRouting::matches($announceKey)) {
+        if ($announceKey === null || ! $endpoint->matches($announceKey)) {
             return TrackerResponse::error('Invalid announce key');
         }
 

@@ -79,6 +79,35 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | More announce endpoints
+    |--------------------------------------------------------------------------
+    |
+    | URL shapes served beside the one above, all at once. A tracker migrating
+    | onto Marque keeps its old URL live for the .torrent files already on
+    | strangers' disks, while new downloads carry the URL above. Each entry is
+    | named (lowercase letters, digits, - and _) and takes the same keys as
+    | 'routes'; anything left out gets the same default. Its routes are named
+    | tracker.announce.<name> and tracker.scrape.<name>.
+    |
+    | No two endpoints may share a path, and that includes one's announce on
+    | another's scrape: only one would ever answer, so it refuses to boot.
+    |
+    |   'endpoints' => [
+    |       'legacy' => [
+    |           'announce_path' => 'announce.php',
+    |           'scrape_path'   => 'scrape.php',
+    |           'key_source'    => 'query',
+    |           'key_parameter' => 'passkey',
+    |           'key_pattern'   => '[0-9a-f]{32}',
+    |       ],
+    |   ],
+    |
+    */
+
+    'endpoints' => [],
+
+    /*
+    |--------------------------------------------------------------------------
     | Uploads
     |--------------------------------------------------------------------------
     |
