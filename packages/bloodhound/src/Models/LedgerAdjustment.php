@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Marque\Bloodhound\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use LogicException;
 
 /**
@@ -28,7 +29,7 @@ use LogicException;
  * @property int $leechtime
  * @property string $reason
  * @property int $made_by
- * @property \Illuminate\Support\Carbon|null $created_at
+ * @property Carbon|null $created_at
  */
 class LedgerAdjustment extends Model
 {
