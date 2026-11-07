@@ -7,7 +7,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [Unreleased]
+## [11.3.0] — 2026-11-08
 
 > A tracker can serve several announce URLs at once: its native one beside the legacy URL old .torrent files still announce to.
 
