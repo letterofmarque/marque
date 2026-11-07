@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Marque\Bloodhound\Support;
 
 use Illuminate\Http\Request;
+use InvalidArgumentException;
+use Marque\Bloodhound\Contracts\AnnounceTransform;
 
 /**
  * One announce URL shape: where its announce and scrape live, and where and
@@ -36,6 +38,8 @@ final class AnnounceEndpoint
         public readonly string $keyParameter,
         public readonly string $keyPattern,
         public readonly string $malformedKey,
+        /** @var class-string<AnnounceTransform>|null */
+        public readonly ?string $transform = null,
     ) {}
 
     /**
@@ -61,7 +65,52 @@ final class AnnounceEndpoint
             // Only an explicit 'not_found' gets the router's 404. A published
             // config from before 8.1 has no such key, and gets the default.
             malformedKey: ($config['malformed_key'] ?? null) === 'not_found' ? 'not_found' : 'failure',
+            transform: self::transformClass($name, $config['transform'] ?? null),
         );
+    }
+
+    /**
+     * The request the native flow should see: the transform's reshaping of
+     * it, or the request itself when the endpoint names none. The transform
+     * comes from the container, by the class name config gave.
+     */
+    public function transform(Request $request): Request
+    {
+        if ($this->transform === null) {
+            return $request;
+        }
+
+        /** @var AnnounceTransform $transform */
+        $transform = app($this->transform);
+
+        return $transform->apply($request);
+    }
+
+    /**
+     * A transform is named by class, and only a class implementing
+     * AnnounceTransform is accepted (Spec #117). A file path, a function name,
+     * anything not shaped like a class name, is refused before it reaches the
+     * autoloader: config naming code to run on the announce path, which
+     * strangers hit unauthenticated, would be remote code execution.
+     *
+     * @return class-string<AnnounceTransform>|null
+     */
+    private static function transformClass(string $endpoint, mixed $transform): ?string
+    {
+        if ($transform === null || $transform === '') {
+            return null;
+        }
+
+        $named = is_string($transform) ? $transform : get_debug_type($transform);
+
+        if (! is_string($transform)
+            || preg_match('/^\\\\?[A-Za-z_][A-Za-z0-9_]*(\\\\[A-Za-z_][A-Za-z0-9_]*)+$/D', $transform) !== 1
+            || ! class_exists($transform)
+            || ! is_subclass_of($transform, AnnounceTransform::class)) {
+            throw new InvalidArgumentException("bloodhound endpoint \"{$endpoint}\": transform must name a class implementing ".AnnounceTransform::class.", resolved from the container. Got {$named}.");
+        }
+
+        return ltrim($transform, '\\');
     }
 
     public function keyIsInQuery(): bool

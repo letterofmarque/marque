@@ -32,6 +32,7 @@ class ScrapeController extends Controller
     public function __invoke(Request $request, ?string $announceKey = null): Response
     {
         $endpoint = AnnounceRouting::forRequest($request);
+        $request = $endpoint->transform($request);
         $announceKey = $endpoint->keyFromRequest($request, $announceKey);
 
         if ($announceKey !== null && ! $endpoint->matches($announceKey)) {

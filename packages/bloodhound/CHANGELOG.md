@@ -23,6 +23,14 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   own pattern, and a path-key endpoint gets its own bencoded "Invalid announce key"
   fallback. Two endpoints sharing a path refuse to boot, naming both, rather than one
   silently shadowing the other.
+- **An endpoint can name an `AnnounceTransform`** (Job #109): a class, resolved from the
+  container, that reshapes a legacy request (a renamed parameter, a key in another case)
+  into one the native tracker accepts, before announce or scrape handle it. Only a class
+  implementing `Marque\Bloodhound\Contracts\AnnounceTransform` is accepted; a file path or
+  function name refuses to boot, since config naming code to run on the announce URL would
+  be remote code execution. bloodhound reads `info_hash` and `peer_id` from the raw query
+  string, so `ReshapedRequest::withQueryString()` builds the reshaped request with both
+  in step.
 
 ## [11.2.0] — 2026-11-07
 

@@ -39,6 +39,10 @@ class AnnounceController extends Controller
         // The endpoint the request came in on (Job #109): its own key source
         // and pattern, never another endpoint's.
         $endpoint = AnnounceRouting::forRequest($request);
+
+        // A legacy endpoint's transform reshapes the request first (Job #109);
+        // everything below sees the reshaped one.
+        $request = $endpoint->transform($request);
         $announceKey = $endpoint->keyFromRequest($request, $announceKey);
 
         // Absent entirely (query mode, parameter missing) or malformed. Both are

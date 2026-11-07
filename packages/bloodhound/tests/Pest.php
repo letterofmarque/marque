@@ -20,6 +20,7 @@ use Marque\Bloodhound\Tests\RatioModeOffTestCase;
 use Marque\Bloodhound\Tests\RatioModeSeedtimeTestCase;
 use Marque\Bloodhound\Tests\TestCase;
 use Marque\Bloodhound\Tests\TestUser;
+use Marque\Bloodhound\Tests\TransformTestCase;
 use Marque\Threepio\Http\Middleware\BlockBrowsers;
 use Marque\Threepio\Support\Bencode;
 use Marque\Trove\Contracts\TrackerStatsInterface;
@@ -41,6 +42,7 @@ pest()->extend(QueryKeyTestCase::class)->in('RoutingQuery');
 pest()->extend(CustomPatternTestCase::class)->in('RoutingPattern');
 pest()->extend(MalformedKeyNotFoundTestCase::class)->in('RoutingMalformed');
 pest()->extend(EndpointsTestCase::class)->in('RoutingEndpoints');
+pest()->extend(TransformTestCase::class)->in('RoutingTransform');
 
 // Spec #119: the stats binding must hold in every ratio_mode, and a binding is
 // decided before boot — so ratio_mode is set before the app boots, a directory
