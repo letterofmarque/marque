@@ -221,7 +221,8 @@ the shipped one whole (see [Configuration](#configuration)).
 On announce a missing key is refused the same way. Scrape accepts a missing key, since a
 public scrape is legitimate, and refuses only a malformed one. Only the configured paths
 are covered. A legacy URL at a different path (`/announce.php` when you serve `/announce`)
-is still the app's 404 until you configure that path.
+is still the app's 404 until you configure it, as an
+[additional endpoint](#serving-the-old-url-and-the-new-one-at-once) if the new URL stays.
 
 #### An nginx rewrite is the right fix for an outage, not for a migration
 
@@ -231,13 +232,165 @@ concern in deployment config where the application cannot see it, it is easy to 
 server rebuild, it cannot be covered by this package's tests, and it does nothing for
 anyone on a host where they do not control the web server.
 
-#### Before you build "unknown key → import from the old tracker"
+#### Serving the old URL and the new one at once
 
-A migration often wants to auto-create an account the first time a legacy key announces.
-That feature belongs in your application, not here — but note this before you build it:
-**bloodhound mints its own 32-character alphanumeric keys.** If a legacy key can collide
-with a bloodhound-generated one, that is account takeover, not a data bug. Prove the two
-key formats are disjoint first.
+A migration doesn't cut over. The .torrent files issued years ago announce to the old URL
+for as long as they're seeded, while the ones you issue now should carry the native one.
+So serve both: `routes` above is the **primary** endpoint, and `endpoints` lists more,
+each with the same keys, all live together.
+
+<!-- check-docs: ignore — an example endpoint; its name is the operator's choice and ships empty -->
+```php
+'routes' => [ /* the native /announce/{key}, unchanged */ ],
+
+'endpoints' => [
+    'legacy' => [
+        'announce_path' => 'announce.php',
+        'scrape_path'   => 'scrape.php',
+        'key_source'    => 'query',
+        'key_parameter' => 'passkey',
+        'key_pattern'   => '[0-9a-f]{32}',
+    ],
+],
+```
+
+Coming from TBDev or Gazelle, that serves `announce.php?passkey=<key>` beside
+`/announce/<key>`, each checking keys against its own pattern.
+
+- **Names.** The primary keeps `tracker.announce` and `tracker.scrape`; the others are
+  `tracker.announce.<name>` and `tracker.scrape.<name>`. A name is lowercase letters,
+  digits, `-` and `_`.
+- **Downloads** carry the primary endpoint's URL. Only old files use the others.
+- **A key in the path** gets the same bencoded "Invalid announce key" fallback on every
+  endpoint, per its own `malformed_key`.
+- **No two endpoints may share a path**, including one's announce path as another's
+  scrape path. Laravel would let the first route win without a word, so bloodhound
+  refuses to boot instead, naming both.
+
+#### Reshaping old requests: transforms
+
+Sometimes the old URL isn't just a different place: a parameter has another name, or keys
+were stored in another case. An endpoint can name a **transform**, a class that reshapes
+each request before announce and scrape handle it:
+
+<!-- check-docs: ignore — an example endpoint; its name is the operator's choice and ships empty -->
+```php
+'legacy' => [
+    // ...
+    'transform' => App\Tracker\OldTrackerTransform::class,
+],
+```
+
+```php
+use Illuminate\Http\Request;
+use Marque\Bloodhound\Contracts\AnnounceTransform;
+use Marque\Bloodhound\Support\ReshapedRequest;
+use Marque\Trove\Contracts\UserInterface;
+
+class OldTrackerTransform implements AnnounceTransform
+{
+    public function apply(Request $request): Request
+    {
+        // The old links say ?pk=; this endpoint reads ?passkey=.
+        $query = preg_replace('/(^|&)pk=/', '$1passkey=', (string) $request->server('QUERY_STRING'));
+
+        return ReshapedRequest::withQueryString($request, $query);
+    }
+
+    public function resolveUser(Request $request): ?UserInterface
+    {
+        return null; // see Lazy migration, below
+    }
+}
+```
+
+- **It's a class, from the container, never a file.** The announce URL is the most
+  probed, least authenticated address a tracker has; a config value naming code to run
+  there would be remote code execution. Anything but a class implementing
+  `AnnounceTransform` refuses to boot.
+- **Build the new query with `ReshapedRequest::withQueryString()`.** bloodhound reads
+  `info_hash` and `peer_id`, which are binary, from the raw query string, not the parsed
+  one, and this keeps the two in step.
+- **It reshapes; it can't stop a request.** A broken transform produces a request the
+  normal checks refuse with a bencoded error, never a tracker that silently stops
+  answering.
+- **Scrape uses the same transform** as its endpoint's announce. A legacy scrape URL has
+  the same shape.
+- **Key case on MySQL and MariaDB.** Their default collation compares announce keys
+  without regard to case, so lower-casing keys changes nothing there; on PostgreSQL and
+  SQLite it does.
+
+#### Lazy migration: members arrive when they first announce
+
+Importing every member of the old tracker means 100,000 rows of whom perhaps 10,000 ever
+come back. Instead, a transform's `resolveUser()` can find the announcing member itself,
+and provision one the old tracker knows but Marque doesn't yet:
+
+```php
+use Marque\Bloodhound\Services\AnnounceKeyProvisioner;
+
+public function __construct(private AnnounceKeyProvisioner $provisioner) {}
+
+public function resolveUser(Request $request): ?UserInterface
+{
+    $key = (string) $request->query('passkey');
+
+    return $this->provisioner->provision($key, function () use ($key) {
+        $old = DB::connection('old_tracker')->table('users')->where('passkey', $key)->first();
+
+        if ($old === null) {
+            return null; // not one of ours: nothing is created
+        }
+
+        return User::create(['name' => $old->username, 'email' => $old->email]);
+    });
+}
+```
+
+The contract:
+
+- **What `resolveUser()` returns replaces the native lookup.** One lookup either way, not
+  two. Null means "not mine", and the native lookup by key runs as usual.
+- **Null never means "create one".** The old tracker is the gate: a key it never issued
+  creates nothing and is answered "Unknown announce key", like any other unknown key.
+- **A key Marque already knows** returns its member without running your creator, so the
+  old tracker is asked once per member.
+- **Exactly one member per key, under concurrency.** A client announcing to twenty
+  torrents sends twenty first announces at once. The member and their key are written in
+  one transaction, and the unique indexes refuse all but one; the others roll back and get
+  the winner's member.
+- **The member keeps their old key** as their Marque key, so their old .torrent files and
+  the native URL both work.
+- **A provisioned member is checked like anyone:** a disabled account is refused.
+- **If the old tracker can't be reached, that's your transform's call.** An exception
+  from the creator rolls back anything it created and answers the client with an HTTP
+  error, which clients retry. Return null instead and the client is told "Unknown announce
+  key".
+
+**Bring their old ratio with them.** Provisioned at zero, a member can be restricted by
+your ratio rules for being new. Carry their old figures over in the creator, on the
+record (see [Correcting the numbers](#correcting-the-numbers)):
+
+```php
+$user = User::create([/* ... */]);
+
+app(LedgerAdjuster::class)->adjust($user->id, 0, ['uploaded' => $old->uploaded, 'downloaded' => $old->downloaded],
+    by: $operatorId, reason: 'Carried over from the old tracker');
+```
+
+**Prove the key formats are disjoint first.** bloodhound mints its own keys, 32 random
+letters and digits. If an old key could equal a key bloodhound minted for someone else,
+the old member's announces would credit that someone else: account takeover, not a data
+bug. A 32-character hex key colliding with a random one is vanishingly unlikely, but if
+your old keys are short, guessable or reused, don't put them in `announce_keys` at all.
+Keep them in a mapping table of your own, have `resolveUser()` look them up there, and
+issue the member a fresh key with `TrackerStatsInterface::regenerateAnnounceKey()`. That
+path is yours to make race-safe.
+
+**Not verified: `route:cache`.** Endpoint routes are ordinary named routes and should
+cache like any others, but a package test can't prove it: `route:cache` re-bootstraps the
+app without the providers the test harness injects. After caching, check
+`php artisan route:list` on your own app.
 
 ### Announce Flow
 
@@ -877,6 +1030,7 @@ Covered in full under [Announce URL shape](#announce-url-shape) above.
 | `routes.key_parameter` | `announce_key` | Route segment or query parameter name |
 | `routes.key_pattern` | `[0-9a-zA-Z]{32}` | Regex the key must match — no delimiters, no anchors |
 | `routes.malformed_key` | `failure` | A malformed key in the path: `failure` (bencoded reason) or `not_found` (the router's 404, the default before 9.0) |
+| `endpoints` | `[]` | More announce URLs served beside `routes`, by name, each taking the keys above plus an optional `transform` class (see [Serving the old URL and the new one at once](#serving-the-old-url-and-the-new-one-at-once)) |
 
 ### Redis and baselines
 

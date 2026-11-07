@@ -40,8 +40,8 @@ return [
     | 'announce_path'  Path segment, no leading slash. 'announce.php' is fine.
     | 'scrape_path'    Same, for scrape. Change both or you half-migrate.
     | 'key_source'     'path' (/announce/<key>) or 'query' (?passkey=<key>).
-    | 'key_parameter'  Route segment name, or query parameter name. TBDev and
-    |                  Gazelle-derived trackers use 'passkey'.
+    | 'key_parameter'  Route segment name, or query parameter name. Many older
+    |                  trackers use 'passkey'.
     | 'key_pattern'    Regex (no delimiters) the key must match. ONE source of
     |                  truth — the route constraint and the controllers all
     |                  read this, so they cannot drift apart.
