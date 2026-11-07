@@ -499,11 +499,16 @@ function checkDoc(string $path, string $root): void
                 $codeLang = strtolower($fm[1]);
                 $snippet = [];
                 $snippetStart = $n + 1;
+                // A marker on the line before the fence covers the whole
+                // snippet: an example keyed by a name the reader chooses
+                // can't be checked against what ships.
+                $snippetMarker = $marker;
             } else {
                 $inCode = false;
                 if ($codeLang === 'php' && $configName !== null && isset($configs[$configName])) {
-                    checkSnippet($snippet, $snippetStart, $configName, $emit);
+                    checkSnippet($snippet, $snippetStart, $configName, $emit, $snippetMarker ?? null);
                 }
+                $snippetMarker = null;
             }
 
             continue;
@@ -613,7 +618,7 @@ function checkKey(string $key, ?string $documented, int $line, string $configNam
  * A PHP snippet documenting config: every `'key' =>` in it must exist, and a
  * literal or env() default must match.
  */
-function checkSnippet(array $snippet, int $start, string $configName, callable $emit): void
+function checkSnippet(array $snippet, int $start, string $configName, callable $emit, ?string $marker = null): void
 {
     // Only a pure config fragment — every line a `'key' => value`, a closing
     // bracket, or a comment. Anything with code in it (`$torrent->update([...])`)
@@ -641,7 +646,7 @@ function checkSnippet(array $snippet, int $start, string $configName, callable $
         if (preg_match('/=>\s*env\(\s*[\'"][^\'"]+[\'"]\s*,\s*(.+?)\)\s*,?\s*(\/\/.*)?$/', $text, $dm)) {
             $default = $dm[1];
         }
-        checkKey($path, $default, $line, $configName, null, $emit);
+        checkKey($path, $default, $line, $configName, $marker, $emit);
     }
 }
 

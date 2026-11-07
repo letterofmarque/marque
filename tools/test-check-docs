@@ -314,6 +314,53 @@ run_case hatch-bare
 [[ $status -ne 0 ]] && pass "escape hatch: a marker with no reason is itself a finding" \
     || fail "escape hatch: a marker with no reason is itself a finding" "$out"
 
+# A config snippet that's an example, keyed by a name the operator chooses
+# (bloodhound's `endpoints`), can't be checked against what ships. A marker on
+# the line before the fence covers the whole snippet, as it covers whatever
+# line follows it anywhere else.
+make_repo "$SCRATCH/hatch-snippet"
+cat >>"$SCRATCH/hatch-snippet/packages/acme/README.md" <<'MD'
+
+Add your own in `config/acme.php`:
+
+<!-- check-docs: ignore — an example entry; its name is the operator's -->
+```php
+'widgets' => [
+    'mine' => [
+        'colour' => 'red',
+    ],
+],
+```
+MD
+run_case hatch-snippet
+[[ $status -eq 0 ]] && pass "escape hatch: a marker before a config snippet covers the snippet" \
+    || fail "escape hatch: a marker before a config snippet covers the snippet" "$out"
+expect "$out" "escape hatch: each covered key is still listed" 'ignored.*widgets\.mine\.colour|ignored.*operator'
+
+# …and only that snippet: the next one is checked as usual.
+make_repo "$SCRATCH/hatch-snippet-once"
+cat >>"$SCRATCH/hatch-snippet-once/packages/acme/README.md" <<'MD'
+
+In `config/acme.php`:
+
+<!-- check-docs: ignore — an example entry; its name is the operator's -->
+```php
+'widgets' => [
+    'mine' => [
+        'colour' => 'red',
+    ],
+],
+```
+
+```php
+'gadgets' => [
+    'theirs' => true,
+],
+```
+MD
+run_case hatch-snippet-once
+expect "$out" "escape hatch: a snippet marker doesn't reach the next snippet" 'config-missing.*`gadgets\.theirs`'
+
 # ── 3. False positives found on the first real run ───────────────────────
 #
 # The first pass over main produced findings that were not true. Each case
