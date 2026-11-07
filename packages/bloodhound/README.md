@@ -176,8 +176,7 @@ cannot reissue them. So bloodhound lets you keep serving the URL they expect:
 ],
 ```
 
-Coming from TBDev, Gazelle, or one of their many forks — where the key is a query
-parameter — that is:
+Coming from TBDev or one of its many forks, where the key is a query parameter, that is:
 
 ```env
 BLOODHOUND_ANNOUNCE_PATH=announce.php
@@ -254,8 +253,10 @@ each with the same keys, all live together.
 ],
 ```
 
-Coming from TBDev or Gazelle, that serves `announce.php?passkey=<key>` beside
-`/announce/<key>`, each checking keys against its own pattern.
+Coming from TBDev or one of its forks, that serves `announce.php?passkey=<key>` beside
+`/announce/<key>`, each checking keys against its own pattern. bloodhound routes a key
+after the path or in the query; a tracker whose key comes before the path (Gazelle's
+Ocelot announces to `/<key>/announce`) needs a web-server rewrite to one of those.
 
 - **Names.** The primary keeps `tracker.announce` and `tracker.scrape`; the others are
   `tracker.announce.<name>` and `tracker.scrape.<name>`. A name is lowercase letters,
@@ -308,13 +309,14 @@ class OldTrackerTransform implements AnnounceTransform
 
 - **It's a class, from the container, never a file.** The announce URL is the most
   probed, least authenticated address a tracker has; a config value naming code to run
-  there would be remote code execution. Anything but a class implementing
+  there would be remote code execution. Anything but a namespaced class implementing
   `AnnounceTransform` refuses to boot.
 - **Build the new query with `ReshapedRequest::withQueryString()`.** bloodhound reads
   `info_hash` and `peer_id`, which are binary, from the raw query string, not the parsed
   one, and this keeps the two in step.
-- **It reshapes; it can't stop a request.** A broken transform produces a request the
-  normal checks refuse with a bencoded error, never a tracker that silently stops
+- **It reshapes; it can't decline a request.** A transform that returns a malformed
+  request is refused by the normal checks with a bencoded error; one that throws is
+  answered with an HTTP error, which clients retry. Either way the tracker keeps
   answering.
 - **Scrape uses the same transform** as its endpoint's announce. A legacy scrape URL has
   the same shape.
@@ -351,8 +353,9 @@ public function resolveUser(Request $request): ?UserInterface
 
 The contract:
 
-- **What `resolveUser()` returns replaces the native lookup.** One lookup either way, not
-  two. Null means "not mine", and the native lookup by key runs as usual.
+- **What `resolveUser()` returns replaces the native lookup.** When the transform finds
+  the member, that's the only lookup. Null means "not mine", and the native lookup by key
+  runs as usual.
 - **Null never means "create one".** The old tracker is the gate: a key it never issued
   creates nothing and is answered "Unknown announce key", like any other unknown key.
 - **A key Marque already knows** returns its member without running your creator, so the
@@ -378,16 +381,25 @@ which runs once the member is committed and only in the request that created the
 return $this->provisioner->provision($key, $create, function (UserInterface $user) use ($key) {
     $old = DB::connection('old_tracker')->table('users')->where('passkey', $key)->first();
 
-    app(LedgerAdjuster::class)->adjust($user->getAuthIdentifier(), 0,
-        ['uploaded' => $old->uploaded, 'downloaded' => $old->downloaded],
+    // adjust() refuses an adjustment that moves nothing.
+    if ((int) $old->uploaded === 0 && (int) $old->downloaded === 0) {
+        return;
+    }
+
+    app(LedgerAdjuster::class)->adjust((int) $user->getAuthIdentifier(), 0,
+        ['uploaded' => (int) $old->uploaded, 'downloaded' => (int) $old->downloaded],
         by: $operatorId, reason: 'Carried over from the old tracker');
 });
 ```
 
+`$operatorId` is the user id of an existing admin, recorded as the one who carried the
+figures over.
+
 Not in the creator: the ledger can live on its own database, where an adjustment commits
 straight away, and a request that loses the race rolls its member back, which would leave
-the adjustment behind. If the adjustment fails, the member stays, without their old
-figures, and the error says so; `bloodhound:adjust-totals` can add them afterwards.
+the adjustment behind. If the adjustment fails, the member stays without their old
+figures: the adjuster's exception answers that announce with an HTTP error and is logged,
+and `bloodhound:adjust-totals` can add the figures afterwards.
 
 **Prove the key formats are disjoint first.** bloodhound mints its own keys, 32 random
 letters and digits. If an old key could equal a key bloodhound minted for someone else,

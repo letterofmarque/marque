@@ -34,12 +34,13 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   in step.
 - **Lazy migration: a transform can find the announcing member, and provision one the old
   tracker knows but Marque doesn't yet** (Job #109). `resolveUser()` replaces the native
-  lookup by key rather than adding to it (one lookup either way); null means "not mine",
-  and the native lookup runs. `AnnounceKeyProvisioner::provision($key, $create)` is how a
+  lookup by key rather than adding to it; null means "not mine", and the native lookup
+  runs. `AnnounceKeyProvisioner::provision($key, $create)` is how a
   transform provisions: a key Marque knows returns its member without calling `$create`;
   for an unknown key `$create` asks the old tracker (the gate) and creates the member, or
   returns null and nothing is created. The member keeps their old key, so their old
-  .torrent files and the native URL both work. Concurrent first announces with one key
+  .torrent files and the native URL both work, including on a model whose
+  `HasTrackerStats` issues a fresh key on create (the old key replaces it). Concurrent first announces with one key
   produce exactly one member: the losing request rolls back and returns the winner's.
   `provision()`'s third argument runs once the member is committed, only in the request
   that created them, which is where a transform carries the member's old figures over with
