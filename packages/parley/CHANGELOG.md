@@ -5,7 +5,7 @@ All notable changes to `marque/parley` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
-## [Unreleased]
+## [4.0.1] — 2026-11-07
 
 > A comment thread acts on its own thread only: a crafted request can't post a comment or reply into another one.
 

@@ -8,7 +8,7 @@ those versions describe the package under its former names.*
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
-## [Unreleased]
+## [2.2.1] — 2026-11-07
 
 > A crafted Livewire request can no longer make the navigation 500, or rewrite its links.
 

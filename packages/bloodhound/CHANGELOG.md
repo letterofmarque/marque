@@ -7,7 +7,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [Unreleased]
+## [11.2.0] — 2026-11-07
 
 > Operators can correct a member's totals on the record: accept stored totals the ledger can't explain, or give and take an amount, with who and why.
 

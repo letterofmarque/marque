@@ -5,7 +5,7 @@ All notable changes to `marque/squidink` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
-## [Unreleased]
+## [1.1.5] — 2026-11-07
 
 > The Livewire editor's settings can't be changed from the client; a bogus parser name no longer makes the preview 500.
 

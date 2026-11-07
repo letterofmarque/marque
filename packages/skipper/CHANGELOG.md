@@ -5,7 +5,7 @@ All notable changes to `marque/skipper` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
-## [Unreleased]
+## [1.1.1] — 2026-11-07
 
 > A crafted Livewire request can no longer rewrite the admin panel's tiles.
 
