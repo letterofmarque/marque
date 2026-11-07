@@ -1184,8 +1184,9 @@ tracker, history from before the ledger, a speed forfeit you decide was wrong. R
 reports the first two as drift every day, and the rebuild it recommends would erase them.
 The third never reached the totals at all.
 
-Two commands correct a member's totals **on the record**. Each writes a row to
-`ledger_adjustments` with the amounts (signed), the torrent (0 for the member as a whole),
+Two commands correct a member's totals **on the record**. Each writes rows to
+`ledger_adjustments` (accept-totals one per torrent it records, adjust-totals one) with the
+amounts (signed), the torrent (0 for the member as a whole),
 who decided (`--by`, a user id, required) and why (`--reason`, required). Each shows what
 it will write and asks first (`--force` for a script), logs a warning, and records a staff
 action (`bloodhound.ledger.accepted` or `bloodhound.ledger.adjusted`) that bosun's Audit
@@ -1195,7 +1196,9 @@ reconcile is clean afterwards and a rebuild keeps the result.
 **`bloodhound:accept-totals`: the stored totals are right.** It records the gap between
 what's stored and what the ledger explains: per torrent from `torrent_user`, and what the
 member holds beyond their torrents on torrent 0. Either way round: a stored total below
-its ledger is accepted too. The totals themselves don't change. `--user=` for one member,
+its ledger is accepted too. The member's totals don't change; a `torrent_user` row on
+torrent 0, where there is one, is brought into line with the member-level part, as a
+rebuild would bring it. `--user=` for one member,
 or `--all` for everyone reconcile reports.
 
 ```bash

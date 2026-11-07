@@ -19,7 +19,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   first two as drift every day, and the rebuild it recommended erased them; the third
   never reached the totals. Now:
   - `bloodhound:accept-totals --user=|--all` records the stored totals as correct, per
-    torrent and on torrent 0 (the member as a whole), without changing them.
+    torrent and on torrent 0 (the member as a whole), without changing the member's totals.
   - `bloodhound:adjust-totals` gives or takes a stated amount, moving the totals with it.
   - `bloodhound:ledger-adjustments` lists them.
 

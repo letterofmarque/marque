@@ -39,13 +39,13 @@ php artisan usarrs:owner you@example.com
 
 ## What's recorded
 
-Whatever the packages record. As of Marque 11.0 that is:
+Whatever the packages record. As of bloodhound 11.2 that is:
 
 | Package | Actions |
 |---|---|
 | usarrs | `usarrs.user.banned`, `unbanned`, `role_changed`; `usarrs.invite.revoked` |
 | trove | `trove.torrent.edited` (through guise, disguise and cennad), `trove.torrent.deleted` (through cennad's API) |
-| bloodhound | `bloodhound.exemption.granted`, `removed`; `bloodhound.seedbox.approved`, `revoked` |
+| bloodhound | `bloodhound.exemption.granted`, `removed`; `bloodhound.seedbox.approved`, `revoked`; `bloodhound.ledger.accepted`, `adjusted` |
 | parley | `parley.thread.pinned`, `unpinned`, `locked`, `unlocked`, `edited`, `deleted`; `parley.post.edited`, `deleted` |
 | taxonomy | `taxonomy.term.added`, `renamed`, `deleted`; `taxonomy.facet_value.added`, `deleted` |
 

@@ -50,7 +50,7 @@ $this->app->make(AdminScreenRegistry::class)->register(new AdminScreen(
 | `component` | The Livewire component that renders the screen |
 | `path` | Where it lives, relative to the panel: the first segment stands for the panel prefix and is replaced by `skipper.prefix` (`admin/clients` is served at `/staff/clients` with the prefix `staff`); a single-segment path is used as-is under the prefix |
 | `minimumRole` | The floor. Enforced on the listing **and** on the request |
-| `icon` | Optional, rendered from `deck`'s icon set, which is small: `arrow-left`, `arrow-down-tray`, `magnifying-glass`, `pencil`, `plus`. Any other name renders nothing |
+| `icon` | Optional, rendered from `deck`'s icon set, which is small: see [deck's Icons](../deck/README.md#icons) for the names. Any other name renders nothing |
 | `group` | Optional heading. Ungrouped screens fall under `skipper.default_group` |
 | `position` | Ordering within the group. Lower first |
 

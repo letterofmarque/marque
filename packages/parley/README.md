@@ -17,7 +17,7 @@ thread and a titled, categorised thread are the same row shape with different co
 Building that as a single polymorphic model means a comment box and a forum share every
 line of posting, replying, editing and moderation logic — nothing is implemented twice, and
 anything that later wants discussion (requests, uploads, user profiles) gets it by attaching
-to the same `threads` table.
+to the same `parley_threads` table.
 
 Parley does not implement its own text formatting. Post bodies go through
 [marque/squidink](https://github.com/letterofmarque/squidink) — parley stores source text
