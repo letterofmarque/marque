@@ -11,7 +11,10 @@ use Marque\Trove\Contracts\UserInterface;
 
 /**
  * A reshaping transform, as a migration would write one: old links carry the
- * key in upper-case hex, and the keys copied into Marque are lower-case.
+ * key as `pk`, in upper-case hex, where the endpoint reads `passkey` and the
+ * keys copied into Marque are lower-case. (Case alone wouldn't show what the
+ * transform did on every engine: MySQL and MariaDB compare keys
+ * case-insensitively under their default collation.)
  *
  * Records every path it reshaped, so a test can tell announce from scrape.
  */
@@ -27,8 +30,8 @@ class LowercaseKeyTransform implements AnnounceTransform
         $pairs = [];
 
         foreach (explode('&', (string) $request->server('QUERY_STRING', '')) as $pair) {
-            if (str_starts_with($pair, 'passkey=')) {
-                $pair = strtolower($pair);
+            if (str_starts_with($pair, 'pk=')) {
+                $pair = 'passkey='.strtolower(substr($pair, 3));
             }
 
             $pairs[] = $pair;

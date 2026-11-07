@@ -7,6 +7,7 @@ namespace Marque\Bloodhound\Support;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
 use Marque\Bloodhound\Contracts\AnnounceTransform;
+use Marque\Trove\Contracts\UserInterface;
 
 /**
  * One announce URL shape: where its announce and scrape live, and where and
@@ -84,6 +85,24 @@ final class AnnounceEndpoint
         $transform = app($this->transform);
 
         return $transform->apply($request);
+    }
+
+    /**
+     * The announcing member as the endpoint's transform finds them, or null
+     * when it names none or resolves no one: the native lookup by key then
+     * runs. A resolving transform replaces that lookup rather than adding to
+     * it. Null never means "create one".
+     */
+    public function resolveUser(Request $request): ?UserInterface
+    {
+        if ($this->transform === null) {
+            return null;
+        }
+
+        /** @var AnnounceTransform $transform */
+        $transform = app($this->transform);
+
+        return $transform->resolveUser($request);
     }
 
     /**

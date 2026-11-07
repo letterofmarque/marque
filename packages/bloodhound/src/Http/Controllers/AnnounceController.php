@@ -8,7 +8,7 @@ use BackedEnum;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
-use Marque\Bloodhound\Models\AnnounceKey;
+use Marque\Bloodhound\Services\AnnounceKeyProvisioner;
 use Marque\Bloodhound\Services\AnnounceService;
 use Marque\Bloodhound\Support\AnnounceRouting;
 use Marque\Threepio\Support\PeerAddresses;
@@ -52,8 +52,10 @@ class AnnounceController extends Controller
             return TrackerResponse::error('Invalid announce key');
         }
 
-        // Find user by announce key
-        $user = $this->findUserByAnnounceKey($announceKey);
+        // The endpoint's transform finds the member if it can (and may
+        // provision one a migration hasn't brought over yet); otherwise the
+        // native lookup by key. One or the other, never both (Job #109).
+        $user = $endpoint->resolveUser($request) ?? $this->findUserByAnnounceKey($announceKey);
         if ($user === null) {
             return TrackerResponse::error('Unknown announce key');
         }
@@ -210,12 +212,7 @@ class AnnounceController extends Controller
      */
     private function findUserByAnnounceKey(string $announceKey): ?UserInterface
     {
-        $userModel = config('trove.user_model', 'App\\Models\\User');
-        $model = new $userModel;
-
-        return $userModel::query()
-            ->whereIn($model->getKeyName(), AnnounceKey::query()->select('user_id')->where('key', $announceKey))
-            ->first();
+        return app(AnnounceKeyProvisioner::class)->userForKey($announceKey);
     }
 
     /**

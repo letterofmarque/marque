@@ -29,7 +29,7 @@ function transformAnnounce($test, string $path, string $key, string $peerId): ar
     // info_hash and peer_id are binary, read from the raw query string, so a
     // successful announce also proves the reshaped query string kept them.
     $query = http_build_query([
-        'passkey' => $key,
+        'pk' => $key,
         'info_hash' => hex2bin($test->torrent->info_hash),
         'peer_id' => $peerId,
         'port' => 51413,
@@ -53,14 +53,15 @@ it('announces end to end once the transform has reshaped the request', function 
 });
 
 it('is the transform that made it work', function () {
+    // Without it, the old link's `pk` is not the parameter the endpoint reads.
     expect(transformAnnounce($this, 'announce2.php', OLD_LINK_KEY, '-qB4210-plainplainpl')['failure reason'])
-        ->toBe('Unknown announce key');
+        ->toBe('Invalid announce key');
 });
 
 // OQ1: a legacy scrape URL has the same shape as its announce URL, so the
 // endpoint's one transform reshapes both.
 it('reshapes scrape with the same transform', function () {
-    $response = trackerRequest($this, '/scrape.php?passkey='.OLD_LINK_KEY.'&info_hash='.urlencode(hex2bin($this->torrent->info_hash)));
+    $response = trackerRequest($this, '/scrape.php?pk='.OLD_LINK_KEY.'&info_hash='.urlencode(hex2bin($this->torrent->info_hash)));
 
     expect(decodeTracker($response))->toHaveKey('files')
         ->and(LowercaseKeyTransform::$applied)->toBe(['scrape.php']);
