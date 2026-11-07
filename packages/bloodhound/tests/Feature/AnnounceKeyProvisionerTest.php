@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Marque\Bloodhound\Models\AnnounceKey;
 use Marque\Bloodhound\Services\AnnounceKeyProvisioner;
 use Marque\Bloodhound\Tests\TestUser;
+use Marque\Bloodhound\Tests\TrackerUser;
 
 it('finds the member a key belongs to', function () {
     $user = makeTrackerUser('aaaabbbbccccddddeeeeffffgggghhhh', 'found@example.com');
@@ -87,4 +88,18 @@ describe('after the member is created', function () {
 
         expect($runs)->toBe(0);
     });
+});
+
+// Found by the 11.3.0 release read-through: a model using HasTrackerStats is
+// issued a fresh key the moment it's created, verified (or not verifying
+// addresses at all). Provisioning then added the old key as a SECOND row for
+// the member, which announce_keys' one-key-per-member index refused: an HTTP
+// error on every first announce. The member's key becomes the old one instead.
+it('gives a member whose model issues keys on create their old key, and only that', function () {
+    $user = app(AnnounceKeyProvisioner::class)->provision(
+        'feedfacefeedfacefeedfacefeedface',
+        fn () => TrackerUser::create(['name' => 'T', 'email' => 'tracker-user@example.com', 'password' => 'p']),
+    );
+
+    expect(AnnounceKey::query()->where('user_id', $user->getAuthIdentifier())->pluck('key')->all())->toBe(['feedfacefeedfacefeedfacefeedface']);
 });

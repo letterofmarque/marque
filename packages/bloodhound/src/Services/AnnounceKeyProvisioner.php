@@ -77,7 +77,13 @@ class AnnounceKeyProvisioner
                 // Written as the key's row, not through TrackerStats'
                 // regenerate (which mints a new key): the member keeps the key
                 // the old tracker gave them, which their .torrent files carry.
-                (new AnnounceKey)->forceFill(['user_id' => $user->getAuthIdentifier(), 'key' => $key])->save();
+                // A model using HasTrackerStats has already been issued a
+                // fresh key on create; the old key replaces it, since a member
+                // has one key (found by the 11.3.0 release read-through).
+                $row = AnnounceKey::query()->where('user_id', $user->getAuthIdentifier())->first()
+                    ?? (new AnnounceKey)->forceFill(['user_id' => $user->getAuthIdentifier()]);
+
+                $row->forceFill(['key' => $key])->save();
 
                 return $user;
             });
