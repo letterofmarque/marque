@@ -5,6 +5,7 @@ declare(strict_types=1);
 // Job #213 step 4: the operator's commands. Never silent: each shows what it
 // will write and asks before writing; --force is how a script says yes.
 
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Marque\Bloodhound\Models\LedgerAdjustment;
@@ -225,9 +226,9 @@ describe('bloodhound:ledger-adjustments', function () {
 
         // One capture: the amount and the reason share a table line, and each
         // expectsOutputToContain() consumes the write it matches.
-        expect(Illuminate\Support\Facades\Artisan::call('bloodhound:ledger-adjustments', ['--user' => $this->member->id]))->toBe(0);
+        expect(Artisan::call('bloodhound:ledger-adjustments', ['--user' => $this->member->id]))->toBe(0);
 
-        expect(Illuminate\Support\Facades\Artisan::output())
+        expect(Artisan::output())
             ->toContain('Imported from TBDev')
             ->toContain('5000')
             ->toContain((string) $this->admin->id);

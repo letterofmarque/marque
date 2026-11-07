@@ -12,6 +12,7 @@ declare(strict_types=1);
 // on the record, how much and why: the ledger is its rows, its carry and its
 // adjustments.
 
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Schema;
 use Marque\Bloodhound\Models\LedgerAdjustment;
 
@@ -66,7 +67,7 @@ describe('the ledger_adjustments table', function () {
             'reason' => 'r', 'made_by' => 1, 'created_at' => now(),
             $column => null,
         ]));
-    })->with(['reason', 'made_by'])->throws(Illuminate\Database\QueryException::class);
+    })->with(['reason', 'made_by'])->throws(QueryException::class);
 });
 
 describe('an adjustment, once made', function () {

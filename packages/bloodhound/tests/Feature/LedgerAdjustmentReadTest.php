@@ -9,10 +9,12 @@ declare(strict_types=1);
 // step 3's service writes them.
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Marque\Bloodhound\Models\LedgerAdjustment;
 use Marque\Bloodhound\Models\LedgerCarry;
 use Marque\Bloodhound\Models\TorrentUser;
 use Marque\Bloodhound\Services\LedgerAuditor;
+use Marque\Bloodhound\Services\LedgerExtras;
 use Marque\Bloodhound\Services\LedgerRebuilder;
 use Marque\Bloodhound\Services\PrunedHistory;
 use Marque\Bloodhound\Services\TimeOpeningBalance;
@@ -185,10 +187,10 @@ describe('the gap finders', function () {
 // record_time_opening_balances) before ledger_adjustments is created. No
 // adjustment can exist yet, so its absence means none, not an error.
 it('reads carry alone where the adjustments table does not exist yet', function () {
-    Illuminate\Support\Facades\Schema::connection(config('bloodhound.announce_log.connection'))->drop('ledger_adjustments');
+    Schema::connection(config('bloodhound.announce_log.connection'))->drop('ledger_adjustments');
     LedgerCarry::query()->create(['user_id' => $this->user->id, 'torrent_id' => $this->torrent->id, 'uploaded' => 400]);
 
-    expect(app(Marque\Bloodhound\Services\LedgerExtras::class)->perPair())
+    expect(app(LedgerExtras::class)->perPair())
         ->toHaveKey("{$this->user->id}:{$this->torrent->id}")
         ->and(app(PrunedHistory::class)->record()['rows'])->toBe(0);
 });
