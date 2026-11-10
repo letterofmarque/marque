@@ -12,6 +12,7 @@ use Marque\Usarrs\Http\Controllers\LogoutController;
 use Marque\Usarrs\Http\Controllers\MagicLinkController;
 use Marque\Usarrs\Http\Controllers\PasswordResetController;
 use Marque\Usarrs\Http\Controllers\SocialiteController;
+use Marque\Usarrs\Livewire\Auth\ConfirmByEmail;
 use Marque\Usarrs\Livewire\Auth\ConfirmOAuthLink;
 use Marque\Usarrs\Livewire\Auth\Login;
 use Marque\Usarrs\Livewire\Auth\PasswordConfirm;
@@ -60,6 +61,14 @@ Route::middleware(config('usarrs.middleware', ['web']))
         Route::get('auth/magic-link/sent', [MagicLinkController::class, 'showSentPage'])->name('magic-link.sent');
         Route::get('auth/magic-link/verify', [MagicLinkController::class, 'verify'])->name('magic-link.verify');
 
+        // The emailed "confirm it's you" link (Job #355): signed and expiring,
+        // and opened on whatever device reads the mail, signed in or not. It
+        // opens a page; approving is a deliberate action there, and the
+        // session that asked picks the approval up.
+        Route::get('user/confirm-password/email/{token}', ConfirmByEmail::class)
+            ->middleware('signed')
+            ->name('password.confirm.email');
+
         // Socialite — only under socialite mode (Spec #142). These used to be
         // registered under every mode and gated only on socialite_providers,
         // which defaults to ['github'], so a password-mode install had a live
@@ -71,6 +80,13 @@ Route::middleware(config('usarrs.middleware', ['web']))
             // ended here, not allowed to connect another provider (CP #776).
             Route::get('auth/{provider}/redirect', [SocialiteController::class, 'redirect'])->middleware('auth.session')->name('socialite.redirect');
             Route::get('auth/{provider}/callback', [SocialiteController::class, 'callback'])->middleware('auth.session')->name('socialite.callback');
+
+            // Confirming it's you by signing in again with a provider already
+            // connected to your account: the step-up a socialite member has,
+            // whose password is random and unknown (Job #355). A POST from the
+            // confirm page; the callback accepts only an identity linked to the
+            // signed-in member.
+            Route::post('auth/{provider}/confirm', [SocialiteController::class, 'confirm'])->middleware(['auth', 'auth.session'])->name('socialite.confirm');
 
             // The emailed "connect this account?" link — signed and expiring.
             // It opens a page naming the provider account; connecting is a

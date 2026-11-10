@@ -7,6 +7,35 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+### Fixed
+
+- **Confirming it's you works for members with no password to type** (Job #355). The
+  `password.confirm` page asked only for a password. A socialite member's password is
+  random and unknown, and a magic-link member never chose one. So everything behind
+  `password.confirm` (managing passkeys, for a start) was a dead end for them. The page now
+  offers whatever the member has, and every option ends in the same session mark, so the
+  stock middleware stays the only gate:
+  - **their password**, where a password signs in (`password`, `invite_only`);
+  - **a link to their verified address**, on every driver. The link opens a page naming
+    the browser that asked, and approving there confirms that session only, once, from any
+    device. Opening the link approves nothing, so mail scanners can't. Sent at most once a
+    minute. Not offered to an unverified address;
+  - **signing in again with a provider connected to their account**, under socialite
+    (`POST /auth/{provider}/confirm`, `socialite.confirm`). The callback accepts only an
+    identity linked to the signed-in member, and connects nothing;
+  - **a passkey**, where they have one, through laravel/passkeys' confirm endpoint, which
+    already marked the session confirmed but was never offered.
+- **A password no longer confirms under `magic_link` or `socialite`.** A password set from
+  the profile there was never a way in, and may be a squatter's (#10880).
+
+### Changed
+
+- **The `usarrs::auth.password-confirm` view takes `offersPassword`, `offersLink`,
+  `linkOut`, `providers` and `passkeyUrls`.** An app that published the view should
+  republish it, or its members on those drivers keep the dead end.
+
 ## [9.0.1] — 2026-11-07
 
 > The admin user screen's subject comes from its URL only.

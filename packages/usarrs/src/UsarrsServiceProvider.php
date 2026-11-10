@@ -44,6 +44,7 @@ use Marque\Usarrs\Listeners\StampSessionPasswordHash;
 use Marque\Usarrs\Livewire\Admin\SeedboxIndex;
 use Marque\Usarrs\Livewire\Admin\UserIndex;
 use Marque\Usarrs\Livewire\Admin\UserShow;
+use Marque\Usarrs\Livewire\Auth\ConfirmByEmail;
 use Marque\Usarrs\Livewire\Auth\ConfirmOAuthLink;
 use Marque\Usarrs\Livewire\Auth\Login;
 use Marque\Usarrs\Livewire\Auth\PasswordConfirm;
@@ -508,6 +509,7 @@ class UsarrsServiceProvider extends ServiceProvider
         Livewire::component('usarrs-passkey-management', PasskeyManagement::class);
         Livewire::component('usarrs-password-confirm', PasswordConfirm::class);
         Livewire::component('usarrs-confirm-oauth-link', ConfirmOAuthLink::class);
+        Livewire::component('usarrs-confirm-by-email', ConfirmByEmail::class);
     }
 
     // Profile, invites, admin — unaffected by manage_auth in either state.

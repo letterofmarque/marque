@@ -47,6 +47,21 @@ class SocialiteController
     }
 
     /**
+     * Start a round trip that confirms it's you (Job #355): the step-up a
+     * socialite member has, since their password is random and unknown. The
+     * callback reads the intent and accepts only an identity already linked to
+     * the signed-in member; see confirmCurrentUser().
+     */
+    public function confirm(string $provider): SymfonyRedirect
+    {
+        $this->validateProvider($provider);
+
+        session()->put('usarrs.oauth.intent', 'confirm');
+
+        return $this->oauth->redirect($provider);
+    }
+
+    /**
      * Resolve the returning user by linked identity — (provider, provider's
      * user id) — and nothing else (Spec #142).
      *
@@ -60,6 +75,14 @@ class SocialiteController
         $this->validateProvider($provider);
 
         $identity = $this->oauth->user($provider);
+
+        // Read once, whoever comes back: a round trip started to confirm must
+        // not leave the next one confirming.
+        $intent = session()->pull('usarrs.oauth.intent');
+
+        if ($intent === 'confirm' && auth()->check()) {
+            return $this->confirmCurrentUser($identity);
+        }
 
         // Signed in already: this is connecting a provider to *this* account,
         // never a login. It used to be treated as one — an identity linked to
@@ -248,6 +271,26 @@ class SocialiteController
         }
 
         return redirect()->route('profile.show')->with('status', __(':provider connected.', ['provider' => $provider]));
+    }
+
+    /**
+     * Mark the session confirmed if this identity is linked to the signed-in
+     * member, and to nobody else (Job #355). A stolen session's browser is
+     * signed in to the thief's provider account, not the owner's. Nothing is
+     * connected here, whatever comes back.
+     */
+    private function confirmCurrentUser(OAuthIdentity $identity): RedirectResponse
+    {
+        $link = SocialAccount::resolve($identity->provider, $identity->id);
+
+        if ($link === null || (string) $link->user_id !== (string) auth()->id()) {
+            return redirect()->route('password.confirm')
+                ->withErrors(['provider' => __('That :provider account isn\'t connected to yours. Confirm with the one that is, or another way.', ['provider' => ucfirst($identity->provider)])]);
+        }
+
+        session()->passwordConfirmed();
+
+        return redirect()->intended(LoginCompletion::home());
     }
 
     private function refuse(string $message): RedirectResponse
