@@ -41,6 +41,6 @@ class StepUpConfirmationLink extends Notification implements ShouldQueue
             ->line(__('A browser signed in to your :app account asked to confirm it\'s you, before a change to your account\'s security.', ['app' => $app]))
             ->action(__('Review and confirm'), $this->url)
             ->line(__('This link expires in :minutes minutes.', ['minutes' => EmailStepUp::MINUTES]))
-            ->line(__('If you didn\'t ask for this, don\'t confirm. Someone may be signed in as you: sign out your other sessions from your profile.'));
+            ->line(__('If you didn\'t ask for this, don\'t confirm. Someone may be signed in as you: tell the site\'s staff.'));
     }
 }

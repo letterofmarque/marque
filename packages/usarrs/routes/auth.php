@@ -88,6 +88,11 @@ Route::middleware(config('usarrs.middleware', ['web']))
             // signed-in member.
             Route::post('auth/{provider}/confirm', [SocialiteController::class, 'confirm'])->middleware(['auth', 'auth.session'])->name('socialite.confirm');
 
+            // Connecting a provider to the signed-in account (#10858): a POST
+            // from the profile's connected accounts, only with a confirmed
+            // step-up. Only this round trip's callback connects anything.
+            Route::post('auth/{provider}/connect', [SocialiteController::class, 'connect'])->middleware(['auth', 'auth.session'])->name('socialite.connect');
+
             // The emailed "connect this account?" link — signed and expiring.
             // It opens a page naming the provider account; connecting is a
             // deliberate action there, and works once (Spec #142, CP #762).

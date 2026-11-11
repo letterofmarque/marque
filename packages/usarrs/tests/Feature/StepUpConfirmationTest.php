@@ -163,7 +163,11 @@ it('refuses an unsigned or tampered link', function () {
     $url = requestStepUpLink($user);
 
     $this->get(route('password.confirm.email', ['token' => tokenFrom($url)]))->assertForbidden();
-    $this->get(str_replace(tokenFrom($url), 'x'.substr(tokenFrom($url), 1), $url))->assertForbidden();
+    // A different first character, always: 'x' alone left a token that began
+    // with 'x' untouched, and the valid link answered 200 (1 run in 62).
+    $token = tokenFrom($url);
+    $tampered = ($token[0] === 'x' ? 'y' : 'x').substr($token, 1);
+    $this->get(str_replace($token, $tampered, $url))->assertForbidden();
 });
 
 it('does not offer or send a link to an address nobody has proven', function () {

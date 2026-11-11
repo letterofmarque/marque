@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Marque\Usarrs\Contracts\OAuthProvider;
 use Marque\Usarrs\Models\SocialAccount;
+use Marque\Usarrs\Notifications\OAuthLinkConfirmation;
 use Marque\Usarrs\Tests\FakeOAuthProvider;
 use Marque\Usarrs\Tests\TestUser;
 
@@ -29,6 +30,19 @@ beforeEach(function () {
     $this->someoneElse = TestUser::factory()->create(['email' => 'else@example.com']);
 });
 
+/**
+ * A signed-in member returning from a connect round trip they started from
+ * their profile, with the step-up done (Job #355): the only round trip whose
+ * callback connects anything.
+ */
+function connectingAs(object $test, TestUser $user): object
+{
+    return $test->actingAs($user)->withSession([
+        'usarrs.oauth.intent' => 'connect',
+        'auth.password_confirmed_at' => time(),
+    ]);
+}
+
 function linkFor(TestUser $user, string $provider, string $id): void
 {
     SocialAccount::forceCreate(['user_id' => $user->getKey(), 'provider' => $provider, 'provider_user_id' => $id]);
@@ -37,7 +51,7 @@ function linkFor(TestUser $user, string $provider, string $id): void
 it('links an unlinked identity to the signed-in account', function () {
     $this->oauth->asserts('gitlab', 'gl-9', 'me@example.com');
 
-    $this->actingAs($this->me)->get(route('socialite.callback', 'gitlab'));
+    connectingAs($this, $this->me)->get(route('socialite.callback', 'gitlab'));
 
     $this->assertAuthenticatedAs($this->me);
     expect(SocialAccount::resolve('gitlab', 'gl-9')?->user_id)->toBe($this->me->getKey());
@@ -48,17 +62,19 @@ it('links it even when the provider reports a different email', function () {
     // irrelevant to connecting their own account.
     $this->oauth->asserts('gitlab', 'gl-9', 'personal@elsewhere.example');
 
-    $this->actingAs($this->me)->get(route('socialite.callback', 'gitlab'));
+    connectingAs($this, $this->me)->get(route('socialite.callback', 'gitlab'));
 
     expect(SocialAccount::resolve('gitlab', 'gl-9')?->user_id)->toBe($this->me->getKey());
-    Notification::assertNothingSent();
+    // No "connect this account?" mail: the member is proven. (The connected
+    // notice does go, Job #355.)
+    Notification::assertNotSentTo($this->me, OAuthLinkConfirmation::class);
 });
 
 it('never switches to the account an identity is already linked to', function () {
     linkFor($this->someoneElse, 'github', 'gh-theirs');
     $this->oauth->asserts('github', 'gh-theirs', 'else@example.com');
 
-    $this->actingAs($this->me)->get(route('socialite.callback', 'github'))
+    connectingAs($this, $this->me)->get(route('socialite.callback', 'github'))
         ->assertSessionHasErrors('email');
 
     $this->assertAuthenticatedAs($this->me);
@@ -68,7 +84,7 @@ it('never switches to the account an identity is already linked to', function ()
 it('never creates a second account for a signed-in user', function () {
     $this->oauth->asserts('gitlab', 'gl-new', 'fresh@example.com');
 
-    $this->actingAs($this->me)->get(route('socialite.callback', 'gitlab'));
+    connectingAs($this, $this->me)->get(route('socialite.callback', 'gitlab'));
 
     expect(TestUser::where('email', 'fresh@example.com')->exists())->toBeFalse();
     $this->assertAuthenticatedAs($this->me);
@@ -78,7 +94,7 @@ it('does nothing but confirm when the identity is already theirs', function () {
     linkFor($this->me, 'github', 'gh-mine');
     $this->oauth->asserts('github', 'gh-mine', 'me@example.com');
 
-    $this->actingAs($this->me)->get(route('socialite.callback', 'github'))
+    connectingAs($this, $this->me)->get(route('socialite.callback', 'github'))
         ->assertSessionHasNoErrors();
 
     $this->assertAuthenticatedAs($this->me);
@@ -89,7 +105,7 @@ it('refuses a second identity from a provider the account already has', function
     linkFor($this->me, 'github', 'gh-mine');
     $this->oauth->asserts('github', 'gh-another', 'me@example.com');
 
-    $this->actingAs($this->me)->get(route('socialite.callback', 'github'))
+    connectingAs($this, $this->me)->get(route('socialite.callback', 'github'))
         ->assertSessionHasErrors('email');
 
     $this->assertAuthenticatedAs($this->me);
@@ -107,7 +123,7 @@ it('reports a connection made concurrently instead of failing', function () {
     });
     $this->oauth->asserts('gitlab', 'gl-9', 'me@example.com');
 
-    $this->actingAs($this->me)->get(route('socialite.callback', 'gitlab'))
+    connectingAs($this, $this->me)->get(route('socialite.callback', 'gitlab'))
         ->assertRedirect(route('profile.show'))
         ->assertSessionHasErrors('email');
 
@@ -121,7 +137,7 @@ it('refuses to connect a provider to an account whose address is unproven', func
     $this->me->forceFill(['email_verified_at' => null])->save();
     $this->oauth->asserts('gitlab', 'gl-9', 'me@example.com');
 
-    $this->actingAs($this->me)->get(route('socialite.callback', 'gitlab'))
+    connectingAs($this, $this->me)->get(route('socialite.callback', 'gitlab'))
         ->assertSessionHasErrors('email');
 
     expect(SocialAccount::resolve('gitlab', 'gl-9'))->toBeNull();

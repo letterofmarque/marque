@@ -17,10 +17,12 @@ use Marque\Usarrs\Auth\LoginCompletion;
 use Marque\Usarrs\Auth\NewAccount;
 use Marque\Usarrs\Auth\OAuthIdentity;
 use Marque\Usarrs\Auth\RegistrationRules;
+use Marque\Usarrs\Auth\StepUp;
 use Marque\Usarrs\Contracts\OAuthProvider;
 use Marque\Usarrs\Exceptions\InviteAlreadyRedeemed;
 use Marque\Usarrs\Livewire\Auth\ConfirmOAuthLink;
 use Marque\Usarrs\Models\SocialAccount;
+use Marque\Usarrs\Notifications\OAuthConnectionNotice;
 use Marque\Usarrs\Notifications\OAuthLinkConfirmation;
 use Marque\Usarrs\Services\InviteService;
 use Symfony\Component\HttpFoundation\RedirectResponse as SymfonyRedirect;
@@ -62,6 +64,29 @@ class SocialiteController
     }
 
     /**
+     * Start a round trip that connects a provider to the signed-in member
+     * (#10858). It used to take nothing but a signed-in session: a stolen one
+     * could connect the thief's provider and keep a way in after the owner
+     * took the account back. Now it takes a confirmed step-up, and an
+     * unconfirmed member is sent to confirm and brought back to the profile to
+     * start again (a POST can't be redirected back to).
+     */
+    public function connect(string $provider): SymfonyRedirect
+    {
+        $this->validateProvider($provider);
+
+        if (! StepUp::recent()) {
+            session()->put('url.intended', route('profile.show'));
+
+            return redirect()->route('password.confirm');
+        }
+
+        session()->put('usarrs.oauth.intent', 'connect');
+
+        return $this->oauth->redirect($provider);
+    }
+
+    /**
      * Resolve the returning user by linked identity — (provider, provider's
      * user id) — and nothing else (Spec #142).
      *
@@ -86,8 +111,21 @@ class SocialiteController
 
         // Signed in already: this is connecting a provider to *this* account,
         // never a login. It used to be treated as one — an identity linked to
-        // someone else switched the user into that account (Spec #142).
+        // someone else switched the user into that account (Spec #142). And it
+        // connected whatever came back, with no step-up (#10858): now only a
+        // round trip started by connect(), still confirmed.
         if (auth()->check()) {
+            if ($intent !== 'connect') {
+                return redirect()->route('profile.show')
+                    ->withErrors(['email' => __('To connect :provider, start from your profile.', ['provider' => ucfirst($provider)])]);
+            }
+
+            if (! StepUp::recent()) {
+                session()->put('url.intended', route('profile.show'));
+
+                return redirect()->route('password.confirm');
+            }
+
             return $this->connectToCurrentUser($identity);
         }
 
@@ -269,6 +307,10 @@ class SocialiteController
                 ? redirect()->route('profile.show')->with('status', __(':provider is already connected to your account.', ['provider' => $provider]))
                 : redirect()->route('profile.show')->withErrors(['email' => __('That :provider account is already connected to a different account.', ['provider' => $provider])]);
         }
+
+        // Told by mail, so an owner learns of a connection they didn't make
+        // even if the session that made it isn't theirs (#10858).
+        $user->notify(new OAuthConnectionNotice($identity->provider, connected: true, label: $identity->label()));
 
         return redirect()->route('profile.show')->with('status', __(':provider connected.', ['provider' => $provider]));
     }

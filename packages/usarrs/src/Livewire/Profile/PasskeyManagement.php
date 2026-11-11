@@ -8,6 +8,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Route;
 use Laravel\Passkeys\Passkey;
 use Livewire\Attributes\Locked;
+use Marque\Usarrs\Auth\StepUp;
 use Marque\Usarrs\Livewire\Component;
 
 class PasskeyManagement extends Component
@@ -34,7 +35,7 @@ class PasskeyManagement extends Component
 
         // The DELETE endpoint asks for a confirmed password; this button used
         // not to (Job #141 review).
-        if (! $this->passwordRecentlyConfirmed()) {
+        if (! StepUp::recent()) {
             $this->requirePasswordConfirmation();
 
             return;
@@ -54,11 +55,6 @@ class PasskeyManagement extends Component
         session()->put('url.intended', $this->returnTo);
 
         $this->redirect(route('password.confirm'));
-    }
-
-    private function passwordRecentlyConfirmed(): bool
-    {
-        return time() - (int) session('auth.password_confirmed_at', 0) < (int) config('auth.password_timeout', 10800);
     }
 
     public function render(): View

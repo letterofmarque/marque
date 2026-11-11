@@ -58,6 +58,7 @@ use Marque\Usarrs\Livewire\Dashboard\TrackerStatsPanel;
 use Marque\Usarrs\Livewire\Invite\InviteCreate;
 use Marque\Usarrs\Livewire\Invite\InviteIndex;
 use Marque\Usarrs\Livewire\Profile\AnnounceKeyManagement;
+use Marque\Usarrs\Livewire\Profile\ConnectedAccounts;
 use Marque\Usarrs\Livewire\Profile\Edit;
 use Marque\Usarrs\Livewire\Profile\PasskeyManagement;
 use Marque\Usarrs\Livewire\Profile\SeedboxManagement;
@@ -507,6 +508,7 @@ class UsarrsServiceProvider extends ServiceProvider
         Livewire::component('usarrs-two-factor-challenge', TwoFactorChallenge::class);
         Livewire::component('usarrs-two-factor-setup', TwoFactorSetup::class);
         Livewire::component('usarrs-passkey-management', PasskeyManagement::class);
+        Livewire::component('usarrs-connected-accounts', ConnectedAccounts::class);
         Livewire::component('usarrs-password-confirm', PasswordConfirm::class);
         Livewire::component('usarrs-confirm-oauth-link', ConfirmOAuthLink::class);
         Livewire::component('usarrs-confirm-by-email', ConfirmByEmail::class);

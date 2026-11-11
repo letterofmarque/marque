@@ -18,7 +18,7 @@
             <x-deck::text class="font-mono text-sm break-all">{{ $pending['agent'] ?: __('an unidentified browser') }}</x-deck::text>
 
             <x-deck::text class="text-sm text-zinc-500">
-                {{ __('If that wasn\'t you, don\'t confirm. Close this page and sign out your other sessions from your profile.') }}
+                {{ __('If that wasn\'t you, don\'t confirm. Close this page and tell the site\'s staff: someone may be signed in as you.') }}
             </x-deck::text>
 
             <x-deck::button variant="primary" wire:click="approve" class="w-full">

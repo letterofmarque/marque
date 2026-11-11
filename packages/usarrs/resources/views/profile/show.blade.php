@@ -42,6 +42,10 @@
         </div>
     </div>
 
+    @if ($showsConnectedAccounts)
+        <livewire:usarrs-connected-accounts />
+    @endif
+
     <div class="flex gap-2">
         <x-deck::button variant="primary" :href="route('profile.edit')" wire:navigate>
             {{ __('Edit Profile') }}

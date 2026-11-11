@@ -27,8 +27,25 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
     identity linked to the signed-in member, and connects nothing;
   - **a passkey**, where they have one, through laravel/passkeys' confirm endpoint, which
     already marked the session confirmed but was never offered.
+- **Connecting a provider while signed in takes a confirmed step-up, and the member is
+  told by mail** (#10858). It took nothing but a signed-in session, so a stolen one could
+  connect the thief's provider and keep a way in after the owner took the account back. A
+  connection now starts from the profile, as a POST to `socialite.connect`
+  (`/auth/{provider}/connect`). An unconfirmed member is sent to confirm and brought back to
+  the profile. Only that round trip's callback connects anything: a signed-in member coming
+  back from any other round trip (the sign-in button, or one another page started) is
+  refused, and so is one whose confirmation lapsed on the way. `OAuthConnectionNotice` mails
+  the member when a provider is connected or removed.
 - **A password no longer confirms under `magic_link` or `socialite`.** A password set from
   the profile there was never a way in, and may be a squatter's (#10880).
+
+### Added
+
+- **Connected accounts on the profile** (#10858), under socialite: `Profile\ConnectedAccounts`
+  (`usarrs-connected-accounts`), on usarrs' profile page and embeddable in an app's own. It
+  lists the member's providers, connects the ones they haven't, and disconnects. Disconnecting
+  takes a confirmed step-up, mails a notice, and is refused when it would remove the last way
+  in (the only connection, with no passkey).
 
 ### Changed
 
