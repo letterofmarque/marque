@@ -10,6 +10,8 @@ changelogs — edit those, not this.*
 
 ## 2026-11-11
 
+- **[bosun 1.0.2](packages/bosun/CHANGELOG.md)** — Accepts marque/usarrs 10.
+- **[marque 2.0.2](packages/marque/CHANGELOG.md)** — Accepts marque/usarrs 10.
 - **[usarrs 10.0.0](packages/usarrs/CHANGELOG.md)** — Confirming it's you works for every member, whatever the auth driver; connecting an OAuth provider takes it and tells the member; connections can be listed and removed; remember-me is a choice; invites can't be planted.
 
 ## 2026-11-08

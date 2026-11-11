@@ -5,6 +5,16 @@ All notable changes to `marque/marque` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.2] — 2026-11-11
+
+> Accepts marque/usarrs 10.
+
+### Changed
+
+- **Requires `marque/usarrs` `^9.0|^10.0`.** usarrs 10 makes confirming it's you work for
+  every member and hardens OAuth (see its changelog); the installer needs nothing new from it, and
+  an app still on usarrs 9 keeps resolving.
+
 ## [2.0.1] — 2026-10-29
 
 > The README's preseed example and the installer's tests use a neutral site name.

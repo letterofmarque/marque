@@ -5,6 +5,16 @@ All notable changes to `marque/bosun` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
+## [1.0.2] — 2026-11-11
+
+> Accepts marque/usarrs 10.
+
+### Changed
+
+- **Requires `marque/usarrs` `^9.0|^10.0`.** usarrs 10 makes confirming it's you work for
+  every member and hardens OAuth (see its changelog); bosun needs nothing new from it, and
+  an app still on usarrs 9 keeps resolving.
+
 ## [1.0.1] — 2026-11-07
 
 > The staff screen's member-being-changed can't be set from the client.
