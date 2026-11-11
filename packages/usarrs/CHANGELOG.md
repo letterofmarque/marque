@@ -7,7 +7,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [Unreleased]
+## [10.0.0] — 2026-11-11
 
 > Confirming it's you works for every member, whatever the auth driver; connecting an OAuth provider takes it and tells the member; connections can be listed and removed; remember-me is a choice; invites can't be planted.
 
