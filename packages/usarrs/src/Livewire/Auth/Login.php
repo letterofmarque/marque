@@ -85,7 +85,13 @@ class Login extends Component
 
         if ($user) {
             $token = app('auth.password.broker')->createToken($user);
-            $url = url('/auth/magic-link/verify?token='.$token.'&email='.urlencode($this->email).($this->remember ? '&remember=1' : ''));
+            // By route name, so usarrs.prefix applies: url('/auth/...') ignored
+            // it, and on a prefixed install every link 404'd.
+            $url = route('magic-link.verify', array_filter([
+                'token' => $token,
+                'email' => $this->email,
+                'remember' => $this->remember ? 1 : null,
+            ]));
 
             $user->notify(new MagicLinkNotification($url));
         }
