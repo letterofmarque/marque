@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Marque\Usarrs\Auth\LoginCompletion;
@@ -106,6 +107,12 @@ class SocialiteController
 
         $identity = $this->oauth->user($provider);
 
+        // An empty id would be a linkable identity that every empty-id sign-in
+        // matches (#10880).
+        if ($identity->id === '') {
+            return $this->refuse(__(':provider didn\'t say which account this is. Try again.', ['provider' => ucfirst($provider)]));
+        }
+
         // Read once, whoever comes back: a round trip started to confirm must
         // not leave the next one confirming.
         $intent = session()->pull('usarrs.oauth.intent');
@@ -148,7 +155,9 @@ class SocialiteController
         // takeover. If it matches an account, ask that account's own inbox.
         $inviteCode = session()->pull('usarrs.oauth.invite');
 
-        if ($identity->email === null) {
+        // An address longer than the column can't be stored, and no real one is
+        // (RFC 5321 caps a path at 254); taken as no address (#10880).
+        if ($identity->email === null || mb_strlen($identity->email) > 255) {
             return $this->refuse(__(':provider didn\'t share an email address, so an account can\'t be made from it.', ['provider' => ucfirst($provider)]));
         }
 
@@ -191,7 +200,9 @@ class SocialiteController
         try {
             $user = DB::transaction(function () use ($identity, $invite) {
                 $user = $this->userModel()::create([
-                    'name' => $identity->name ?? $identity->nickname ?? $identity->email,
+                    // The provider's name, cut to the column: a longer one
+                    // was a 500 under MySQL strict mode (#10880).
+                    'name' => mb_substr((string) ($identity->name ?? $identity->nickname ?? $identity->email), 0, 255),
                     'email' => $identity->email,
                     // Nobody knows it and nothing can reset it under socialite
                     // mode: this account is reached through its OAuth link only.
@@ -213,7 +224,12 @@ class SocialiteController
         } catch (InviteAlreadyRedeemed) {
             return $this->refuse(__('That invite has already been used.'));
         } catch (UniqueConstraintViolationException) {
-            return $this->refuse(__('That :provider account was connected moments ago — try signing in again.', ['provider' => ucfirst($identity->provider)]));
+            // Either the identity was linked meanwhile, or another sign-up took
+            // the address. Saying which is safe: registration is open here, and
+            // /register says an address is taken anyway (#10880).
+            return SocialAccount::resolve($identity->provider, $identity->id) !== null
+                ? $this->refuse(__('That :provider account was connected moments ago — try signing in again.', ['provider' => ucfirst($identity->provider)]))
+                : $this->refuse(__('An account with that email address was made moments ago. Sign in to it instead.'));
         }
 
         // Unverified, like any other new account. The provider's say-so is not
@@ -244,6 +260,13 @@ class SocialiteController
         // Except where nobody has proven the address: that connection may be a
         // squatter's, and confirming drops it (ConfirmOAuthLink::stripUnprovenAccount()).
         if ($alreadyHasOne && ! ConfirmOAuthLink::unproven($holder)) {
+            return;
+        }
+
+        // Three an hour per account: each callback carrying the address sent a
+        // mail, so anyone could fill an inbox (#10880). The visitor's answer
+        // doesn't change, or it would say the address has an account.
+        if (RateLimiter::hit('usarrs.oauth-link-mail:'.$holder->getAuthIdentifier(), 3600) > 3) {
             return;
         }
 

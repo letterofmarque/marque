@@ -17,6 +17,16 @@
                 {{ __("If you didn't just try to sign in with :provider, don't connect it — close this page and nothing changes.", ['provider' => $providerName]) }}
             </x-deck::text>
 
+            @if ($strips)
+                {{-- This account's address was never proven, so what it gained
+                     before may be a squatter's; connecting removes it all (CP #776). --}}
+                <div class="rounded-lg bg-amber-50 p-4 text-left dark:bg-amber-900/20">
+                    <x-deck::text class="text-sm text-amber-800 dark:text-amber-200">
+                        {{ __('Connecting also removes everything else that can sign in to this account: other connected accounts, passkeys, two-factor authentication and remembered sign-ins. Nobody had proven this email address before, so anything set up until now may not be yours. If it is, set it up again afterwards.') }}
+                    </x-deck::text>
+                </div>
+            @endif
+
             <x-deck::button variant="primary" wire:click="connect" class="w-full">
                 {{ __('Connect :provider', ['provider' => $providerName]) }}
             </x-deck::button>

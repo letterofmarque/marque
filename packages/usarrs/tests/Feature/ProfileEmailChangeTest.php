@@ -20,6 +20,8 @@ use Marque\Usarrs\Tests\TestUser;
 beforeEach(function () {
     Notification::fake();
     $this->user = TestUser::factory()->create(['email' => 'old@example.com']);
+    // An email change takes a confirmed step-up (Job #355; ProfileStepUpTest).
+    session()->put('auth.password_confirmed_at', time());
 });
 
 it('un-verifies the account when its email changes, and sends the new address a verification mail', function () {

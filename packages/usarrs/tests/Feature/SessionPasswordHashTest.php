@@ -27,6 +27,9 @@ it('refuses a Livewire action from a session whose password hash has rotated', f
 
     $html = $this->get(route('profile.edit'))->assertOk()->getContent();
     preg_match('/wire:snapshot="([^"]+)"/', $html, $match);
+
+    // A password change takes a confirmed step-up (Job #355).
+    session()->put('auth.password_confirmed_at', time());
     $snapshot = html_entity_decode($match[1], ENT_QUOTES);
 
     // Rotated underneath this session — as proving the inbox does.
@@ -45,7 +48,8 @@ it('refuses a Livewire action from a session whose password hash has rotated', f
 
 it('keeps you signed in after changing your own password', function () {
     $user = TestUser::factory()->create();
-    $this->actingAs($user);
+    // A password change takes a confirmed step-up (Job #355).
+    $this->actingAs($user)->withSession(['auth.password_confirmed_at' => time()]);
     $this->get(route('profile.show'))->assertOk(); // the session records its hash
 
     Livewire::test(Edit::class)
@@ -65,7 +69,8 @@ it('keeps you signed in after changing your password through the real update end
     $html = $this->get(route('profile.edit'))->assertOk()->getContent();
     preg_match('/wire:snapshot="([^"]+)"/', $html, $match);
 
-    $this->withHeaders(['X-Livewire' => '1'])->postJson(EndpointResolver::updatePath(), [
+    // A password change takes a confirmed step-up (Job #355).
+    $this->withSession(['auth.password_confirmed_at' => time()])->withHeaders(['X-Livewire' => '1'])->postJson(EndpointResolver::updatePath(), [
         'components' => [[
             'snapshot' => html_entity_decode($match[1], ENT_QUOTES),
             'updates' => ['password' => 'a-new-password', 'password_confirmation' => 'a-new-password'],

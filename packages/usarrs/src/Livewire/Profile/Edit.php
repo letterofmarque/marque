@@ -9,6 +9,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Attributes\Validate;
+use Marque\Usarrs\Auth\StepUp;
 use Marque\Usarrs\Listeners\StampSessionPasswordHash;
 use Marque\Usarrs\Livewire\Component;
 use Marque\Usarrs\Rules\UniqueEmail;
@@ -62,6 +63,17 @@ class Edit extends Component
         // verification let a squatter verify their own inbox and switch back
         // to someone else's address as "verified" (Build #124 CP #776).
         $changed = mb_strtolower($this->email) !== mb_strtolower((string) $user->email);
+
+        // A new address or password takes a confirmed step-up (#10880): a
+        // session that isn't the member's could otherwise take the account's
+        // address (and with it every emailed proof) or set a password that
+        // outlives it. Nothing is saved; the member confirms and comes back.
+        if (($changed || $this->password !== '') && ! StepUp::recent()) {
+            session()->put('url.intended', route('profile.edit'));
+            $this->redirect(route('password.confirm'));
+
+            return;
+        }
 
         if ($this->password) {
             $data['password'] = Hash::make($this->password);

@@ -53,3 +53,26 @@ it('refuses to register an address an account uses in a different case', functio
 
     expect(TestUser::count())->toBe(1);
 });
+
+// Job #355 step 4 (#10880): two registrations racing on one address. The
+// UniqueEmail rule passes for both; the database refuses the second, which was
+// a 500.
+it('reports an address registered mid-request instead of failing', function () {
+    TestUser::creating(function (TestUser $user) {
+        if ($user->email === 'racer@example.com') {
+            DB::table('users')->insert(['name' => 'Winner', 'email' => 'racer@example.com', 'password' => 'x', 'created_at' => now(), 'updated_at' => now()]);
+        }
+    });
+
+    Livewire::test(Register::class)
+        ->set('name', 'Racer')
+        ->set('email', 'racer@example.com')
+        ->set('password', 'password123')
+        ->set('password_confirmation', 'password123')
+        ->call('register')
+        ->assertHasErrors('email');
+
+    // (The winner's write is undone here too: in this test it runs inside the
+    // losing request's transaction. A real competitor commits on its own.)
+    $this->assertGuest();
+});

@@ -51,6 +51,27 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   404 there, so the only way to use an invite was a hand-made redirect URL. `/register` is
   now the invite's landing page under socialite: the code (or a field for one), a
   remember-me box, and a POST button per provider. Its password form stays refused.
+- **Changing the email address, or setting or changing the password, on `/profile/edit`
+  takes a confirmed step-up** (#10880). A session that wasn't the member's could take the
+  account's address, and with it every emailed proof, or set a password that outlived the
+  session. Nothing is saved without the step-up: the member confirms and comes back. A
+  name or bio change needs none.
+- **OAuth hardening from the 8.1.0 reviews** (#10880):
+  - an account is mailed at most three connection links an hour, and the visitor's answer
+    doesn't change when the limit is hit (it would otherwise reveal that the address has an
+    account);
+  - `OAuthLinkConfirmation` is queued, so a callback carrying a known address answers as fast
+    as one carrying an unknown address;
+  - an identity with an empty provider id is refused, since it would have been one identity
+    for every such sign-in;
+  - a provider name longer than the column is cut to 255 characters (it was a 500 under MySQL
+    strict mode), and an email address longer than 255 counts as no address;
+  - two registrations racing on one address get "registered moments ago" on `/register` (it
+    was a 500). An OAuth sign-up that loses the address race is now told that, instead of
+    being told the provider was connected moments ago;
+  - the connection link's page warns, before connecting, when connecting will strip an
+    account whose address was never proven of its other connections, passkeys, two-factor and
+    remembered sign-ins.
 - **A password no longer confirms under `magic_link` or `socialite`.** A password set from
   the profile there was never a way in, and may be a squatter's (#10880).
 

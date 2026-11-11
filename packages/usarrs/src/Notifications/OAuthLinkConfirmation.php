@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Marque\Usarrs\Notifications;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -16,8 +17,12 @@ use Illuminate\Notifications\Notification;
  * The provider's say-so about an email is not proof of owning the account it
  * matches. Receiving this mail is: whoever follows the link controls the
  * inbox, which is what signing in as that account has always required.
+ *
+ * Queued (#10880): sent in the request, it made a callback carrying a known
+ * address measurably slower than one carrying an unknown address, where the
+ * answers are otherwise the same.
  */
-class OAuthLinkConfirmation extends Notification
+class OAuthLinkConfirmation extends Notification implements ShouldQueue
 {
     use Queueable;
 
