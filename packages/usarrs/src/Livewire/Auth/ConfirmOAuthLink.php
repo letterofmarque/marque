@@ -137,7 +137,9 @@ class ConfirmOAuthLink extends Component
             return;
         }
 
-        $this->redirect(app(LoginCompletion::class)->begin($user, remember: true), navigate: false);
+        // The remember-me choice made on the login page, carried here with the
+        // pending connection; off when there was none (#10858).
+        $this->redirect(app(LoginCompletion::class)->begin($user, remember: (bool) ($pending['remember'] ?? false)), navigate: false);
     }
 
     /**

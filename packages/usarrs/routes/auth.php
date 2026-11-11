@@ -78,7 +78,11 @@ Route::middleware(config('usarrs.middleware', ['web']))
             // auth.session: a signed-in session whose password hash has rotated
             // under it — a squatter's, once the owner proved the inbox — is
             // ended here, not allowed to connect another provider (CP #776).
-            Route::get('auth/{provider}/redirect', [SocialiteController::class, 'redirect'])->middleware('auth.session')->name('socialite.redirect');
+            // GET for a bare sign-in; POST (CSRF-protected, from the login and
+            // invite pages) is the only way to bring an invite or a remember-me
+            // choice along. A GET carrying ?invite= let any page plant an invite
+            // in a visitor's session (#10858).
+            Route::match(['get', 'post'], 'auth/{provider}/redirect', [SocialiteController::class, 'redirect'])->middleware('auth.session')->name('socialite.redirect');
             Route::get('auth/{provider}/callback', [SocialiteController::class, 'callback'])->middleware('auth.session')->name('socialite.callback');
 
             // Confirming it's you by signing in again with a provider already

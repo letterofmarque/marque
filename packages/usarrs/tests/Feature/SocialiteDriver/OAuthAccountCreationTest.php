@@ -96,7 +96,8 @@ it('creates the account and redeems the invite carried through the redirect', fu
     $inviter = TestUser::factory()->create();
     $invite = app(InviteServiceInterface::class)->create($inviter);
 
-    $this->get(route('socialite.redirect', ['provider' => 'github', 'invite' => $invite->code]));
+    // A POST, from the invite page: a GET's ?invite= is ignored (Job #355).
+    $this->post(route('socialite.redirect', 'github'), ['invite' => $invite->code]);
     $this->oauth->asserts('github', 'gh-new', 'newcomer@example.com');
     $this->get(route('socialite.callback', 'github'))->assertRedirect('/');
 
@@ -108,7 +109,7 @@ it('refuses an invite that is not valid', function () {
     config()->set('usarrs.invites.enabled', true);
     config()->set('usarrs.invites.required', true);
 
-    $this->get(route('socialite.redirect', ['provider' => 'github', 'invite' => 'not-a-real-code']));
+    $this->post(route('socialite.redirect', 'github'), ['invite' => 'not-a-real-code']);
     $this->oauth->asserts('github', 'gh-new', 'newcomer@example.com');
     $this->get(route('socialite.callback', 'github'))->assertSessionHasErrors('email');
 
@@ -144,7 +145,7 @@ it('makes no account when the invite is redeemed by someone else mid-request', f
         }
     });
 
-    $this->get(route('socialite.redirect', ['provider' => 'github', 'invite' => $invite->code]));
+    $this->post(route('socialite.redirect', 'github'), ['invite' => $invite->code]);
     $this->oauth->asserts('github', 'gh-new', 'newcomer@example.com');
     $this->get(route('socialite.callback', 'github'))->assertSessionHasErrors('email');
 
@@ -181,7 +182,7 @@ it('treats an invite that is not a string as no invite', function () {
     config()->set('usarrs.invites.enabled', true);
     config()->set('usarrs.invites.required', true);
 
-    $this->get(route('socialite.redirect', 'github').'?invite[]=x');
+    $this->post(route('socialite.redirect', 'github'), ['invite' => ['x']]);
     $this->oauth->asserts('github', 'gh-new', 'newcomer@example.com');
 
     $this->get(route('socialite.callback', 'github'))->assertSessionHasErrors('email');

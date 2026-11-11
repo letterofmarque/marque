@@ -277,10 +277,11 @@ describe('confirming proves the inbox', function () {
     });
 
     it('ends any remembered sign-in from before the address was proven', function () {
-        // The attacker signs in remembered — every OAuth login is — and keeps
+        // The attacker signs in remembered (ticking the box, Job #355) and keeps
         // that cookie. (squat() signs out afterwards, and signing out cycles the
         // token, so take it from a fresh remembered login.)
         $account = squat($this, 'gitlab', 'gl-attacker');
+        $this->post(route('socialite.redirect', 'gitlab'), ['remember' => '1']);
         $this->oauth->asserts('gitlab', 'gl-attacker', 'victim@example.com');
         $this->get(route('socialite.callback', 'gitlab'));
         $before = $account->fresh()->getRememberToken();

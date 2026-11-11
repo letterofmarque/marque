@@ -39,11 +39,16 @@ class SocialiteController
     {
         $this->validateProvider($provider);
 
-        // There is no registration form under socialite mode to type an invite
-        // into, so it rides the round trip: /auth/github/redirect?invite=CODE.
-        // Anything but a string (?invite[]=x) is no invite, not a TypeError.
-        $invite = $request->query('invite');
-        session()->put('usarrs.oauth.invite', is_string($invite) ? $invite : null);
+        // An invite and the remember-me choice ride the round trip, and only
+        // from a POST: the form on /register (the invite email's link) or the
+        // login page, which CSRF protection ties to this site. A GET used to
+        // take ?invite=, so any page could start a round trip carrying an
+        // attacker's invite, and an auto-approving provider made the visitor's
+        // account on it (#10858). A GET is a bare sign-in.
+        // Anything but a string (invite[]=x) is no invite, not a TypeError.
+        $invite = $request->isMethod('post') ? $request->input('invite') : null;
+        session()->put('usarrs.oauth.invite', is_string($invite) && $invite !== '' ? $invite : null);
+        session()->put('usarrs.oauth.remember', $request->isMethod('post') && $request->boolean('remember'));
 
         return $this->oauth->redirect($provider);
     }
@@ -105,6 +110,10 @@ class SocialiteController
         // not leave the next one confirming.
         $intent = session()->pull('usarrs.oauth.intent');
 
+        // Off unless the member ticked the box: every OAuth sign-in used to set
+        // a long-lived remember cookie (#10858).
+        $remember = (bool) session()->pull('usarrs.oauth.remember', false);
+
         if ($intent === 'confirm' && auth()->check()) {
             return $this->confirmCurrentUser($identity);
         }
@@ -132,7 +141,7 @@ class SocialiteController
         $link = SocialAccount::resolve($identity->provider, $identity->id);
 
         if ($link !== null) {
-            return redirect(app(LoginCompletion::class)->begin($link->user, remember: true));
+            return redirect(app(LoginCompletion::class)->begin($link->user, $remember));
         }
 
         // Not linked to anyone. Never sign in on the email — that is the
@@ -146,7 +155,7 @@ class SocialiteController
         $holder = $this->userByEmail($identity->email);
 
         if ($holder !== null) {
-            $this->sendConfirmation($holder, $identity);
+            $this->sendConfirmation($holder, $identity, $remember);
         }
 
         $sentLink = __('If an account here uses that :provider account\'s email address, we\'ve sent it a link to connect them — check your email.', ['provider' => ucfirst($provider)]);
@@ -162,7 +171,7 @@ class SocialiteController
             return redirect()->route('login')->with('status', __('That :provider account isn\'t connected here yet.', ['provider' => ucfirst($provider)]).' '.$sentLink);
         }
 
-        return $this->register($identity, $inviteCode);
+        return $this->register($identity, $inviteCode, $remember);
     }
 
     /**
@@ -175,7 +184,7 @@ class SocialiteController
      * CP #763): an invite lost to a concurrent request, or the same identity
      * linked by one, leaves no account behind and no error page.
      */
-    private function register(OAuthIdentity $identity, ?string $inviteCode): RedirectResponse
+    private function register(OAuthIdentity $identity, ?string $inviteCode, bool $remember): RedirectResponse
     {
         $invite = $this->rules->validInvite($inviteCode);
 
@@ -211,7 +220,7 @@ class SocialiteController
         // this site's proof that the address is theirs.
         NewAccount::announce($user);
 
-        return redirect(app(LoginCompletion::class)->begin($user, remember: true));
+        return redirect(app(LoginCompletion::class)->begin($user, $remember));
     }
 
     /**
@@ -225,7 +234,7 @@ class SocialiteController
      * server-side, and consumed when the holder confirms on the page it opens
      * (Livewire\Auth\ConfirmOAuthLink).
      */
-    private function sendConfirmation(Authenticatable $holder, OAuthIdentity $identity): void
+    private function sendConfirmation(Authenticatable $holder, OAuthIdentity $identity, bool $remember): void
     {
         $alreadyHasOne = SocialAccount::query()
             ->where('user_id', $holder->getAuthIdentifier())
@@ -246,6 +255,8 @@ class SocialiteController
             'provider' => $identity->provider,
             'provider_user_id' => $identity->id,
             'label' => $label,
+            // The sign-in the confirmation finishes keeps the member's choice.
+            'remember' => $remember,
         ], now()->addMinutes(60));
 
         $holder->notify(new OAuthLinkConfirmation(

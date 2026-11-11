@@ -153,10 +153,18 @@ reporting someone's email address does not make you that someone.
 | it isn't connected and matches no account | an account is created **only if registration is open** — the same rules as `/register`, including required invites — then it's sent the verification email and signed in. Where registration is closed, the visitor gets the same answer whether or not the address has an account, so the callback can't be used to probe which addresses exist |
 | they're already signed in | the identity is connected to *their* account. One that's connected to someone else is refused; they are never switched into another account |
 
-**Invites with OAuth:** there's no registration form under this driver, so send the
-invite through the redirect — `/auth/github/redirect?invite=CODE`. An invite is
-claimed in the same transaction that creates the account, so two sign-ups racing on
-one invite get one account between them.
+**Invites with OAuth:** `/register` has no password form under this driver. It's the
+invite's landing page: the invite email's `/register?invite=CODE` link opens it, with
+the code filled in (or a field to type one, where invites are required) and a
+**Continue with &lt;provider&gt;** button for each provider. The invite travels with that
+button's POST, the only way one reaches the callback. A `GET /auth/{provider}/redirect`
+ignores `?invite=`, because a GET can be started by any page, which could plant its own
+invite in a visitor's sign-up. An invite is claimed in the same transaction that creates
+the account, so two sign-ups racing on one invite get one account between them.
+
+**Remember me** is a checkbox beside the provider buttons, off by default as on the
+password form. It rides the round trip, including through the emailed connection link
+below. Under `magic_link` the login form's checkbox rides the emailed sign-in link.
 
 **Connecting proves the address.** An account made by OAuth starts unverified: a
 provider *reporting* an address isn't proof of owning it. So someone could make an

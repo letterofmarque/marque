@@ -36,6 +36,21 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   back from any other round trip (the sign-in button, or one another page started) is
   refused, and so is one whose confirmation lapsed on the way. `OAuthConnectionNotice` mails
   the member when a provider is connected or removed.
+- **Remember-me is the member's choice on every sign-in** (#10858). Every OAuth sign-in,
+  OAuth sign-up, emailed connection confirmation and magic-link sign-in set a long-lived
+  remember cookie. The login page now has a checkbox under `socialite` and `magic_link`
+  too, off by default as on the password form. It rides the OAuth round trip (and the
+  emailed connection link) and the magic link.
+- **An invite reaches an OAuth sign-up only in a POST** (#10858). `GET
+  /auth/{provider}/redirect?invite=CODE` could be started by any page, planting an
+  attacker's invite in a visitor's sign-up: with an auto-approving provider, the visitor's
+  account was made on it, skewing the invite tree. The redirect now also takes a POST
+  (CSRF-protected) carrying `invite` and `remember`. A GET is a bare sign-in, and its
+  `?invite=` is ignored.
+- **The invite email's link works under socialite.** `/register?invite=CODE` returned a
+  404 there, so the only way to use an invite was a hand-made redirect URL. `/register` is
+  now the invite's landing page under socialite: the code (or a field for one), a
+  remember-me box, and a POST button per provider. Its password form stays refused.
 - **A password no longer confirms under `magic_link` or `socialite`.** A password set from
   the profile there was never a way in, and may be a squatter's (#10880).
 
@@ -49,6 +64,11 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ### Changed
 
+- **Links to `socialite.redirect` carrying `?invite=` no longer bring the invite.** Send
+  invitees to `/register?invite=CODE` (the invite email already does).
+- **The `usarrs::auth.login` and `usarrs::auth.register` views changed** (the provider
+  buttons are a POST form, from the new `usarrs::auth.partials.oauth-start`; the register
+  view takes `viaOAuth`). An app that published them should republish.
 - **The `usarrs::auth.password-confirm` view takes `offersPassword`, `offersLink`,
   `linkOut`, `providers` and `passkeyUrls`.** An app that published the view should
   republish it, or its members on those drivers keep the dead end.

@@ -38,7 +38,9 @@ it('refuses a password login with valid credentials', function () {
 });
 
 it('does not serve the password registration form', function () {
-    $this->get('/register')->assertNotFound();
+    // /register is the invite email's landing page under socialite (Job #355):
+    // the providers, posting the invite along, and no password form.
+    $this->get('/register')->assertOk()->assertDontSee('type="password"', escape: false);
 });
 
 it('refuses a password registration even from a component mounted before the switch', function () {

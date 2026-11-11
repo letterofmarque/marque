@@ -42,6 +42,8 @@ class MagicLinkController
 
         // Through the seam, so a user with 2FA confirmed is challenged. This
         // path used to sign them straight in (Spec #142).
-        return redirect(app(LoginCompletion::class)->begin($user, remember: true));
+        // The login form's remember-me choice, carried in the link. It used to
+        // be on for every magic-link sign-in (#10858).
+        return redirect(app(LoginCompletion::class)->begin($user, remember: $request->boolean('remember')));
     }
 }

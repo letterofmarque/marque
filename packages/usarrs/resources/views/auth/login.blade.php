@@ -14,13 +14,7 @@
         @endif
 
         @if ($driver->value === 'socialite')
-            <div class="space-y-3">
-                @foreach (config('usarrs.socialite_providers', []) as $provider)
-                    <x-deck::button variant="outline" class="w-full" :href="route('socialite.redirect', $provider)">
-                        {{ __('Continue with :provider', ['provider' => ucfirst($provider)]) }}
-                    </x-deck::button>
-                @endforeach
-            </div>
+            @include('usarrs::auth.partials.oauth-start')
         @else
             <form wire:submit="login" class="space-y-6">
                 <x-deck::field :label="__('Email')" name="email">
@@ -31,20 +25,21 @@
                     <x-deck::field :label="__('Password')" name="password">
                         <x-deck::input wire:model="password" type="password" required />
                     </x-deck::field>
-
-                    <div class="flex items-center justify-between">
-                        <label class="flex items-center gap-2">
-                            <input type="checkbox" wire:model="remember" class="rounded border-zinc-300 dark:border-zinc-600">
-                            <x-deck::text class="text-sm">{{ __('Remember me') }}</x-deck::text>
-                        </label>
-
-                        @if ($driver->supportsPasswordReset())
-                            <a href="{{ route('password.request') }}" class="text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200" wire:navigate>
-                                {{ __('Forgot password?') }}
-                            </a>
-                        @endif
-                    </div>
                 @endif
+
+                {{-- Under magic_link too: the choice rides the emailed link (#10858). --}}
+                <div class="flex items-center justify-between">
+                    <label class="flex items-center gap-2">
+                        <input type="checkbox" wire:model="remember" class="rounded border-zinc-300 dark:border-zinc-600">
+                        <x-deck::text class="text-sm">{{ __('Remember me') }}</x-deck::text>
+                    </label>
+
+                    @if ($driver->supportsPasswordReset())
+                        <a href="{{ route('password.request') }}" class="text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200" wire:navigate>
+                            {{ __('Forgot password?') }}
+                        </a>
+                    @endif
+                </div>
 
                 <x-deck::button type="submit" variant="primary" class="w-full">
                     @if ($driver->value === 'magic_link')

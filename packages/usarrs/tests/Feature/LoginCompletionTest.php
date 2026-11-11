@@ -59,11 +59,13 @@ describe('magic link', function () {
         $this->assertAuthenticatedAs($user);
     });
 
-    it('keeps "remember me" across the challenge, as the link always has', function () {
+    it('keeps "remember me" across the challenge when the link carries it', function () {
+        // The link carries the login form's choice; it used to be on always
+        // (Job #355).
         config()->set('usarrs.two_factor.enabled', true);
         [$user] = twoFactorUser();
 
-        $this->get(magicLinkFor($user));
+        $this->get(magicLinkFor($user).'&remember=1');
 
         expect(session('login.remember'))->toBeTrue();
     });

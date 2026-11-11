@@ -85,7 +85,7 @@ class Login extends Component
 
         if ($user) {
             $token = app('auth.password.broker')->createToken($user);
-            $url = url('/auth/magic-link/verify?token='.$token.'&email='.urlencode($this->email));
+            $url = url('/auth/magic-link/verify?token='.$token.'&email='.urlencode($this->email).($this->remember ? '&remember=1' : ''));
 
             $user->notify(new MagicLinkNotification($url));
         }

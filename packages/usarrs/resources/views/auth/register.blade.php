@@ -7,6 +7,9 @@
             </x-deck::text>
         </div>
 
+        @if ($viaOAuth)
+            @include('usarrs::auth.partials.oauth-start', ['invite' => $invite, 'inviteRequired' => $inviteRequired])
+        @else
         <form wire:submit="register" class="space-y-6">
             @if ($inviteRequired)
                 <x-deck::field :label="__('Invite Code')" name="invite">
@@ -34,6 +37,7 @@
                 {{ __('Register') }}
             </x-deck::button>
         </form>
+        @endif
 
         <x-deck::text class="text-center text-sm text-zinc-500">
             {{ __('Already have an account?') }}
