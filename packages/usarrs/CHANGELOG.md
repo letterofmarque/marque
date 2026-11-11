@@ -9,6 +9,30 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [Unreleased]
 
+> Confirming it's you works for every member, whatever the auth driver; connecting an OAuth provider takes it and tells the member; connections can be listed and removed; remember-me is a choice; invites can't be planted.
+
+### Breaking
+
+See [Upgrading from 9.x to 10.0](README.md#upgrading-from-9x-to-100).
+
+- **Remember-me is off unless the member ticks the box.** OAuth sign-ins and sign-ups, the
+  emailed connection link and magic links all used to remember. Members on those drivers
+  will be asked to sign in again when their session ends.
+- **A signed-in member's OAuth round trip connects nothing unless they started it from the
+  profile** (`POST socialite.connect`, after a step-up). A link or button of your own that
+  sent signed-in members to `socialite.redirect` to connect a provider now gets them an
+  error. Point it at the profile, or POST to `socialite.connect`.
+- **`?invite=` on `GET socialite.redirect` is ignored.** The README told operators to send
+  invitees there. Send them to `/register?invite=CODE` (the invite email already does).
+- **A password no longer confirms under `magic_link` or `socialite`.**
+- **Changing the email or password on `/profile/edit` takes a confirmed step-up.**
+- **The `usarrs::auth.login` and `usarrs::auth.register` views changed** (the provider
+  buttons are a POST form, from the new `usarrs::auth.partials.oauth-start`; the register
+  view takes `viaOAuth`). An app that published them should republish.
+- **The `usarrs::auth.password-confirm` view takes `offersPassword`, `offersLink`,
+  `linkOut`, `providers` and `passkeyUrls`.** An app that published the view should
+  republish it, or its members on those drivers keep the dead end.
+
 ### Fixed
 
 - **Confirming it's you works for members with no password to type** (Job #355). The
@@ -82,17 +106,6 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   lists the member's providers, connects the ones they haven't, and disconnects. Disconnecting
   takes a confirmed step-up, mails a notice, and is refused when it would remove the last way
   in (the only connection, with no passkey).
-
-### Changed
-
-- **Links to `socialite.redirect` carrying `?invite=` no longer bring the invite.** Send
-  invitees to `/register?invite=CODE` (the invite email already does).
-- **The `usarrs::auth.login` and `usarrs::auth.register` views changed** (the provider
-  buttons are a POST form, from the new `usarrs::auth.partials.oauth-start`; the register
-  view takes `viaOAuth`). An app that published them should republish.
-- **The `usarrs::auth.password-confirm` view takes `offersPassword`, `offersLink`,
-  `linkOut`, `providers` and `passkeyUrls`.** An app that published the view should
-  republish it, or its members on those drivers keep the dead end.
 
 ## [9.0.1] — 2026-11-07
 

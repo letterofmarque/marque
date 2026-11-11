@@ -585,6 +585,31 @@ still live. The tracker decides what ending costs (bloodhound credits nothing th
 session moved since its last announce) and refuses to end another member's. With no such
 tracker the route exists and answers 404, and nothing links to it.
 
+## Upgrading from 9.x to 10.0
+
+10.0 makes confirming it's you work for every member, and hardens OAuth around it. Most of
+it needs nothing from you. Check these:
+
+1. **Published views.** If you published `usarrs::auth.password-confirm`,
+   `usarrs::auth.login` or `usarrs::auth.register`, republish them
+   (`php artisan vendor:publish --tag=usarrs-views --force`, then reapply your changes).
+   The confirm page now offers more than a password, and the provider buttons are a POST
+   form (`usarrs::auth.partials.oauth-start`). An old copy of the confirm page leaves
+   socialite and magic-link members at the dead end 10.0 fixes.
+2. **Your own links into OAuth.** A link to `socialite.redirect` with `?invite=` no longer
+   carries the invite: send invitees to `/register?invite=CODE`, which is what the invite
+   email does. A link meant to connect a provider for a signed-in member needs to go to the
+   profile, or POST to `socialite.connect`. The callback no longer connects anything a
+   member didn't start there.
+3. **Remember-me is off by default** on OAuth and magic-link sign-ins, as it always was on
+   the password form. Members who don't tick the box sign in again when their session ends.
+4. **Queued mail.** The OAuth connection link, the "confirm it's you" link and the
+   connection notices are queued notifications. Run a queue worker, or use the `sync`
+   queue connection.
+5. **Step-ups.** Changing the email or password on `/profile/edit`, and connecting or
+   removing an OAuth provider, now ask the member to confirm it's them first. A password no
+   longer counts as that confirmation under `magic_link` or `socialite`.
+
 ## Requirements
 
 - PHP 8.3+
