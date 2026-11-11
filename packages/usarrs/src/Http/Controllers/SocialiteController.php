@@ -51,6 +51,11 @@ class SocialiteController
         session()->put('usarrs.oauth.invite', is_string($invite) && $invite !== '' ? $invite : null);
         session()->put('usarrs.oauth.remember', $request->isMethod('post') && $request->boolean('remember'));
 
+        // A sign-in round trip is never a connection or a confirmation, even
+        // if one of those was started and abandoned at the provider: its
+        // intent would otherwise still be waiting for this callback.
+        session()->forget('usarrs.oauth.intent');
+
         return $this->oauth->redirect($provider);
     }
 
@@ -164,7 +169,7 @@ class SocialiteController
         $holder = $this->userByEmail($identity->email);
 
         if ($holder !== null) {
-            $this->sendConfirmation($holder, $identity, $remember);
+            $this->sendConfirmation($holder, $identity);
         }
 
         $sentLink = __('If an account here uses that :provider account\'s email address, we\'ve sent it a link to connect them — check your email.', ['provider' => ucfirst($provider)]);
@@ -250,7 +255,7 @@ class SocialiteController
      * server-side, and consumed when the holder confirms on the page it opens
      * (Livewire\Auth\ConfirmOAuthLink).
      */
-    private function sendConfirmation(Authenticatable $holder, OAuthIdentity $identity, bool $remember): void
+    private function sendConfirmation(Authenticatable $holder, OAuthIdentity $identity): void
     {
         $alreadyHasOne = SocialAccount::query()
             ->where('user_id', $holder->getAuthIdentifier())
@@ -278,8 +283,6 @@ class SocialiteController
             'provider' => $identity->provider,
             'provider_user_id' => $identity->id,
             'label' => $label,
-            // The sign-in the confirmation finishes keeps the member's choice.
-            'remember' => $remember,
         ], now()->addMinutes(60));
 
         $holder->notify(new OAuthLinkConfirmation(

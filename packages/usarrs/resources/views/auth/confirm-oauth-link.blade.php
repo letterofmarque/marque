@@ -27,6 +27,11 @@
                 </div>
             @endif
 
+            <label class="flex items-center justify-center gap-2">
+                <input type="checkbox" wire:model="remember" class="rounded border-zinc-300 dark:border-zinc-600">
+                <x-deck::text class="text-sm">{{ __('Remember me') }}</x-deck::text>
+            </label>
+
             <x-deck::button variant="primary" wire:click="connect" class="w-full">
                 {{ __('Connect :provider', ['provider' => $providerName]) }}
             </x-deck::button>

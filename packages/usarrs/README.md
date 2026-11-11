@@ -179,8 +179,9 @@ invite in a visitor's sign-up. An invite is claimed in the same transaction that
 the account, so two sign-ups racing on one invite get one account between them.
 
 **Remember me** is a checkbox beside the provider buttons, off by default as on the
-password form. It rides the round trip, including through the emailed connection link
-below. Under `magic_link` the login form's checkbox rides the emailed sign-in link.
+password form. It rides the round trip. The emailed connection link below asks it again on
+its own page, of the inbox owner. Under `magic_link` the login form's checkbox rides the
+emailed sign-in link.
 
 **Connecting proves the address.** An account made by OAuth starts unverified: a
 provider *reporting* an address isn't proof of owning it. So someone could make an
@@ -296,9 +297,17 @@ random and unknown, and under `magic_link` the member never chose one:
 | A passkey | passkeys are enabled and the member has one |
 | A link to their email address | always, once the address is verified. The link opens a page naming the browser that asked; approving there confirms that session, once, from any device. Opening the link approves nothing, so mail scanners can't |
 
-usarrs asks for it before adding or removing a passkey, connecting or removing an OAuth
-provider, and changing the email address or password on `/profile/edit`. Put
-`password.confirm` on your own sensitive routes the same way.
+usarrs asks for it before adding or removing a passkey, turning two-factor on or off,
+seeing or regenerating recovery codes, connecting or removing an OAuth provider, and
+changing the email address or password on `/profile/edit`. Put `password.confirm` on your
+own sensitive routes the same way.
+
+A magic-link sign-in verifies the address it was sent to, as a verification link does. An
+unverified member who has nothing else to confirm with is pointed to verify first.
+
+**The emailed confirmation can be phished.** A session that isn't the member's can ask for
+one, and the link lands in the owner's real inbox. The page it opens names the browser that
+asked, and says not to approve if that wasn't them.
 
 **There's no "sign out my other sessions" yet** (#11154). A member who gets a confirmation
 link or connection notice they didn't ask for should tell staff. A password change under
@@ -328,6 +337,9 @@ model needs `Laravel\Fortify\TwoFactorAuthenticatable`.
 | Password confirmation | 5 a minute | the signed-in user |
 | "Confirm it's you" email | 1 a minute | the signed-in user |
 | OAuth "connect this account?" email | 3 an hour; the visitor's answer doesn't change | the account it's sent to |
+
+The connection-email limit is per account, so anyone with a provider account reporting a
+member's address can use it up and hold back the member's own link for up to an hour.
 
 Each attempt is counted before the answer is checked, as an atomic increment.
 Checking first and counting only failures would let a burst of parallel

@@ -18,7 +18,11 @@ use Marque\Usarrs\Notifications\InviteNotification;
 use Marque\Usarrs\Tests\TestUser;
 
 describe('two-factor authentication', function () {
-    beforeEach(fn () => config()->set('usarrs.two_factor.enabled', true));
+    beforeEach(function () {
+        config()->set('usarrs.two_factor.enabled', true);
+        // Past the step-up (Job #355; TwoFactorStepUpTest), to the address gate.
+        session()->put('auth.password_confirmed_at', time());
+    });
 
     it('cannot be turned on from an unverified account', function () {
         $user = TestUser::factory()->unverified()->create();

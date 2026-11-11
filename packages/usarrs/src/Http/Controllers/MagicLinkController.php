@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Marque\Usarrs\Http\Controllers;
 
+use Illuminate\Auth\Events\Verified;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -39,6 +41,14 @@ class MagicLinkController
         }
 
         app('auth.password.broker')->deleteToken($user);
+
+        // The link went to this address and came back: the same proof a
+        // verification link gives. Without it a magic-link member who skipped
+        // the verification mail had nothing to confirm it's them with (Job #355).
+        if ($user instanceof MustVerifyEmail && ! $user->hasVerifiedEmail()) {
+            $user->markEmailAsVerified();
+            event(new Verified($user));
+        }
 
         // Through the seam, so a user with 2FA confirmed is challenged. This
         // path used to sign them straight in (Spec #142).

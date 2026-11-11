@@ -24,6 +24,23 @@ See [Upgrading from 9.x to 10.0](README.md#upgrading-from-9x-to-100).
   error. Point it at the profile, or POST to `socialite.connect`.
 - **`?invite=` on `GET socialite.redirect` is ignored.** The README told operators to send
   invitees there. Send them to `/register?invite=CODE` (the invite email already does).
+- **Two-factor setup takes a confirmed step-up** (Job #355's independent check). Turning
+  it on or off and regenerating recovery codes took none, and the codes were shown to any
+  session. A session that wasn't the member's could disable two-factor, read the codes, or
+  turn it on with its own authenticator and lock the owner out. The codes now show only
+  after a recent confirmation.
+- **An abandoned connection can't be finished by another round trip.** A connect given up
+  at the provider left its intent in the session, so a sign-in round trip started within
+  the step-up window (by another page, say) connected whatever came back. Starting any
+  sign-in round trip now clears it.
+- **Removing connections can't leave no way in.** Two removals at once each counted two
+  connections and deleted one. Removals for one member now take turns, under a lock on the
+  member's row, and the count after deleting decides.
+- **A magic-link sign-in verifies the address**, the proof a verification link gives. An
+  unverified member with nothing else to confirm with is told to verify first, instead of
+  being shown an empty confirm page.
+- **The emailed connection link's page asks "Remember me"**, rather than carrying the
+  choice of whoever started the round trip, who may not be the inbox owner.
 - **A password no longer confirms under `magic_link` or `socialite`.**
 - **Changing the email or password on `/profile/edit` takes a confirmed step-up.**
 - **The `usarrs::auth.login` and `usarrs::auth.register` views changed** (the provider
@@ -63,8 +80,8 @@ See [Upgrading from 9.x to 10.0](README.md#upgrading-from-9x-to-100).
 - **Remember-me is the member's choice on every sign-in** (#10858). Every OAuth sign-in,
   OAuth sign-up, emailed connection confirmation and magic-link sign-in set a long-lived
   remember cookie. The login page now has a checkbox under `socialite` and `magic_link`
-  too, off by default as on the password form. It rides the OAuth round trip (and the
-  emailed connection link) and the magic link.
+  too, off by default as on the password form. It rides the OAuth round trip and the magic
+  link, and the emailed connection link's page asks it of the inbox owner.
 - **An invite reaches an OAuth sign-up only in a POST** (#10858). `GET
   /auth/{provider}/redirect?invite=CODE` could be started by any page, planting an
   attacker's invite in a visitor's sign-up: with an auto-approving provider, the visitor's

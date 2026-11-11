@@ -35,6 +35,10 @@
                     {{ __('Regenerate Codes') }}
                 </x-deck::button>
             </div>
+        @else
+            <x-deck::button variant="ghost" size="sm" wire:click="regenerateRecoveryCodes">
+                {{ __('Confirm it\'s you to see or regenerate recovery codes') }}
+            </x-deck::button>
         @endif
 
         <x-deck::button variant="ghost" wire:click="disable">{{ __('Disable Two-Factor Authentication') }}</x-deck::button>

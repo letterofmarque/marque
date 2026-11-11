@@ -6,9 +6,11 @@ namespace Marque\Usarrs\Livewire\Profile;
 
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Livewire\Attributes\Locked;
 use Marque\Usarrs\Auth\StepUp;
+use Marque\Usarrs\Exceptions\LastWayIn;
 use Marque\Usarrs\Livewire\Component;
 use Marque\Usarrs\Models\SocialAccount;
 use Marque\Usarrs\Notifications\OAuthConnectionNotice;
@@ -40,8 +42,7 @@ class ConnectedAccounts extends Component
     public function disconnect(string $provider): void
     {
         $user = auth()->user();
-        $connections = $this->connections();
-        $connection = $connections->firstWhere('provider', $provider);
+        $connection = $this->connections()->firstWhere('provider', $provider);
 
         if ($connection === null) {
             return;
@@ -54,13 +55,26 @@ class ConnectedAccounts extends Component
             return;
         }
 
-        if ($connections->count() === 1 && ! $this->hasPasskey()) {
+        try {
+            DB::transaction(function () use ($user, $connection) {
+                // Two removals at once each counted two connections and deleted
+                // one, leaving none (Job #355). Locking the member's row makes
+                // this member's removals take turns; the count after deleting is
+                // the one that decides, and a removal that would leave no way in
+                // rolls back.
+                $user::query()->whereKey($user->getKey())->lockForUpdate()->first();
+
+                $connection->delete();
+
+                if ($this->connections()->isEmpty() && ! $this->hasPasskey()) {
+                    throw new LastWayIn;
+                }
+            });
+        } catch (LastWayIn) {
             $this->addError('disconnect', __(':provider is your only way to sign in. Connect another first.', ['provider' => ucfirst($provider)]));
 
             return;
         }
-
-        $connection->delete();
 
         $user->notify(new OAuthConnectionNotice($provider, connected: false));
 

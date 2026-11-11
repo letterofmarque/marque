@@ -169,6 +169,7 @@ class PasswordConfirm extends Component
         return $this->usarrsView('usarrs::auth.password-confirm', [
             'offersPassword' => $this->driver()->allowsPasswordLogin(),
             'offersLink' => ! VerifiedAddress::missing(auth()->user()),
+            'needsVerification' => VerifiedAddress::missing(auth()->user()) && Route::has('verification.notice'),
             'linkOut' => session()->has(EmailStepUp::SESSION_KEY),
             'providers' => $this->providers(),
             'passkeyUrls' => $this->hasPasskey()

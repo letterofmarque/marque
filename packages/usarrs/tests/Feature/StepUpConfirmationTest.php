@@ -217,3 +217,15 @@ it('builds a link that URL::hasValidSignature accepts', function () {
 
     expect(URL::hasValidSignature(request()->create($url)))->toBeTrue();
 });
+
+it('tells an unverified member with nothing else to confirm with to verify first', function () {
+    // From the independent check: under socialite with no connection, an
+    // unproven address left a confirm page offering nothing at all.
+    config(['usarrs.auth_driver' => 'socialite']);
+    $user = TestUser::factory()->unverified()->create();
+
+    $this->actingAs($user)->get(route('password.confirm'))
+        ->assertOk()
+        ->assertSee(__('Verify your email address first'))
+        ->assertSee(route('verification.notice'));
+});

@@ -98,6 +98,15 @@
             </div>
         @endif
 
+        @if ($needsVerification)
+            {{-- Without a verified address there's no emailed link, and under
+                 magic_link or socialite perhaps nothing else either (Job #355). --}}
+            <x-deck::text class="text-center text-sm text-zinc-500">
+                {{ __('Verify your email address first, and you can confirm it\'s you by email.') }}
+                <a href="{{ route('verification.notice') }}" class="underline">{{ __('Verify your email address') }}</a>
+            </x-deck::text>
+        @endif
+
         @if ($offersLink)
             <div class="rounded-xl border border-zinc-200 bg-white p-6 text-center dark:border-zinc-700 dark:bg-zinc-900"
                 @if ($linkOut) wire:poll.3s="checkLink" @endif>

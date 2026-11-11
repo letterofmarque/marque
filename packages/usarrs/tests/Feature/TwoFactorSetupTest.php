@@ -10,6 +10,8 @@ use PragmaRX\Google2FA\Google2FA;
 
 beforeEach(function () {
     $this->user = TestUser::factory()->create();
+    // Managing two-factor takes a confirmed step-up (Job #355; TwoFactorStepUpTest).
+    session()->put('auth.password_confirmed_at', time());
 });
 
 test('two factor setup is unreachable when the feature is off', function () {

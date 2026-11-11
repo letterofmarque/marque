@@ -49,6 +49,8 @@ class ConfirmOAuthLink extends Component
     #[Locked]
     public string $token = '';
 
+    public bool $remember = false;
+
     public function mount(string $provider, string $token): void
     {
         abort_unless(in_array($provider, config('usarrs.socialite_providers', []), true), 404);
@@ -134,9 +136,9 @@ class ConfirmOAuthLink extends Component
             return;
         }
 
-        // The remember-me choice made on the login page, carried here with the
-        // pending connection; off when there was none (#10858).
-        $this->redirect(app(LoginCompletion::class)->begin($user, remember: (bool) ($pending['remember'] ?? false)), navigate: false);
+        // Asked here, of the inbox owner signing in. Whoever started the round
+        // trip may not be them (Job #355; it used to be always on, #10858).
+        $this->redirect(app(LoginCompletion::class)->begin($user, remember: $this->remember), navigate: false);
     }
 
     /**

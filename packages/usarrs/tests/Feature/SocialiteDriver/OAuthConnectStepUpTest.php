@@ -13,6 +13,7 @@ declare(strict_types=1);
 // them, with disconnect behind the same step-up, never removing the last way
 // in.
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
 use Marque\Usarrs\Contracts\OAuthProvider;
@@ -165,4 +166,37 @@ it('removes only the member\'s own connection', function () {
     Livewire::actingAs($this->me)->test(ConnectedAccounts::class)->call('disconnect', 'gitlab');
 
     expect(SocialAccount::resolve('gitlab', 'gl-other'))->not->toBeNull();
+});
+
+it('forgets an abandoned connection when another round trip starts', function () {
+    // From the independent check: a connect abandoned at the provider left its
+    // intent in the session, so a GET round trip another page started within
+    // the step-up window connected whatever identity came back.
+    confirmedAs($this, $this->me)->post(route('socialite.connect', 'gitlab'));
+
+    $this->get(route('socialite.redirect', 'gitlab'));
+    $this->oauth->asserts('gitlab', 'gl-planted', 'me@example.com');
+    $this->get(route('socialite.callback', 'gitlab'))->assertSessionHasErrors('email');
+
+    expect(SocialAccount::resolve('gitlab', 'gl-planted'))->toBeNull();
+});
+
+it('removes nothing when a concurrent removal took the other way in', function () {
+    // From the independent check: two removes at once each counted two
+    // connections and deleted one, leaving none. The removal re-checks after
+    // deleting, under a lock on the member.
+    SocialAccount::forceCreate(['user_id' => $this->me->getKey(), 'provider' => 'gitlab', 'provider_user_id' => 'gl-me']);
+    session()->put('auth.password_confirmed_at', time());
+    SocialAccount::deleting(function (SocialAccount $account) {
+        if ($account->provider === 'gitlab') {
+            DB::table('usarrs_social_accounts')->where('provider', 'github')->delete();
+        }
+    });
+
+    Livewire::actingAs($this->me)->test(ConnectedAccounts::class)
+        ->call('disconnect', 'gitlab')
+        ->assertHasErrors('disconnect');
+
+    expect(SocialAccount::resolve('gitlab', 'gl-me'))->not->toBeNull();
+    Notification::assertNothingSent();
 });

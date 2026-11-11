@@ -78,12 +78,12 @@ it('remembers an OAuth sign-up only when asked', function (bool $ticked) {
     $ticked ? $response->assertCookie(recaller()) : $response->assertCookieMissing(recaller());
 })->with(['ticked' => true, 'not ticked' => false]);
 
-it('carries the choice through the emailed connection link', function (bool $ticked) {
-    // The factory issues a remember token; start with none, so one appearing
-    // means this sign-in was remembered.
+it('asks the inbox owner on the connection page, whatever the round trip chose', function (bool $startedRemembered, bool $ownerTicks) {
+    // From the independent check: the choice belonged to whoever started the
+    // round trip, who may not be the inbox owner confirming. The page asks.
     $member = TestUser::factory()->create(['email' => 'member@example.com', 'remember_token' => null]);
 
-    $this->post(route('socialite.redirect', 'github'), $ticked ? ['remember' => '1'] : []);
+    $this->post(route('socialite.redirect', 'github'), $startedRemembered ? ['remember' => '1'] : []);
     $this->oauth->asserts('github', 'gh-1', 'member@example.com');
     $this->get(route('socialite.callback', 'github'));
 
@@ -94,10 +94,16 @@ it('carries the choice through the emailed connection link', function (bool $tic
         return true;
     });
 
-    Livewire::test(ConfirmOAuthLink::class, ['provider' => 'github', 'token' => $token])->call('connect');
+    Livewire::test(ConfirmOAuthLink::class, ['provider' => 'github', 'token' => $token])
+        ->assertSee(__('Remember me'))
+        ->set('remember', $ownerTicks)
+        ->call('connect');
 
-    expect(filled($member->fresh()->getRememberToken()))->toBe($ticked);
-})->with(['ticked' => true, 'not ticked' => false]);
+    expect(filled($member->fresh()->getRememberToken()))->toBe($ownerTicks);
+})->with([
+    'started remembered, owner declines' => [true, false],
+    'started not remembered, owner ticks' => [false, true],
+]);
 
 // Invites
 

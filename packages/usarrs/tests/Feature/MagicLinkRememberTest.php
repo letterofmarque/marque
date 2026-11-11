@@ -46,3 +46,14 @@ it('remembers a magic-link sign-in only when asked', function (bool $ticked) {
         ? $response->assertCookie(Auth::guard()->getRecallerName())
         : $response->assertCookieMissing(Auth::guard()->getRecallerName());
 })->with(['ticked' => true, 'not ticked' => false]);
+
+// Job #355, from its independent check: a used magic link proves the inbox, the
+// same proof a verification link gives. Without this a magic-link member who
+// never clicked the separate verification mail had no way to confirm it's them.
+it('marks the address verified when a magic link signs in', function () {
+    $user = TestUser::factory()->unverified()->create();
+
+    $this->get(rememberingMagicLink($user, false));
+
+    expect($user->fresh()->hasVerifiedEmail())->toBeTrue();
+});
