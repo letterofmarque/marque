@@ -66,7 +66,7 @@ audiences:
 | Config key | Default | Applies to |
 |---|---|---|
 | `guest_middleware` | `['web', 'guest']` | login, register, 2FA challenge, forgot-password |
-| `middleware` | `['web']` | reset-password, magic-link, OAuth redirect/callback/confirm |
+| `middleware` | `['web']` | reset-password, magic-link, OAuth redirect/callback, the emailed OAuth connection and "confirm it's you" pages; plus `auth` for OAuth connect and confirm |
 | `auth_middleware` | `['web', 'auth']` | logout, profile, email verification, password confirm |
 
 The middle row is the one worth understanding. Those routes are **not**
@@ -149,7 +149,7 @@ reporting someone's email address does not make you that someone.
 | Someone completes OAuth and… | What happens |
 |---|---|
 | the identity is connected to an account | signed in to that account — through the two-factor challenge if they have 2FA on |
-| it isn't connected, but its email matches an account here (ignoring case) | nobody is signed in. That account's own address is emailed a link, valid 60 minutes and good once. The email and the page it opens name the provider account; nothing is connected until the holder presses **Connect** there, which then signs them in (2FA applies). Opening the link alone — or a mail scanner opening it — does nothing |
+| it isn't connected, but its email matches an account here (ignoring case) | nobody is signed in. That account's own address is emailed a link (unless it already has a proven connection for that provider, or has had three this hour), valid 60 minutes and good once. The email and the page it opens name the provider account; nothing is connected until the holder presses **Connect** there, which then signs them in (2FA applies). Opening the link alone — or a mail scanner opening it — does nothing |
 | it isn't connected and matches no account | an account is created **only if registration is open** — the same rules as `/register`, including required invites — then it's sent the verification email and signed in. Where registration is closed, the visitor gets the same answer whether or not the address has an account, so the callback can't be used to probe which addresses exist |
 | they're already signed in, and started a connection from their profile | the identity is connected to *their* account, and they're mailed a notice. Starting one takes a confirmed step-up (see [Confirming it's you](#confirming-its-you)). One connected to someone else is refused; they are never switched into another account |
 | they're already signed in, and didn't start a connection | nothing is connected. A sign-in button pressed while signed in, or a round trip another page started, is refused |
@@ -179,7 +179,7 @@ invite in a visitor's sign-up. An invite is claimed in the same transaction that
 the account, so two sign-ups racing on one invite get one account between them.
 
 **Remember me** is a checkbox beside the provider buttons, off by default as on the
-password form. It rides the round trip. The emailed connection link below asks it again on
+password form. It rides the round trip. The emailed connection link above asks it again on
 its own page, of the inbox owner. Under `magic_link` the login form's checkbox rides the
 emailed sign-in link.
 
@@ -216,9 +216,10 @@ at every sign-in so no session escapes it. Routes your app defines need it too �
 `Route::middleware(['auth', 'auth.session'])` — or a squatter can keep using them.
 
 **The cache must be shared and persistent.** A pending connection is held in the
-default cache store between the email and the confirmation. With the `array` store,
-or a per-server `file` store behind a load balancer, every link reads as "already
-used or expired".
+default cache store between the email and the confirmation, and so is the approval of an
+emailed "confirm it's you" link. With the `array` store, or a per-server `file` store
+behind a load balancer, every connection link reads as "already used or expired", and an
+approval made on a phone never reaches the browser that asked.
 
 **Upgrading from before 8.1:** existing OAuth accounts have no stored connection yet.
 The first time each of those users signs in with OAuth, they're emailed the
@@ -310,8 +311,8 @@ one, and the link lands in the owner's real inbox. The page it opens names the b
 asked, and says not to approve if that wasn't them.
 
 **There's no "sign out my other sessions" yet** (#11154). A member who gets a confirmation
-link or connection notice they didn't ask for should tell staff. A password change under
-the `password` driver signs out every other session.
+link or connection notice they didn't ask for should tell staff. Setting or changing the
+password on `/profile/edit` (any driver, after a step-up) signs out every other session.
 
 Both are part of the auth surface [manage_auth](#manage_auth-escape-hatch) governs —
 absent entirely when `manage_auth=false`, same as login/register/2FA/passkey.
@@ -343,8 +344,9 @@ member's address can use it up and hold back the member's own link for up to an 
 
 Each attempt is counted before the answer is checked, as an atomic increment.
 Checking first and counting only failures would let a burst of parallel
-requests through before any of them was counted. A successful attempt resets
-the count.
+requests through before any of them was counted. For password login, the
+two-factor challenge and password confirmation, a successful attempt resets the count;
+the two mail limits never reset early.
 
 The challenge limit isn't keyed on IP. Anyone at the challenge already has the
 password, and an IP key would let them switch addresses to get five more guesses.
@@ -394,10 +396,10 @@ own controllers, paths and route names:
 
 `usarrs-passkeys` is a named limiter, so it doesn't share a bucket with the
 app's other throttled routes. It allows 10 requests a minute per user, or per
-IP for guests, which is five sign-ins (options, then the assertion). Removing
-a passkey from the profile page also asks for a confirmed password, as the
-`DELETE` endpoint does. When adding one needs a confirmed password first, the
-page sends the user to confirm it and then returns them.
+IP for guests, which is five sign-ins (options, then the assertion). Adding or
+removing a passkey asks the member to confirm it's them (see
+[Confirming it's you](#confirming-its-you)), as the `DELETE` endpoint does; the page
+sends them to confirm and then returns them.
 
 While usarrs manages auth, `laravel/passkeys` is never allowed to register them. This works the same on
 every Fortify version usarrs allows (`^1.30`). Fortify 1.39 suppresses
@@ -602,12 +604,18 @@ tracker the route exists and answers 404, and nothing links to it.
 10.0 makes confirming it's you work for every member, and hardens OAuth around it. Most of
 it needs nothing from you. Check these:
 
-1. **Published views.** If you published `usarrs::auth.password-confirm`,
-   `usarrs::auth.login` or `usarrs::auth.register`, republish them
-   (`php artisan vendor:publish --tag=usarrs-views --force`, then reapply your changes).
-   The confirm page now offers more than a password, and the provider buttons are a POST
-   form (`usarrs::auth.partials.oauth-start`). An old copy of the confirm page leaves
-   socialite and magic-link members at the dead end 10.0 fixes.
+1. **Published views.** If you published any of these, republish them
+   (`php artisan vendor:publish --tag=usarrs-views --force`, then reapply your changes):
+   - `usarrs::auth.password-confirm`: it offers more than a password now. An old copy
+     leaves socialite and magic-link members at the dead end 10.0 fixes.
+   - `usarrs::auth.login` and `usarrs::auth.register`: the provider buttons are a POST form
+     (`usarrs::auth.partials.oauth-start`). An old copy can't carry an invite or remember-me.
+   - `usarrs::profile.show`: it embeds the connected accounts. With an old copy socialite
+     members have no way to connect a provider.
+   - `usarrs::profile.two-factor-setup`: recovery codes show only after a step-up, behind a
+     new button. With an old copy members can't see or regenerate their codes.
+   - `usarrs::auth.confirm-oauth-link`: it asks remember-me and warns before stripping an
+     unproven account.
 2. **Your own links into OAuth.** A link to `socialite.redirect` with `?invite=` no longer
    carries the invite: send invitees to `/register?invite=CODE`, which is what the invite
    email does. A link meant to connect a provider for a signed-in member needs to go to the
@@ -618,8 +626,9 @@ it needs nothing from you. Check these:
 4. **Queued mail.** The OAuth connection link, the "confirm it's you" link and the
    connection notices are queued notifications. Run a queue worker, or use the `sync`
    queue connection.
-5. **Step-ups.** Changing the email or password on `/profile/edit`, and connecting or
-   removing an OAuth provider, now ask the member to confirm it's them first. A password no
+5. **Step-ups.** Changing the email or password on `/profile/edit`, connecting or removing
+   an OAuth provider, turning two-factor on or off, and seeing or regenerating recovery
+   codes now ask the member to confirm it's them first. A password no
    longer counts as that confirmation under `magic_link` or `socialite`.
 
 ## Requirements

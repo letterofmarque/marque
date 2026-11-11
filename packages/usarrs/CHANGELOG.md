@@ -41,13 +41,21 @@ See [Upgrading from 9.x to 10.0](README.md#upgrading-from-9x-to-100).
   being shown an empty confirm page.
 - **The emailed connection link's page asks "Remember me"**, rather than carrying the
   choice of whoever started the round trip, who may not be the inbox owner.
+- **A magic link works under `usarrs.prefix`.** It was built with a bare
+  `url('/auth/magic-link/verify')`, ignoring the prefix the route is registered under, so on
+  a prefixed install every emailed link 404'd. It's built from the route name now.
 - **A password no longer confirms under `magic_link` or `socialite`.**
 - **Changing the email or password on `/profile/edit` takes a confirmed step-up.**
 - **The `usarrs::auth.login` and `usarrs::auth.register` views changed** (the provider
   buttons are a POST form, from the new `usarrs::auth.partials.oauth-start`; the register
   view takes `viaOAuth`). An app that published them should republish.
+- **The `usarrs::profile.show`, `usarrs::profile.two-factor-setup` and
+  `usarrs::auth.confirm-oauth-link` views changed.** An old copy of `profile.show` has no
+  connected accounts, so socialite members can't connect a provider; an old copy of
+  `two-factor-setup` can't show or regenerate recovery codes, which now sit behind a step-up.
+  Republish them.
 - **The `usarrs::auth.password-confirm` view takes `offersPassword`, `offersLink`,
-  `linkOut`, `providers` and `passkeyUrls`.** An app that published the view should
+  `linkOut`, `providers`, `passkeyUrls` and `needsVerification`.** An app that published the view should
   republish it, or its members on those drivers keep the dead end.
 
 ### Fixed
