@@ -143,6 +143,16 @@ describe('login', function () {
         expect($challenge->verified)->toBe([]);
     });
 
+    it('refuses the right password with an answer the verifier rejects', function () {
+        $challenge = bindChallenge();
+
+        Livewire::test(Login::class)->set('email', 'member@example.com')->set('password', 'right-password')
+            ->set('challenge', 'wrong-answer')->call('login')->assertHasErrors('challenge');
+
+        $this->assertGuest();
+        expect($challenge->verified)->toBe([['answer' => 'wrong-answer', 'form' => 'login']]);
+    });
+
     it('signs in with the right password and a passing answer', function () {
         bindChallenge();
 

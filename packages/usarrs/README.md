@@ -432,6 +432,7 @@ form is refused.
 ### Example: Cloudflare Turnstile
 
 ```php
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Marque\Usarrs\Contracts\Challenge;
@@ -450,11 +451,15 @@ class TurnstileChallenge implements Challenge
 
     public function verify(string $answer, string $form, Request $request): bool
     {
-        $result = Http::asForm()->timeout(5)->post('https://challenges.cloudflare.com/turnstile/v0/siteverify', [
-            'secret' => config('services.turnstile.secret_key'),
-            'response' => $answer,
-            'remoteip' => $request->ip(),
-        ]);
+        try {
+            $result = Http::asForm()->timeout(5)->post('https://challenges.cloudflare.com/turnstile/v0/siteverify', [
+                'secret' => config('services.turnstile.secret_key'),
+                'response' => $answer,
+                'remoteip' => $request->ip(),
+            ]);
+        } catch (ConnectionException) {
+            return false;
+        }
 
         return $result->ok() && $result->json('success') === true && $result->json('action') === $form;
     }
@@ -482,8 +487,9 @@ $this->app->singleton(\Marque\Usarrs\Contracts\Challenge::class, TurnstileChalle
 ```
 
 Checking `action` stops a token solved on one form being spent on another. If Turnstile
-can't be reached, `verify()` returns false and the form is refused: a check that fails
-open is no check.
+can't be reached, Laravel's HTTP client throws `ConnectionException`; the example catches
+it and returns false, so the visitor sees the form refused rather than a server error.
+Either way it fails closed: a check that fails open is no check.
 
 ## Passkeys (WebAuthn)
 
