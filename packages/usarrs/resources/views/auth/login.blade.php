@@ -41,6 +41,8 @@
                     @endif
                 </div>
 
+                @include('usarrs::auth.partials.challenge', ['form' => \Marque\Usarrs\Contracts\Challenge::LOGIN])
+
                 <x-deck::button type="submit" variant="primary" class="w-full">
                     @if ($driver->value === 'magic_link')
                         {{ __('Send Login Link') }}

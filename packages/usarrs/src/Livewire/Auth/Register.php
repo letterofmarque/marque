@@ -13,15 +13,20 @@ use Livewire\Attributes\Validate;
 use Marque\Usarrs\Auth\LoginCompletion;
 use Marque\Usarrs\Auth\NewAccount;
 use Marque\Usarrs\Auth\RegistrationRules;
+use Marque\Usarrs\Auth\Throttle;
+use Marque\Usarrs\Contracts\Challenge;
 use Marque\Usarrs\Enums\AuthDriver;
 use Marque\Usarrs\Exceptions\InviteAlreadyRedeemed;
 use Marque\Usarrs\Livewire\Component;
+use Marque\Usarrs\Livewire\Concerns\AsksChallenge;
 use Marque\Usarrs\Rules\UniqueEmail;
 use Marque\Usarrs\Services\InviteService;
 
 #[Title('Register')]
 class Register extends Component
 {
+    use AsksChallenge;
+
     #[Validate('required|string|max:255')]
     public string $name = '';
 
@@ -70,6 +75,10 @@ class Register extends Component
 
         $this->validate();
 
+        if (! $this->passesChallenge(Challenge::REGISTER)) {
+            return;
+        }
+
         // The same rules the OAuth callback asks (Spec #142).
         if (($refusal = $rules->refusal($this->invite)) !== null) {
             $this->addError('invite', $refusal);
@@ -78,6 +87,15 @@ class Register extends Component
         }
 
         $invite = $rules->validInvite($this->invite);
+
+        // Every account sends a verification email to the address typed, so
+        // unlimited sign-ups mean unlimited mail to strangers (Job #366).
+        // Counted only once the form is valid, so typos don't use it up.
+        if (($wait = Throttle::hit('usarrs.register:'.request()->ip(), Throttle::perIp('registrations_per_ip', 5), 3600)) !== null) {
+            $this->addError('email', $wait);
+
+            return;
+        }
 
         $model = config('trove.user_model', 'App\\Models\\User');
 

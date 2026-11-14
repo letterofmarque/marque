@@ -338,6 +338,26 @@ model needs `Laravel\Fortify\TwoFactorAuthenticatable`.
 | Password confirmation | 5 a minute | the signed-in user |
 | "Confirm it's you" email | 1 a minute | the signed-in user |
 | OAuth "connect this account?" email | 3 an hour; the visitor's answer doesn't change | the account it's sent to |
+| Registration | 5 accounts an hour (`usarrs.limits.registrations_per_ip`) | IP |
+| Sign-in link (magic link) email | 1 a minute | the address typed (case-folded) |
+| Sign-in link email | 10 an hour (`usarrs.limits.sign_in_links_per_ip`) | IP |
+| Password reset email | 10 an hour (`usarrs.limits.reset_links_per_ip`), plus Laravel's own 1 a minute per account | IP |
+| Verification email resend | 1 a minute; the wait is shown as the status message | the signed-in user |
+
+**Registration and the three mail limits keep usarrs from mailing strangers.** Every
+new account is sent a verification email at the address typed into the form, and the
+sign-in and reset forms each mail the address they're given. Without limits, a script
+could make your mail provider send unlimited mail to addresses that never asked for it,
+which costs you its reputation. Registration counts only a form that passes validation
+(and the [human check](#a-human-check-captcha), if you have one), so typos and refused
+bots don't use up anyone's sign-ups. The sign-in and reset limits count an address with
+no account the same as one with, so a refusal says nothing about who's a member.
+
+**Per-IP limits can catch real people who share an address.** Mobile carriers put many
+customers behind one IP (carrier-grade NAT), and so do offices and universities. Raise
+the `usarrs.limits` values (or their `USARRS_*_PER_IP` env vars) if yours do, or set one
+to `0` to turn it off. Behind a proxy or CDN, configure `TrustProxies`, or every visitor
+shares the proxy's IP and one limit.
 
 The connection-email limit is per account, so anyone with a provider account reporting a
 member's address can use it up and hold back the member's own link for up to an hour.
@@ -346,7 +366,7 @@ Each attempt is counted before the answer is checked, as an atomic increment.
 Checking first and counting only failures would let a burst of parallel
 requests through before any of them was counted. For password login, the
 two-factor challenge and password confirmation, a successful attempt resets the count;
-the two mail limits never reset early.
+registration and the mail limits never reset early.
 
 The challenge limit isn't keyed on IP. Anyone at the challenge already has the
 password, and an IP key would let them switch addresses to get five more guesses.
@@ -371,6 +391,99 @@ block each other. usarrs keys it per user.
 The limits and the used-code record live in your app's cache store. A cache
 that doesn't persist between requests, such as the `array` driver, turns both
 off.
+
+## A human check (captcha)
+
+usarrs can put a human check (Cloudflare Turnstile, hCaptcha, or anything else) in front
+of the forms a script would abuse: **register**, **login** (password and sign-in link) and
+**password reset**. usarrs ships no check and requires no vendor. With nothing bound, the
+forms are exactly as they were.
+
+To add one, implement `Marque\Usarrs\Contracts\Challenge` and bind it:
+
+| Method | |
+|---|---|
+| `protects(string $form): bool` | Whether this form asks. `$form` is `Challenge::REGISTER`, `Challenge::LOGIN` or `Challenge::PASSWORD_RESET`. |
+| `widget(string $form): Htmlable\|string` | The markup shown inside the form, above the submit button. It must write its answer into the form's `[data-usarrs-challenge]` input and dispatch an `input` event on it. |
+| `verify(string $answer, string $form, Request $request): bool` | Whether the answer passes. |
+
+**usarrs refuses a missing or blank answer itself, before `verify()` is called.** So an
+implementation can't be bypassed by a script that leaves the token out. That's an easy
+hole to leave in a hand-rolled validation rule: Laravel skips a rule that isn't implicit
+when its field is absent.
+
+**An answer is used once.** After every submission usarrs clears it and dispatches
+`usarrs-challenge-reset` on `window`, so a single-use token can be replaced before the
+next try. A refused check doesn't count against the [registration limit](#rate-limits).
+
+**If you've published usarrs' views** (`--tag=usarrs-views`), add the check to your copies
+of `auth/register`, `auth/login` and `auth/forgot-password`, inside the form above the
+submit button, as usarrs' own views now do:
+
+```blade
+@include('usarrs::auth.partials.challenge', ['form' => \Marque\Usarrs\Contracts\Challenge::REGISTER])
+{{-- forgot-password is a plain form, not Livewire: --}}
+@include('usarrs::auth.partials.challenge', ['form' => \Marque\Usarrs\Contracts\Challenge::PASSWORD_RESET, 'livewire' => false])
+```
+
+Without it, a copy shows no widget, every answer is blank, and every submission of that
+form is refused.
+
+### Example: Cloudflare Turnstile
+
+```php
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use Marque\Usarrs\Contracts\Challenge;
+
+class TurnstileChallenge implements Challenge
+{
+    public function protects(string $form): bool
+    {
+        return true;
+    }
+
+    public function widget(string $form): string
+    {
+        return view('turnstile', ['form' => $form])->render();
+    }
+
+    public function verify(string $answer, string $form, Request $request): bool
+    {
+        $result = Http::asForm()->timeout(5)->post('https://challenges.cloudflare.com/turnstile/v0/siteverify', [
+            'secret' => config('services.turnstile.secret_key'),
+            'response' => $answer,
+            'remoteip' => $request->ip(),
+        ]);
+
+        return $result->ok() && $result->json('success') === true && $result->json('action') === $form;
+    }
+}
+```
+
+```blade
+{{-- resources/views/turnstile.blade.php --}}
+<div class="cf-turnstile" data-sitekey="{{ config('services.turnstile.site_key') }}"
+     data-action="{{ $form }}" data-callback="usarrsTurnstileDone"></div>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+<script>
+    window.usarrsTurnstileDone ??= function (token) {
+        const input = document.querySelector('[data-usarrs-challenge]');
+        input.value = token;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    window.addEventListener('usarrs-challenge-reset', () => window.turnstile?.reset());
+</script>
+```
+
+```php
+// AppServiceProvider::register()
+$this->app->singleton(\Marque\Usarrs\Contracts\Challenge::class, TurnstileChallenge::class);
+```
+
+Checking `action` stops a token solved on one form being spent on another. If Turnstile
+can't be reached, `verify()` returns false and the form is refused: a check that fails
+open is no check.
 
 ## Passkeys (WebAuthn)
 

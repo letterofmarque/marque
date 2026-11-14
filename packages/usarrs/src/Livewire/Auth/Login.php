@@ -11,13 +11,18 @@ use Illuminate\Support\Str;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Validate;
 use Marque\Usarrs\Auth\LoginCompletion;
+use Marque\Usarrs\Auth\Throttle;
+use Marque\Usarrs\Contracts\Challenge;
 use Marque\Usarrs\Enums\AuthDriver;
 use Marque\Usarrs\Livewire\Component;
+use Marque\Usarrs\Livewire\Concerns\AsksChallenge;
 use Marque\Usarrs\Notifications\MagicLinkNotification;
 
 #[Title('Login')]
 class Login extends Component
 {
+    use AsksChallenge;
+
     #[Validate('required|email')]
     public string $email = '';
 
@@ -45,6 +50,10 @@ class Login extends Component
         }
 
         $this->validate();
+
+        if (! $this->passesChallenge(Challenge::LOGIN)) {
+            return;
+        }
 
         // Laravel's standard: five a minute per email and IP (#10856). Counted
         // before the password is checked, as an atomic increment, so the sixth
@@ -79,6 +88,22 @@ class Login extends Component
     protected function sendMagicLink(): void
     {
         $this->validate(['email' => 'required|email']);
+
+        if (! $this->passesChallenge(Challenge::LOGIN)) {
+            return;
+        }
+
+        // Each send mails the address typed: one a minute per address, and a
+        // cap per IP so a list of addresses can't be walked (Job #366). Both
+        // are counted whether or not the address has an account.
+        $perAddress = Throttle::hit('usarrs.sign-in-link:'.Throttle::address($this->email), 1, 60);
+        $perIp = Throttle::hit('usarrs.sign-in-link-ip:'.request()->ip(), Throttle::perIp('sign_in_links_per_ip', 10), 3600);
+
+        if (($wait = $perAddress ?? $perIp) !== null) {
+            $this->addError('email', $wait);
+
+            return;
+        }
 
         $model = config('trove.user_model', 'App\\Models\\User');
         $user = $model::where('email', $this->email)->first();

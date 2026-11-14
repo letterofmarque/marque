@@ -7,6 +7,48 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+> Sign-up and the sign-in, reset and verification emails are rate-limited, so a script can't create accounts or mail strangers without limit; apps can bind a human check (Turnstile, hCaptcha, anything) on register, login and password reset.
+
+### Security
+
+- **Sign-up and the mail anyone can trigger were unlimited** (Job #366). Every new account
+  is sent a verification email at the address typed. The sign-in link (magic link) form
+  and the password reset form each mail the address they're given, and a member could
+  resend verification as often as they liked. So a script could make the operator's mail
+  provider send unlimited mail to addresses that never asked for it. Now:
+  - registration is limited to 5 accounts an hour per IP;
+  - sign-in links to 1 a minute per address and 10 an hour per IP;
+  - reset links to 10 an hour per IP, on top of Laravel's 1 a minute per account;
+  - verification resends to 1 a minute per member.
+
+  Each limit is counted before the work, as an atomic increment, and counts an address
+  with no account the same as one with. The per-IP limits are configurable under
+  `usarrs.limits` (0 turns one off), because carriers put many real people behind one
+  IP. Nothing documented these as unlimited, and login rate limiting arrived the same way
+  in 8.2.0, so this is a minor.
+
+### Added
+
+- **A human check on register, login and password reset**: `Marque\Usarrs\Contracts\Challenge`.
+  An app binds an implementation (the README has a Turnstile one); usarrs shows its widget
+  in the three forms and asks it on submit. **A missing or blank answer is refused by
+  usarrs before the check is asked**, so leaving the token out can't bypass it. A used
+  answer is cleared and the widget told to reset (`usarrs-challenge-reset`). With nothing
+  bound, nothing changes.
+- `usarrs.limits.registrations_per_ip`, `sign_in_links_per_ip` and `reset_links_per_ip`
+  (defaults 5, 10, 10; env `USARRS_REGISTRATIONS_PER_IP`, `USARRS_SIGN_IN_LINKS_PER_IP`,
+  `USARRS_RESET_LINKS_PER_IP`).
+
+### Changed
+
+- **The `auth/register`, `auth/login` and `auth/forgot-password` views include
+  `usarrs::auth.partials.challenge`.** It renders nothing unless a Challenge is bound, so
+  an app that binds none needs no change to a published copy. An app that binds one must
+  add the include to its published copies, or every submission of that form is refused
+  (see the README).
+
 ## [10.0.0] — 2026-11-11
 
 > Confirming it's you works for every member, whatever the auth driver; connecting an OAuth provider takes it and tells the member; connections can be listed and removed; remember-me is a choice; invites can't be planted.

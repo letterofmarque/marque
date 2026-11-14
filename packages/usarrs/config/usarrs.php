@@ -95,6 +95,25 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Limits
+    |--------------------------------------------------------------------------
+    |
+    | Per-IP limits on sign-up and on the mail a visitor can make usarrs send,
+    | each counted over an hour. A mobile carrier can put many real people
+    | behind one address, so raise these if yours do; 0 turns one off. They
+    | need trusted proxies configured, or every visitor shares one IP. The
+    | per-address and per-member limits are fixed (see the README).
+    |
+    */
+
+    'limits' => [
+        'registrations_per_ip' => env('USARRS_REGISTRATIONS_PER_IP', 5),
+        'sign_in_links_per_ip' => env('USARRS_SIGN_IN_LINKS_PER_IP', 10),
+        'reset_links_per_ip' => env('USARRS_RESET_LINKS_PER_IP', 10),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Profile
     |--------------------------------------------------------------------------
     */

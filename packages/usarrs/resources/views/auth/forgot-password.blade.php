@@ -20,6 +20,8 @@
                 <x-deck::input name="email" type="email" value="{{ old('email') }}" required autofocus />
             </x-deck::field>
 
+            @include('usarrs::auth.partials.challenge', ['form' => \Marque\Usarrs\Contracts\Challenge::PASSWORD_RESET, 'livewire' => false])
+
             <x-deck::button type="submit" variant="primary" class="w-full">
                 {{ __('Send Reset Link') }}
             </x-deck::button>

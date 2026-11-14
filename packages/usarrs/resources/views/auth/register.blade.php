@@ -33,6 +33,8 @@
                 <x-deck::input wire:model="password_confirmation" type="password" required />
             </x-deck::field>
 
+            @include('usarrs::auth.partials.challenge', ['form' => \Marque\Usarrs\Contracts\Challenge::REGISTER])
+
             <x-deck::button type="submit" variant="primary" class="w-full">
                 {{ __('Register') }}
             </x-deck::button>

@@ -9,6 +9,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\View\View;
+use Marque\Usarrs\Auth\ChallengeGate;
+use Marque\Usarrs\Auth\Throttle;
+use Marque\Usarrs\Contracts\Challenge;
 use Marque\Usarrs\Enums\AuthDriver;
 
 class PasswordResetController
@@ -26,6 +29,16 @@ class PasswordResetController
         $this->ensureResetsAllowed();
 
         $request->validate(['email' => 'required|email']);
+
+        if (($refusal = ChallengeGate::refusal(Challenge::PASSWORD_RESET, $request->input('challenge'), $request)) !== null) {
+            return back()->withInput($request->only('email'))->withErrors(['challenge' => $refusal]);
+        }
+
+        // The broker allows one link a minute per account; nothing stopped a
+        // list of addresses being walked from one IP (Job #366).
+        if (($wait = Throttle::hit('usarrs.reset-link-ip:'.$request->ip(), Throttle::perIp('reset_links_per_ip', 10), 3600)) !== null) {
+            return back()->withInput($request->only('email'))->withErrors(['email' => $wait]);
+        }
 
         Password::sendResetLink($request->only('email'));
 

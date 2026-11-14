@@ -9,6 +9,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Marque\Usarrs\Auth\LoginCompletion;
+use Marque\Usarrs\Auth\Throttle;
 
 /**
  * job #10602 Gap 7: Fortify's own /email/verify routes are suppressed
@@ -68,6 +69,12 @@ class EmailVerificationController
 
     public function send(Request $request): RedirectResponse
     {
+        // One a minute per member (Job #366); Laravel's stock route allows six.
+        // Said in the status line, which the published view already shows.
+        if (($wait = Throttle::hit('usarrs.verification-mail:'.$request->user()->getAuthIdentifier(), 1, 60)) !== null) {
+            return back()->with('status', $wait);
+        }
+
         $request->user()->sendEmailVerificationNotification();
 
         return back()->with('status', __('A new verification link has been sent to your email address.'));
