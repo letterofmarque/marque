@@ -7,7 +7,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [Unreleased]
+## [10.1.0] — 2026-11-14
 
 > Sign-up and the sign-in, reset and verification emails are rate-limited, so a script can't create accounts or mail strangers without limit; apps can bind a human check (Turnstile, hCaptcha, anything) on register, login and password reset.
 
