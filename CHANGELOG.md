@@ -10,7 +10,7 @@ changelogs — edit those, not this.*
 
 ## 2026-11-14
 
-- **[usarrs 10.1.0](packages/usarrs/CHANGELOG.md)** — Sign-up and the sign-in, reset and verification emails are rate-limited, so a script can't create accounts or mail strangers without limit; apps can bind a human check (Turnstile, hCaptcha, anything) on register, login and password reset.
+- **[usarrs 10.1.0](packages/usarrs/CHANGELOG.md)** — Sign-up and the sign-in, reset and verification emails are rate-limited, so a script can't create accounts through `/register` or mail strangers without limit; apps can bind a human check (Turnstile, hCaptcha, anything) on register, login and password reset.
 
 ## 2026-11-11
 

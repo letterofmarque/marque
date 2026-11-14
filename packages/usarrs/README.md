@@ -338,7 +338,7 @@ model needs `Laravel\Fortify\TwoFactorAuthenticatable`.
 | Password confirmation | 5 a minute | the signed-in user |
 | "Confirm it's you" email | 1 a minute | the signed-in user |
 | OAuth "connect this account?" email | 3 an hour; the visitor's answer doesn't change | the account it's sent to |
-| Registration | 5 accounts an hour (`usarrs.limits.registrations_per_ip`) | IP |
+| Registration (`/register`) | 5 accounts an hour (`usarrs.limits.registrations_per_ip`); OAuth sign-ups aren't counted | IP |
 | Sign-in link (magic link) email | 1 a minute | the address typed (case-folded) |
 | Sign-in link email | 10 an hour (`usarrs.limits.sign_in_links_per_ip`) | IP |
 | Password reset email | 10 an hour (`usarrs.limits.reset_links_per_ip`), plus Laravel's own 1 a minute per account | IP |
@@ -412,9 +412,12 @@ implementation can't be bypassed by a script that leaves the token out. That's a
 hole to leave in a hand-rolled validation rule: Laravel skips a rule that isn't implicit
 when its field is absent.
 
-**An answer is used once.** After every submission usarrs clears it and dispatches
-`usarrs-challenge-reset` on `window`, so a single-use token can be replaced before the
-next try. A refused check doesn't count against the [registration limit](#rate-limits).
+**An answer is used once.** Once usarrs has asked the check, it clears the answer and,
+on the Livewire forms (register and login), dispatches `usarrs-challenge-reset` on
+`window`, so a single-use token can be replaced before the next try. A submission that
+fails validation isn't asked, so its answer is kept. The forgot-password form is a plain
+form: it reloads with a fresh widget. A refused check doesn't count against the
+[registration limit](#rate-limits).
 
 **If you've published usarrs' views** (`--tag=usarrs-views`), add the check to your copies
 of `auth/register`, `auth/login` and `auth/forgot-password`, inside the form above the

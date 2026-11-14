@@ -9,7 +9,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [10.1.0] — 2026-11-14
 
-> Sign-up and the sign-in, reset and verification emails are rate-limited, so a script can't create accounts or mail strangers without limit; apps can bind a human check (Turnstile, hCaptcha, anything) on register, login and password reset.
+> Sign-up and the sign-in, reset and verification emails are rate-limited, so a script can't create accounts through `/register` or mail strangers without limit; apps can bind a human check (Turnstile, hCaptcha, anything) on register, login and password reset.
 
 ### Security
 
@@ -18,7 +18,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
   and the password reset form each mail the address they're given, and a member could
   resend verification as often as they liked. So a script could make the operator's mail
   provider send unlimited mail to addresses that never asked for it. Now:
-  - registration is limited to 5 accounts an hour per IP;
+  - registration through `/register` is limited to 5 accounts an hour per IP (OAuth
+    sign-ups aren't counted: each needs its own provider account);
   - sign-in links to 1 a minute per address and 10 an hour per IP;
   - reset links to 10 an hour per IP, on top of Laravel's 1 a minute per account;
   - verification resends to 1 a minute per member.

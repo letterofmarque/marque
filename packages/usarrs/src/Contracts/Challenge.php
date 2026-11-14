@@ -35,9 +35,10 @@ interface Challenge
     /**
      * The markup that shows the check inside the form. It must write its
      * answer into the form's `[data-usarrs-challenge]` input and dispatch an
-     * `input` event on it. After each submission usarrs clears the answer and
-     * dispatches `usarrs-challenge-reset` on window, so a single-use token can
-     * be replaced (Turnstile: `turnstile.reset()`).
+     * `input` event on it. Once the check has been asked, usarrs clears the
+     * answer and, on the Livewire forms, dispatches `usarrs-challenge-reset`
+     * on window, so a single-use token can be replaced (Turnstile:
+     * `turnstile.reset()`). The plain forgot-password form reloads instead.
      */
     public function widget(string $form): Htmlable|string;
 
