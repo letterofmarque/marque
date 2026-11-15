@@ -20,6 +20,7 @@ beforeEach(function () {
     // Two first-party panels to sit either side of the stranger's (30, 40).
     config()->set('usarrs.two_factor.enabled', true);
     config()->set('usarrs.invites.enabled', true);
+    config()->set('usarrs.invites.min_role', 'user'); // Member invites (#11179 made staff-only the default).
 });
 
 it('registers the stranger\'s panel alongside usarrs\' own', function () {

@@ -45,7 +45,7 @@ describe('two-factor authentication', function () {
 });
 
 describe('invites', function () {
-    beforeEach(fn () => config()->set('usarrs.invites.enabled', true));
+    beforeEach(fn () => config()->set(['usarrs.invites.enabled' => true, 'usarrs.invites.min_role' => 'user'])); // Member invites (#11179 made staff-only the default).
 
     it('cannot be created once the address is unverified, even from a form opened before', function () {
         // Changing your email un-verifies it (CP #776), so a form can be open
@@ -80,6 +80,7 @@ describe('invite email', function () {
     // revoking and creating again sent as many as anyone liked.
     it('stops sending invite emails past ten an hour for one member', function () {
         config()->set('usarrs.invites.enabled', true);
+        config()->set('usarrs.invites.min_role', 'user'); // Member invites (#11179 made staff-only the default).
         config()->set('usarrs.invites.max_per_user', 100);
         Notification::fake();
         $user = TestUser::factory()->create();

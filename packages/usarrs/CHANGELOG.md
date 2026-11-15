@@ -7,6 +7,42 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+> Only admins and the owner can create invites by default (`invites.min_role`), staff have no allowance limit (`invites.max_per_role`), and one policy decides who sees and uses invite creation.
+
+### Breaking
+
+See [Upgrading from 10.x to 11.0](README.md#upgrading-from-10x-to-110).
+
+- **Only admins and the owner can create invites by default** (#11179). With
+  `invites.enabled` on, every signed-in member could create them; nobody had decided
+  that, and for a private tracker it hands the membership gate to every member. The new
+  `invites.min_role` (env `USARRS_INVITES_MIN_ROLE`, default `admin`) is the lowest role
+  that can. Set it to `user` to keep member invites. A value that isn't a role lets only
+  the owner create invites.
+- **The dashboard's Invites panel view changed** (`usarrs::dashboard.panels.invites`). It
+  says "No limit" for a member whose role has none. An old published copy shows a blank
+  count there.
+
+### Added
+
+- **`invites.max_per_role`**: allowances by role, overriding `max_per_user`, with `null`
+  meaning no limit. Default: admins and the owner unlimited. A member takes the entry for
+  the highest listed role they hold or outrank.
+- `InviteService::allowanceFor()`: a member's allowance, or null for no limit.
+
+### Changed
+
+- **`InvitePolicy::create()` is the one gate**: invites enabled, the role at least
+  `min_role`, and a verified address. It used to check only `invites.enabled`, and nothing
+  asked it. `InviteService::canCreateInvite()` now asks it before the allowance, and the
+  create page (403 for someone it refuses), the create action, the **Create Invite**
+  button and the dashboard panel all follow that. `/invites` stays open, so a demoted
+  member can still see and revoke what they sent.
+- A config published before 11.0 has neither new key (Laravel merges package config only
+  at the top level). usarrs falls back to the shipped defaults: admin, and staff unlimited.
+
 ## [10.1.0] — 2026-11-14
 
 > Sign-up and the sign-in, reset and verification emails are rate-limited, so a script can't create accounts through `/register` or mail strangers without limit; apps can bind a human check (Turnstile, hCaptcha, anything) on register, login and password reset.

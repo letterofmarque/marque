@@ -31,7 +31,12 @@ class InviteCreate extends Component
             abort_unless(Route::has('verification.notice'), 403, __('Verify your email address before creating invites.'));
 
             $this->redirect(route('verification.notice'), navigate: true);
+
+            return;
         }
+
+        // Below invites.min_role, or out of allowance (#11179).
+        abort_unless(app(InviteService::class)->canCreateInvite(auth()->user()), 403);
     }
 
     public function create(InviteService $service): void

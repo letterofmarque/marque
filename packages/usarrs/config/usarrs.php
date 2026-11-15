@@ -89,7 +89,24 @@ return [
     'invites' => [
         'enabled' => env('USARRS_INVITES_ENABLED', false),
         'required' => env('USARRS_INVITES_REQUIRED', false),
+
+        // The lowest role that may create invites: user, uploader, moderator,
+        // admin or owner. Staff only by default; set `user` to let every
+        // member invite. An owner counts as an admin. A value that isn't a
+        // role lets only the owner create invites.
+        'min_role' => env('USARRS_INVITES_MIN_ROLE', 'admin'),
+
+        // Outstanding (pending) invites a member may hold at once.
         'max_per_user' => env('USARRS_MAX_INVITES', 3),
+
+        // Allowances by role, instead of max_per_user; null is no limit. A
+        // member takes the entry for the highest listed role they hold or
+        // outrank; anyone below every listed role gets max_per_user.
+        'max_per_role' => [
+            'admin' => null,
+            'owner' => null,
+        ],
+
         'expiry_days' => env('USARRS_INVITE_EXPIRY', 7),
     ],
 

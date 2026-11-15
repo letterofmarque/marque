@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Notification;
 use Marque\Trove\Contracts\StaffActionsInterface;
+use Marque\Trove\Contracts\UserInterface;
+use Marque\Trove\Enums\Role;
 use Marque\Trove\Support\StaffAction;
 use Marque\Usarrs\Contracts\InviteServiceInterface;
 use Marque\Usarrs\Enums\InviteStatus;
@@ -108,10 +110,42 @@ class InviteService implements InviteServiceInterface
             ->count();
     }
 
+    /**
+     * May $user create an invite now: InvitePolicy::create() allows it, and
+     * they have allowance left. The create page, its action, the button and
+     * the dashboard panel all ask this, so none of them can disagree (#11179).
+     */
     public function canCreateInvite(Authenticatable $user): bool
     {
-        $max = config('usarrs.invites.max_per_user', 3);
+        if (! Gate::forUser($user)->allows('create', Invite::class)) {
+            return false;
+        }
 
-        return $this->countActiveForUser($user) < $max;
+        $allowance = $this->allowanceFor($user);
+
+        return $allowance === null || $this->countActiveForUser($user) < $allowance;
+    }
+
+    /**
+     * How many outstanding invites $user may hold, or null for no limit:
+     * `invites.max_per_role` for the highest listed role they hold or
+     * outrank, else `invites.max_per_user`.
+     */
+    public function allowanceFor(Authenticatable $user): ?int
+    {
+        // The fallback matches the shipped default: a published config keeps
+        // its own `invites` block whole (mergeConfigFrom is top-level only),
+        // so a copy from before 11.0 has no max_per_role at all.
+        $perRole = (array) config('usarrs.invites.max_per_role', ['admin' => null, 'owner' => null]);
+
+        if ($user instanceof UserInterface) {
+            foreach (array_reverse(Role::cases()) as $role) {
+                if (array_key_exists($role->value, $perRole) && $user->hasRoleAtLeast($role)) {
+                    return $perRole[$role->value] === null ? null : (int) $perRole[$role->value];
+                }
+            }
+        }
+
+        return (int) config('usarrs.invites.max_per_user', 3);
     }
 }

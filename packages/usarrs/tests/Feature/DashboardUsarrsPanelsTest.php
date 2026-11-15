@@ -112,6 +112,7 @@ describe('invites panel', function () {
 
     it('shows how many invites the user has left, and links to them', function () {
         config()->set('usarrs.invites.enabled', true);
+        config()->set('usarrs.invites.min_role', 'user'); // Member invites (#11179 made staff-only the default).
         config()->set('usarrs.invites.max_per_user', 3);
         app(InviteServiceInterface::class)->create($this->user);
 

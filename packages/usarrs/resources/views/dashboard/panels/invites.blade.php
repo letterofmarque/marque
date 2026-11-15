@@ -1,5 +1,9 @@
 <div class="flex flex-col gap-3">
-    <x-deck::heading size="lg">{{ __(':available of :max available', ['available' => $available, 'max' => $max]) }}</x-deck::heading>
+    @if ($max === null)
+        <x-deck::heading size="lg">{{ __('No limit') }}</x-deck::heading>
+    @else
+        <x-deck::heading size="lg">{{ __(':available of :max available', ['available' => $available, 'max' => $max]) }}</x-deck::heading>
+    @endif
     <x-deck::text class="text-sm text-zinc-500">{{ __(':pending pending', ['pending' => $pending]) }}</x-deck::text>
 
     <div class="mt-1 flex gap-2">

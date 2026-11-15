@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Marque\Usarrs\Policies;
 
 use Marque\Trove\Contracts\UserInterface;
+use Marque\Trove\Enums\Role;
+use Marque\Usarrs\Auth\VerifiedAddress;
 use Marque\Usarrs\Models\Invite;
 
 class InvitePolicy
@@ -14,9 +16,28 @@ class InvitePolicy
         return true;
     }
 
+    /**
+     * Invites are how a private tracker controls who joins, so by default only
+     * staff mint them (#11179; nobody had decided that any member could). The
+     * floor is `usarrs.invites.min_role`, and an unproven address mints
+     * nothing (#10879). This is the one gate: the create page, its action, the
+     * button and the dashboard panel all ask it, through
+     * InviteService::canCreateInvite().
+     */
     public function create(UserInterface $user): bool
     {
-        return config('usarrs.invites.enabled', false);
+        return config('usarrs.invites.enabled', false)
+            && $user->hasRoleAtLeast(self::minimumRole())
+            && ! VerifiedAddress::missing($user);
+    }
+
+    /**
+     * The configured floor. A value that isn't a role fails closed: only the
+     * owner, rather than guessing what was meant.
+     */
+    public static function minimumRole(): Role
+    {
+        return Role::tryFrom((string) config('usarrs.invites.min_role', 'admin')) ?? Role::Owner;
     }
 
     /**

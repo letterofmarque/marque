@@ -14,6 +14,7 @@ beforeEach(function () {
     $this->user = TestUser::factory()->create();
     $this->service = app(InviteService::class);
     config()->set('usarrs.invites.enabled', true);
+    config()->set('usarrs.invites.min_role', 'user'); // Member invites (#11179 made staff-only the default).
 });
 
 test('can create an invite', function () {

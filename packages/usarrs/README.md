@@ -121,7 +121,7 @@ a time:
 | `password` | Email + password login and registration | — |
 | `magic_link` | Passwordless email-only login. A link is emailed on request; visiting it logs the user in | Password login and password reset; password-based registration still creates an account, but sign-*in* afterwards is link-only |
 | `socialite` | OAuth sign-in, via the providers in `config('usarrs.socialite_providers')` (default `['github']`) — plus passkeys, if you've enabled them (see [Passkeys](#passkeys-webauthn)). Requires `composer require laravel/socialite` | Password login, password registration, password reset and magic links — refused on the server, not just hidden. See [OAuth](#oauth-the-socialite-driver) |
-| `invite_only` | Password login, and registration through an invite | Open sign-up: `GET /register` is a 404 unless it carries a valid, unused, unexpired invite (`/register?invite=CODE`, the link in the invite email). Needs `invites.enabled` so members can create invites |
+| `invite_only` | Password login, and registration through an invite | Open sign-up: `GET /register` is a 404 unless it carries a valid, unused, unexpired invite (`/register?invite=CODE`, the link in the invite email). Needs `invites.enabled` so invites can be created: by staff by default, see [Invites](#invites) |
 
 The OAuth routes are registered only under `socialite`. Magic-link verification and
 password reset are registered under every driver, and answer 404 except under their
@@ -617,10 +617,32 @@ Further owners are made from the user screen.
 'invites' => [
     'enabled' => env('USARRS_INVITES_ENABLED', false),
     'required' => env('USARRS_INVITES_REQUIRED', false),
+    'min_role' => env('USARRS_INVITES_MIN_ROLE', 'admin'),
     'max_per_user' => env('USARRS_MAX_INVITES', 3),
+    'max_per_role' => ['admin' => null, 'owner' => null],
     'expiry_days' => env('USARRS_INVITE_EXPIRY', 7),
 ],
 ```
+
+**Who can create invites: staff only, by default.** Invites are how a private tracker
+controls who joins, so out of the box only admins and the owner can create them.
+`invites.min_role` is the lowest role that can: `user`, `uploader`, `moderator`, `admin` or
+`owner` (an owner counts as an admin). To let every member invite, set
+`USARRS_INVITES_MIN_ROLE=user`. A value that isn't one of those lets only the owner
+create invites, rather than guessing what was meant. A member also needs a verified
+address (see [Email Verification](#email-verification--password-confirmation)).
+
+`InvitePolicy::create()` decides all of this, and everything follows it: the
+`/invites/create` page (403 for anyone it refuses), the create action, the **Create Invite**
+button and the dashboard's Invites panel. `/invites` itself stays open, so a member who
+lost the right (a demotion, say) can still see and revoke what they sent.
+
+**How many:** `invites.max_per_user` is how many outstanding (pending) invites a member
+may hold at once. `invites.max_per_role` overrides it by role, with `null` meaning no
+limit. By default admins and the owner have none. A member takes the entry for the
+highest listed role they hold or outrank, so with only `admin` listed, the owner gets
+admin's. Anyone below every listed role gets `max_per_user`. An invite stops counting
+once it's used, revoked or expired.
 
 Two ways to run an invite-gated tracker:
 
@@ -720,6 +742,22 @@ somewhere else and is refused by the tracker's location limits while its old ses
 still live. The tracker decides what ending costs (bloodhound credits nothing the old
 session moved since its last announce) and refuses to end another member's. With no such
 tracker the route exists and answers 404, and nothing links to it.
+
+## Upgrading from 10.x to 11.0
+
+11.0 changes one default: **who can create invites.** Before, with `invites.enabled` on,
+every signed-in member could, and admins and the owner had the same allowance as everyone
+else. Nobody had decided that. Now:
+
+1. **Only admins and the owner can create invites** (`invites.min_role`, default `admin`).
+   Members who could before will get a 403 on `/invites/create`, and the button and the
+   dashboard panel won't offer it. To keep member invites, set
+   `USARRS_INVITES_MIN_ROLE=user`; for uploaders and above, `uploader`.
+2. **Admins and the owner have no allowance limit** (`invites.max_per_role`). Everyone
+   else still has `invites.max_per_user`. If you published `config/usarrs.php`, add
+   `min_role` and `max_per_role` to your copy's `invites` block, or the defaults apply.
+3. **Published views.** If you published `usarrs::dashboard.panels.invites`, republish it:
+   the new copy says "No limit" for staff, where an old one shows a blank count.
 
 ## Upgrading from 9.x to 10.0
 
