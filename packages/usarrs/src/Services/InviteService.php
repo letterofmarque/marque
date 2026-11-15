@@ -103,10 +103,16 @@ class InviteService implements InviteServiceInterface
             ->paginate($perPage);
     }
 
+    /**
+     * Outstanding invites: pending and not past expires_at. Nothing marks an
+     * invite expired, so an expired one stays pending; it can't be redeemed
+     * (redeem() asks the same thing), and it no longer holds a slot (#11179).
+     */
     public function countActiveForUser(Authenticatable $user): int
     {
         return Invite::where('creator_id', $user->getAuthIdentifier())
             ->where('status', InviteStatus::Pending->value)
+            ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
             ->count();
     }
 

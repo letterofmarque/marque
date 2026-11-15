@@ -11,8 +11,8 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
 ### Changed
 
-- **Requires `marque/usarrs` `^9.0|^10.0|^11.0`.** usarrs 11 makes invite creation
-  staff-only by default (see its changelog); bosun needs nothing new from it, and an app
+- **Requires `marque/usarrs` `^9.0|^10.0|^11.0`.** usarrs 11 lets only admins and the
+  owner create invites by default (see its changelog); bosun needs nothing new from it, and an app
   still on usarrs 9 or 10 keeps resolving.
 
 ## [1.0.2] — 2026-11-11

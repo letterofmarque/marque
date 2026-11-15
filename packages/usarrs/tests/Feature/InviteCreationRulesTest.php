@@ -133,6 +133,21 @@ describe('allowances', function () {
         expect(Invite::where('creator_id', $moderator->id)->count())->toBe(2);
     });
 
+    it('stops counting an invite once it has expired', function () {
+        config()->set('usarrs.invites.min_role', 'user');
+        config()->set('usarrs.invites.max_per_user', 1);
+        $member = memberWithRole('user');
+        $service = app(InviteService::class);
+
+        $service->create($member);
+        expect($service->canCreateInvite($member))->toBeFalse();
+
+        $this->travel(config('usarrs.invites.expiry_days') + 1)->days();
+
+        expect($service->countActiveForUser($member))->toBe(0)
+            ->and($service->canCreateInvite($member))->toBeTrue();
+    });
+
     it('gives a member the entry for the highest listed role they outrank', function () {
         // Only admin listed: the owner outranks it and takes its entry.
         config()->set('usarrs.invites.max_per_role', ['admin' => 4]);
@@ -150,11 +165,15 @@ describe('a config published before 11.0', function () {
         $service = app(InviteService::class);
 
         $admin = memberWithRole('admin');
-        $service->create($admin);
-        $service->create($admin);
+        $owner = memberWithRole('owner');
+        foreach ([$admin, $owner] as $staff) {
+            $service->create($staff);
+            $service->create($staff);
+        }
 
         expect($service->canCreateInvite(memberWithRole('user')))->toBeFalse()
-            ->and($service->canCreateInvite($admin))->toBeTrue();
+            ->and($service->canCreateInvite($admin))->toBeTrue()
+            ->and($service->canCreateInvite($owner))->toBeTrue();
     });
 });
 
@@ -162,7 +181,8 @@ describe('the UI follows the policy', function () {
     it('shows a plain member under the default no Invites panel and no create button', function () {
         $member = memberWithRole('user');
 
-        $this->actingAs($member)->get(route('dashboard.index'))->assertOk()->assertDontSee('Send an invite');
+        $this->actingAs($member)->get(route('dashboard.index'))->assertOk()
+            ->assertDontSee('available')->assertDontSee('Send an invite');
         $this->actingAs($member)->get(route('invites.index'))->assertOk()->assertDontSee('Create Invite');
     });
 

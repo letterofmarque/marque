@@ -18,7 +18,7 @@ class InvitePolicy
 
     /**
      * Invites are how a private tracker controls who joins, so by default only
-     * staff mint them (#11179; nobody had decided that any member could). The
+     * admins and the owner mint them (#11179; nobody had decided that any member could). The
      * floor is `usarrs.invites.min_role`, and an unproven address mints
      * nothing (#10879). This is the one gate: the create page, its action, the
      * button and the dashboard panel all ask it, through

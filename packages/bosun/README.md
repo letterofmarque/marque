@@ -23,7 +23,7 @@ composer require marque/bosun
 php artisan migrate
 ```
 
-bosun requires `marque/trove` ^5.0, `marque/usarrs` ^9.0 and `marque/deck`. Its screens
+bosun requires `marque/trove` ^5.0, `marque/usarrs` ^9.0|^10.0|^11.0 and `marque/deck` ^2.2. Its screens
 register with trove's `AdminScreenRegistry`, so
 [`marque/skipper`](https://github.com/letterofmarque/skipper), the admin panel, lists them
 under **Staff**, visible to admins and the owner. Without skipper, mount

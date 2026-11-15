@@ -9,7 +9,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 
 ## [Unreleased]
 
-> Only admins and the owner can create invites by default (`invites.min_role`), staff have no allowance limit (`invites.max_per_role`), and one policy decides who sees and uses invite creation.
+> Only admins and the owner can create invites by default (`invites.min_role`), admins and the owner have no allowance limit (`invites.max_per_role`), and one policy decides who sees and uses invite creation.
 
 ### Breaking
 
@@ -37,11 +37,11 @@ See [Upgrading from 10.x to 11.0](README.md#upgrading-from-10x-to-110).
 - **`InvitePolicy::create()` is the one gate**: invites enabled, the role at least
   `min_role`, and a verified address. It used to check only `invites.enabled`, and nothing
   asked it. `InviteService::canCreateInvite()` now asks it before the allowance, and the
-  create page (403 for someone it refuses), the create action, the **Create Invite**
+  create page (403 for someone it refuses; an unverified member is sent to verify first), the create action, the **Create Invite**
   button and the dashboard panel all follow that. `/invites` stays open, so a demoted
   member can still see and revoke what they sent.
 - A config published before 11.0 has neither new key (Laravel merges package config only
-  at the top level). usarrs falls back to the shipped defaults: admin, and staff unlimited.
+  at the top level). usarrs falls back to the shipped defaults: admin, and admins and the owner unlimited.
 
 ## [10.1.0] — 2026-11-14
 

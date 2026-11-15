@@ -91,7 +91,7 @@ return [
         'required' => env('USARRS_INVITES_REQUIRED', false),
 
         // The lowest role that may create invites: user, uploader, moderator,
-        // admin or owner. Staff only by default; set `user` to let every
+        // admin or owner. Admins and the owner by default; set `user` to let every
         // member invite. An owner counts as an admin. A value that isn't a
         // role lets only the owner create invites.
         'min_role' => env('USARRS_INVITES_MIN_ROLE', 'admin'),
