@@ -5,6 +5,16 @@ All notable changes to `marque/bosun` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning
 follows the suite's [VERSIONING.md](../../VERSIONING.md).
 
+## [Unreleased]
+
+> Accepts marque/usarrs 11.
+
+### Changed
+
+- **Requires `marque/usarrs` `^9.0|^10.0|^11.0`.** usarrs 11 makes invite creation
+  staff-only by default (see its changelog); bosun needs nothing new from it, and an app
+  still on usarrs 9 or 10 keeps resolving.
+
 ## [1.0.2] — 2026-11-11
 
 > Accepts marque/usarrs 10.
