@@ -7,7 +7,7 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
-## [Unreleased]
+## [11.0.0] — 2026-11-15
 
 > Only admins and the owner can create invites by default (`invites.min_role`), admins and the owner have no allowance limit (`invites.max_per_role`), and one policy decides who sees and uses invite creation.
 
