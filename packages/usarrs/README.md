@@ -585,11 +585,13 @@ little. If you want `socialite` to mean OAuth and nothing else, leave passkeys o
 
 When `false`, usarrs registers **none** of its own auth surface — not
 `routes/auth.php` (login, register, two-factor-challenge, password reset, magic
-link, socialite, logout), not the `Login`/`Register`/2FA/passkey Livewire
-components. Not merely a 404 behind a mount-time check: these routes and component
-tags are never bound in the first place. Fortify's own routes stay suppressed
-regardless. Roles, invites, admin, profile, and announce-key management are
-completely unaffected by this flag in either state.
+link, socialite, logout), not its auth Livewire components (login, register, the
+two-factor challenge and setup, passkeys, confirming it's you, connected accounts, and
+Sign out every other browser). Not merely a 404 behind a mount-time check: these routes
+and component tags are never bound in the first place. Fortify's own routes stay
+suppressed regardless. Roles, invites, admin and announce-key management are unaffected.
+The profile page stays, without the parts that depend on usarrs' auth: connected
+accounts, and Sign out every other browser.
 
 This exists for a power-user building a fully custom login/register/2FA/passkey
 implementation and needing usarrs to get out of the way entirely. **It's a one-way

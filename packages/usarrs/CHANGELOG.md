@@ -14,9 +14,10 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 ### Added
 
 - **Sign out every other browser** (#11154), on `/profile`, behind a step-up. Nothing let
-  a member end their other sessions: Laravel's `logoutOtherDevices()` runs only on a
-  password change, so a magic-link or OAuth member never could, and a thief's session
-  lived until it idled out. Now:
+  a member end their other sessions except changing their password: Laravel's
+  `logoutOtherDevices()` runs only on a password change, so a magic-link or OAuth member
+  could do it only by setting a password they may never have wanted, and a thief's
+  session otherwise lived until it idled out. Now:
   - every sign-in stamps the session with the member's `session_epoch`;
   - the button moves it on, and middleware on the `web` group ends any session whose
     stamp no longer matches, on its next request (an open Livewire tab included);
