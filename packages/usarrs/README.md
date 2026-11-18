@@ -310,12 +310,48 @@ unverified member who has nothing else to confirm with is pointed to verify firs
 one, and the link lands in the owner's real inbox. The page it opens names the browser that
 asked, and says not to approve if that wasn't them.
 
-**There's no "sign out my other sessions" yet** (#11154). A member who gets a confirmation
-link or connection notice they didn't ask for should tell staff. Setting or changing the
-password on `/profile/edit` (any driver, after a step-up) signs out every other session.
-
 Both are part of the auth surface [manage_auth](#manage_auth-escape-hatch) governs —
 absent entirely when `manage_auth=false`, same as login/register/2FA/passkey.
+
+### Signing out every other browser
+
+`/profile` has **Sign out every other browser**, under every auth driver. It takes a
+step-up, as removing a connection does, so a stolen session can't sign the owner out.
+**The password doesn't change.** Laravel's own `logoutOtherDevices()` works by re-hashing
+the password the member types in, so it needs one. A member who signs in by magic link,
+OAuth or passkey may never have set one.
+The confirmation mail and the connection notice point members here when something wasn't
+them.
+
+How it works:
+- Each member has a `session_epoch` (a `users` column, from usarrs' migrations), and every
+  sign-in stamps the session with it.
+- Signing out every other browser moves the epoch on and restamps the session that did
+  it.
+- Middleware on the `web` group ends any session whose stamp no longer matches, on its
+  next request to any page. An open Livewire tab is refused too. The session is ended the
+  way Laravel's `auth.session` ends one: flushed, and the visitor sent to sign in.
+- **Remember-me cookies on other devices stop working**: the remember token is replaced.
+  The member's own cookie on this device is re-issued with the new one.
+
+A session with no stamp (one from before this existed) counts as current until the
+member first uses the button, and is ended after that.
+
+**API tokens aren't touched.** usarrs doesn't know your token system. It fires
+`Marque\Usarrs\Events\OtherSessionsEnded` (with `$user`), so an app that issues Passport or
+Sanctum tokens can listen and revoke them:
+
+```php
+Event::listen(OtherSessionsEnded::class, fn ($e) => $e->user->tokens()->delete());
+```
+
+Setting or changing the password on `/profile/edit` (any driver, after a step-up) still
+signs out every other session too.
+
+With `manage_auth=false` the button isn't on the profile, because the confirm-it's-you
+page it sends members to is part of usarrs' auth. Your own UI can call
+`Marque\Usarrs\Auth\SessionEpoch::endOthers($user)` after its own confirmation. The
+middleware and the sign-in stamp run either way.
 
 ## Two-Factor Authentication
 

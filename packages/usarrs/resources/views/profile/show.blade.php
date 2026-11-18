@@ -46,6 +46,11 @@
         <livewire:usarrs-connected-accounts />
     @endif
 
+    {{-- Every driver: it never touches the password (#11154). --}}
+    @if ($showsOtherSessions ?? false)
+        <livewire:usarrs-profile-other-sessions />
+    @endif
+
     <div class="flex gap-2">
         <x-deck::button variant="primary" :href="route('profile.edit')" wire:navigate>
             {{ __('Edit Profile') }}

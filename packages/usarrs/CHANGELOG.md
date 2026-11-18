@@ -7,6 +7,38 @@ follows the suite's [VERSIONING.md](../../VERSIONING.md). This changelog starts
 2026-08-26 — earlier releases aren't backfilled; see `git log` or
 [docs/upgrading.md](../../docs/upgrading.md) for the story up to this point.
 
+## [Unreleased]
+
+> Members can sign out every other browser from their profile, under every auth driver, without their password changing; their other remember-me cookies stop working, and an event lets the app revoke API tokens.
+
+### Added
+
+- **Sign out every other browser** (#11154), on `/profile`, behind a step-up. Nothing let
+  a member end their other sessions: Laravel's `logoutOtherDevices()` runs only on a
+  password change, so a magic-link or OAuth member never could, and a thief's session
+  lived until it idled out. Now:
+  - every sign-in stamps the session with the member's `session_epoch`;
+  - the button moves it on, and middleware on the `web` group ends any session whose
+    stamp no longer matches, on its next request (an open Livewire tab included);
+  - the remember token is replaced, so another device's remember-me cookie can't sign it
+    back in. This device's cookie is re-issued.
+
+  The password is never touched.
+- **`Marque\Usarrs\Events\OtherSessionsEnded`**, fired after, so an app can revoke the
+  member's API tokens. usarrs doesn't know your token system.
+- `Marque\Usarrs\Auth\SessionEpoch::endOthers($user)`, for an app with `manage_auth` off
+  to call from its own UI.
+- **A migration**: `users.session_epoch`, an unsigned integer defaulting to 0. Run
+  `php artisan migrate`.
+
+### Changed
+
+- **The confirmation mail and the connection notice** point the member to the new button
+  on their profile when something wasn't them, as well as telling the site's staff.
+- **`usarrs::profile.show`** includes the new `usarrs-profile-other-sessions` component.
+  A published copy doesn't show the button until you add
+  `<livewire:usarrs-profile-other-sessions />` (shown only when usarrs manages auth).
+
 ## [11.0.0] — 2026-11-15
 
 > Only admins and the owner can create invites by default (`invites.min_role`), admins and the owner have no allowance limit (`invites.max_per_role`), and one policy decides who sees and uses invite creation.

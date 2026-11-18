@@ -33,13 +33,16 @@ use Marque\Trove\Registry\DashboardPanel;
 use Marque\Trove\Registry\DashboardPanelRegistry;
 use Marque\Trove\Registry\NavItem;
 use Marque\Trove\Registry\NavRegistry;
+use Marque\Usarrs\Auth\SessionEpoch;
 use Marque\Usarrs\Auth\SocialiteOAuthProvider;
 use Marque\Usarrs\Console\OwnerCommand;
 use Marque\Usarrs\Contracts\InviteServiceInterface;
 use Marque\Usarrs\Contracts\OAuthProvider;
 use Marque\Usarrs\Enums\UserStatus;
+use Marque\Usarrs\Http\Middleware\EndRevokedSessions;
 use Marque\Usarrs\Http\Middleware\EnsureUserIsActive;
 use Marque\Usarrs\Listeners\RefuseInactiveLogin;
+use Marque\Usarrs\Listeners\StampSessionEpoch;
 use Marque\Usarrs\Listeners\StampSessionPasswordHash;
 use Marque\Usarrs\Livewire\Admin\SeedboxIndex;
 use Marque\Usarrs\Livewire\Admin\UserIndex;
@@ -60,6 +63,7 @@ use Marque\Usarrs\Livewire\Invite\InviteIndex;
 use Marque\Usarrs\Livewire\Profile\AnnounceKeyManagement;
 use Marque\Usarrs\Livewire\Profile\ConnectedAccounts;
 use Marque\Usarrs\Livewire\Profile\Edit;
+use Marque\Usarrs\Livewire\Profile\OtherSessions;
 use Marque\Usarrs\Livewire\Profile\PasskeyManagement;
 use Marque\Usarrs\Livewire\Profile\SeedboxManagement;
 use Marque\Usarrs\Livewire\Profile\SessionManagement;
@@ -139,6 +143,26 @@ class UsarrsServiceProvider extends ServiceProvider
         $kernel->addToMiddlewarePriorityAfter(AuthenticatesRequests::class, EnsureUserIsActive::class);
     }
 
+    /**
+     * Run EndRevokedSessions on every web request, after the session has
+     * started. Through the kernel, for the reason enforceActiveUsers gives.
+     * Sessions only, so not the api group.
+     */
+    private function endRevokedSessions(): void
+    {
+        $kernel = $this->app->make(HttpKernel::class);
+
+        if (! $kernel instanceof FoundationHttpKernel) {
+            $this->app['router']->pushMiddlewareToGroup('web', EndRevokedSessions::class);
+
+            return;
+        }
+
+        if (array_key_exists('web', $kernel->getMiddlewareGroups())) {
+            $kernel->appendMiddlewareToGroup('web', EndRevokedSessions::class);
+        }
+    }
+
     public function boot(): void
     {
         // Every sign-in records the password hash it signed in under, so
@@ -149,6 +173,13 @@ class UsarrsServiceProvider extends ServiceProvider
         // ends on its next request to any web page, not just usarrs' (#10857).
         Event::listen(LoginEvent::class, RefuseInactiveLogin::class);
         $this->enforceActiveUsers();
+
+        // "Sign out every other browser" (#11154): each sign-in is stamped
+        // with the member's session epoch, and a session whose stamp no
+        // longer matches ends on its next web request, Livewire's included.
+        Event::listen(LoginEvent::class, StampSessionEpoch::class);
+        SessionEpoch::registerGuardMacro();
+        $this->endRevokedSessions();
 
         if (config('usarrs.passkeys.enabled', false)) {
             $this->configurePasskeys();
@@ -509,6 +540,7 @@ class UsarrsServiceProvider extends ServiceProvider
         Livewire::component('usarrs-two-factor-setup', TwoFactorSetup::class);
         Livewire::component('usarrs-passkey-management', PasskeyManagement::class);
         Livewire::component('usarrs-connected-accounts', ConnectedAccounts::class);
+        Livewire::component('usarrs-profile-other-sessions', OtherSessions::class);
         Livewire::component('usarrs-password-confirm', PasswordConfirm::class);
         Livewire::component('usarrs-confirm-oauth-link', ConfirmOAuthLink::class);
         Livewire::component('usarrs-confirm-by-email', ConfirmByEmail::class);

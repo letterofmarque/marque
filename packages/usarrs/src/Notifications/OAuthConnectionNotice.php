@@ -48,6 +48,6 @@ class OAuthConnectionNotice extends Notification implements ShouldQueue
 
         return $message
             ->action(__('Review your connected accounts'), route('profile.show'))
-            ->line(__('If this wasn\'t you, someone may be signed in as you. Remove anything you don\'t recognise from your profile, and tell the site\'s staff.'));
+            ->line(__('If this wasn\'t you, someone may be signed in as you. On your profile (:url), sign out every other browser and remove anything you don\'t recognise, and tell the site\'s staff.', ['url' => route('profile.show')]));
     }
 }
