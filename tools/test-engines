@@ -7,6 +7,7 @@
 #   tools/test-engines sqlite pgsql       # a subset
 #   tools/test-engines --packages trove,skipper mysql
 #   tools/test-engines --workers 1        # force serial (debugging)
+#   tools/test-engines --php 8.6 sqlite   # under another PHP (php8.6 on PATH)
 #
 # Engines run one at a time; packages run in parallel WITHIN an engine.
 #
@@ -191,18 +192,30 @@ PKG_TIMEOUT="${PKG_TIMEOUT:-900}"
 # database server each engine has.
 WORKERS="${WORKERS:-4}"
 
+# Which PHP runs pest. Default: whatever `php` is. --php 8.6 runs php8.6, as
+# installed side by side from the ondrej/php PPA, so a PHP the CI matrix
+# covers can be checked here too without switching the system default.
+PHP_BIN="${PHP_BIN:-php}"
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --packages) PACKAGES="$2"; shift 2 ;;
         --packages=*) PACKAGES="${1#*=}"; shift ;;
         --workers) WORKERS="$2"; shift 2 ;;
         --workers=*) WORKERS="${1#*=}"; shift ;;
-        -h|--help) sed -n '2,10p' "$0" | sed 's/^# \?//'; exit 0 ;;
+        --php) PHP_BIN="php$2"; shift 2 ;;
+        --php=*) PHP_BIN="php${1#*=}"; shift ;;
+        -h|--help) sed -n '2,11p' "$0" | sed 's/^# \?//'; exit 0 ;;
         *) ENGINES+=("$1"); shift ;;
     esac
 done
 
 ENGINES=("${ENGINES[@]:-${ALL_ENGINES[@]}}")
+
+if ! command -v "$PHP_BIN" > /dev/null; then
+    echo "$PHP_BIN isn't installed (looked on PATH)" >&2
+    exit 2
+fi
 
 if [[ ! "$WORKERS" =~ ^[0-9]+$ ]] || [[ "$WORKERS" -lt 1 ]]; then
     echo "--workers must be a positive integer, got: $WORKERS" >&2
@@ -418,7 +431,7 @@ run_package() {
     # run mid-migration, which BOTH reports a fake failure AND leaves the
     # database dirty for the next package — the two together produced three
     # wrong diagnoses before this was tracked down.
-    ( cd "$ROOT/packages/$pkg" && timeout "$PKG_TIMEOUT" env $(engine_env "$engine" "$db") ./vendor/bin/pest 2>&1 ) > "$out" 2>&1
+    ( cd "$ROOT/packages/$pkg" && timeout "$PKG_TIMEOUT" env $(engine_env "$engine" "$db") "$PHP_BIN" ./vendor/bin/pest 2>&1 ) > "$out" 2>&1
     rc=$?
 
     elapsed=$(( $(date +%s) - start ))
@@ -448,7 +461,7 @@ PY
         reset_db "$engine" "$db" >/dev/null 2>&1
         {
             echo "pest exited $rc with no result line; run again without PAO (PAO_DISABLE=1) to show why:"
-            ( cd "$ROOT/packages/$pkg" && timeout "$PKG_TIMEOUT" env $(engine_env "$engine" "$db") PAO_DISABLE=1 ./vendor/bin/pest --colors=never 2>&1 ) \
+            ( cd "$ROOT/packages/$pkg" && timeout "$PKG_TIMEOUT" env $(engine_env "$engine" "$db") PAO_DISABLE=1 "$PHP_BIN" ./vendor/bin/pest --colors=never 2>&1 ) \
                 | grep -vE '^\s*$|✓|^\s*PASS\b' | head -25
         } > "$out" 2>&1
         result=crashed
@@ -477,7 +490,7 @@ for engine in "${ENGINES[@]}"; do
     pool=$WORKERS
     [[ ${#PKG_LIST[@]} -lt $pool ]] && pool=${#PKG_LIST[@]}
 
-    printf '\n\033[1m=== %s ===\033[0m (%d workers)\n' "$engine" "$pool"
+    printf '\n\033[1m=== %s ===\033[0m (%d workers, %s)\n' "$engine" "$pool" "$("$PHP_BIN" -r 'echo "PHP ", PHP_VERSION;')"
     engine_start=$(date +%s)
 
     QUEUE="$RESULTS/queue-$engine"

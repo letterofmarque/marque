@@ -1,6 +1,6 @@
-# The full matrix: every package, every engine, both ends of every declared
-# dependency range. 66 jobs, which is why it runs once a night rather than on
-# every push.
+# The full matrix: every package, every engine, every supported PHP, both ends
+# of every declared dependency range. Too many jobs for every push, so once a
+# night.
 #
 # The axis that only exists here is --prefer-lowest, and for a *package* it is
 # arguably the most valuable one in the whole file. Every package declares
@@ -24,14 +24,26 @@ on:
   workflow_dispatch:
 
 jobs:
-  full-matrix:
-    name: Full
+  # Every engine on 8.5, what production runs, at both ends of the dependency
+  # ranges.
+  engines:
+    name: Engines
     uses: ./.github/workflows/test-run.yml
     with:
       databases: '["sqlite", "mysql", "mariadb", "pgsql"]'
       dependency-versions: '["highest", "lowest"]'
-      # Both ends of the declared `php: ^8.3` range. 8.3 is the floor a
-      # consumer is entitled to run on, and Laravel 13's own floor; 8.4 is what
-      # development happens on. Testing only the top of a declared range is the
-      # same mistake --prefer-lowest exists to catch on the composer side.
-      php-versions: '["8.3", "8.4"]'
+      php-versions: '["8.5"]'
+
+  # The rest of the declared `php: ^8.3` range, on SQLite (a PHP difference
+  # doesn't care which engine is behind it). 8.3 is the floor a consumer is
+  # entitled to run on, and Laravel 13's own; 8.6 is the newest. Testing only
+  # one end of a declared range is the same mistake --prefer-lowest exists to
+  # catch on the composer side, and lowest dependencies on the newest PHP is
+  # where an old package that can't run on it shows up.
+  php-range:
+    name: PHP range
+    uses: ./.github/workflows/test-run.yml
+    with:
+      databases: '["sqlite"]'
+      dependency-versions: '["highest", "lowest"]'
+      php-versions: '["8.3", "8.4", "8.6"]'

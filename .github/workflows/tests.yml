@@ -46,7 +46,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.4'
+          php-version: '8.5'
           coverage: none
 
       - name: Install dependencies
@@ -97,7 +97,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.4'
+          php-version: '8.5'
           coverage: none
 
       - name: Install root dependencies (phpstan + larastan)
@@ -113,18 +113,22 @@ jobs:
         working-directory: packages/${{ matrix.package }}
         run: ../../vendor/bin/phpstan analyse --no-progress
 
-  # Both ends of the declared `php: ^8.3` range, on SQLite. The PHP axis and
-  # the database axis are independent — a syntax or stdlib difference does not
-  # care which engine is behind it — so they are split across tiers rather than
-  # multiplied together. Crossing them here would be 88 jobs a push to catch
-  # what 22 already catches.
+  # The PHP axis and the database axis are independent — a syntax or stdlib
+  # difference does not care which engine is behind it — so they are split
+  # rather than multiplied: the engines run on one PHP, and the rest of the
+  # declared `php: ^8.3` range runs on SQLite.
+  #
+  # The engines run on 8.5: what the production consumer runs. Every other supported PHP, 8.3 (the floor, Laravel 13's)
+  # through 8.6 (the newest), runs on SQLite on every push, not only on pull
+  # requests: work here lands on main directly, so a PR-only axis never ran
+  # (2026-11-23).
   pull-request:
     name: SQLite
     if: github.event_name == 'pull_request'
     uses: ./.github/workflows/test-run.yml
     with:
       databases: '["sqlite"]'
-      php-versions: '["8.3", "8.4"]'
+      php-versions: '["8.3", "8.4", "8.5", "8.6"]'
 
   main:
     name: Cross-engine
@@ -132,4 +136,12 @@ jobs:
     uses: ./.github/workflows/test-run.yml
     with:
       databases: '["sqlite", "mysql", "mariadb", "pgsql"]'
-      php-versions: '["8.4"]'
+      php-versions: '["8.5"]'
+
+  main-php:
+    name: PHP range
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/test-run.yml
+    with:
+      databases: '["sqlite"]'
+      php-versions: '["8.3", "8.4", "8.6"]'

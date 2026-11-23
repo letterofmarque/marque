@@ -173,8 +173,9 @@ platform error rather than an obvious constraint conflict.
 
 ### How these stay honest
 
-The nightly CI matrix runs every package against both ends of every declared range: PHP 8.3
-and 8.4, `--prefer-lowest` and highest, on SQLite, MySQL, MariaDB and PostgreSQL. A
+The nightly CI matrix runs every package against both ends of every declared range:
+`--prefer-lowest` and highest, on SQLite, MySQL, MariaDB and PostgreSQL under PHP 8.5, and
+on SQLite under every other PHP the `^8.3` range covers (8.3, 8.4 and 8.6). A
 constraint that claims more than it delivers fails there rather than in a consumer's
 `composer update`.
 
