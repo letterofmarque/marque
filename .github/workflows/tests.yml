@@ -129,6 +129,7 @@ jobs:
     with:
       databases: '["sqlite"]'
       php-versions: '["8.3", "8.4", "8.5", "8.6"]'
+      dev-tools-ahead: '["8.6"]'
 
   main:
     name: Cross-engine
@@ -145,3 +146,4 @@ jobs:
     with:
       databases: '["sqlite"]'
       php-versions: '["8.3", "8.4", "8.6"]'
+      dev-tools-ahead: '["8.6"]'

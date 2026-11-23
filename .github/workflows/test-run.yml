@@ -22,6 +22,15 @@ on:
         required: false
         type: string
         default: '["8.5"]'
+      dev-tools-ahead:
+        description: >-
+          JSON array of PHP versions newer than the test tooling allows yet.
+          There, dev dependencies install ignoring only their PHP upper bound,
+          and a separate step proves the runtime dependencies resolve with
+          nothing ignored.
+        required: false
+        type: string
+        default: '[]'
 
 jobs:
   test:
@@ -33,19 +42,6 @@ jobs:
         php: ${{ fromJSON(inputs.php-versions) }}
         database: ${{ fromJSON(inputs.databases) }}
         dependencies: ${{ fromJSON(inputs.dependency-versions) }}
-        # Ports are carried alongside the engine rather than derived from it in
-        # an expression: a chain of ternaries that silently hands MariaDB the
-        # Postgres port fails as a connection error, which reads like a broken
-        # service rather than a wrong string. sqlite's value is never used.
-        include:
-          - database: sqlite
-            port: 0
-          - database: mysql
-            port: 3306
-          - database: mariadb
-            port: 3307
-          - database: pgsql
-            port: 5432
         package:
           - threepio
           - trove
@@ -164,7 +160,19 @@ jobs:
         with:
           working-directory: packages/${{ matrix.package }}
           dependency-versions: ${{ matrix.dependencies }}
-          composer-options: '--prefer-dist'
+          # On a PHP newer than the test tooling allows (PHP 8.6 on 2026-11-23:
+          # Pest 4 needs a paratest capped at ~8.5), ignore only PHP *upper*
+          # bounds, so the real suite runs there. The step below keeps that
+          # from hiding a runtime dependency a consumer couldn't install.
+          composer-options: ${{ contains(fromJSON(inputs.dev-tools-ahead), matrix.php) && '--prefer-dist --ignore-platform-req=php+' || '--prefer-dist' }}
+
+      - name: Runtime dependencies resolve on PHP ${{ matrix.php }}, nothing ignored
+        if: contains(fromJSON(inputs.dev-tools-ahead), matrix.php)
+        working-directory: packages/${{ matrix.package }}
+        run: |
+          php -r '$c = json_decode(file_get_contents("composer.json"), true); unset($c["require-dev"]); file_put_contents("composer.runtime.json", json_encode($c));'
+          COMPOSER=composer.runtime.json composer update --no-dev --dry-run --no-interaction ${{ matrix.dependencies == 'lowest' && '--prefer-lowest --prefer-stable' || '' }}
+          rm -f composer.runtime.json
 
       - name: Run tests
         working-directory: packages/${{ matrix.package }}
@@ -173,7 +181,13 @@ jobs:
           # match the defaults there, so only DB_CONNECTION and the port need
           # setting; sqlite ignores all of it and runs in memory.
           DB_CONNECTION: ${{ matrix.database }}
-          DB_PORT: ${{ matrix.port }}
+          # A lookup by engine, not a chain of ternaries: a ternary chain that
+          # silently hands MariaDB the Postgres port fails as a connection error,
+          # which reads like a broken service rather than a wrong string. Not a
+          # matrix `include` either: an include whose engine isn't in this
+          # run's databases adds a job of its own, and the SQLite-only runs
+          # grew three empty "(mysql, PHP , )" jobs that way (2026-11-23).
+          DB_PORT: ${{ fromJSON('{"sqlite":0,"mysql":3306,"mariadb":3307,"pgsql":5432}')[matrix.database] }}
           DB_DATABASE: marque_test
           DB_USERNAME: marque
           DB_PASSWORD: marque
