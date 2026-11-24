@@ -135,6 +135,19 @@ the reasoning matters if you are planning an upgrade.
 **Lowering a floor is a MINOR. Raising one is a MAJOR.** That asymmetry is the thing to
 plan around: a floor is easy to give away and expensive to take back.
 
+### Which PHP versions are supported
+
+**Supported: PHP 8.3, 8.4 and 8.5.** Every release is tested on each of them before it's
+tagged. MySQL, MariaDB and PostgreSQL are tested on 8.5, and SQLite on all three.
+
+**A newer PHP should work, but isn't supported until it's added.** `php: ^8.3` deliberately
+has no upper bound, so Composer won't stop you installing on PHP 8.6. We run the suite
+on it nightly as an early warning, but it's not a release gate, and a problem that only
+shows there doesn't block a release. You're on your own there until it joins the supported
+range. A new PHP version comes out every November, and the supported range is reviewed
+once a year, around August or September, when we move to the next Laravel major. By then
+the new version has been out for most of a year.
+
 ### Why the PHP floor is 8.3, and what it costs
 
 Marque required PHP 8.4 from [3.0](docs/releases/3.0.md) until
@@ -175,7 +188,8 @@ platform error rather than an obvious constraint conflict.
 
 The nightly CI matrix runs every package against both ends of every declared range:
 `--prefer-lowest` and highest, on SQLite, MySQL, MariaDB and PostgreSQL under PHP 8.5, and
-on SQLite under every other PHP the `^8.3` range covers (8.3, 8.4 and 8.6). A
+on SQLite under the other supported PHPs (8.3 and 8.4). PHP 8.6 runs too, as an early
+warning that isn't a gate. A
 constraint that claims more than it delivers fails there rather than in a consumer's
 `composer update`.
 

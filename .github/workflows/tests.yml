@@ -118,18 +118,22 @@ jobs:
   # rather than multiplied: the engines run on one PHP, and the rest of the
   # declared `php: ^8.3` range runs on SQLite.
   #
-  # The engines run on 8.5: what the production consumer runs. Every other supported PHP, 8.3 (the floor, Laravel 13's)
-  # through 8.6 (the newest), runs on SQLite on every push, not only on pull
-  # requests: work here lands on main directly, so a PR-only axis never ran
-  # (2026-11-23).
+  # The engines run on 8.5: what the production consumer runs. The other
+  # supported PHPs, 8.3 (the floor, Laravel 13's) and 8.4, run on SQLite on
+  # every push, not only on pull requests: work here lands on main directly,
+  # so a PR-only axis never ran (2026-11-23).
+  #
+  # Supported means 8.3 to 8.5 (VERSIONING.md). A newer PHP (8.6 since
+  # 2026-11-19) should work and isn't blocked by composer.json, but isn't
+  # supported until the yearly review adds it, so it isn't in this gate:
+  # the nightly runs it as an early warning.
   pull-request:
     name: SQLite
     if: github.event_name == 'pull_request'
     uses: ./.github/workflows/test-run.yml
     with:
       databases: '["sqlite"]'
-      php-versions: '["8.3", "8.4", "8.5", "8.6"]'
-      dev-tools-ahead: '["8.6"]'
+      php-versions: '["8.3", "8.4", "8.5"]'
 
   main:
     name: Cross-engine
@@ -145,5 +149,4 @@ jobs:
     uses: ./.github/workflows/test-run.yml
     with:
       databases: '["sqlite"]'
-      php-versions: '["8.3", "8.4", "8.6"]'
-      dev-tools-ahead: '["8.6"]'
+      php-versions: '["8.3", "8.4"]'

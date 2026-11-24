@@ -34,17 +34,29 @@ jobs:
       dependency-versions: '["highest", "lowest"]'
       php-versions: '["8.5"]'
 
-  # The rest of the declared `php: ^8.3` range, on SQLite (a PHP difference
-  # doesn't care which engine is behind it). 8.3 is the floor a consumer is
-  # entitled to run on, and Laravel 13's own; 8.6 is the newest. Testing only
-  # one end of a declared range is the same mistake --prefer-lowest exists to
-  # catch on the composer side, and lowest dependencies on the newest PHP is
-  # where an old package that can't run on it shows up.
+  # The other supported PHPs, on SQLite (a PHP difference doesn't care which
+  # engine is behind it). 8.3 is the floor a consumer is entitled to run on,
+  # and Laravel 13's own. Testing only one end of a declared range is the
+  # same mistake --prefer-lowest exists to catch on the composer side.
   php-range:
     name: PHP range
     uses: ./.github/workflows/test-run.yml
     with:
       databases: '["sqlite"]'
       dependency-versions: '["highest", "lowest"]'
-      php-versions: '["8.3", "8.4", "8.6"]'
+      php-versions: '["8.3", "8.4"]'
+
+  # A PHP newer than the supported range: it "should work", and isn't
+  # blocked by composer.json, but isn't supported until the yearly review
+  # (Aug/Sep, with the Laravel bump) adds it. Run here as an early warning,
+  # so that review starts from what's known rather than a surprise. The test
+  # tooling doesn't allow 8.6 yet (Pest 4's paratest caps PHP at ~8.5), hence
+  # dev-tools-ahead; see test-run.yml.
+  php-ahead:
+    name: PHP ahead (unsupported, early warning)
+    uses: ./.github/workflows/test-run.yml
+    with:
+      databases: '["sqlite"]'
+      dependency-versions: '["highest", "lowest"]'
+      php-versions: '["8.6"]'
       dev-tools-ahead: '["8.6"]'

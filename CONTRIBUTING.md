@@ -124,7 +124,7 @@ Those are generated mirrors — issues and pull requests are turned off on all o
 
 ### Prerequisites
 
-- PHP 8.3+ (CI tests 8.3 through 8.6; the real databases run on 8.5)
+- PHP 8.3+ (8.3 to 8.5 are supported and tested; the real databases run on 8.5)
 - Composer
 - Redis (for the bloodhound, hound and threepio tests)
 - Optionally MySQL, MariaDB and/or PostgreSQL — see [Testing](#testing)
